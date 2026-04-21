@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "E:\KALYANI CALDIM PROJECTS\QuickTIMS\backend\time_tracking\views.py", line 184, in get
+    res = self._handle_get(request)
+  File "E:\KALYANI CALDIM PROJECTS\QuickTIMS\backend\time_tracking\views.py", line 270, in _handle_get
+    weekly_hours[(y, w)] += hours
+TypeError: unsupported operand type(s) for +=: 'float' and 'dict'

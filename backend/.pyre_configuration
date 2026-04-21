@@ -1,0 +1,5 @@
+{
+  "source_directories": ["."],
+  "search_path": [".venv/Lib/site-packages"],
+  "exclude": [".venv"]
+}
