@@ -11,7 +11,7 @@ const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       {googleClientId ? (
         <GoogleOAuthProvider clientId={googleClientId}>
           <AuthProvider>

@@ -52,8 +52,11 @@ class CompanyMiddleware(MiddlewareMixin):
         if company:
             request.company = company
             request.tenant = company
-            connection.set_tenant(company)
-            print(f"DEBUG: CompanyMiddleware - Schema set to: {company.schema_name}")
+            if hasattr(connection, 'set_tenant'):
+                connection.set_tenant(company)
+                print(f"DEBUG: CompanyMiddleware - Schema set to: {company.schema_name}")
+            else:
+                print(f"DEBUG: CompanyMiddleware - set_tenant not supported on this backend.")
         else:
             print(f"DEBUG: CompanyMiddleware - No tenant resolved for: {request.path}")
 

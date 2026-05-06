@@ -11,6 +11,10 @@ from django.db import connection
 
 from .serializers import UserSerializer
 from employees.utils import generate_next_employee_id
+import uuid
+import traceback
+from django.db import transaction
+from companies.models import Company
 
 
 
@@ -144,10 +148,7 @@ class RegisterView(APIView):
             # All shared-schema writes in one transaction (Company, Domain, User)
             with transaction.atomic():
                 # 1. Create Company (triggers tenant schema creation + migrations)
-                from companies.models import Company
                 from django.utils.text import slugify
-
-                base_slug = slugify(organization_name) or f"org-{uuid.uuid4().hex[:8]}"
                 existing_company = Company.objects.filter(company_name=organization_name).first()
                 if existing_company and existing_company.users.count() == 0:
                     company = existing_company
@@ -177,7 +178,9 @@ class RegisterView(APIView):
                 user.save()
 
             # 3. Create Employee in tenant schema (must be outside public transaction)
-            connection.set_tenant(company)
+            if hasattr(connection, 'set_tenant'):
+                connection.set_tenant(company)
+                
             from employees.models import Employee
             Employee.objects.get_or_create(
                 user=user,
@@ -188,11 +191,11 @@ class RegisterView(APIView):
                     "hourly_rate": 0,
                 }
             )
-            connection.set_schema_to_public()
+            if hasattr(connection, 'set_schema_to_public'):
+                connection.set_schema_to_public()
 
         except Exception as e:
             print(f"ERROR in RegisterView: {str(e)}")
-            import traceback
             traceback.print_exc()
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 

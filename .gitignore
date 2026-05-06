@@ -1,0 +1,35 @@
+node_modules
+dist
+.env
+.env.local
+.env.*.local
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+
+backend/.venv/
+**/__pycache__/
+*.pyc
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Django
+media/
+staticfiles/
+
+# Environment Variables
+.env
+
+# VS Code
+.vscode/
+
+# Node
+node_modules/
+
+# Build
+dist/
+build/

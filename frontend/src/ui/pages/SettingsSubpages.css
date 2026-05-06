@@ -1479,3 +1479,241 @@ a.psHighlight:hover {
     color: #475569;
     text-transform: uppercase;
 }
+
+/* ── Integrations Section ─────────────────────────────────────── */
+.stIntLayout {
+    display: flex;
+    gap: 32px;
+    margin-top: 24px;
+}
+
+.stIntSidebar {
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: sticky;
+    top: 0;
+    height: fit-content;
+}
+
+.stIntCatBtn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.stIntCatBtn:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+.stIntCatBtn.on {
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.stIntMain {
+    flex: 1;
+    min-width: 0;
+}
+
+.stIntGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+.stIntCard {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    transition: all 0.2s;
+}
+
+.stIntCard:hover {
+    border-color: #2563eb;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+    transform: translateY(-2px);
+}
+
+.stIntCard.connected {
+    background: #f8fafc;
+}
+
+.stIntCardTop {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.stIntIcon {
+    width: 44px;
+    height: 44px;
+    background: #f8fafc;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1e293b;
+}
+
+.stIntBadge {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 8px;
+    background: #f1f5f9;
+    color: #64748b;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.stIntName {
+    font-size: 16px;
+    font-weight: 800;
+    color: #1e293b;
+    margin: 0;
+    font-family: inherit;
+}
+
+.stIntDesc {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+    margin: 0;
+    flex: 1;
+}
+
+.stIntActions {
+    margin-top: 8px;
+}
+
+.stIntConnectBtn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.stIntConnectBtn:hover:not(:disabled) {
+    background: #1d4ed8;
+}
+
+.stIntConnectBtn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.stConnectedGroup {
+    display: flex;
+    gap: 8px;
+}
+
+.stStatusChip {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px;
+    background: #ecfdf5;
+    color: #059669;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.stIntConfigBtn, .stIntUnlinkBtn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e2e8f0;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #64748b;
+}
+
+.stIntConfigBtn:hover {
+    border-color: #cbd5e1;
+    color: #1e293b;
+}
+
+.stIntUnlinkBtn:hover {
+    background: #fef2f2;
+    border-color: #fee2e2;
+    color: #ef4444;
+}
+
+.stIntFooter {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.stIntInfoBox {
+    display: flex;
+    gap: 16px;
+    padding: 20px;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    color: #475569;
+}
+
+.stIntInfoBox strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 800;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+.stIntInfoBox p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+@media (max-width: 1024px) {
+    .stIntLayout {
+        flex-direction: column;
+    }
+    .stIntSidebar {
+        width: 100%;
+        flex-direction: row;
+        overflow-x: auto;
+        padding-bottom: 8px;
+    }
+    .stIntCatBtn {
+        flex-shrink: 0;
+    }
+}

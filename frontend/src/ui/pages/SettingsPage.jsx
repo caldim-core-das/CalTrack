@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react"
-import { useLocation } from "react-router-dom"
+import { useLocation, NavLink } from "react-router-dom"
+import { routes } from "../routes.js"
+import { useAuth } from "../../state/auth/AuthProvider.jsx"
 import {
   Building2, Palette, CreditCard, Users2, History, ScrollText,
   Clock, CalendarDays, Banknote, FileText, ShieldCheck, BarChart3,
@@ -9,7 +11,9 @@ import {
   Save, X, CheckCircle2, AlertTriangle, Upload, Eye, EyeOff,
   Smartphone, Mail, MessageSquare, LogOut, Key, Wifi, Clock3,
   Edit3, MapPin, DollarSign, Calendar, TrendingUp, User,
-  ChevronRight, Home
+  ChevronRight, Home, Plug, Layers, Cpu, MessageCircle,
+  Database, Command, Link, Share2, SlidersHorizontal, CalendarRange,
+  Copy, Download, Box, Terminal, Layout, FileJson, Link2, Briefcase, Timer
 } from "lucide-react"
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -53,58 +57,70 @@ const TABS = [
   {
     id: "general", label: "General",
     subs: [
-      { id: "profile", label: "Profile", icon: <User size={14} /> },
-      { id: "company", label: "Company Settings", icon: <Building2 size={14} /> },
-      { id: "logo", label: "Company Logo", icon: <ImageIcon size={14} /> },
-      { id: "localization", label: "Localization", icon: <Globe size={14} /> },
-      { id: "pace", label: "Operational Pace", icon: <TrendingUp size={14} /> },
+      { id: "profile", label: "My Profile", icon: <User size={14} /> },
+      { id: "preferences", label: "Preferences", icon: <SlidersHorizontal size={14} /> },
+      { id: "branding", label: "Branding", icon: <Palette size={14} />, adminOnly: true },
+      { id: "organization", label: "Organization", icon: <Building2 size={14} />, adminOnly: true },
     ]
   },
   {
-    id: "notifications", label: "Notifications",
+    id: "ai", label: "AI & Automation", adminOnly: true,
     subs: [
-      { id: "notif-prefs", label: "Preferences", icon: <Bell size={14} /> },
-      { id: "activity", label: "Activity Logs", icon: <ScrollText size={14} /> },
+      { id: "ai-automation", label: "AI & Automation", icon: <Zap size={14} /> },
     ]
   },
   {
-    id: "members", label: "Members",
+    id: "workforce", label: "Workforce",
     subs: [
-      { id: "users", label: "Users & Roles", icon: <Users2 size={14} /> },
-      { id: "permissions", label: "Permission History", icon: <History size={14} /> },
+      { id: "people", label: "People", icon: <Users2 size={14} />, adminOnly: true },
+      { id: "time-tracking", label: "Time Tracking", icon: <Clock size={14} /> },
+      { id: "attendance", label: "Attendance Policies", icon: <SlidersHorizontal size={14} /> },
+      { id: "schedules", label: "Work Schedules", icon: <Sun size={14} /> },
+      { id: "shift-planner", label: "Shift Planning", icon: <CalendarRange size={14} />, adminOnly: true },
+      { id: "holidays", label: "Time Off & Holidays", icon: <Briefcase size={14} /> },
     ]
   },
   {
-    id: "billings", label: "Billings",
+    id: "financials", label: "Financials", adminOnly: true,
     subs: [
-      { id: "plan", label: "Plans & Subscription", icon: <CreditCard size={14} /> },
-      { id: "invoices", label: "Invoices", icon: <FileText size={14} /> },
+      { id: "payroll", label: "Payroll", icon: <Banknote size={14} /> },
+      { id: "expenses", label: "Expenses", icon: <CreditCard size={14} /> },
     ]
   },
   {
-    id: "language", label: "Language & Region",
+    id: "operations", label: "Operations",
     subs: [
-      { id: "localization", label: "Timezone & Format", icon: <Globe size={14} /> },
-      { id: "fiscal", label: "Fiscal Calendar", icon: <Calendar size={14} /> },
+      { id: "workflows", label: "Approval Workflows", icon: <Workflow size={14} />, adminOnly: true },
+      { id: "productivity", label: "Productivity", icon: <Timer size={14} />, adminOnly: true },
+      { id: "reports", label: "Reports & Analytics", icon: <BarChart3 size={14} />, adminOnly: true },
+      { id: "notifications", label: "Notifications", icon: <Bell size={14} /> },
     ]
   },
   {
-    id: "security", label: "Security",
+    id: "system", label: "System & Security",
     subs: [
-      { id: "security-sessions", label: "Active Sessions", icon: <Wifi size={14} /> },
-      { id: "security-password", label: "Password", icon: <Key size={14} /> },
-      { id: "security-2fa", label: "Two-Factor Auth", icon: <Smartphone size={14} /> },
+      { id: "security", label: "Security", icon: <Shield size={14} /> },
+      { id: "rbac", label: "Permissions / RBAC", icon: <ShieldCheck size={14} />, adminOnly: true },
+      { id: "audit", label: "Audit Log", icon: <ScrollText size={14} />, adminOnly: true },
+      { id: "devices", label: "Devices", icon: <Smartphone size={14} />, adminOnly: true },
+      { id: "location", label: "Location Tracking", icon: <MapPin size={14} />, adminOnly: true },
     ]
   },
   {
-    id: "integrations", label: "Integrations",
+    id: "enterprise", label: "Enterprise",
     subs: [
-      { id: "integrations", label: "Calendar Integrations", icon: <CalendarDays size={14} /> },
+      { id: "integrations", label: "App Integrations", icon: <Plug size={14} /> },
+      { id: "developer", label: "Developer / API", icon: <Terminal size={14} />, adminOnly: true },
+      { id: "billing", label: "Billing & Plans", icon: <CreditCard size={14} />, adminOnly: true },
+      { id: "data", label: "Data & Backups", icon: <Database size={14} />, adminOnly: true },
     ]
   },
 ]
 
+
 export function SettingsPage({ section: sectionProp }) {
+  const { user } = useAuth()
+  const isAdmin = user?.role === "admin"
   const location = useLocation()
   const [activeSection, setActiveSection] = useState("profile")
   const [activeTab, setActiveTab] = useState("general")
@@ -112,17 +128,23 @@ export function SettingsPage({ section: sectionProp }) {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(null)
+
+  const filteredTabs = TABS.filter(t => !t.adminOnly || isAdmin).map(t => ({
+    ...t,
+    subs: t.subs.filter(s => !s.adminOnly || isAdmin)
+  })).filter(t => t.subs.length > 0)
+
   const markDirty = useCallback(() => setDirty(true), [])
   const showToast = useCallback((msg, type = "success") => setToast({ msg, type, id: Date.now() }), [])
 
   useEffect(() => {
     const section = sectionProp || new URLSearchParams(location.search).get("section")
     if (!section) return
-    const tab = TABS.find((t) => t.subs.some((s) => s.id === section)) || TABS[0]
+    const tab = filteredTabs.find((t) => t.subs.some((s) => s.id === section)) || filteredTabs[0]
     setActiveTab(tab.id)
     setActiveSection(tab.subs.some((s) => s.id === section) ? section : tab.subs[0].id)
     setHoveredTab(null)
-  }, [location.search, sectionProp])
+  }, [location.search, sectionProp, isAdmin])
 
   const handleSave = async () => {
     setSaving(true); await new Promise(r => setTimeout(r, 800)); setSaving(false); setDirty(false)
@@ -133,14 +155,14 @@ export function SettingsPage({ section: sectionProp }) {
   const navigate = (tabId, secId) => { setActiveTab(tabId); setActiveSection(secId); setHoveredTab(null) }
 
   /* left card items for current tab */
-  const currentTab = TABS.find(t => t.subs.some(s => s.id === activeSection)) || TABS[0]
+  const currentTab = filteredTabs.find(t => t.subs.some(s => s.id === activeSection)) || filteredTabs[0]
   const currentSubs = currentTab.subs
 
   return (
     <div className="stPage">
       {/* ── Breadcrumb ── */}
       <div className="stBreadcrumb">
-        <Home size={13} /><span>Home</span>
+        <NavLink to={routes.dashboard} className="stBreadLink"><Home size={13} /><span>Home</span></NavLink>
         <ChevronRight size={12} /><span className="stBreadcrumbActive">Settings</span>
       </div>
 
@@ -148,7 +170,7 @@ export function SettingsPage({ section: sectionProp }) {
       <div className="stTopRow">
         <h1 className="stPageTitle">Settings</h1>
         <nav className="stTabBar">
-          {TABS.map(tab => {
+          {filteredTabs.map(tab => {
             const isCurrent = currentTab.id === tab.id
             return (
               <div
@@ -216,21 +238,45 @@ export function SettingsPage({ section: sectionProp }) {
 
         {/* Right Content */}
         <main className="stMain">
+          {/* General */}
           {activeSection === "profile" && <ProfileSection markDirty={markDirty} showToast={showToast} />}
-          {activeSection === "company" && <CompanySettingsSection markDirty={markDirty} showToast={showToast} />}
-          {activeSection === "logo" && <LogoSection markDirty={markDirty} />}
-          {activeSection === "localization" && <LocalizationSection markDirty={markDirty} />}
-          {activeSection === "fiscal" && <LocalizationSection markDirty={markDirty} />}
-          {activeSection === "pace" && <PaceSection markDirty={markDirty} />}
-          {activeSection === "notif-prefs" && <NotificationsSection markDirty={markDirty} />}
-          {activeSection === "activity" && <ActivitySection />}
-          {activeSection === "users" && <UsersSection showToast={showToast} />}
-          {activeSection === "plan" && <PlanSection />}
-          {activeSection === "security-sessions" && <SecuritySessionsSection showToast={showToast} />}
-          {activeSection === "security-password" && <SecurityPasswordSection showToast={showToast} />}
-          {activeSection === "security-2fa" && <Security2FASection markDirty={markDirty} showToast={showToast} />}
-          {activeSection === "integrations" && <IntegrationsSection markDirty={markDirty} showToast={showToast} />}
-          {["permissions", "invoices"].includes(activeSection) && <ComingSoon label={currentSubs.find(s => s.id === activeSection)?.label} />}
+          {activeSection === "preferences" && <PreferencesSection markDirty={markDirty} showToast={showToast} />}
+          {activeSection === "branding" && <LogoSection markDirty={markDirty} />}
+          {activeSection === "organization" && <CompanySettingsSection markDirty={markDirty} showToast={showToast} />}
+
+          {/* AI */}
+          {activeSection === "ai-automation" && <AISettingsSection markDirty={markDirty} showToast={showToast} />}
+
+          {/* Workforce */}
+          {activeSection === "people" && <ProfileRequirementsSection markDirty={markDirty} />}
+          {activeSection === "time-tracking" && <ClockInMethodsSection markDirty={markDirty} />}
+          {activeSection === "attendance" && <AttendancePolicySection markDirty={markDirty} showToast={showToast} />}
+          {activeSection === "schedules" && <FlexibleHoursSection markDirty={markDirty} />}
+          {activeSection === "shift-planner" && <ShiftPlanningSection markDirty={markDirty} />}
+          {activeSection === "holidays" && <PublicHolidaysSection markDirty={markDirty} />}
+
+          {/* Financials */}
+          {activeSection === "payroll" && <PayCycleSection markDirty={markDirty} />}
+          {activeSection === "expenses" && <ExpensesSection markDirty={markDirty} showToast={showToast} />}
+
+          {/* Operations */}
+          {activeSection === "workflows" && <WorkflowSection markDirty={markDirty} showToast={showToast} />}
+          {activeSection === "productivity" && <ProductivitySection markDirty={markDirty} />}
+          {activeSection === "reports" && <ReportsSection showToast={showToast} />}
+          {activeSection === "notifications" && <DeliveryChannelsSection markDirty={markDirty} />}
+
+          {/* System */}
+          {activeSection === "security" && <SecuritySection markDirty={markDirty} showToast={showToast} />}
+          {activeSection === "rbac" && <RolesPermissionsSection markDirty={markDirty} />}
+          {activeSection === "audit" && <ActivitySection />}
+          {activeSection === "devices" && <DevicesSection markDirty={markDirty} showToast={showToast} />}
+          {activeSection === "location" && <GeofencingSection markDirty={markDirty} />}
+
+          {/* Enterprise */}
+          {activeSection === "integrations" && <IntegrationsSection showToast={showToast} />}
+          {activeSection === "developer" && <DeveloperSection showToast={showToast} />}
+          {activeSection === "billing" && <PlanSection />}
+          {activeSection === "data" && <DataBackupsSection showToast={showToast} />}
         </main>
       </div>
 
@@ -269,94 +315,6 @@ function ComingSoon({ label }) {
   )
 }
 
-function IntegrationsSection({ markDirty, showToast }) {
-  const [googleConnected, setGoogleConnected] = useState(false)
-  const [outlookConnected, setOutlookConnected] = useState(false)
-  const [syncTimeOff, setSyncTimeOff] = useState(true)
-  const [syncWorkSchedules, setSyncWorkSchedules] = useState(false)
-
-  const googleEnabled = googleConnected && (syncTimeOff || syncWorkSchedules)
-  const outlookEnabled = outlookConnected && (syncTimeOff || syncWorkSchedules)
-
-  function toggleGoogleConnection() {
-    setGoogleConnected((prev) => {
-      const next = !prev
-      showToast(next ? "Google Calendar connected." : "Google Calendar disconnected.", next ? "success" : "warn")
-      markDirty()
-      return next
-    })
-  }
-
-  function toggleOutlookConnection() {
-    setOutlookConnected((prev) => {
-      const next = !prev
-      showToast(next ? "Outlook Calendar connected." : "Outlook Calendar disconnected.", next ? "success" : "warn")
-      markDirty()
-      return next
-    })
-  }
-
-  return (
-    <div className="stPanel">
-      <SectionHeader
-        title="Integrations"
-        subtitle="Connect external calendars to sync time off, holidays, and work schedules."
-      />
-
-      <div className="stCard">
-        <div style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--fg)" }}>Google Calendar</div>
-            <div style={{ fontSize: 12, color: "var(--muted)" }}>
-              {googleConnected ? "Connected" : "Not connected"}{googleEnabled ? " · Sync enabled" : ""}
-            </div>
-          </div>
-          <button className={googleConnected ? "stGhostBtn stDangerTxt" : "stPrimaryBtn"} onClick={toggleGoogleConnection}>
-            {googleConnected ? "Disconnect" : "Connect"}
-          </button>
-        </div>
-
-        <div style={{ height: 1, background: "var(--stroke)", margin: "16px 0" }} />
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          <div className="stToggleRow" style={{ padding: 0, background: "transparent", border: "none", margin: 0 }}>
-            <div>
-              <div className="stToggleLabel">Sync Time Off & Holidays</div>
-              <div className="stToggleDesc">Push approved time off and holidays to connected calendars</div>
-            </div>
-            <ToggleSwitch checked={syncTimeOff} onChange={(v) => { setSyncTimeOff(v); markDirty() }} accent="#1A56DB" />
-          </div>
-
-          <div className="stToggleRow" style={{ padding: 0, background: "transparent", border: "none", margin: 0 }}>
-            <div>
-              <div className="stToggleLabel">Sync Work Schedules</div>
-              <div className="stToggleDesc">Publish schedules and shifts to connected calendars</div>
-            </div>
-            <ToggleSwitch checked={syncWorkSchedules} onChange={(v) => { setSyncWorkSchedules(v); markDirty() }} accent="#F59E0B" />
-          </div>
-        </div>
-      </div>
-
-      <div className="stCard">
-        <div style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "var(--fg)" }}>Outlook Calendar</div>
-            <div style={{ fontSize: 12, color: "var(--muted)" }}>
-              {outlookConnected ? "Connected" : "Not connected"}{outlookEnabled ? " · Sync enabled" : ""}
-            </div>
-          </div>
-          <button className={outlookConnected ? "stGhostBtn stDangerTxt" : "stPrimaryBtn"} onClick={toggleOutlookConnection}>
-            {outlookConnected ? "Disconnect" : "Connect"}
-          </button>
-        </div>
-
-        <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
-          Supports Microsoft 365 accounts. Once connected, the same sync settings above apply.
-        </div>
-      </div>
-    </div>
-  )
-}
 
 /* ═══ PROFILE ════════════════════════════════════════════════════ */
 function ProfileSection({ markDirty, showToast }) {
@@ -538,6 +496,243 @@ function CompanySettingsSection({ markDirty, showToast }) {
             </p>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ AI & AUTOMATION ════════════════════════════════════════════════ */
+function AISettingsSection({ markDirty, showToast }) {
+  const [enabled, setEnabled] = useState(true)
+  const [anomaly, setAnomaly] = useState(true)
+  const [autoApproval, setAutoApproval] = useState(false)
+  
+  return (
+    <div className="stPanel">
+      <SectionHeader title="AI & Automation" subtitle="Leverage machine learning for attendance insights and smart operations." />
+      
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">AI Attendance Insights</div>
+            <div className="stToggleDesc">Automatically detect patterns in employee clock-ins and outs.</div>
+          </div>
+          <ToggleSwitch checked={enabled} onChange={v => { setEnabled(v); markDirty() }} />
+        </div>
+        
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Anomaly Detection</div>
+            <div className="stToggleDesc">Flag suspicious activity like multiple logins or unusual locations.</div>
+          </div>
+          <ToggleSwitch checked={anomaly} onChange={v => { setAnomaly(v); markDirty() }} accent="#F43F5E" />
+        </div>
+
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Auto-Payroll Suggestions</div>
+            <div className="stToggleDesc">AI-generated payroll exports based on historical work hours.</div>
+          </div>
+          <ToggleSwitch checked={autoApproval} onChange={v => { setAutoApproval(v); markDirty() }} accent="#10B981" />
+        </div>
+      </div>
+
+      <div className="stCard">
+        <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 800 }}>Productivity Scoring</h4>
+        <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>Calculate individual and team productivity scores using AI models.</p>
+        <button className="stSecondaryBtn" onClick={() => showToast("AI Model Training in progress...", "info")}>
+          <RefreshCcw size={14} /> Recalculate Scores
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ ATTENDANCE POLICIES ════════════════════════════════════════════ */
+function AttendancePolicySection({ markDirty, showToast }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Attendance Policies" subtitle="Define rules for late marks, grace periods, and overtime." />
+      
+      <div className="stCard">
+        <div className="stFormGrid">
+          <Field label="Late Mark Threshold (Minutes)" half>
+            <input type="number" className="stInput" defaultValue={15} onChange={markDirty} />
+          </Field>
+          <Field label="Grace Period (Minutes)" half>
+            <input type="number" className="stInput" defaultValue={5} onChange={markDirty} />
+          </Field>
+          <Field label="Auto Clock-out after Idle" half>
+            <select className="stInput stSelect" onChange={markDirty}>
+              <option>Disabled</option>
+              <option>1 Hour</option>
+              <option>2 Hours</option>
+              <option>4 Hours</option>
+            </select>
+          </Field>
+          <Field label="Weekend Policy" half>
+            <select className="stInput stSelect" onChange={markDirty}>
+              <option>Standard (Sat/Sun off)</option>
+              <option>Flexible (2 days off)</option>
+              <option>Custom (Fixed days)</option>
+            </select>
+          </Field>
+        </div>
+      </div>
+
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Require Note on Late Arrival</div>
+            <div className="stToggleDesc">Employees must provide a reason if they clock in after the threshold.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+        <div style={{ marginTop: 24 }}>
+          <div style={{ padding: 12, borderRadius: 8, background: "var(--surface2)", border: "1px solid var(--stroke)" }}>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
+              Need a custom data retention policy? Our legal team can help you configure data residency and long-term storage solutions.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ PREFERENCES ══════════════════════════════════════════════ */
+function PreferencesSection({ markDirty, showToast }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader 
+        title="Personal Preferences" 
+        subtitle="Manage your theme, language, and interface settings." 
+      />
+      
+      <div className="stCard">
+        <h4 className="stCardTitle">Appearance</h4>
+        <div className="stFormGrid">
+          <div className="stField">
+            <div className="stLabel">Theme</div>
+            <select className="stInput" defaultValue="system" onChange={markDirty}>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="system">System Default</option>
+            </select>
+          </div>
+          <div className="stField">
+            <div className="stLabel">Language</div>
+            <select className="stInput" defaultValue="en" onChange={markDirty}>
+              <option value="en">English (US)</option>
+              <option value="es">Español</option>
+              <option value="fr">Français</option>
+              <option value="de">Deutsch</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="stToggleRow" style={{ marginTop: 24 }}>
+          <div>
+            <div className="stToggleLabel">Compact Mode</div>
+            <div className="stToggleDesc">Density optimization for small screens.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} />
+        </div>
+      </div>
+
+      <div className="stCard">
+        <h4 className="stCardTitle">Date & Time</h4>
+        <div className="stFormGrid">
+          <div className="stField">
+            <div className="stLabel">Date Format</div>
+            <select className="stInput" defaultValue="DMY" onChange={markDirty}>
+              <option value="DMY">DD/MM/YYYY</option>
+              <option value="MDY">MM/DD/YYYY</option>
+              <option value="YMD">YYYY-MM-DD</option>
+            </select>
+          </div>
+          <div className="stField">
+            <div className="stLabel">Time Format</div>
+            <select className="stInput" defaultValue="24" onChange={markDirty}>
+              <option value="24">24-hour</option>
+              <option value="12">12-hour (AM/PM)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ APPROVAL WORKFLOWS ═════════════════════════════════════════════ */
+function WorkflowSection({ markDirty, showToast }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Approval Workflows" subtitle="Design multi-level approval chains for leaves and expenses." />
+      
+      <div className="stCard">
+        <h4 style={{ margin: "0 0 16px 0", fontSize: 15, fontWeight: 800 }}>Leave Approval Chain</h4>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, background: "var(--surface2)", borderRadius: 8, border: "1px solid var(--stroke)" }}>
+            <div style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--stroke)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800 }}>1</div>
+            <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>Direct Manager</div>
+            <Shield size={14} color="var(--muted)" />
+          </div>
+          <div style={{ display: "flex", justifyContent: "center" }}><ArrowRight size={14} style={{ transform: "rotate(90deg)" }} color="var(--muted)" /></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, background: "var(--surface2)", borderRadius: 8, border: "1px solid var(--stroke)" }}>
+            <div style={{ width: 24, height: 24, borderRadius: "50%", background: "var(--stroke)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800 }}>2</div>
+            <div style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>HR Department</div>
+            <Shield size={14} color="var(--muted)" />
+          </div>
+        </div>
+        <button className="stGhostBtn" style={{ marginTop: 16, width: "100%" }} onClick={() => showToast("Workflow Editor coming soon.", "info")}>
+          <Plus size={14} /> Add Approval Step
+        </button>
+      </div>
+
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Auto-approve Overtime</div>
+            <div className="stToggleDesc">Automatically approve OT if it falls within pre-set limits.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} accent="#10B981" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ SECURITY ═══════════════════════════════════════════════════════ */
+function SecuritySection({ markDirty, showToast }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Security & Access" subtitle="Manage session safety, 2FA, and login restrictions." />
+      
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Enforce 2FA for Admins</div>
+            <div className="stToggleDesc">Two-factor authentication is mandatory for all administrative accounts.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#6366F1" />
+        </div>
+        
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Session IP Restriction</div>
+            <div className="stToggleDesc">Restrict dashboard access to specific company IP ranges.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} accent="#F43F5E" />
+        </div>
+      </div>
+
+      <div className="stCard">
+        <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 800 }}>Session Management</h4>
+        <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16 }}>Force logout all active sessions for security maintenance.</p>
+        <button className="stSecondaryBtn stDangerTxt" onClick={() => showToast("All sessions terminated.", "warn")}>
+          <LogOut size={14} /> Terminate All Sessions
+        </button>
       </div>
     </div>
   )
@@ -1027,4 +1222,1078 @@ function Security2FASection({ markDirty, showToast }) {
   )
 }
 
+/* ═══ PEOPLE ══════════════════════════════════════════════════════ */
+function OnboardingAutomationSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Onboarding Automation" subtitle="Automate the welcome process for new employees." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Auto-send Welcome Email</div>
+            <div className="stToggleDesc">Send system login credentials immediately upon creation.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Auto-assign Onboarding Tasks</div>
+            <div className="stToggleDesc">Assign standard 'Getting Started' tasks to new hires.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+        <Field label="Welcome Message Template">
+          <textarea className="stInput stTextarea" defaultValue="Welcome to the team! We're excited to have you here." rows={4} onChange={markDirty} />
+        </Field>
+      </div>
+    </div>
+  )
+}
 
+function ProfileRequirementsSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Profile Requirements" subtitle="Set mandatory documents and verification steps." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Require Government ID</div>
+            <div className="stToggleDesc">Employees must upload a valid ID before they can clock in.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} accent="#F43F5E" />
+        </div>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Background Verification</div>
+            <div className="stToggleDesc">Trigger background check workflow for new profiles.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} accent="#F43F5E" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MandatoryFieldsSection({ markDirty }) {
+  const fields = ["Full Name", "Work Email", "Phone Number", "Employee ID", "Department", "Position", "Date of Join"]
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Mandatory Fields" subtitle="Select which profile fields are required for all employees." />
+      <div className="stCard">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {fields.map(f => (
+            <div key={f} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0" }}>
+              <input type="checkbox" defaultChecked={true} onChange={markDirty} style={{ accentColor: "#1A56DB" }} />
+              <span style={{ fontSize: 14, fontWeight: 500 }}>{f}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DefaultRoleAssignmentSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Default Role Assignment" subtitle="Set the initial access level for newly created accounts." />
+      <div className="stCard">
+        <Field label="Standard New Hire Role">
+          <select className="stInput stSelect" defaultValue="employee" onChange={markDirty}>
+            <option value="employee">Employee</option>
+            <option value="manager">Manager</option>
+            <option value="kiosk">Kiosk Only</option>
+          </select>
+        </Field>
+        <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
+          Admins can always override this role during or after the creation process.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ TIME TRACKING ═══════════════════════════════════════════════ */
+function ClockInMethodsSection({ markDirty }) {
+  const methods = [
+    { id: "web", label: "Web Portal", icon: <Globe size={14} />, desc: "Clock in via browser dashboard" },
+    { id: "mobile", label: "Mobile App", icon: <Smartphone size={14} />, desc: "Clock in via iOS/Android app" },
+    { id: "kiosk", label: "Kiosk Mode", icon: <Monitor size={14} />, desc: "Shared tablet/terminal entry" },
+    { id: "qr", label: "QR Code Scan", icon: <RefreshCcw size={14} />, desc: "Scan station code to clock in" },
+    { id: "face", label: "Face Recognition", icon: <User size={14} />, desc: "Biometric verification at Kiosk" },
+  ]
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Clock-in Methods" subtitle="Enable or disable ways for employees to record their time." />
+      <div className="stCard" style={{ display: "grid", gap: 12 }}>
+        {methods.map(m => (
+          <div key={m.id} className="stToggleRow">
+            <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ padding: 8, background: "var(--surface2)", borderRadius: 8, color: "var(--fg)" }}>{m.icon}</div>
+              <div>
+                <div className="stToggleLabel">{m.label}</div>
+                <div className="stToggleDesc">{m.desc}</div>
+              </div>
+            </div>
+            <ToggleSwitch checked={true} onChange={markDirty} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function GeofencingSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="GPS Geofencing" subtitle="Restrict clock-ins to specific workplace locations." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Enable GPS Restriction</div>
+            <div className="stToggleDesc">Compare user location with workplace coordinates.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#6366F1" />
+        </div>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Block-on-Violation</div>
+            <div className="stToggleDesc">Prevent clock-in if user is outside the geofence radius.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#F43F5E" />
+        </div>
+        <Field label="Default Radius (meters)">
+          <input className="stInput" type="number" defaultValue={200} onChange={markDirty} />
+        </Field>
+      </div>
+    </div>
+  )
+}
+
+function RoundingRulesSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Time Rounding Rules" subtitle="Automatically round clock-in/out times for payroll simplicity." />
+      <div className="stCard">
+        <Field label="Rounding Increment">
+          <select className="stInput stSelect" defaultValue="15" onChange={markDirty}>
+            <option value="0">No Rounding</option>
+            <option value="5">Nearest 5 minutes</option>
+            <option value="15">Nearest 15 minutes</option>
+            <option value="30">Nearest 30 minutes</option>
+          </select>
+        </Field>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Round Up Only</div>
+            <div className="stToggleDesc">Always round clock-out times upwards to the next increment.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function OvertimeThresholdsSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Overtime Thresholds" subtitle="Define when extra hours start counting as overtime." />
+      <div className="stCard">
+        <Field label="Daily Overtime starts after (hours)">
+          <input className="stInput" type="number" defaultValue={8} onChange={markDirty} />
+        </Field>
+        <Field label="Weekly Overtime starts after (hours)">
+          <input className="stInput" type="number" defaultValue={40} onChange={markDirty} />
+        </Field>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Double Time Rule</div>
+            <div className="stToggleDesc">Enable 2x rate for hours exceeding 12 per day.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#EAB308" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EntryApprovalsSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Manual Entry Approvals" subtitle="Control who can add time entries manually and who must approve them." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Require Manager Approval</div>
+            <div className="stToggleDesc">Manual timesheet entries must be approved before payroll inclusion.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Allow Retroactive Edits</div>
+            <div className="stToggleDesc">Employees can edit entries from previous pay periods.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} accent="#F43F5E" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ WORK SCHEDULES ══════════════════════════════════════════════ */
+function FlexibleHoursSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Flexible vs Core Hours" subtitle="Toggle between fixed shifts and flexible attendance." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Enable Flexible Mode</div>
+            <div className="stToggleDesc">Employees can clock in anytime as long as daily hours are met.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} accent="#8B5CF6" />
+        </div>
+        <Field label="Core Hours (Must be present during)">
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input className="stInput" type="time" defaultValue="10:00" onChange={markDirty} />
+            <span>to</span>
+            <input className="stInput" type="time" defaultValue="16:00" onChange={markDirty} />
+          </div>
+        </Field>
+      </div>
+    </div>
+  )
+}
+
+function BreakDeductionSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Break Auto-deduction" subtitle="Automatically subtract break time from shift totals." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Auto-deduct Unpaid Breaks</div>
+            <div className="stToggleDesc">Automatically subtract 30-60 mins for shifts longer than 6 hours.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+        <Field label="Break Duration (minutes)">
+          <input className="stInput" type="number" defaultValue={30} onChange={markDirty} />
+        </Field>
+      </div>
+    </div>
+  )
+}
+
+function ShiftSwapSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Shift Swap Policy" subtitle="Configure how employees can trade shifts with each other." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Allow Peer Swaps</div>
+            <div className="stToggleDesc">Employees can request to swap shifts directly via the app.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#10B981" />
+        </div>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Require Manager Approval</div>
+            <div className="stToggleDesc">Swaps must be reviewed by a manager before the schedule is updated.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MinimumRestSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Minimum Rest Between Shifts" subtitle="Ensure compliance with rest period regulations." />
+      <div className="stCard">
+        <Field label="Minimum Rest Period (hours)">
+          <input className="stInput" type="number" defaultValue={11} onChange={markDirty} />
+        </Field>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Block Schedule Violations</div>
+            <div className="stToggleDesc">Prevent managers from assigning shifts that violate rest rules.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#F43F5E" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SchedulePublishingSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Schedule Publishing" subtitle="Settings for releasing work schedules to the team." />
+      <div className="stCard">
+        <Field label="Advance Publishing (days)">
+          <input className="stInput" type="number" defaultValue={14} onChange={markDirty} />
+        </Field>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Auto-publish on Completion</div>
+            <div className="stToggleDesc">Notify employees as soon as the manager finishes the roster.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ TIME OFF ════════════════════════════════════════════════════ */
+function AccrualFrequencySection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Accrual Frequency" subtitle="Control how often leave balances are updated." />
+      <div className="stCard">
+        <Field label="Accrual Cycle">
+          <select className="stInput stSelect" defaultValue="monthly" onChange={markDirty}>
+            <option value="annually">Annually (Lump sum)</option>
+            <option value="monthly">Monthly</option>
+            <option value="biweekly">Bi-weekly</option>
+            <option value="worked">Per hour worked</option>
+          </select>
+        </Field>
+      </div>
+    </div>
+  )
+}
+
+function CarryOverRulesSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Carry-over Rules" subtitle="Settings for unused leave at the end of the fiscal year." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Allow Carry-over</div>
+            <div className="stToggleDesc">Unused days transfer to the next year.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+        <Field label="Max Carry-over Days">
+          <input className="stInput" type="number" defaultValue={5} onChange={markDirty} />
+        </Field>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Allow Negative Balance</div>
+            <div className="stToggleDesc">Employees can 'borrow' leave from the next accrual period.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} accent="#F43F5E" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SickLeaveDocsSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Sick Leave Document Requirements" subtitle="Mandatory proof of illness settings." />
+      <div className="stCard">
+        <Field label="Require Doctor's Note after (days)">
+          <input className="stInput" type="number" defaultValue={3} onChange={markDirty} />
+        </Field>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Strict Verification</div>
+            <div className="stToggleDesc">Flag sick leave without documentation for HR review.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PublicHolidaysSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Public Holidays" subtitle="Manage company-wide holiday calendars." />
+      <div className="stCard">
+        <Field label="Country-specific Calendar">
+          <select className="stInput stSelect" defaultValue="in" onChange={markDirty}>
+            <option value="in">India (Standard)</option>
+            <option value="us">United States</option>
+            <option value="uk">United Kingdom</option>
+            <option value="ae">UAE / Dubai</option>
+          </select>
+        </Field>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Auto-apply Public Holidays</div>
+            <div className="stToggleDesc">Automatically mark these days as 'Paid Off' in the timesheet.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ PAYROLL ═════════════════════════════════════════════════════ */
+function PayCycleSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Pay Cycle" subtitle="Configure your payroll frequency and cutoff dates." />
+      <div className="stCard">
+        <Field label="Payment Frequency">
+          <select className="stInput stSelect" defaultValue="monthly" onChange={markDirty}>
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Bi-weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </Field>
+        <Field label="Cutoff Day (of the month)">
+          <input className="stInput" type="number" defaultValue={25} onChange={markDirty} />
+        </Field>
+      </div>
+    </div>
+  )
+}
+
+function CurrencySection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Currency & Locale" subtitle="Set the primary currency for salary and reports." />
+      <div className="stCard">
+        <Field label="Primary Currency">
+          <select className="stInput stSelect" defaultValue="INR" onChange={markDirty}>
+            <option value="INR">Indian Rupee (₹)</option>
+            <option value="USD">US Dollar ($)</option>
+            <option value="GBP">British Pound (£)</option>
+            <option value="EUR">Euro (€)</option>
+          </select>
+        </Field>
+      </div>
+    </div>
+  )
+}
+
+function OvertimeMultipliersSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Overtime Multipliers" subtitle="Define rate increases for overtime work." />
+      <div className="stCard">
+        <div className="stFormGrid">
+          <Field label="Weekday Overtime Rate" half>
+            <div className="stInputAddon">
+              <input className="stInput" type="number" step="0.1" defaultValue={1.5} onChange={markDirty} />
+              <span className="stInputAddonPrefix">x</span>
+            </div>
+          </Field>
+          <Field label="Weekend Overtime Rate" half>
+            <div className="stInputAddon">
+              <input className="stInput" type="number" step="0.1" defaultValue={2.0} onChange={markDirty} />
+              <span className="stInputAddonPrefix">x</span>
+            </div>
+          </Field>
+          <Field label="Public Holiday Rate" half>
+            <div className="stInputAddon">
+              <input className="stInput" type="number" step="0.1" defaultValue={2.5} onChange={markDirty} />
+              <span className="stInputAddonPrefix">x</span>
+            </div>
+          </Field>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AutoExportSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Auto-export to Accounting" subtitle="Sync payroll data with external accounting tools." />
+      <div className="stCard">
+        <Field label="Accounting Tool">
+          <select className="stInput stSelect" defaultValue="tally" onChange={markDirty}>
+            <option value="none">No Export</option>
+            <option value="tally">Tally Prime</option>
+            <option value="quickbooks">QuickBooks</option>
+            <option value="xero">Xero</option>
+            <option value="sap">SAP / Oracle</option>
+          </select>
+        </Field>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Auto-sync on Payroll Completion</div>
+            <div className="stToggleDesc">Push data immediately once the payroll run is finalized.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ NOTIFICATIONS (Alert Sets) ══════════════════════════════════ */
+function AlertSetSection({ role, markDirty }) {
+  const events = role === "employee" ? [
+    { key: "clockin_late", label: "Late Clock-in", desc: "Alert when you miss your shift start" },
+    { key: "payslip", label: "Payslip Published", desc: "Notification when salary is credited" },
+    { key: "leave_approved", label: "Leave Approval", desc: "Status update on your leave request" },
+    { key: "schedule_new", label: "New Schedule", desc: "Alert when a new work roster is published" },
+  ] : [
+    { key: "missed_clockin", label: "Staff Late Arrival", desc: "Alert when an employee misses shift start" },
+    { key: "leave_request", label: "New Leave Application", desc: "Notification for pending approvals" },
+    { key: "manual_entry", label: "Manual Timesheet Entry", desc: "Alert for timesheet edits requiring review" },
+    { key: "overtime_alert", label: "Approaching Overtime", desc: "Notification when staff near OT thresholds" },
+  ]
+
+  return (
+    <div className="stPanel">
+      <SectionHeader title={`${role.charAt(0).toUpperCase() + role.slice(1)} Alert Sets`} subtitle={`Configure default notification sets for the ${role} role.`} />
+      <div className="stCard" style={{ padding: 0 }}>
+        <div className="stNotifTable">
+          {events.map(ev => (
+            <div key={ev.key} className="stNotifRow">
+              <div style={{ flex: 1 }}>
+                <div className="stNotifEvLabel">{ev.label}</div>
+                <div className="stNotifEvDesc">{ev.desc}</div>
+              </div>
+              <div className="stNotifCol">
+                <ToggleSwitch checked={true} onChange={markDirty} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DeliveryChannelsSection({ markDirty }) {
+  const channels = [
+    { id: "push", label: "Mobile Push", icon: <Smartphone size={14} />, desc: "Direct app notifications" },
+    { id: "email", label: "Email Notifications", icon: <Mail size={14} />, desc: "HTML alerts to work inbox" },
+    { id: "sms", label: "SMS Alerts", icon: <MessageSquare size={14} />, desc: "Text messages for critical alerts" },
+    { id: "whatsapp", label: "WhatsApp Business", icon: <MessageSquare size={14} />, desc: "Automated WhatsApp messages" },
+  ]
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Channels & Delivery" subtitle="Manage available communication methods." />
+      <div className="stCard" style={{ display: "grid", gap: 12 }}>
+        {channels.map(c => (
+          <div key={c.id} className="stToggleRow">
+            <div style={{ display: "flex", gap: 12 }}>
+              <div style={{ padding: 8, background: "var(--surface2)", borderRadius: 8, color: "var(--fg)" }}>{c.icon}</div>
+              <div>
+                <div className="stToggleLabel">{c.label}</div>
+                <div className="stToggleDesc">{c.desc}</div>
+              </div>
+            </div>
+            <ToggleSwitch checked={c.id === "push" || c.id === "email"} onChange={markDirty} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ═══ RBAC ════════════════════════════════════════════════════════ */
+function RolesPermissionsSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Roles & Permissions" subtitle="Granular control over system access levels." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Manager Leave Approval</div>
+            <div className="stToggleDesc">Allow team managers to approve/reject leaves.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Timesheet Lock</div>
+            <div className="stToggleDesc">Prevent employees from editing past timesheets.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SalaryVisibilitySection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Salary Visibility" subtitle="Control who can see financial data." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Hide Salary from Managers</div>
+            <div className="stToggleDesc">Only Admins and Finance roles can see pay rates.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#F43F5E" />
+        </div>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Payslip Access</div>
+            <div className="stToggleDesc">Allow employees to download their own payslips.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ AUDIT LOG ═══════════════════════════════════════════════════ */
+function RetentionPolicySection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Retention Policy" subtitle="How long logs and data are stored in the system." />
+      <div className="stCard">
+        <Field label="Log Retention Period">
+          <select className="stInput stSelect" defaultValue="365" onChange={markDirty}>
+            <option value="90">90 Days</option>
+            <option value="180">180 Days</option>
+            <option value="365">1 Year</option>
+            <option value="1095">3 Years</option>
+            <option value="unlimited">Unlimited (Compliance)</option>
+          </select>
+        </Field>
+        <div className="stCardActions" style={{ marginTop: 20 }}>
+          <button className="stGhostBtn"><FileText size={14} /> Export CSV Audit Trail</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SecurityAlertsSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Security Alerts" subtitle="Alerts for suspicious or unusual system activity." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Suspicious Login Detection</div>
+            <div className="stToggleDesc">Notify admins of new devices or locations.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#F43F5E" />
+        </div>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Bulk Data Export Alert</div>
+            <div className="stToggleDesc">Alert when someone exports more than 50 employee records.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#F43F5E" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ INTEGRATIONS ════════════════════════════════════════════════ */
+function IntegrationsSection({ showToast }) {
+  const [connected, setConnected] = useState(["google-cal", "slack"])
+  const [connecting, setConnecting] = useState(null)
+
+  const categories = [
+    { id: "auth", label: "Identity & Authentication", icon: <Shield size={16} /> },
+    { id: "comm", label: "Communication & Messaging", icon: <MessageCircle size={16} /> },
+    { id: "pm", label: "Project Management", icon: <Layout size={16} /> },
+    { id: "calendar", label: "Calendars & Scheduling", icon: <Calendar size={16} /> },
+    { id: "tracking", label: "Time Tracking Sync", icon: <Clock size={16} /> },
+    { id: "storage", label: "Cloud Storage", icon: <Database size={16} /> },
+    { id: "ai", label: "Artificial Intelligence", icon: <Cpu size={16} /> },
+    { id: "browser", label: "Browser Extensions", icon: <Globe size={16} /> },
+  ]
+
+  const apps = [
+    { id: "discord", cat: "comm", label: "Discord", desc: "Collaborative communication for teams.", free: "Free Tier Available", icon: <MessageCircle size={18} /> },
+    { id: "slack", cat: "comm", label: "Slack", desc: "Professional team messaging and workflows.", free: "Great for MVP", icon: <Layers size={18} /> },
+    { id: "google-auth", cat: "auth", label: "Google Workspace", desc: "Enable SSO via Google OAuth 2.0.", free: "Always Free", icon: <Globe size={18} /> },
+    { id: "auth0", cat: "auth", label: "Auth0", desc: "Enterprise-grade identity management.", free: "Generous Free Tier", icon: <Shield size={18} /> },
+    { id: "trello", cat: "pm", label: "Trello", desc: "Visual task boards and cards.", free: "Standard Free Plan", icon: <Layout size={18} /> },
+    { id: "clickup", cat: "pm", label: "ClickUp", desc: "One app to replace them all.", free: "Full-featured Free", icon: <Box size={18} /> },
+    { id: "asana", cat: "pm", label: "Asana", desc: "Manage projects and team tasks.", free: "Limited Free Plan", icon: <Plus size={18} /> },
+    { id: "sentry", cat: "monitoring", label: "Sentry", desc: "Error tracking & monitoring.", free: "Excellent Free Tier", icon: <AlertTriangle size={18} /> },
+    { id: "new-relic", cat: "monitoring", label: "New Relic", desc: "Full-stack observability.", free: "Limited Free Quota", icon: <BarChart3 size={18} /> },
+    { id: "google-drive", cat: "storage", label: "Google Drive", desc: "Cloud storage for team assets.", free: "15GB Free per User", icon: <Database size={18} /> },
+    { id: "dropbox", cat: "storage", label: "Dropbox", desc: "File hosting and smart sync.", free: "API Access Free", icon: <Box size={18} /> },
+    { id: "clockify", cat: "tracking", label: "Clockify", desc: "The most popular free time tracker.", free: "100% Free for Teams", icon: <Clock size={18} /> },
+    { id: "jibble", cat: "tracking", label: "Jibble", desc: "Time tracking with face recognition.", free: "Strong Free Tier", icon: <Smartphone size={18} /> },
+    { id: "gemini", cat: "ai", label: "Gemini AI", desc: "Google DeepMind's powerful LLM.", free: "Free Daily Quota", icon: <Cpu size={18} /> },
+    { id: "local-ai", cat: "ai", label: "Ollama / Local", desc: "Self-hosted open-source AI models.", free: "Fully Free Forever", icon: <Terminal size={18} /> },
+    { id: "google-cal", cat: "calendar", label: "Google Calendar", desc: "Sync events and track time.", free: "Oauth-based", icon: <Calendar size={18} /> },
+    { id: "outlook-cal", cat: "calendar", label: "Outlook Calendar", desc: "Microsoft 365 integration.", free: "Enterprise Sync", icon: <Mail size={18} /> },
+    { id: "chrome-ext", cat: "browser", label: "Chrome Extension", desc: "Track time inside other web apps.", free: "Free Download", icon: <Globe size={18} /> },
+    { id: "firefox-ext", cat: "browser", label: "Firefox Add-on", desc: "Browser-based tracking.", free: "Free Download", icon: <Share2 size={18} /> },
+  ]
+
+  const handleConnect = (id) => {
+    setConnecting(id)
+    setTimeout(() => {
+      setConnected(prev => [...prev, id])
+      setConnecting(null)
+      showToast(`${apps.find(a => a.id === id).label} connected successfully!`)
+    }, 1200)
+  }
+
+  const handleDisconnect = (id) => {
+    setConnected(prev => prev.filter(a => a !== id))
+    showToast(`${apps.find(a => a.id === id).label} disconnected.`, "warn")
+  }
+
+  return (
+    <div className="stPanel">
+      <SectionHeader 
+        title="App Integrations" 
+        subtitle="Connect Caltrack with your favorite tools to automate workflows and sync data." 
+      />
+
+      {categories.map(cat => {
+        const catApps = apps.filter(a => a.cat === cat.id)
+        if (catApps.length === 0) return null
+
+        return (
+          <div key={cat.id} className="stCard" style={{ marginBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <div style={{ padding: 8, background: "var(--surface2)", borderRadius: 8, color: "var(--fg)" }}>
+                {cat.icon}
+              </div>
+              <div>
+                <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: "var(--fg)" }}>{cat.label}</h4>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>{catApps.length} integration{catApps.length !== 1 ? "s" : ""} available</div>
+              </div>
+            </div>
+
+            <div style={{ 
+              display: "grid", 
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", 
+              gap: 16 
+            }}>
+              {catApps.map(app => {
+                const isConnected = connected.includes(app.id)
+                const isConnecting = connecting === app.id
+                
+                return (
+                  <div key={app.id} style={{ 
+                    padding: 16, 
+                    border: "1px solid var(--stroke)", 
+                    borderRadius: 12,
+                    background: isConnected ? "var(--surface2)" : "transparent",
+                    transition: "all 0.2s"
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+                      <div style={{ 
+                        width: 40, height: 40, 
+                        background: "var(--bg)", 
+                        border: "1px solid var(--stroke)", 
+                        borderRadius: 10, 
+                        display: "flex", alignItems: "center", justifyContent: "center" 
+                      }}>
+                        {app.icon}
+                      </div>
+                      <div style={{ fontSize: 10, fontWeight: 800, padding: "2px 8px", background: "var(--stroke)", borderRadius: 10, color: "var(--muted)", textTransform: "uppercase" }}>
+                        {app.free}
+                      </div>
+                    </div>
+                    
+                    <h5 style={{ margin: "0 0 4px 0", fontSize: 14, fontWeight: 800, color: "var(--fg)" }}>{app.label}</h5>
+                    <p style={{ margin: "0 0 16px 0", fontSize: 12, color: "var(--muted)", lineHeight: 1.5, minHeight: 36 }}>
+                      {app.desc}
+                    </p>
+
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {isConnected ? (
+                        <>
+                          <div style={{ 
+                            flex: 1, height: 36, 
+                            display: "flex", alignItems: "center", justifyContent: "center", 
+                            gap: 6, background: "#ecfdf5", color: "#059669", 
+                            borderRadius: 8, fontSize: 12, fontWeight: 800 
+                          }}>
+                            <Check size={12} strokeWidth={4} /> Connected
+                          </div>
+                          <button 
+                            className="stIntConfigBtn" 
+                            style={{ width: 36, height: 36, padding: 0 }}
+                            onClick={() => showToast("Configuration coming soon.", "info")}
+                          >
+                            <Settings size={14} />
+                          </button>
+                          <button 
+                            className="stIntUnlinkBtn" 
+                            style={{ width: 36, height: 36, padding: 0 }}
+                            onClick={() => handleDisconnect(app.id)}
+                          >
+                            <X size={14} />
+                          </button>
+                        </>
+                      ) : (
+                        <button 
+                          className="stPrimaryBtn" 
+                          style={{ width: "100%", height: 36, padding: 0, gap: 8 }}
+                          onClick={() => handleConnect(app.id)}
+                          disabled={isConnecting}
+                        >
+                          {isConnecting ? <RefreshCcw size={14} className="stSpin" /> : <Plug size={14} />}
+                          {isConnecting ? "Connecting..." : "Connect"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+
+      <div className="stInfoBox" style={{ marginTop: 32 }}>
+        <Info size={18} />
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: "var(--fg)", marginBottom: 4 }}>Need a custom integration?</div>
+          <p style={{ fontSize: 13, color: "var(--muted)", margin: 0, lineHeight: 1.5 }}>
+            Our enterprise plan supports webhooks and custom API connectors. Reach out to our solution architects to build a bespoke workflow for your business.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+/* ═══ SHIFT PLANNING ═══════════════════════════════════════════════ */
+function ShiftPlanningSection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Shift Planning & Rosters" subtitle="Configure drag-and-drop scheduling and rotating shift rules." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Enable Rotating Shifts</div>
+            <div className="stToggleDesc">Automatically cycle employees through morning, afternoon, and night shifts.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#EC4899" />
+        </div>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Auto Shift Assignment</div>
+            <div className="stToggleDesc">AI-suggested rosters based on availability and labor laws.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} accent="#10B981" />
+        </div>
+        <Field label="Default Shift Duration (Hours)">
+          <input className="stInput" type="number" defaultValue={8} onChange={markDirty} />
+        </Field>
+      </div>
+      <div className="stCard">
+        <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 800 }}>Weekly Roster Template</h4>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+          {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+            <div key={i} style={{ padding: "8px 4px", background: i < 5 ? "#EFF0FE" : "var(--stroke2)", borderRadius: 4, textAlign: "center", fontSize: 11, fontWeight: 700, color: i < 5 ? "#1A56DB" : "var(--muted)" }}>
+              {d}<br/><span style={{ fontSize: 9 }}>{i < 5 ? "8h" : "OFF"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ EXPENSES ═════════════════════════════════════════════════════ */
+function ExpensesSection({ markDirty, showToast }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Expenses & Reimbursements" subtitle="Manage employee claims, receipt uploads, and travel rules." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Require Receipt Upload</div>
+            <div className="stToggleDesc">All expense claims must have a valid document attached.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#F97316" />
+        </div>
+        <Field label="Max Auto-Approval Limit (₹)">
+          <input className="stInput" type="number" defaultValue={500} onChange={markDirty} />
+        </Field>
+      </div>
+      <div className="stCard">
+        <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 800 }}>Active Expense Categories</h4>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {["Travel", "Meals", "Office Supplies", "Internet", "Hardware"].map(c => (
+            <div key={c} style={{ padding: "6px 12px", background: "var(--surface2)", borderRadius: 20, fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, border: "1px solid var(--stroke)" }}>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#F97316" }} /> {c}
+            </div>
+          ))}
+          <button className="stGhostBtn" style={{ fontSize: 11, padding: "4px 8px" }} onClick={() => showToast("Category editor coming soon.", "info")}><Plus size={12} /> Add Category</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ PRODUCTIVITY ═════════════════════════════════════════════════ */
+function ProductivitySection({ markDirty }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Productivity Analytics" subtitle="Monitor app usage, idle time, and focus scores." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Idle Detection</div>
+            <div className="stToggleDesc">Mark time as 'Idle' after 5 minutes of inactivity.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#06B6D4" />
+        </div>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Website & App Tracking</div>
+            <div className="stToggleDesc">Categorize URL/App usage into 'Productive' or 'Distracting'.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} accent="#F43F5E" />
+        </div>
+      </div>
+      <div className="stCard">
+        <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 800 }}>Focus Score Calculation</h4>
+        <div style={{ padding: 16, background: "var(--surface2)", borderRadius: 12, border: "1px solid var(--stroke)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: "var(--muted)" }}>Current Algorithm</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#06B6D4" }}>v2.4 (Enterprise)</span>
+          </div>
+          <div style={{ height: 4, background: "var(--stroke2)", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{ width: "75%", height: "100%", background: "#06B6D4" }} />
+          </div>
+          <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>Weight: 40% Active Hours, 40% Task Completion, 20% App Focus.</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ REPORTS ══════════════════════════════════════════════════════ */
+function ReportsSection({ showToast }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Reports & Analytics" subtitle="Export your data to Excel, PDF or sync with BI tools." />
+      <div className="stCard">
+        <h4 style={{ margin: "0 0 16px 0", fontSize: 14, fontWeight: 800 }}>Scheduled Reports</h4>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {[
+            { name: "Monthly Attendance", type: "PDF", freq: "Monthly", next: "May 1, 2026" },
+            { name: "Weekly Timesheets", type: "XLSX", freq: "Weekly", next: "Monday, 9 AM" },
+            { name: "Late Mark Summary", type: "CSV", freq: "Daily", next: "Tomorrow, 8 PM" },
+          ].map((r, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, background: "var(--surface2)", borderRadius: 8, border: "1px solid var(--stroke)" }}>
+              <div style={{ padding: 8, background: "var(--stroke)", borderRadius: 6 }}><ScrollText size={15} color="var(--muted)" /></div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>{r.name}</div>
+                <div style={{ fontSize: 11, color: "var(--muted)" }}>{r.type} · {r.freq} · Next: {r.next}</div>
+              </div>
+              <button className="stGhostBtn" style={{ padding: 6 }} onClick={() => showToast(`Downloading ${r.name}...`)}><Download size={14} /></button>
+            </div>
+          ))}
+        </div>
+        <button className="stSecondaryBtn" style={{ marginTop: 16, width: "100%" }} onClick={() => showToast("Report builder coming soon.", "info")}><Plus size={14} /> Create New Schedule</button>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ DEVICES ══════════════════════════════════════════════════════ */
+function DevicesSection({ markDirty, showToast }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Device Management" subtitle="Control allowed hardware and kiosk modes." />
+      <div className="stCard">
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Restrict to Allowed Devices</div>
+            <div className="stToggleDesc">Only registered devices can access the clock-in portal.</div>
+          </div>
+          <ToggleSwitch checked={false} onChange={markDirty} accent="#64748B" />
+        </div>
+        <div className="stToggleRow">
+          <div>
+            <div className="stToggleLabel">Desktop App Control</div>
+            <div className="stToggleDesc">Force use of Caltrack Desktop for time tracking on workstations.</div>
+          </div>
+          <ToggleSwitch checked={true} onChange={markDirty} accent="#1A56DB" />
+        </div>
+      </div>
+      <div className="stCard">
+        <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 800 }}>Registered Kiosks</h4>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 12, background: "#F1F5F9", borderRadius: 8 }}>
+          <Smartphone size={18} color="#64748B" />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 700 }}>Front Desk iPad (Main Entry)</div>
+            <div style={{ fontSize: 11, color: "#64748B" }}>ID: K-8812 · Last Online: 2 mins ago</div>
+          </div>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981" }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ DEVELOPER ════════════════════════════════════════════════════ */
+function DeveloperSection({ showToast }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Developer / API" subtitle="Manage API keys and webhook endpoints for custom integrations." />
+      <div className="stCard">
+        <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 800 }}>API Keys</h4>
+        <div style={{ position: "relative" }}>
+          <input className="stInput" readOnly value="sk_live_51MvXp3S9X2mR7q2..." style={{ fontFamily: "monospace", paddingRight: 40, background: "var(--surface2)" }} />
+          <button style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--muted)" }} onClick={() => { navigator.clipboard.writeText("sk_live_51MvXp3S9X2mR7q2..."); showToast("API Key copied!") }}>
+            <Copy size={14} />
+          </button>
+        </div>
+        <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 8 }}>Treat your API keys as passwords. Do not share them.</p>
+        <button className="stSecondaryBtn" style={{ marginTop: 12 }} onClick={() => showToast("Regenerating API Key...", "warn")}>Regenerate Secret</button>
+      </div>
+      <div className="stCard">
+        <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 800 }}>Webhooks</h4>
+        <div style={{ padding: 12, border: "1px dashed var(--stroke)", borderRadius: 8, textAlign: "center", color: "var(--muted)", fontSize: 12 }}>
+          No active webhooks. <button className="stLinkBtn" style={{ fontWeight: 700, color: "#1A56DB" }} onClick={() => showToast("Webhook editor coming soon.", "info")}>Add Endpoint</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ═══ DATA & BACKUPS ═══════════════════════════════════════════════ */
+function DataBackupsSection({ showToast }) {
+  return (
+    <div className="stPanel">
+      <SectionHeader title="Data & Backups" subtitle="Export, restore, or manage your organization's data retention." />
+      <div className="stCard">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <button className="stSecondaryBtn" style={{ height: 80, flexDirection: "column", gap: 8 }} onClick={() => showToast("Full backup initiated...")}>
+            <Database size={20} />
+            Create Full Backup
+          </button>
+          <button className="stSecondaryBtn" style={{ height: 80, flexDirection: "column", gap: 8 }} onClick={() => showToast("Exporting data as CSV...")}>
+            <Download size={20} />
+            Export Organization Data
+          </button>
+        </div>
+      </div>
+      <div className="stCard">
+        <h4 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 800 }}>Retention Policy</h4>
+        <Field label="Keep Activity Logs for">
+          <select className="stInput stSelect">
+            <option>90 Days</option>
+            <option>1 Year</option>
+            <option>5 Years (Compliance)</option>
+            <option>Indefinitely</option>
+          </select>
+        </Field>
+      </div>
+    </div>
+  )
+}

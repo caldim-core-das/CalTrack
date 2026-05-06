@@ -39,7 +39,16 @@ import {
   Tag,
   Plug,
   Timer,
-  Rocket
+  Rocket,
+  Bell,
+  ShieldCheck,
+  ScrollText,
+  Workflow,
+  Shield,
+  Smartphone,
+  Palette,
+  Terminal,
+  Database
 } from "lucide-react"
 
 const NAV = [
@@ -59,14 +68,31 @@ const NAV = [
     to: routes.settings,
     icon: <Settings size={18} strokeWidth={2.5} color="#64748B" />,
     children: [
-      { label: "People", to: routes.settings_people, icon: <Users size={17} strokeWidth={2.2} color="#A855F7" /> },
-      { label: "Time Tracking", to: routes.settings_timetracking, icon: <Timer size={17} strokeWidth={2.2} color="#06B6D4" /> },
+      { label: "My Profile", to: routes.settings_profile, icon: <User size={17} strokeWidth={2.2} color="#64748B" /> },
+      { label: "Preferences", to: routes.settings_preferences, icon: <SlidersHorizontal size={17} strokeWidth={2.2} color="#64748B" /> },
+      { label: "People", to: routes.settings_people, icon: <Users size={17} strokeWidth={2.2} color="#A855F7" />, adminOnly: true },
+      { label: "Time Tracking", to: routes.settings_timetracking, icon: <Clock size={17} strokeWidth={2.2} color="#06B6D4" /> },
+      { label: "Attendance Policies", to: routes.settings_attendance, icon: <SlidersHorizontal size={17} strokeWidth={2.2} color="#10B981" /> },
       { label: "Work Schedules", to: routes.settings_schedules, icon: <Sun size={17} strokeWidth={2.2} color="#F59E0B" /> },
+      { label: "Shift Planning", to: routes.settings_shiftplanner, icon: <CalendarRange size={17} strokeWidth={2.2} color="#EC4899" />, adminOnly: true },
       { label: "Time Off & Holidays", to: routes.settings_holidays, icon: <Briefcase size={17} strokeWidth={2.2} color="#F43F5E" /> },
-      { label: "Locations", to: routes.settings_locations, icon: <MapPin size={17} strokeWidth={2.2} color="#6366F1" /> },
-      { label: "Activities & Projects", to: routes.settings_projects, icon: <Tag size={17} strokeWidth={2.2} color="#10B981" /> },
-      { label: "Organization", to: routes.settings_organization, icon: <Settings size={17} strokeWidth={2.2} color="#64748B" /> },
+      { label: "Payroll", to: routes.settings_payroll, icon: <Banknote size={17} strokeWidth={2.2} color="#EAB308" />, adminOnly: true },
+      { label: "Expenses", to: routes.settings_expenses, icon: <CreditCard size={17} strokeWidth={2.2} color="#F97316" />, adminOnly: true },
+      { label: "Approval Workflows", to: routes.settings_workflows, icon: <Workflow size={17} strokeWidth={2.2} color="#2563EB" />, adminOnly: true },
+      { label: "Productivity", to: routes.settings_productivity, icon: <Timer size={17} strokeWidth={2.2} color="#06B6D4" />, adminOnly: true },
+      { label: "Reports & Analytics", to: routes.settings_reports, icon: <BarChart3 size={17} strokeWidth={2.2} color="#F59E0B" />, adminOnly: true },
+      { label: "Notifications", to: routes.settings_notifications, icon: <Bell size={17} strokeWidth={2.2} color="#6366F1" /> },
+      { label: "Security", to: routes.settings_security, icon: <Shield size={17} strokeWidth={2.2} color="#10B981" /> },
+      { label: "Permissions / RBAC", to: routes.settings_rbac, icon: <ShieldCheck size={17} strokeWidth={2.2} color="#10B981" />, adminOnly: true },
+      { label: "Audit Log", to: routes.settings_audit, icon: <ScrollText size={17} strokeWidth={2.2} color="#64748B" />, adminOnly: true },
+      { label: "Devices", to: routes.settings_devices, icon: <Smartphone size={17} strokeWidth={2.2} color="#64748B" />, adminOnly: true },
+      { label: "Location Tracking", to: routes.settings_location, icon: <MapPin size={17} strokeWidth={2.2} color="#F97316" />, adminOnly: true },
+      { label: "Branding", to: routes.settings_branding, icon: <Palette size={17} strokeWidth={2.2} color="#EC4899" />, adminOnly: true },
+      { label: "Organization", to: routes.settings_organization, icon: <Settings size={17} strokeWidth={2.2} color="#64748B" />, adminOnly: true },
       { label: "Integrations", to: routes.settings_integrations, icon: <Plug size={17} strokeWidth={2.2} color="#2563EB" /> },
+      { label: "Developer / API", to: routes.settings_developer, icon: <Terminal size={17} strokeWidth={2.2} color="#64748B" />, adminOnly: true },
+      { label: "Billing", to: routes.settings_billing, icon: <CreditCard size={17} strokeWidth={2.2} color="#EAB308" />, adminOnly: true },
+      { label: "Data & Backups", to: routes.settings_data, icon: <Database size={17} strokeWidth={2.2} color="#6366F1" />, adminOnly: true },
     ],
   },
 ]
@@ -128,7 +154,7 @@ function SidebarTooltip({ tooltip }) {
 }
 
 /* ── Submenu Flyout ────────────────────────────────────────── */
-function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave }) {
+function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user }) {
   if (!flyout) return null
   const style = {
     position: "fixed",
@@ -165,9 +191,11 @@ function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave }) {
         <div style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
           {flyout.label}
         </div>
-        {flyout.children.map((child) => (
-          <NavLink
-            key={child.to}
+        {flyout.children
+          .filter(child => !child.adminOnly || user?.role === 'admin')
+          .map((child) => (
+            <NavLink
+              key={child.to}
             to={child.to}
             style={({ isActive }) => ({
               display: "flex",
@@ -369,6 +397,12 @@ export function AppShell() {
   }, [])
 
   // --- GPS Auto Clock-in/out & Reminders ---
+  useEffect(() => {
+    if (location.pathname.startsWith("/settings")) {
+      setSettingsExpanded(true)
+    }
+  }, [location.pathname])
+
   useEffect(() => {
     if (!user) return
 
@@ -1139,10 +1173,15 @@ export function AppShell() {
                       className={["navItem", location.pathname.startsWith(item.to) ? "active" : ""].filter(Boolean).join(" ")}
                       onClick={(e) => {
                         if (sidebarCollapsed) {
+                          navigate(item.to)
                           if (flyout) setFlyout(null)
                           else showFlyout(item, e)
                         } else {
-                          setSettingsExpanded(!settingsExpanded)
+                          // For parents with children (like Settings):
+                          // 1. Navigate to the parent route
+                          // 2. Expand the section
+                          navigate(item.to)
+                          setSettingsExpanded(true)
                         }
                       }}
                       onMouseEnter={(e) => {
@@ -1167,10 +1206,12 @@ export function AppShell() {
                     </button>
                     {!sidebarCollapsed && settingsExpanded && (
                       <div className="navChildren">
-                        {item.children.map((child) => (
-                          <NavLink
-                            key={child.to}
-                            to={child.to}
+                        {item.children
+                          .filter(child => !child.adminOnly || user?.role === 'admin')
+                          .map((child) => (
+                            <NavLink
+                              key={child.to}
+                              to={child.to}
                             className={({ isActive }) =>
                               ["navItem subItem", isActive ? "active" : ""].filter(Boolean).join(" ")
                             }
@@ -1222,6 +1263,7 @@ export function AppShell() {
         flyout={flyout}
         onMouseEnter={cancelHideFlyout}
         onMouseLeave={hideFlyout}
+        user={user}
       />
     </div>
   )
