@@ -223,19 +223,13 @@ export function NotificationCenter() {
     setError("")
     try {
       const tasksUrl = role === "admin" ? "/tasks/admin/" : "/tasks/my/"
-      const [tasksRes, leavesRes, shiftsRes, payrollRes, timesheetRes] = await Promise.allSettled([
-        apiRequest(tasksUrl),
-        apiRequest("/leaves/"),
-        apiRequest("/scheduling/shifts/"),
-        apiRequest("/payroll/records/"),
-        apiRequest("/time/timesheets/"),
-      ])
-
-      const tasks = tasksRes.status === "fulfilled" ? tasksRes.value : []
-      const leaves = leavesRes.status === "fulfilled" ? leavesRes.value : []
-      const shifts = shiftsRes.status === "fulfilled" ? shiftsRes.value : []
-      const payroll = payrollRes.status === "fulfilled" ? payrollRes.value : []
-      const timesheet = timesheetRes.status === "fulfilled" ? timesheetRes.value : null
+      
+      // Sequential fetches to avoid connection pool exhaustion (EMAXCONNSESSION)
+      let tasks = []; try { tasks = await apiRequest(tasksUrl) } catch(e) {}
+      let leaves = []; try { leaves = await apiRequest("/leaves/") } catch(e) {}
+      let shifts = []; try { shifts = await apiRequest("/scheduling/shifts/") } catch(e) {}
+      let payroll = []; try { payroll = await apiRequest("/payroll/records/") } catch(e) {}
+      let timesheet = null; try { timesheet = await apiRequest("/time/timesheets/") } catch(e) {}
 
       const next = buildNotifications({ tasks, leaves, shifts, payroll, timesheet, isAdmin: role === "admin" })
       setItems(next)
@@ -249,7 +243,7 @@ export function NotificationCenter() {
 
   useEffect(() => {
     load()
-    const t = setInterval(load, 60_000)
+    const t = setInterval(load, 180_000) // 3 minutes
     return () => clearInterval(t)
   }, [load])
 

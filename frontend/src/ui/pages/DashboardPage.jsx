@@ -8,7 +8,6 @@ import "leaflet/dist/leaflet.css"
 
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
-import "./DashboardPage.css"
 
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler)
@@ -158,35 +157,35 @@ export function DashboardPage() {
 
   function KpiDiagramSide({ card, side }) {
     const desc = (
-      <div className={`anl-kpi-di-desc anl-kpi-di-desc-${side}`}>
-        <div className="anl-kpi-di-descTitle" style={{ color: card.color }}>
+      <div className={`flex flex-col ${side === 'left' ? 'items-end text-right max-lg:items-start max-lg:text-left' : 'items-start text-left'} max-w-[320px] mb-2`}>
+        <div className="font-bold text-[0.95rem] tracking-[0.02em]" style={{ color: card.color }}>
           {card.value}
         </div>
-        <div className="anl-kpi-di-descText">{card.sub}</div>
+        <div className="text-slate-400 text-[0.9rem] mt-1">{card.sub}</div>
       </div>
     )
 
     const pill = (
-      <div className={`anl-kpi-di-pill anl-kpi-di-pill-${side}`} style={{ backgroundColor: card.color }}>
-        <div className="anl-kpi-di-pillInner">
-          <div className="anl-kpi-di-pillLabel">{card.title}</div>
+      <div className={`inline-flex items-center rounded-full min-h-[54px] shadow-[0_10px_22px_rgba(15,23,42,0.08)] px-2.5 py-2 gap-2.5`} style={{ backgroundColor: card.color }}>
+        <div className="py-1 px-3">
+          <div className="text-white font-bold text-[0.92rem] tracking-[0.01em]">{card.title}</div>
         </div>
-        <div className="anl-kpi-di-pillIcon">
+        <div className="w-[42px] h-[42px] rounded-full bg-white flex items-center justify-center flex-none">
           <span style={{ color: card.color, display: "flex" }}>{card.icon}</span>
         </div>
       </div>
     )
 
     const connector = (
-      <div className={`anl-kpi-di-connector anl-kpi-di-connector-${side}`}>
-        <span className="anl-kpi-di-connectorLine" />
-        <span className="anl-kpi-di-connectorDot" style={{ backgroundColor: card.color }} />
+      <div className={`flex items-center gap-2 mt-2.5 ${side === 'left' ? 'justify-end max-lg:justify-start' : 'justify-start'}`}>
+        <span className="h-[2px] bg-slate-300/35 max-lg:w-[38px] lg:w-[62px]" />
+        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
       </div>
     )
 
     if (side === "left") {
       return (
-        <div className="anl-kpi-di-side anl-kpi-di-side-left">
+        <div className="grid grid-cols-1 items-center max-lg:justify-items-stretch max-lg:text-left lg:justify-items-end lg:text-right">
           {desc}
           {pill}
           {connector}
@@ -195,7 +194,7 @@ export function DashboardPage() {
     }
 
     return (
-      <div className="anl-kpi-di-side anl-kpi-di-side-right">
+      <div className="grid grid-cols-1 items-center max-lg:justify-items-stretch max-lg:text-left lg:justify-items-start lg:text-left">
         {connector}
         {pill}
         {desc}
@@ -687,17 +686,16 @@ export function DashboardPage() {
     const label = employees > 0 ? employees : (total > 0 ? total : "")
 
     return L.divIcon({
-      className: "anl-loc-dot-icon",
+      className: "bg-transparent border-none",
       iconSize: [size, size],
       iconAnchor: [half, half],
       popupAnchor: [0, -half - 4],
       html: `
-        <div class="anl-loc-dot ${pulse ? 'anl-loc-dot--pulse' : ''}" style="
-          width:${size}px; height:${size}px;
-          background: ${color};
-          box-shadow: 0 0 0 6px ${glow}, 0 4px 14px rgba(0,0,0,0.18);
-        ">
-          <span class="anl-loc-dot-label">${label}</span>
+        <div class="relative" style="width:${size}px; height:${size}px;">
+          ${pulse ? `<div class="absolute inset-0 rounded-full animate-ping opacity-60" style="background: ${color};"></div>` : ''}
+          <div class="absolute inset-0 rounded-full flex items-center justify-center transition-transform duration-300 hover:scale-110 hover:z-[1000] shadow-[0_4px_14px_rgba(0,0,0,0.18)]" style="background: ${color}; box-shadow: 0 0 0 6px ${glow};">
+            <span class="text-white font-extrabold text-[13px] drop-shadow-md tracking-[0.02em] pointer-events-none">${label}</span>
+          </div>
         </div>
       `,
     })
@@ -707,9 +705,9 @@ export function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="anl-layout">
-        <div className="anl-loading">
-          <Loader2 className="spin" size={24} />
+      <div className="p-6 max-w-[1600px] mx-auto flex flex-col gap-6 bg-slate-50 min-h-screen">
+        <div className="flex items-center justify-center gap-3 h-[50vh] text-slate-500 text-lg font-medium">
+          <Loader2 className="animate-spin" size={24} />
           <span>Loading analytics…</span>
         </div>
       </div>
@@ -717,267 +715,267 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="anl-layout">
+    <div className="p-6 max-w-[1600px] mx-auto flex flex-col gap-6 bg-slate-50 min-h-screen">
       {error && (
-        <div className="anl-error">
+        <div className="flex items-center gap-2 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200 font-medium">
           <AlertCircle size={18} /> {error}
         </div>
       )}
 
-      <div className="anl-kpi-diagram-card">
-        <div className="anl-kpi-diagram-header">
-          <div className="anl-kpi-diagram-title">Key Performance Indicators</div>
-          <div className="anl-kpi-diagram-subtitle">Strategic overview</div>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 pt-5 pb-1.5">
+          <div className="text-[1.25rem] font-bold text-slate-900 tracking-tight">Key Performance Indicators</div>
+          <div className="text-[0.9rem] text-slate-400 font-medium mt-1">Strategic overview</div>
         </div>
 
-        <div className="anl-kpi-diagram">
-          <div className="anl-kpi-pos-center">
-            <div className="anl-kpi-di-center">
-              <div className="anl-kpi-di-ring">
-                <span className="anl-kpi-di-dot anl-kpi-di-dot-1" style={{ backgroundColor: kpiEmp.color }} />
-                <span className="anl-kpi-di-dot anl-kpi-di-dot-2" style={{ backgroundColor: kpiHrs.color }} />
-                <span className="anl-kpi-di-dot anl-kpi-di-dot-3" style={{ backgroundColor: kpiPay.color }} />
-                <span className="anl-kpi-di-dot anl-kpi-di-dot-4" style={{ backgroundColor: kpiShft.color }} />
-                <span className="anl-kpi-di-dot anl-kpi-di-dot-5" style={{ backgroundColor: kpiLvs.color }} />
-                <span className="anl-kpi-di-dot anl-kpi-di-dot-6" style={{ backgroundColor: kpiTsk.color }} />
+        <div className="p-[18px] pb-[22px] grid grid-cols-1 lg:grid-cols-[1fr_220px_1fr] lg:grid-rows-[repeat(3,minmax(96px,auto))] gap-x-[18px] gap-y-[14px] items-center">
+          <div className="flex justify-center items-center max-lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:row-span-3">
+            <div className="relative w-[180px] h-[180px] grid place-items-center">
+              <div className="absolute inset-0 rounded-full border-2 border-dashed border-slate-400/60">
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] -top-[7px] left-1/2 -translate-x-1/2" style={{ backgroundColor: kpiEmp.color }} />
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] top-[24px] right-[12px]" style={{ backgroundColor: kpiHrs.color }} />
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] top-1/2 -right-[7px] -translate-y-1/2" style={{ backgroundColor: kpiPay.color }} />
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] bottom-[24px] right-[12px]" style={{ backgroundColor: kpiShft.color }} />
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] -bottom-[7px] left-1/2 -translate-x-1/2" style={{ backgroundColor: kpiLvs.color }} />
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] top-1/2 -left-[7px] -translate-y-1/2" style={{ backgroundColor: kpiTsk.color }} />
               </div>
-              <div className="anl-kpi-di-core">
+              <div className="w-[86px] h-[86px] rounded-full bg-white border border-slate-200 shadow-[0_10px_25px_rgba(15,23,42,0.08)] flex items-center justify-center text-slate-900 z-10">
                 <Activity size={26} />
               </div>
             </div>
           </div>
 
-          <div className="anl-kpi-pos-l1">
+          <div className="max-lg:col-span-1 lg:col-start-1 lg:row-start-1">
             <KpiDiagramSide card={kpiEmp} side="left" />
           </div>
-          <div className="anl-kpi-pos-r1">
+          <div className="max-lg:col-span-1 lg:col-start-3 lg:row-start-1">
             <KpiDiagramSide card={kpiHrs} side="right" />
           </div>
 
-          <div className="anl-kpi-pos-l2">
+          <div className="max-lg:col-span-1 lg:col-start-1 lg:row-start-2">
             <KpiDiagramSide card={kpiTsk} side="left" />
           </div>
-          <div className="anl-kpi-pos-r2">
+          <div className="max-lg:col-span-1 lg:col-start-3 lg:row-start-2">
             <KpiDiagramSide card={kpiPay} side="right" />
           </div>
 
-          <div className="anl-kpi-pos-l3">
+          <div className="max-lg:col-span-1 lg:col-start-1 lg:row-start-3">
             <KpiDiagramSide card={kpiLvs} side="left" />
           </div>
-          <div className="anl-kpi-pos-r3">
+          <div className="max-lg:col-span-1 lg:col-start-3 lg:row-start-3">
             <KpiDiagramSide card={kpiShft} side="right" />
           </div>
         </div>
       </div>
 
       {/* ── Row 1: Hours by Employee + Task Status Donut + Leave Status Pie ── */}
-      <div className="anl-row anl-row-3">
-        <div className="anl-card anl-card-wide">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Hours by Employee</span>
-            <span className="anl-card-badge">Last 30 days</span>
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-[2fr_1fr_1fr]">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Hours by Employee</span>
+            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">Last 30 days</span>
           </div>
-          <div className="anl-card-body anl-chart-h300">
+          <div className="p-5 h-[300px] relative">
             {hoursByEmployee.length ? (
               <Bar data={hbeData} options={hbeOptions} />
             ) : (
-              <div className="anl-empty">No time data available</div>
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-300">No time data available</div>
             )}
           </div>
         </div>
 
-        <div className="anl-card">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Task Status</span>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Task Status</span>
           </div>
-          <div className="anl-card-body anl-chart-h300">
+          <div className="p-5 h-[300px] relative">
             {tsLabels.length ? (
               <Doughnut data={tsData} options={donutOptions} />
             ) : (
-              <div className="anl-empty">No tasks</div>
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-300">No tasks</div>
             )}
           </div>
         </div>
 
-        <div className="anl-card">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Leave Status</span>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Leave Status</span>
           </div>
-          <div className="anl-card-body anl-chart-h300">
+          <div className="p-5 h-[300px] relative">
             {lsLabels.length ? (
               <Doughnut data={lsData} options={pieOptions} />
             ) : (
-              <div className="anl-empty">No leave data</div>
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-300">No leave data</div>
             )}
           </div>
         </div>
       </div>
 
       {/* ── Row 2: Daily Hours Trend (full width) ── */}
-      <div className="anl-row anl-row-1">
-        <div className="anl-card">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Daily Hours Trend</span>
-            <span className="anl-card-badge">Last 30 days</span>
+      <div className="grid gap-6 grid-cols-1">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Daily Hours Trend</span>
+            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">Last 30 days</span>
           </div>
-          <div className="anl-card-body anl-chart-h280">
+          <div className="p-5 h-[280px] relative">
             <Line data={trendData} options={trendOptions} />
           </div>
         </div>
       </div>
 
       {/* ── Row 3: Attendance + Task Category + Payroll Trend ── */}
-      <div className="anl-row anl-row-3">
-        <div className="anl-card">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Daily Attendance</span>
-            <span className="anl-card-badge">Last 7 days</span>
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Daily Attendance</span>
+            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">Last 7 days</span>
           </div>
-          <div className="anl-card-body anl-chart-h280">
+          <div className="p-5 h-[280px] relative">
             <Bar data={attData} options={attOptions} />
           </div>
         </div>
 
-        <div className="anl-card">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Tasks by Category</span>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Tasks by Category</span>
           </div>
-          <div className="anl-card-body anl-chart-h280">
+          <div className="p-5 h-[280px] relative">
             {tcLabels.length ? (
               <Bar data={tcData} options={tcOptions} />
             ) : (
-              <div className="anl-empty">No categorized tasks</div>
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-300">No categorized tasks</div>
             )}
           </div>
         </div>
 
-        <div className="anl-card">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Payroll Trend</span>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Payroll Trend</span>
           </div>
-          <div className="anl-card-body anl-chart-h280">
+          <div className="p-5 h-[280px] relative">
             {payrollTrend.length ? (
               <Bar data={ptData} options={ptOptions} />
             ) : (
-              <div className="anl-empty">No payroll data</div>
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-300">No payroll data</div>
             )}
           </div>
         </div>
       </div>
 
       {/* ── Row 4: Location-wise Analysis ── */}
-      <div className="anl-row anl-row-3">
-        <div className="anl-card">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Employees by Location</span>
-            <span className="anl-card-badge">{employeesByLoc.length} locations</span>
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Employees by Location</span>
+            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">{employeesByLoc.length} locations</span>
           </div>
-          <div className="anl-card-body anl-chart-h300">
+          <div className="p-5 h-[300px] relative">
             {employeesByLoc.length ? (
               <Bar data={empLocData} options={empLocOptions} />
             ) : (
-              <div className="anl-empty">No locations configured</div>
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-300">No locations configured</div>
             )}
           </div>
         </div>
 
-        <div className="anl-card">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Tasks by Location</span>
-            <span className="anl-card-badge">Active vs Total</span>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Tasks by Location</span>
+            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">Active vs Total</span>
           </div>
-          <div className="anl-card-body anl-chart-h300">
+          <div className="p-5 h-[300px] relative">
             {tasksByLoc.length ? (
               <Bar data={taskLocData} options={taskLocOptions} />
             ) : (
-              <div className="anl-empty">No location task data</div>
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-300">No location task data</div>
             )}
           </div>
         </div>
 
-        <div className="anl-card">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Hours by Location</span>
-            <span className="anl-card-badge">Last 30 days</span>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Hours by Location</span>
+            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">Last 30 days</span>
           </div>
-          <div className="anl-card-body anl-chart-h300">
+          <div className="p-5 h-[300px] relative">
             {hoursByLoc.length ? (
               <Bar data={hrsLocData} options={hrsLocOptions} />
             ) : (
-              <div className="anl-empty">No location hours data</div>
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-300">No location hours data</div>
             )}
           </div>
         </div>
       </div>
 
       {/* ── Row 5: Location Map — Innovative Full-Width ── */}
-      <div className="anl-row anl-row-1">
-        <div className="anl-locmap-card">
+      <div className="grid gap-6 grid-cols-1">
+        <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(15,23,42,0.08)] border border-slate-200 overflow-hidden">
           {/* Dark Gradient Header */}
-          <div className="anl-locmap-header">
-            <div className="anl-locmap-header-left">
-              <div className="anl-locmap-title">
+          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-7 py-5 flex justify-between items-center flex-wrap gap-3">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2.5 text-[1.15rem] font-bold text-slate-100 tracking-tight">
                 <MapPin size={20} />
-                <span>Location <span className="anl-locmap-title-accent">Distribution</span> of Employees</span>
+                <span>Location <span className="bg-gradient-to-br from-indigo-400 to-indigo-300 text-transparent bg-clip-text italic">Distribution</span> of Employees</span>
               </div>
-              <div className="anl-locmap-subtitle">
+              <div className="text-[0.82rem] text-slate-400 font-medium pl-[30px]">
                 {locationSummary.length} locations · {locationSummary.reduce((s, l) => s + (l.employees || 0), 0)} total employees
               </div>
             </div>
-            <div className="anl-locmap-legend">
-              <div className="anl-locmap-legend-item">
-                <span className="anl-locmap-legend-dot" style={{ background: "#10B981" }} />
+            <div className="flex gap-4.5">
+              <div className="flex items-center gap-1.5 text-[0.78rem] font-semibold text-slate-300 tracking-wide">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(255,255,255,0.15)]" />
                 Clocked In
               </div>
-              <div className="anl-locmap-legend-item">
-                <span className="anl-locmap-legend-dot" style={{ background: "#F43F5E" }} />
+              <div className="flex items-center gap-1.5 text-[0.78rem] font-semibold text-slate-300 tracking-wide ml-4">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(255,255,255,0.15)]" />
                 Clocked Out
               </div>
-              <div className="anl-locmap-legend-item">
-                <span className="anl-locmap-legend-dot" style={{ background: "#6366F1" }} />
+              <div className="flex items-center gap-1.5 text-[0.78rem] font-semibold text-slate-300 tracking-wide ml-4">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_6px_rgba(255,255,255,0.15)]" />
                 Assigned
               </div>
             </div>
           </div>
 
           {/* Map + Sidebar Layout */}
-          <div className="anl-locmap-body">
+          <div className="flex h-[460px]">
             {/* Sidebar location list */}
-            <div className="anl-locmap-sidebar">
-              <div className="anl-locmap-sidebar-title">Locations by Activity</div>
+            <div className="w-[280px] min-w-[280px] bg-slate-50 border-r border-slate-200 flex flex-col overflow-hidden">
+              <div className="px-5 pt-4 pb-2.5 text-xs font-bold text-slate-500 uppercase tracking-widest">Locations by Activity</div>
               {locationSummary.length ? (
-                <div className="anl-locmap-sidebar-list">
+                <div className="flex-1 overflow-y-auto px-3 pb-3 scrollbar-hide">
                   {locationSummary.map((loc) => {
                     const isHovered = hoveredLoc === loc.name
                     return (
                       <div
                         key={loc.name}
-                        className={`anl-locmap-sidebar-item ${isHovered ? 'anl-locmap-sidebar-item--active' : ''}`}
+                        className={`p-3.5 rounded-xl cursor-pointer transition-all duration-200 mb-1 ${isHovered ? 'bg-white shadow-[0_2px_8px_rgba(99,102,241,0.1)]' : 'hover:bg-white hover:shadow-[0_2px_8px_rgba(99,102,241,0.1)]'}`}
                         onMouseEnter={() => setHoveredLoc(loc.name)}
                         onMouseLeave={() => setHoveredLoc(null)}
                       >
-                        <div className="anl-locmap-sidebar-item-top">
-                          <div className="anl-locmap-sidebar-item-name">{loc.name}</div>
-                          <div className="anl-locmap-sidebar-item-count">{loc.employees || 0}</div>
+                        <div className="flex justify-between items-center mb-1.5">
+                          <div className="text-[0.88rem] font-bold text-slate-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-[180px]">{loc.name}</div>
+                          <div className="text-[0.95rem] font-extrabold text-indigo-600 min-w-[24px] text-right">{loc.employees || 0}</div>
                         </div>
-                        <div className="anl-locmap-sidebar-item-bar">
+                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden mb-1.5">
                           <div
-                            className="anl-locmap-sidebar-item-fill"
+                            className="h-full rounded-full transition-all duration-500 min-w-[4px]"
                             style={{
                               width: `${Math.min(100, Math.max(4, ((loc.employees || 0) / Math.max(1, ...locationSummary.map(l => l.employees || 0))) * 100))}%`,
                               background: (loc.clocked_in_now || 0) > 0 ? '#10B981' : '#6366F1',
                             }}
                           />
                         </div>
-                        <div className="anl-locmap-sidebar-item-meta">
+                        <div className="flex gap-2.5 text-[0.72rem] font-semibold">
                           {(loc.clocked_in_now || 0) > 0 && (
-                            <span style={{ color: '#10B981' }}>● {loc.clocked_in_now} in</span>
+                            <span className="text-emerald-500">● {loc.clocked_in_now} in</span>
                           )}
                           {(loc.clocked_out_today || 0) > 0 && (
-                            <span style={{ color: '#F43F5E' }}>● {loc.clocked_out_today} out</span>
+                            <span className="text-rose-500">● {loc.clocked_out_today} out</span>
                           )}
                           {(loc.clocked_in_now || 0) === 0 && (loc.clocked_out_today || 0) === 0 && (
-                            <span style={{ color: '#94A3B8' }}>No activity today</span>
+                            <span className="text-slate-400">No activity today</span>
                           )}
                         </div>
                       </div>
@@ -985,17 +983,17 @@ export function DashboardPage() {
                   })}
                 </div>
               ) : (
-                <div className="anl-locmap-sidebar-empty">No locations</div>
+                <div className="p-10 text-center text-slate-400 italic">No locations</div>
               )}
             </div>
 
             {/* Map */}
-            <div className="anl-locmap-map-wrap">
+            <div className="flex-1 relative min-h-[300px]">
               {locationSummary.length ? (
                 <MapContainer
                   center={mapCenter}
                   zoom={11}
-                  style={{ width: "100%", height: "100%" }}
+                  style={{ width: "100%", height: "100%", background: "#F1F5F9" }}
                   scrollWheelZoom={true}
                   zoomControl={false}
                 >
@@ -1011,31 +1009,31 @@ export function DashboardPage() {
                       icon={createLocationDotIcon(loc)}
                     >
                       <Popup className="anl-locmap-popup" offset={[0, -4]}>
-                        <div className="anl-locmap-popup-inner">
-                          <div className="anl-locmap-popup-title">{loc.name}</div>
-                          {loc.address && <div className="anl-locmap-popup-addr">{loc.address}</div>}
-                          <div className="anl-locmap-popup-stats">
-                            <div className="anl-locmap-popup-stat">
-                              <span className="anl-locmap-popup-stat-num" style={{ color: '#6366F1' }}>{loc.employees || 0}</span>
-                              <span>Employees</span>
+                        <div className="p-4">
+                          <div className="font-bold text-slate-900 text-base mb-1">{loc.name}</div>
+                          {loc.address && <div className="text-slate-500 text-xs mb-3">{loc.address}</div>}
+                          <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-3 mb-3">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-indigo-600 font-bold text-base">{loc.employees || 0}</span>
+                              <span className="text-slate-500 text-[10px] font-semibold uppercase">Employees</span>
                             </div>
-                            <div className="anl-locmap-popup-stat">
-                              <span className="anl-locmap-popup-stat-num" style={{ color: '#10B981' }}>{loc.clocked_in_now || 0}</span>
-                              <span>Clocked In</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-emerald-500 font-bold text-base">{loc.clocked_in_now || 0}</span>
+                              <span className="text-slate-500 text-[10px] font-semibold uppercase">Clocked In</span>
                             </div>
-                            <div className="anl-locmap-popup-stat">
-                              <span className="anl-locmap-popup-stat-num" style={{ color: '#F43F5E' }}>{loc.clocked_out_today || 0}</span>
-                              <span>Clocked Out</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-rose-500 font-bold text-base">{loc.clocked_out_today || 0}</span>
+                              <span className="text-slate-500 text-[10px] font-semibold uppercase">Clocked Out</span>
                             </div>
                           </div>
-                          <div className="anl-locmap-popup-hours">{loc.hours}h worked (30d)</div>
+                          <div className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-1.5 rounded-lg text-center">{loc.hours}h worked (30d)</div>
                         </div>
                       </Popup>
                     </Marker>
                   ))}
                 </MapContainer>
               ) : (
-                <div className="anl-empty" style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>No locations configured</div>
+                <div className="flex items-center justify-center h-full text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-300">No locations configured</div>
               )}
             </div>
           </div>
@@ -1043,85 +1041,83 @@ export function DashboardPage() {
       </div>
 
       {/* ── Row 5b: Clock-in Status Bar Chart (Full Width) ── */}
-      <div className="anl-row anl-row-1">
-        <div className="anl-card">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Clock-in Status by Location</span>
-            <span className="anl-card-badge">Today</span>
+      <div className="grid gap-6 grid-cols-1">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Clock-in Status by Location</span>
+            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">Today</span>
           </div>
-          <div className="anl-card-body" style={{ height: 320, position: 'relative' }}>
+          <div className="p-5 h-[320px] relative">
             {locationSummary.length ? (
               <Bar data={clockLocData} options={clockLocOptions} />
             ) : (
-              <div className="anl-empty">No location data</div>
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-300">No location data</div>
             )}
           </div>
         </div>
       </div>
 
       {/* ── Row 6: Location Summary Table ── */}
-      <div className="anl-row anl-row-1">
-        <div className="anl-card">
-          <div className="anl-card-header">
-            <span className="anl-card-title">Location Summary</span>
-            <span className="anl-card-badge">
-              <MapPin size={14} style={{ marginRight: 4 }} />
+      <div className="grid gap-6 grid-cols-1">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800">Location Summary</span>
+            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full flex items-center">
+              <MapPin size={14} className="mr-1" />
               {locationSummary.length} Locations
             </span>
           </div>
-          <div className="anl-card-body anl-table-wrap">
+          <div className="p-0 overflow-x-auto">
             {locationSummary.length ? (
-              <table className="anl-table">
+              <table className="w-full text-left border-collapse">
                 <thead>
                   <tr>
-                    <th>Location</th>
-                    <th>Address</th>
-                    <th>Employees</th>
-                    <th>Clocked In</th>
-                    <th>Clocked Out</th>
-                    <th>Tasks</th>
-                    <th>Hours (30d)</th>
+                    <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50 border-b-2 border-slate-200">Location</th>
+                    <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50 border-b-2 border-slate-200">Address</th>
+                    <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50 border-b-2 border-slate-200">Employees</th>
+                    <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50 border-b-2 border-slate-200">Clocked In</th>
+                    <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50 border-b-2 border-slate-200">Clocked Out</th>
+                    <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50 border-b-2 border-slate-200">Tasks</th>
+                    <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-50 border-b-2 border-slate-200">Hours (30d)</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {locationSummary.map((loc) => (
-                    <tr key={loc.name}>
-                      <td>
-                        <div className="anl-emp-cell">
-                          <div className="anl-emp-avatar" style={{ background: "rgba(99, 102, 241, 0.15)", color: "#6366F1" }}>
+                    <tr key={loc.name} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-600 text-white flex items-center justify-center font-semibold shadow-sm">
                             <MapPin size={14} />
                           </div>
-                          <div>
-                            <div className="anl-emp-name">{loc.name}</div>
-                          </div>
+                          <div className="font-bold text-slate-800">{loc.name}</div>
                         </div>
                       </td>
-                      <td style={{ maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{loc.address || "—"}</td>
-                      <td>
-                        <span className="anl-status-pill" style={{ background: "rgba(16, 185, 129, 0.12)", color: "#10B981", borderColor: "rgba(16, 185, 129, 0.3)" }}>
+                      <td className="px-6 py-4 text-sm text-slate-600 max-w-[180px] truncate">{loc.address || "—"}</td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
                           {loc.employees}
                         </span>
                       </td>
-                      <td>
-                        <span className="anl-status-pill" style={{ background: "rgba(16, 185, 129, 0.12)", color: "#10B981", borderColor: "rgba(16, 185, 129, 0.3)" }}>
-                          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#10B981", marginRight: 4 }} />
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5" />
                           {loc.clocked_in_now || 0}
                         </span>
                       </td>
-                      <td>
-                        <span className="anl-status-pill" style={{ background: "rgba(244, 63, 94, 0.12)", color: "#F43F5E", borderColor: "rgba(244, 63, 94, 0.3)" }}>
-                          <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#F43F5E", marginRight: 4 }} />
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5" />
                           {loc.clocked_out_today || 0}
                         </span>
                       </td>
-                      <td>{loc.total_tasks}</td>
-                      <td className="anl-hours-cell">{loc.hours}h</td>
+                      <td className="px-6 py-4 text-sm text-slate-700 font-medium">{loc.total_tasks}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-slate-600">{loc.hours}h</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <div className="anl-empty">No locations configured. Add locations in Settings › Locations.</div>
+              <div className="flex items-center justify-center h-[200px] text-slate-400 text-sm italic bg-slate-50 rounded-lg border border-dashed border-slate-300 m-6">No locations configured. Add locations in Settings › Locations.</div>
             )}
           </div>
         </div>

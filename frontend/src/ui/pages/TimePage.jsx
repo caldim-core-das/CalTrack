@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import { apiRequest, unwrapResults, API_BASE_URL } from "../../api/client.js"
 import { getTokens } from "../../state/auth/tokens.js"
 import { getAddress } from "../../api/geocoding.js"
-import { formatDateTime } from "../components/kit.jsx"
+import { formatDateTime, Card, Button, Pill, Input, Select, TextArea } from "../components/kit.jsx"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { verifyFaces, loadFaceModels, hasFace } from "../../utils/faceVerify.js"
 import { NotificationService } from "../../utils/notifications.js"
@@ -41,7 +41,9 @@ import {
   Download,
   Trash2,
   LogOut,
-  MoreHorizontal
+  MoreHorizontal,
+  ChevronRight,
+  Upload
 } from "lucide-react"
 
 // ─── GPS helpers ──────────────────────────────────────────────
@@ -189,30 +191,56 @@ function useLocationTracker(isClockedIn) {
     // Initial report
     reportLocation()
 
-    // Every 2 minutes
-    const id = setInterval(reportLocation, 120000)
+    // Every 5 minutes (reduced frequency to save DB connections)
+    const id = setInterval(reportLocation, 300000)
     return () => clearInterval(id)
   }, [isClockedIn])
 }
 
-// ─── Sub-components ────────────────────────────────────────────
-function Skeleton({ w = "100%", h = 16, r = 8, style = {} }) {
-  return <div className="tp-skeleton" style={{ width: w, height: h, borderRadius: r, ...style }} />
+// ─── UI Components ──────────────────────────────────────────────
+// (Local Card/Pill removed - now using kit.jsx)
+
+function Skeleton({ w = "100%", h = "16px", r = "8px", className = "" }) {
+  return (
+    <div 
+      className={`animate-pulse bg-slate-100 ${className}`} 
+      style={{ width: w, height: h, borderRadius: r }} 
+    />
+  )
 }
 
 function StatCard({ icon, label, value, sub, color = "#6366F1", pulse }) {
+  const isOT = sub && sub.includes("OT")
   return (
-    <div className="tp-stat-card" style={sub && sub.includes("OT") ? { border: "1px solid #EF444420", background: "#EF444405" } : {}}>
-      <div className="tp-stat-icon" style={{ background: color + "18", color }}>
-        {icon}
-        {pulse && <span className="tp-stat-pulse" style={{ background: color }} />}
+    <Card className={`flex-1 p-6 relative overflow-hidden group transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/50 ${isOT ? 'border-red-100 bg-red-50/30' : ''}`}>
+      <div className="flex items-start justify-between">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className={`p-2 rounded-lg transition-colors ${isOT ? 'bg-red-100 text-red-600' : 'bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600'}`}>
+              {React.cloneElement(icon, { size: 16 })}
+            </div>
+            <span className={`text-[10px] font-black uppercase tracking-widest ${isOT ? 'text-red-400' : 'text-slate-400'}`}>{label}</span>
+          </div>
+          <div className="space-y-1">
+            <div className={`text-2xl font-black tracking-tight ${isOT ? 'text-red-600' : 'text-slate-900'}`}>{value}</div>
+            {sub && (
+              <div className={`text-[10px] font-bold ${isOT ? 'text-red-500' : 'text-slate-400'}`}>
+                {sub}
+              </div>
+            )}
+          </div>
+        </div>
+        {pulse && (
+          <div className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+          </div>
+        )}
       </div>
-      <div className="tp-stat-body">
-        <div className="tp-stat-value" style={{ color: sub && sub.includes("OT") ? "#EF4444" : "inherit" }}>{value}</div>
-        <div className="tp-stat-label">{label}</div>
-        {sub && <div className="tp-stat-sub" style={{ color: sub.includes("OT") ? "#EF4444" : "var(--muted)", fontWeight: sub.includes("OT") ? 700 : 400 }}>{sub}</div>}
-      </div>
-    </div>
+      
+      {/* Decorative background element */}
+      <div className={`absolute bottom-[-20%] right-[-10%] w-24 h-24 rounded-full opacity-[0.03] transition-transform duration-500 group-hover:scale-150 ${isOT ? 'bg-red-600' : 'bg-indigo-600'}`}></div>
+    </Card>
   )
 }
 
@@ -422,299 +450,274 @@ function AdminTimePage() {
   }
 
   return (
-    <div className="tp-layout">
-      {/* ── Header ── */}
-      <div className="tp-header">
-        <div>
-          <h1 className="tp-title">Attendance Dashboard</h1>
-          <div className="tp-secure"><CheckCircle2 size={13} /> Admin Overview — All Employees</div>
-        </div>
-      </div>
-
-      {error && <div className="tp-error"><AlertCircle size={14} /> {error}</div>}
-
-      {/* ── Attendance Dashboard exact UI ── */}
-      <div className="adx-container">
-        {/* Left Panel */}
-        <div className="adx-left">
-          <div className="adx-left-title">{monthStats.attendancePct}% Attendance in {monthNames[selectedMonth]}</div>
-          <div style={{ display: "flex", gap: "10px", marginBottom: "16px" }}>
-            <button 
-              className="adx-icon-btn" 
-              onClick={() => setLogsOpen(!logsOpen)} 
-              title="Toggle Detailed Logs"
-            >
-              <Filter size={14}/>
-            </button>
-            <button 
-              className="adx-icon-btn" 
-              onClick={load} 
-              title="Refresh Data"
-              disabled={loading}
-            >
-              <RefreshCw size={14} className={loading ? "spin" : ""} />
-            </button>
-            <button 
-              className="adx-icon-btn" 
-              onClick={() => alert("Attendance summary exported successfully.")}
-              title="More Options"
-            >
-              <MoreHorizontal size={14}/>
-            </button>
+    <div className="flex flex-col h-[calc(100vh-64px)] w-full bg-white overflow-hidden">
+      {/* ── HEADER ── */}
+      <div className="h-20 bg-white border-b border-slate-100 px-8 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-100">
+            <Clock size={24} className="animate-pulse" />
           </div>
-          <div style={{ fontSize: "12px", fontWeight: "700", marginBottom: "8px", display: "flex", alignItems: "center", gap: "4px" }}>Emp Card <ChevronDown size={14}/></div>
-          
-          <div className="adx-left-scroll" style={{ overflowY: 'auto', flex: 1, paddingRight: 4 }}>
-            {empStatus.map((e) => {
-              const empLogs = logs.filter(l => l.employee === e.id)
-              const presentCount = empLogs.filter(l => !!l.clock_in).length
-              const sickCount = 0 // Mocking as system doesn't track these yet, but shows structure
-              const vacationCount = 0
-              
-              return (
-                <div key={e.id} className="adx-emp-card">
-                  <div className="adx-emp-header">
-                    <div className="adx-emp-name" style={{ maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.name}</div>
-                    <div className="adx-emp-avatar">{e.avatarLetter}</div>
-                  </div>
-                  <div className="adx-emp-stats">
-                    <div>Total days: {monthStats.daysInMonth}</div>
-                    <div style={{ color: '#10b981', fontWeight: 700 }}>Present: {presentCount}</div>
-                    <div>Sick: {sickCount}</div>
-                    <div>Vacation: {vacationCount}</div>
-                    <div>On call: {e.log ? 1 : 0}</div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="adx-main">
-          {/* Top Nav */}
-          <div className="adx-top-nav">
-            {monthNames.map((m, idx) => (
-              <div 
-                key={m} 
-                className={`adx-nav-item ${selectedMonth === idx ? 'active' : ''}`}
-                onClick={() => setSelectedMonth(idx)}
-              >
-                {m}
-              </div>
-            ))}
-          </div>
-
-          <div className="adx-body">
-            {/* Calendar */}
-            <div className="adx-calendar">
-              <div className="adx-cal-grid">
-                {/* Header */}
-                <div className="adx-cal-header-row">
-                  <div className="adx-cal-header">Week of Month</div>
-                  <div className="adx-cal-header">Sun</div>
-                  <div className="adx-cal-header">Mon</div>
-                  <div className="adx-cal-header">Tue</div>
-                  <div className="adx-cal-header">Wed</div>
-                  <div className="adx-cal-header">Thu</div>
-                  <div className="adx-cal-header">Fri</div>
-                  <div className="adx-cal-header">Sat</div>
-                </div>
-
-                {/* Weeks Grid */}
-                {(() => {
-                  const firstDayOfMonth = new Date(selectedYear, selectedMonth, 1).getDay()
-                  const days = []
-                  for (let i = 0; i < firstDayOfMonth; i++) days.push(null)
-                  for (let i = 1; i <= monthStats.daysInMonth; i++) days.push(i)
-                  
-                  const weeks = []
-                  for (let i = 0; i < days.length; i += 7) {
-                    weeks.push(days.slice(i, i + 7))
-                  }
-
-                  return weeks.map((week, wIndex) => (
-                    <div className="adx-cal-cell-wrap" key={`week-${wIndex}`}>
-                      <div className="adx-cal-row-header">Wk{wIndex + 1}</div>
-                      {week.map((day, dIndex) => {
-                        const dateStr = day ? `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : null
-                        const dayLogs = day ? logs.filter(l => l.work_date === dateStr) : []
-                        const isWeekend = dIndex === 0 || dIndex === 6
-                        const attendancePct = dayLogs.length > 0 && employees.length > 0 ? Math.round((dayLogs.length / employees.length) * 100) : 0
-
-                        return (
-                          <div key={`d-${wIndex}-${dIndex}`} className={`adx-cal-cell ${!day ? 'empty' : ''}`}>
-                            {day && (
-                              <>
-                                <div className="adx-cal-date">{day}</div>
-                                <div className="adx-cal-bottom">
-                                  {dayLogs.length > 0 ? (
-                                    <>
-                                      <span className="adx-dot" style={{ background: attendancePct > 50 ? '#10b981' : '#f59e0b' }}></span>
-                                      <span style={{ fontSize: 9 }}>{attendancePct}%</span>
-                                    </>
-                                  ) : !isWeekend ? (
-                                    <span className="adx-dot" style={{ background: '#ef4444' }}></span>
-                                  ) : (
-                                    <span className="adx-dot" style={{ background: '#facc15' }}></span>
-                                  )}
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        )
-                      })}
-                      {week.length < 7 && [...Array(7 - week.length)].map((_, i) => <div key={`pad-${i}`} className="adx-cal-cell empty"></div>)}
-                    </div>
-                  ))
-                })()}
-              </div>
-            </div>
-
-            {/* KPIs */}
-            <div className="adx-kpi-panel">
-              <div className="adx-kpi-title">KPIs — {monthNames[selectedMonth]}</div>
-              
-              <div className="adx-kpi-item">
-                <div className="adx-kpi-label">Total Logs (Month)</div>
-                <div className="adx-kpi-val">{monthStats.totalDays}</div>
-              </div>
-              <div className="adx-kpi-item">
-                <div className="adx-kpi-label">Actual Active Employees</div>
-                <div className="adx-kpi-val">{monthStats.totalAttendance}</div>
-              </div>
-              <div className="adx-kpi-item">
-                <div className="adx-kpi-label">Target Attendance (Total)</div>
-                <div className="adx-kpi-val">{monthStats.totalWorkingDays}</div>
-              </div>
-              <div className="adx-kpi-item">
-                <div className="adx-kpi-label">Attendance Score</div>
-                <div className="adx-kpi-val">{monthStats.attendancePct}%</div>
-              </div>
-              <div className="adx-kpi-item">
-                <div className="adx-kpi-label">Total Days in Month</div>
-                <div className="adx-kpi-val">{monthStats.daysInMonth}</div>
-              </div>
-              <div className="adx-kpi-item">
-                <div className="adx-kpi-label">Work Days (Mon-Fri)</div>
-                <div className="adx-kpi-val">{monthStats.workDaysInMonth}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Logs table ── */}
-      <div className="tp-logs">
-        <div className="tp-logs-header">
           <div>
-            <h2 className="tp-logs-title">Attendance Logs</h2>
-            <div className="tp-logs-subtitle">{filterFrom} – {filterTo} · {filteredLogs.length} records</div>
-          </div>
-          <div className="tp-logs-meta">
-            <button className="tp-logs-refresh" onClick={load} title="Refresh"><RefreshCw size={13} /></button>
-            <span className="tp-logs-badge">{filteredLogs.length} entries</span>
-            <button className="tp-logs-chevron" onClick={() => setLogsOpen(v => !v)}>
-              <ChevronUp size={15} style={{ transform: logsOpen ? "rotate(0deg)" : "rotate(180deg)", transition: "transform 0.25s ease" }} />
-            </button>
+            <h1 className="text-xl font-black text-slate-900 tracking-tight">Attendance Ledger</h1>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Enterprise Administrative View</span>
+            </div>
           </div>
         </div>
-
-        {/* ── Filters row ── */}
-        <div className="adm-filters-row">
-          {/* Date range */}
-          <div className="tp-date-filter-group">
-            <label className="tp-date-label">From</label>
-            <input id="adm-date-from" type="date" className="tp-date-input" value={filterFrom} max={filterTo}
-              onChange={e => setFilterFrom(e.target.value)} />
+        
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-100">
+            <Users size={16} className="text-slate-400" />
+            <span className="text-xs font-black text-slate-700">{employees.length} Personnel Managed</span>
           </div>
-          <div className="tp-date-filter-sep">→</div>
-          <div className="tp-date-filter-group">
-            <label className="tp-date-label">To</label>
-            <input id="adm-date-to" type="date" className="tp-date-input" value={filterTo} min={filterFrom} max={todayStr}
-              onChange={e => setFilterTo(e.target.value)} />
-          </div>
-
-          {/* Quick presets */}
-          <button className="tp-date-preset" onClick={() => { setFilterFrom(todayStr); setFilterTo(todayStr) }}>Today</button>
-          <button className="tp-date-preset" onClick={() => { setFilterFrom(weekAgo); setFilterTo(todayStr) }}>This Week</button>
-          <button className="tp-date-preset" onClick={() => {
-            const m = new Date(); m.setDate(1)
-            setFilterFrom(m.toLocaleDateString("en-CA")); setFilterTo(todayStr)
-          }}>This Month</button>
-
-          {/* Employee dropdown */}
-          <div className="adm-select-wrap">
-            <Filter size={13} color="#9CA3AF" />
-            <select className="adm-select" value={filterEmp} onChange={e => setFilterEmp(e.target.value)}>
-              <option value="">All Employees</option>
-              {employees.map(e => (
-                <option key={e.id} value={e.id}>
-                  {[e.user?.first_name, e.user?.last_name].filter(Boolean).join(" ") || e.user?.username}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={13} color="#9CA3AF" />
-          </div>
-
-          {/* Status filter */}
-          <div className="adm-status-tabs">
-            {["all", "live", "submitted", "done"].map(s => (
-              <button key={s} className={`adm-status-tab ${statusFilter === s ? "adm-status-tab--active" : ""}`}
-                onClick={() => setStatusFilter(s)}>
-                {s === "all" ? "All" : s === "live" ? "● Live" : s === "submitted" ? "Pending" : "Completed"}
-              </button>
-            ))}
-          </div>
-
-          {/* Search */}
-          <div className="adm-search-wrap">
-            <Search size={13} color="#9CA3AF" />
-            <input className="adm-search" placeholder="Search employee…" value={searchQ} onChange={e => setSearchQ(e.target.value)} />
-          </div>
+          <button 
+            onClick={load}
+            className="p-2.5 bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-xl border border-slate-100 transition-all"
+          >
+            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+          </button>
         </div>
+      </div>
 
-        {logsOpen && (
-          <div className="tp-table-wrap">
-            {loading ? (
-              <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 12 }}>
-                {[1, 2, 3, 4].map(i => <Skeleton key={i} h={24} />)}
-              </div>
-            ) : (
-              <table className="tp-table adm-table">
-                <thead>
-                  <tr>
-                    <th>EMPLOYEE</th>
-                    <th className="adm-sortable" onClick={() => toggleSort("work_date")}>
-                      DATE {sortField === "work_date" && (sortDir === "asc" ? "↑" : "↓")}
-                    </th>
-                    <th className="adm-sortable" onClick={() => toggleSort("clock_in")}>
-                      CLOCK IN {sortField === "clock_in" && (sortDir === "asc" ? "↑" : "↓")}
-                    </th>
-                    <th className="adm-sortable" onClick={() => toggleSort("clock_out")}>
-                      CLOCK OUT {sortField === "clock_out" && (sortDir === "asc" ? "↑" : "↓")}
-                    </th>
-                    <th>BREAKS</th>
-                    <th>JOB PHOTOS</th>
-                    <th>STATUS</th>
-                    <th className="right adm-sortable" onClick={() => toggleSort("worked_seconds")}>
-                      HOURS {sortField === "worked_seconds" && (sortDir === "asc" ? "↑" : "↓")}
-                    </th>
-                    <th className="right">ACTION</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLogs.map(l => (
-                    <AdminLogRow key={l.id} log={l} onAction={load} />
-                  ))}
-                  {filteredLogs.length === 0 && (
-                    <tr><td colSpan={6} className="tp-empty">No records found for the selected filters</td></tr>
-                  )}
-                </tbody>
-              </table>
-            )}
+      <div className="flex-1 overflow-y-auto p-8 space-y-10">
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold">
+            <AlertCircle size={18} /> {error}
           </div>
         )}
+
+        {/* ── Attendance Dashboard Container ── */}
+        <div className="flex flex-col xl:flex-row gap-8">
+          {/* Left Panel: Stats & Quick Roster */}
+          <div className="w-full xl:w-80 shrink-0 space-y-8">
+            <Card className="p-6 bg-indigo-600 text-white border-none shadow-2xl shadow-indigo-200">
+              <div className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1">Monthly Attendance</div>
+              <div className="text-4xl font-black tracking-tight">{monthStats.attendancePct}%</div>
+              <div className="mt-4 text-xs font-bold text-indigo-100">{monthNames[selectedMonth]} Performance</div>
+              <div className="mt-6 h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                <div className="h-full bg-white rounded-full" style={{ width: `${monthStats.attendancePct}%` }}></div>
+              </div>
+            </Card>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Personnel Cards</h2>
+                <ChevronDown size={14} className="text-slate-400" />
+              </div>
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                {empStatus.map(e => {
+                  const empLogs = logs.filter(l => l.employee === e.id)
+                  const presentCount = empLogs.filter(l => !!l.clock_in).length
+                  return (
+                    <div key={e.id} className="group p-4 bg-slate-50 rounded-2xl border border-transparent hover:border-slate-200 hover:bg-white transition-all">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center font-black text-slate-400 text-xs group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-all">
+                          {e.avatarLetter}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-black text-slate-900 truncate">{e.name}</div>
+                          <div className="text-[9px] font-bold text-slate-400">@{e.username}</div>
+                        </div>
+                        {e.log && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="px-2 py-1 bg-white rounded-lg text-[9px] font-bold text-slate-400">Days: {monthStats.daysInMonth}</div>
+                        <div className="px-2 py-1 bg-white rounded-lg text-[9px] font-black text-emerald-500">Present: {presentCount}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="flex-1 space-y-8">
+            {/* Month Navigation */}
+            <div className="bg-slate-50/50 p-1.5 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar">
+              {monthNames.map((m, idx) => (
+                <button
+                  key={m}
+                  onClick={() => setSelectedMonth(idx)}
+                  className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedMonth === idx ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  {m.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            {/* Calendar & KPIs Row */}
+            <div className="flex flex-col lg:flex-row gap-8">
+              {/* Calendar Grid */}
+              <Card className="flex-1 p-6 bg-white border-slate-100 shadow-sm">
+                <div className="grid grid-cols-8 gap-px bg-slate-100 rounded-xl overflow-hidden border border-slate-100">
+                  {/* Header */}
+                  <div className="bg-slate-50 p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">WEEK</div>
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
+                    <div key={day} className="bg-slate-50 p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">{day}</div>
+                  ))}
+
+                  {/* Dynamic Weeks */}
+                  {(() => {
+                    const firstDayOfMonth = new Date(selectedYear, selectedMonth, 1).getDay()
+                    const days = []
+                    for (let i = 0; i < firstDayOfMonth; i++) days.push(null)
+                    for (let i = 1; i <= monthStats.daysInMonth; i++) days.push(i)
+                    const weeks = []
+                    for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7))
+
+                    return weeks.map((week, wIdx) => (
+                      <React.Fragment key={`w-${wIdx}`}>
+                        <div className="bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-300">W{wIdx + 1}</div>
+                        {week.map((day, dIdx) => {
+                          const dateStr = day ? `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : null
+                          const dayLogs = day ? logs.filter(l => l.work_date === dateStr) : []
+                          const isWeekend = dIdx === 0 || dIdx === 6
+                          const attendancePct = dayLogs.length > 0 && employees.length > 0 ? Math.round((dayLogs.length / employees.length) * 100) : 0
+                          
+                          return (
+                            <div key={`d-${wIdx}-${dIdx}`} className={`bg-white aspect-square p-2 relative ${!day ? 'bg-slate-50/30' : ''}`}>
+                              {day && (
+                                <>
+                                  <span className={`text-[11px] font-black ${isWeekend ? 'text-slate-300' : 'text-slate-900'}`}>{day}</span>
+                                  <div className="absolute bottom-2 left-0 right-0 flex flex-col items-center gap-1">
+                                    {dayLogs.length > 0 ? (
+                                      <div className={`w-1 h-1 rounded-full ${attendancePct > 50 ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+                                    ) : !isWeekend && (
+                                      <div className="w-1 h-1 rounded-full bg-red-400"></div>
+                                    )}
+                                    {dayLogs.length > 0 && <span className="text-[8px] font-black text-slate-400">{attendancePct}%</span>}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )
+                        })}
+                        {week.length < 7 && [...Array(7 - week.length)].map((_, i) => <div key={`pad-${i}`} className="bg-slate-50/30"></div>)}
+                      </React.Fragment>
+                    ))
+                  })()}
+                </div>
+              </Card>
+
+              {/* KPI Summary Cards */}
+              <div className="w-full lg:w-72 grid grid-cols-2 lg:grid-cols-1 gap-4">
+                <Card className="p-5 border-slate-100 bg-slate-50/50">
+                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Monthly Activity</div>
+                  <div className="text-2xl font-black text-slate-900">{monthStats.totalDays}</div>
+                  <div className="text-[10px] font-bold text-slate-400 mt-1">Logs Captured</div>
+                </Card>
+                <Card className="p-5 border-slate-100 bg-slate-50/50">
+                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Headcount Active</div>
+                  <div className="text-2xl font-black text-slate-900">{monthStats.totalAttendance}</div>
+                  <div className="text-[10px] font-bold text-slate-400 mt-1">Unique Personnel</div>
+                </Card>
+                <Card className="p-5 border-slate-100 bg-slate-50/50">
+                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">System Target</div>
+                  <div className="text-2xl font-black text-slate-900">{monthStats.totalWorkingDays}</div>
+                  <div className="text-[10px] font-bold text-slate-400 mt-1">Expected Log Count</div>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── DETAILED LOGS SECTION ── */}
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+              <h2 className="text-lg font-black text-slate-900">Audit Ledger</h2>
+              <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-widest">{filteredLogs.length} Records</span>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setLogsOpen(!logsOpen)}
+                className={`p-2 rounded-xl border transition-all ${logsOpen ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200'}`}
+              >
+                <Filter size={18} />
+              </button>
+            </div>
+          </div>
+
+          {logsOpen && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+              {/* Table Filters */}
+              <Card className="p-4 bg-white border-slate-100 flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-3 flex-1 min-w-[300px]">
+                  <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-2 border border-slate-100 flex-1">
+                    <Search size={16} className="text-slate-300" />
+                    <input 
+                      type="text" 
+                      placeholder="Search personnel or date..." 
+                      value={searchQ}
+                      onChange={e => setSearchQ(e.target.value)}
+                      className="bg-transparent border-none text-sm font-bold outline-none w-full"
+                    />
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <div className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Filter</div>
+                    <select 
+                      value={statusFilter} 
+                      onChange={e => setStatusFilter(e.target.value)}
+                      className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm font-bold outline-none"
+                    >
+                      <option value="all">All Records</option>
+                      <option value="live">Live Now</option>
+                      <option value="submitted">In Review</option>
+                      <option value="done">Completed</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 bg-slate-50 border border-slate-100 rounded-xl p-1">
+                    <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} className="bg-transparent text-[10px] font-black px-2 outline-none" />
+                    <ChevronRight size={12} className="text-slate-300" />
+                    <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} className="bg-transparent text-[10px] font-black px-2 outline-none" />
+                  </div>
+                </div>
+              </Card>
+
+              {/* Data Table */}
+              <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50 border-b border-slate-100">
+                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee</th>
+                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Shift Date</th>
+                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Timeline</th>
+                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Photos</th>
+                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Verification</th>
+                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Duration</th>
+                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {filteredLogs.map(l => (
+                        <AdminLogRow key={l.id} log={l} onAction={load} />
+                      ))}
+                      {filteredLogs.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="p-20 text-center">
+                            <div className="flex flex-col items-center gap-4 text-slate-400">
+                              <FileText size={48} className="opacity-10" />
+                              <div className="font-bold">No attendance records found</div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -739,155 +742,120 @@ function AdminLogRow({ log, onAction }) {
     finally { setBusy(false) }
   }
 
-  const statusLabel = log.status || (isLive ? 'live' : 'draft')
-  const statusColor = {
-    approved: "#10B981",
-    rejected: "#EF4444",
-    submitted: "#F59E0B",
-    draft: "#6B7280",
-    live: "#10B981"
-  }[statusLabel] || "#6B7280"
+  const workedSeconds = isLive ? elapsed : log.worked_seconds
 
   return (
-    <tr className={isLive ? "adm-row-live" : ""}>
-      <td>
-        <div className="tp-emp-cell">
-          <div className="tp-emp-avatar"
-            style={{ background: isLive ? "linear-gradient(135deg,#10B981,#059669)" : "linear-gradient(135deg,#6366F1,#8B5CF6)" }}>
-            {(log.employee_name || log.employee_username || "?").charAt(0).toUpperCase()}
+    <tr className={`group hover:bg-slate-50/50 transition-colors ${isLive ? 'bg-indigo-50/30' : ''}`}>
+      <td className="p-6">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm ${isLive ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
+            {(log.employee_name || "?").charAt(0)}
           </div>
           <div>
-            <div className="tp-emp-name">{log.employee_name || log.employee_username || "Unknown"}</div>
-            {log.employee_username && log.employee_name && (
-              <div className="tp-emp-username">@{log.employee_username}</div>
+            <div className="text-sm font-black text-slate-900">{log.employee_name}</div>
+            <div className="text-[10px] font-bold text-slate-400">@{log.employee_username}</div>
+          </div>
+        </div>
+      </td>
+      <td className="p-6">
+        <div className="text-sm font-bold text-slate-700">{log.work_date}</div>
+      </td>
+      <td className="p-6">
+        <div className="flex items-center gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-400 uppercase">In</span>
+              <span className="text-sm font-bold text-slate-700">{formatDateTime(log.clock_in).split(",")[1]}</span>
+            </div>
+            {log.clock_out && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black text-slate-400 uppercase">Out</span>
+                <span className="text-sm font-bold text-slate-700">{formatDateTime(log.clock_out).split(",")[1]}</span>
+              </div>
             )}
           </div>
+          {isLive && (
+            <div className="px-2 py-0.5 bg-indigo-600 text-white text-[9px] font-black rounded-full animate-pulse">LIVE</div>
+          )}
         </div>
       </td>
-      <td className="tp-td-date">{log.work_date}</td>
-      <td>
-        <div className="tp-time-cell">
-          <span>{formatDateTime(log.clock_in).split(",")[1]?.trim()}</span>
+      <td className="p-6">
+        <div className="flex items-center gap-2">
           {log.clock_in_photo && (
-            <a href={log.clock_in_photo} target="_blank" rel="noreferrer" className="tp-photo-chip tp-photo-chip--link" title="View verification photo">
-              <Camera size={10} />
+            <a href={log.clock_in_photo} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg overflow-hidden border border-slate-100 shadow-sm hover:scale-110 transition-transform">
+              <img src={log.clock_in_photo} className="w-full h-full object-cover" />
             </a>
           )}
+          {log.clock_out_photo && (
+            <a href={log.clock_out_photo} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg overflow-hidden border border-slate-100 shadow-sm hover:scale-110 transition-transform">
+              <img src={log.clock_out_photo} className="w-full h-full object-cover" />
+            </a>
+          )}
+          {!log.clock_in_photo && !log.clock_out_photo && <span className="text-[10px] font-bold text-slate-300">N/A</span>}
         </div>
       </td>
-      <td>
-        {isLive
-          ? <span className="tp-pending-badge">● Live</span>
-          : <span>{formatDateTime(log.clock_out).split(",")[1]?.trim()}</span>}
-      </td>
-      <td>
-        {completedBreaks.length > 0 ? (
-          <div className="adm-break-cell" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {completedBreaks.map((b, idx) => (
-              <span key={idx}
-                style={{
-                  background: b.break_type === "lunch" ? "#DBEAFE" : b.break_type === "short" ? "#ECFDF5" : "#FEF3C7",
-                  color: b.break_type === "lunch" ? "#2563EB" : b.break_type === "short" ? "#059669" : "#D97706",
-                  padding: "2px 5px", borderRadius: 4, fontSize: 9, fontWeight: 900
-                }}
-                title={`${b.break_type}: ${formatDuration(b.duration_seconds)}`}>
-                {(b.break_type || "break").charAt(0).toUpperCase()}
-              </span>
-            ))}
-          </div>
-        ) : <span className="adm-no-break">—</span>}
-      </td>
-      <td>
-        {(log.photos || []).length > 0 ? (
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {log.photos.map((p, idx) => (
-              <a key={idx} href={p.photo} target="_blank" rel="noreferrer" title={`${p.photo_type}${p.caption ? ': ' + p.caption : ''}`}>
-                <div style={{
-                  width: 24, height: 24, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--stroke)',
-                  background: 'var(--surface2)', display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                  <img src={p.photo} alt="job" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-              </a>
-            ))}
-          </div>
-        ) : <span className="adm-no-break">—</span>}
-      </td>
-      <td>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{
-            padding: "4px 8px", borderRadius: 12, fontSize: 10, fontWeight: 800, textTransform: "uppercase",
-            backgroundColor: `${statusColor}15`, color: statusColor, border: `1px solid ${statusColor}30`
-          }}>
-            {statusLabel === 'submitted' ? 'In Review' : statusLabel}
-          </span>
+      <td className="p-6">
+        <div className="flex flex-col gap-2">
+          <Pill variant={log.status === 'approved' ? 'success' : log.status === 'rejected' ? 'danger' : log.status === 'submitted' ? 'warning' : 'neutral'}>
+            {log.status === 'submitted' ? 'In Review' : (log.status || (isLive ? 'Live' : 'Draft'))}
+          </Pill>
           {log.face_match_status && log.face_match_status !== 'skipped' && (
-            <span style={{
-              padding: "2px 6px", borderRadius: 4, fontSize: 9, fontWeight: 900, textAlign: 'center',
-              backgroundColor: log.face_match_status === 'matched' ? "#10B98115" : "#EF444415",
-              color: log.face_match_status === 'matched' ? "#10B981" : "#EF4444",
-              border: `1px solid ${log.face_match_status === 'matched' ? "#10B98130" : "#EF444430"}`
-            }}>
-              {log.face_match_status === 'matched' ? "✓ Identity Verified" : "⚠ Identity Mismatch"}
-            </span>
+            <div className={`flex items-center gap-1 text-[9px] font-black uppercase ${log.face_match_status === 'matched' ? 'text-emerald-500' : 'text-red-500'}`}>
+              {log.face_match_status === 'matched' ? <Check size={10} /> : <AlertCircle size={10} />}
+              {log.face_match_status === 'matched' ? 'Verified' : 'Mismatch'}
+            </div>
           )}
         </div>
       </td>
-      <td className="right">
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-          <span className={`tp-hours-pill ${isLive ? "tp-hours-pill--live" : ""}`}
-            style={(isLive ? elapsed : log.worked_seconds) > 8 * 3600 ? { color: "#EF4444", fontWeight: 800, background: "#EF444410", border: "1px solid #EF444430" } : {}}>
-            {isLive ? formatDuration(elapsed) : formatDuration(log.worked_seconds)}
-          </span>
-          {log.manual_hours_correction && (
-            <span style={{ fontSize: 9, fontWeight: 700, color: "#6366F1" }}>Adjusted: {log.manual_hours_correction}h</span>
-          )}
+      <td className="p-6 text-right">
+        <div className={`text-sm font-black ${workedSeconds > 8 * 3600 ? 'text-red-600' : 'text-slate-900'}`}>
+          {formatDuration(workedSeconds)}
         </div>
+        {workedSeconds > 8 * 3600 && (
+          <div className="text-[9px] font-black text-red-400 uppercase">OT +{formatDuration(workedSeconds - 8 * 3600)}</div>
+        )}
       </td>
-      <td className="right">
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
+      <td className="p-6 text-right">
+        <div className="flex items-center justify-end gap-2">
           {log.status === 'submitted' ? (
             <>
-              <button disabled={busy} onClick={() => handleApprove("approve")}
-                style={{ background: "#10B981", color: "#fff", border: "none", borderRadius: 6, padding: "4px 8px", fontSize: 10, cursor: "pointer", fontWeight: 700 }}>
-                APPROVE
-              </button>
+              <button disabled={busy} onClick={() => handleApprove("approve")} className="px-3 py-1.5 bg-emerald-500 text-white text-[10px] font-black rounded-lg shadow-lg shadow-emerald-100 hover:bg-emerald-600 transition-all">APPROVE</button>
               <button disabled={busy} onClick={() => {
                 const reason = window.prompt("Rejection reason?");
                 if (reason !== null) handleApprove("reject", reason);
-              }} style={{ background: "#EF4444", color: "#fff", border: "none", borderRadius: 6, padding: "4px 8px", fontSize: 10, cursor: "pointer", fontWeight: 700 }}>
-                REJECT
-              </button>
+              }} className="px-3 py-1.5 bg-red-500 text-white text-[10px] font-black rounded-lg shadow-lg shadow-red-100 hover:bg-red-600 transition-all">REJECT</button>
             </>
           ) : (
             <>
               {isLive && (
-                <button disabled={busy} onClick={() => {
-                  if (window.confirm("Force clock out this employee?")) handleApprove("force_clock_out");
-                }} title="Force Clock Out"
-                  style={{ background: "none", border: "1px solid #F59E0B", color: "#F59E0B", borderRadius: 6, padding: "4px 8px", fontSize: 10, cursor: "pointer", display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <LogOut size={12} /> OUT
+                <button 
+                  disabled={busy}
+                  onClick={() => { if (window.confirm("Force clock out?")) handleApprove("force_clock_out") }}
+                  className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
+                  title="Force Clock Out"
+                >
+                  <LogOut size={16} />
                 </button>
               )}
               {log.clock_out && (
-                <button onClick={() => downloadLogPdf(log.id)} title="Download PDF Summary"
-                  style={{ background: "none", border: "1px solid var(--stroke)", color: "var(--accent)", borderRadius: 6, padding: "4px 8px", fontSize: 10, cursor: "pointer", display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Download size={12} /> PDF
+                <button 
+                  onClick={() => downloadLogPdf(log.id)}
+                  className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                  title="Download Summary"
+                >
+                  <FileText size={16} />
                 </button>
               )}
-              <button onClick={() => {
-                const corr = window.prompt("Enter manual hours correction (e.g. 8.5):", log.manual_hours_correction || "");
-                if (corr !== null) handleApprove("edit", corr);
-              }} style={{ background: "none", border: "1px solid var(--stroke)", color: "var(--muted)", borderRadius: 6, padding: "4px 8px", fontSize: 10, cursor: "pointer" }}>
-                EDIT
-              </button>
             </>
           )}
-          <button disabled={busy} onClick={() => {
-            if (window.confirm("Permanently delete this clock-in record?")) handleApprove("delete");
-          }} title="Delete Log"
-            style={{ background: "none", border: "1px solid #EF444430", color: "#EF4444", borderRadius: 6, padding: "4px 8px", fontSize: 10, cursor: "pointer" }}>
-            <Trash2 size={12} />
+          
+          <button 
+            disabled={busy}
+            onClick={() => { if (window.confirm("Permanently delete?")) handleApprove("delete") }}
+            className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+            title="Delete Record"
+          >
+            <Trash2 size={16} />
           </button>
         </div>
       </td>
@@ -937,6 +905,14 @@ function EmployeeTimePage() {
   const [breakType, setBreakType] = useState("lunch")
   const [faceVerifyStatus, setFaceVerifyStatus] = useState(null) // null | 'verifying' | 'matched' | 'mismatch' | 'no_face'
   const [faceVerifyScore, setFaceVerifyScore] = useState(null)
+
+  // ── Phase 5: dry-run geofence preflight ─────────────────────────────
+  // Holds the most recent response from POST /api/time/geofence/validate-point/.
+  // Format mirrors the engine's Decision → see geofence_service.py.
+  // Shape: { allowed, decision, mode, matched_location, distance_m, radius_m,
+  //          candidate_count, geofence_passed, admin_override_used, shift }
+  const [preflight, setPreflight] = useState(null)
+  const [preflightLoading, setPreflightLoading] = useState(false)
 
   const now = useLiveClock()
   const openLog = useMemo(() => findOpenLog(logs), [logs])
@@ -1021,6 +997,65 @@ function EmployeeTimePage() {
     }
     return null
   }, [distanceToSite, geofenceStatus, openLog])
+
+  // ── Phase 5: dry-run preflight via POST /api/time/geofence/validate-point/ ─
+  // Fires whenever GPS settles, debounced to avoid spamming on jitter.
+  // Skipped while clocked in (no preflight needed).
+  useEffect(() => {
+    if (openLog || !currentGPS) {
+      setPreflight(null)
+      return
+    }
+    let cancelled = false
+    const handle = setTimeout(async () => {
+      if (cancelled) return
+      setPreflightLoading(true)
+      try {
+        const res = await apiRequest("/time/geofence/validate-point/", {
+          method: "POST",
+          json: { lat: currentGPS.lat, lng: currentGPS.lon },
+        })
+        if (!cancelled) setPreflight(res)
+      } catch (err) {
+        if (!cancelled) {
+          // 4xx returns the legacy block body; 5xx is a real error. Either
+          // way, keep the UI usable — the actual /clock-in/ POST is the
+          // real authority.
+          setPreflight(err?.body || null)
+        }
+      } finally {
+        if (!cancelled) setPreflightLoading(false)
+      }
+    }, 800) // debounce: don't fire on every micro-update of GPS
+    return () => { cancelled = true; clearTimeout(handle) }
+  }, [currentGPS, openLog])
+
+  // Derived pill state — { tone, icon-name, label } for visual rendering.
+  const preflightPill = useMemo(() => {
+    if (openLog) return null
+    if (preflightLoading) return { tone: "neutral", label: "Checking site…" }
+    if (!preflight) return null
+    const dist = preflight.distance_m
+    const distStr = dist == null
+      ? ""
+      : dist < 1000 ? ` · ${dist}m` : ` · ${(dist/1000).toFixed(1)}km`
+
+    if (preflight.allowed && preflight.geofence_passed) {
+      const name = preflight.matched_location?.name || "your site"
+      return { tone: "ok", label: `Inside ${name}${distStr}` }
+    }
+    if (preflight.allowed && !preflight.geofence_passed) {
+      // Warn-only mode: server allowed but flagged. Surface the soft warning.
+      return { tone: "warn", label: `Outside geofence (warn-only)${distStr}` }
+    }
+    if (preflight.decision === "shift_location_mismatch") {
+      return { tone: "block", label: `Wrong site for current shift${distStr}` }
+    }
+    if (preflight.decision === "no_assigned_locations") {
+      return { tone: "warn", label: "No site assigned to you" }
+    }
+    return { tone: "block", label: `Outside geofence${distStr}` }
+  }, [preflight, preflightLoading, openLog])
 
   const load = useCallback(async () => {
     setLoading(true); setError("")
@@ -1191,281 +1226,535 @@ function EmployeeTimePage() {
         />
       )}
 
-
       {/* ═══ MOOD SURVEY OVERLAY ═══ */}
       {showMoodSurvey && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
-          <div style={{ background: 'var(--surface)', borderRadius: 24, padding: '40px 36px 32px', width: 420, maxWidth: '90vw', textAlign: 'center', boxShadow: '0 32px 64px rgba(0,0,0,0.15)', animation: 'fadeUp 0.3s ease both' }}>
-            <h2 style={{ fontSize: 22, fontWeight: 850, color: 'var(--fg)', marginBottom: 32, letterSpacing: '-0.02em' }}>How was work today?</h2>
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 32, marginBottom: 32 }}>
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
+          <Card className="max-w-md w-full p-10 text-center shadow-2xl animate-in slide-in-from-bottom-8 duration-500">
+            <h2 className="text-2xl font-black text-slate-900 mb-8 tracking-tight">How was work today?</h2>
+            <div className="flex justify-center gap-4 mb-10">
               {[
                 { key: 'tough', emoji: '😞', label: 'Tough' },
                 { key: 'normal', emoji: '😐', label: 'Normal' },
                 { key: 'great', emoji: '😄', label: 'Great' },
               ].map(m => (
-                <button key={m.key} onClick={() => setMoodRating(m.key)} style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-                  background: 'none', border: moodRating === m.key ? '3px solid #F97316' : '3px solid transparent',
-                  borderRadius: 20, padding: '16px 20px', cursor: 'pointer', transition: 'all 0.2s ease',
-                  transform: moodRating === m.key ? 'scale(1.1)' : 'scale(1)'
-                }}>
-                  <span style={{ fontSize: 48 }}>{m.emoji}</span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: moodRating === m.key ? '#F97316' : 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{m.label}</span>
+                <button 
+                  key={m.key} 
+                  onClick={() => setMoodRating(m.key)} 
+                  className={`flex flex-col items-center gap-3 flex-1 p-4 rounded-2xl border-2 transition-all duration-300 ${moodRating === m.key ? 'border-orange-500 bg-orange-50 scale-105' : 'border-slate-100 bg-white hover:border-slate-200'}`}
+                >
+                  <span className="text-4xl">{m.emoji}</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${moodRating === m.key ? 'text-orange-600' : 'text-slate-400'}`}>{m.label}</span>
                 </button>
               ))}
             </div>
-            <div style={{ textAlign: 'left', marginBottom: 20 }}>
-              <label style={{ fontSize: 14, fontWeight: 800, color: 'var(--fg)', display: 'block', marginBottom: 8 }}>Add a note (optional)</label>
-              <textarea value={moodNote} onChange={e => setMoodNote(e.target.value)} placeholder="It was too busy..." rows={3}
-                style={{ width: '100%', border: '1px solid var(--stroke2)', borderRadius: 12, padding: '12px 16px', fontSize: 14, fontWeight: 600, color: 'var(--fg)', background: 'var(--bg)', resize: 'vertical', outline: 'none', fontFamily: 'inherit' }} />
+            
+            <div className="text-left space-y-2 mb-8">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Additional Context</label>
+              <textarea 
+                value={moodNote} 
+                onChange={e => setMoodNote(e.target.value)} 
+                placeholder="Share your thoughts..." 
+                rows={3}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-bold text-slate-900 focus:border-orange-500 outline-none transition-all" 
+              />
             </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button onClick={() => { setShowMoodSurvey(false); setMoodRating(null); setMoodNote("") }}
-                style={{ flex: 1, padding: '14px', borderRadius: 14, border: '1px solid var(--stroke2)', background: 'var(--surface)', color: 'var(--fg)', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={submitMoodAndClockOut}
-                style={{ flex: 2, padding: '14px', borderRadius: 14, border: 'none', background: '#F97316', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', boxShadow: '0 6px 20px rgba(249,115,22,0.35)' }}>Submit</button>
+            
+            <div className="flex gap-4">
+              <button 
+                onClick={() => { setShowMoodSurvey(false); setMoodRating(null); setMoodNote("") }}
+                className="flex-1 py-4 rounded-2xl text-sm font-black text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={submitMoodAndClockOut}
+                className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-orange-600 hover:bg-orange-700 shadow-xl shadow-orange-200 transition-all"
+              >
+                Submit & Finish
+              </button>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
       {/* ═══ MAIN PAGE ═══ */}
-      <div className="tp-new-layout">
-
+      <div className="flex flex-col h-[calc(100vh-64px)] w-full bg-white overflow-hidden">
         {/* Header Row */}
-        <div className="tp-new-header">
-          <h1 style={{ fontSize: 28, fontWeight: 850, color: 'var(--fg)', margin: 0, letterSpacing: '-0.02em' }}>Timesheets</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            {/* Floating Timer Bar */}
+        <div className="h-20 bg-white border-b border-slate-100 px-8 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-100">
+              <Clock size={24} className={openLog ? 'animate-pulse' : ''} />
+            </div>
+            <div>
+              <h1 className="text-xl font-black text-slate-900 tracking-tight">Personal Timesheets</h1>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${openLog ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  {openLog ? (openBreak ? 'Currently on Break' : 'On Active Duty') : 'System Standby'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
             {openLog && (
-              <div className="tp-timer-bar">
-                <span className="tp-timer-display">{formatDuration(elapsed)}</span>
-                {!openBreak ? (
-                  <>
-                    <button className="tp-timer-icon tp-timer-icon--yellow" title="Take Break" onClick={() => action("/time/break/start/")}><Coffee size={16} /></button>
-                    <button className="tp-timer-icon tp-timer-icon--green" title="Add Photo" onClick={() => setPanelOpen(true)}><Camera size={16} /></button>
-                    <button className="tp-timer-icon tp-timer-icon--red" title="Clock Out" onClick={handleClockOut}><Square size={12} fill="currentColor" /></button>
-                  </>
-                ) : (
-                  <button className="tp-timer-icon tp-timer-icon--green" title="Resume Work" onClick={() => action("/time/break/end/")}><Play size={16} /></button>
-                )}
-                <button className="tp-timer-icon tp-timer-icon--outline" title="Details" onClick={() => setPanelOpen(true)}><Edit3 size={14} /></button>
+              <div className="flex items-center bg-slate-900 text-white rounded-2xl px-1.5 py-1.5 shadow-xl shadow-slate-200">
+                <div className="px-4 py-1">
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block leading-none">Session</span>
+                  <span className="text-lg font-black tabular-nums">{formatDuration(elapsed)}</span>
+                </div>
+                <div className="flex items-center gap-1 ml-2">
+                  {!openBreak ? (
+                    <>
+                      <button onClick={() => action("/time/break/start/")} className="p-2.5 bg-slate-800 hover:bg-amber-500 text-white rounded-xl transition-all" title="Start Break"><Coffee size={16} /></button>
+                      <button onClick={() => setPanelOpen(true)} className="p-2.5 bg-slate-800 hover:bg-emerald-500 text-white rounded-xl transition-all" title="Job Photo"><Camera size={16} /></button>
+                      <button onClick={handleClockOut} className="p-2.5 bg-slate-800 hover:bg-red-500 text-white rounded-xl transition-all" title="Clock Out"><Square size={14} fill="currentColor" /></button>
+                    </>
+                  ) : (
+                    <button onClick={() => action("/time/break/end/")} className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-xl flex items-center gap-2 transition-all"><Play size={14} /> RESUME</button>
+                  )}
+                  <button onClick={() => setPanelOpen(true)} className="p-2.5 bg-slate-800 hover:bg-indigo-500 text-white rounded-xl transition-all" title="Details"><Edit3 size={16} /></button>
+                </div>
               </div>
             )}
             {!openLog && (
-              <button className="tp-clock-in-btn" onClick={() => setPanelOpen(true)} disabled={busy}><Clock size={16} /> Clock In</button>
+              <button 
+                onClick={() => setPanelOpen(true)} 
+                disabled={busy}
+                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black rounded-2xl shadow-xl shadow-indigo-200 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+              >
+                <Clock size={18} /> START SHIFT
+              </button>
             )}
           </div>
         </div>
 
-        {error && <div className="tp-error" style={{ marginBottom: 20 }}><AlertCircle size={14} /> {error}</div>}
-
-        {/* Face Verification Banners */}
-        {faceVerifyStatus === 'verifying' && (
-          <div style={{ background: "#EFF6FF", border: "1px solid #3B82F6", borderRadius: 12, padding: "14px 20px", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
-            <Loader2 size={18} className="spin" color="#3B82F6" /><span style={{ color: "#1E40AF", fontWeight: 700, fontSize: 13 }}>🔍 Verifying identity...</span>
-          </div>
-        )}
-        {faceVerifyStatus === 'mismatch' && (
-          <div style={{ background: "#FEE2E2", border: "2px solid #EF4444", borderRadius: 12, padding: "16px 20px", marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <AlertCircle size={18} color="#EF4444" />
-            <div style={{ flex: 1, color: "#991B1B", fontWeight: 700, fontSize: 13 }}>⚠️ Identity verification failed. <button onClick={() => { setFaceVerifyStatus(null); setError(''); setShowSelfie(true) }} style={{ background: '#EF4444', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontWeight: 800, cursor: 'pointer', fontSize: 11, marginLeft: 8 }}>Retake</button></div>
-          </div>
-        )}
-        {faceVerifyStatus === 'matched' && (
-          <div style={{ background: "#ECFDF5", border: "1px solid #10B981", borderRadius: 12, padding: "12px 20px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
-            <CheckCircle2 size={16} color="#10B981" /><span style={{ color: "#065F46", fontWeight: 700, fontSize: 13 }}>✅ Identity Verified{faceVerifyScore && ` • Score: ${faceVerifyScore}%`}</span>
-          </div>
-        )}
-
-        {/* Stats */}
-        {!loading && (
-          <div className="tp-stats-row" style={{ marginBottom: 32 }}>
-            <StatCard icon={<TrendingUp size={16} />} label="Hours This Week" value={formatHrMin(weekStats.total)} color={weekStats.otSeconds > 0 ? "#EF4444" : "#6366F1"} sub={weekStats.otSeconds > 0 ? `+${formatHrMin(weekStats.otSeconds)} OT ⚠️` : null} />
-            <StatCard icon={<Calendar size={16} />} label="Days Worked" value={`${weekStats.days} days`} color="#10B981" />
-            <StatCard icon={<Timer size={16} />} label="Daily Average" value={formatHrMin(weekStats.avg)} color="#F59E0B" />
-            {openLog && <StatCard icon={<Clock size={16} />} label="Current Session" value={formatDuration(elapsed)} color="#EF4444" pulse />}
-          </div>
-        )}
-
-        {/* Full-Width Logs Table */}
-        <div className="tp-logs-section">
-          <div className="tp-logs-toolbar">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 850, margin: 0, color: 'var(--fg)' }}>Recent Entries</h2>
-              <span style={{ background: 'var(--bg2)', padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 800, color: 'var(--muted)' }}>{logs.length}</span>
+        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-600 text-sm font-bold animate-in shake duration-500">
+              <AlertCircle size={18} /> {error}
             </div>
-            <div className="tp-date-filter" style={{ margin: 0 }}>
-              <div className="tp-date-filter-group"><label className="tp-date-label">From</label><input type="date" className="tp-date-input" value={filterFrom} max={filterTo} onChange={e => setFilterFrom(e.target.value)} /></div>
-              <div className="tp-date-filter-sep">→</div>
-              <div className="tp-date-filter-group"><label className="tp-date-label">To</label><input type="date" className="tp-date-input" value={filterTo} min={filterFrom} max={todayStr} onChange={e => setFilterTo(e.target.value)} /></div>
-              <div style={{ width: 1, height: 20, background: 'var(--stroke2)', margin: '0 4px' }} />
-              <button className="tp-date-preset tp-btn-pill" onClick={() => { setFilterFrom(todayStr); setFilterTo(todayStr) }}>Today</button>
-              <button className="tp-date-preset tp-btn-pill" onClick={() => { setFilterFrom(weekAgo); setFilterTo(todayStr) }}>Week</button>
-              <button className="tp-date-preset tp-btn-pill" onClick={() => { const m = new Date(); m.setDate(1); setFilterFrom(m.toLocaleDateString("en-CA")); setFilterTo(todayStr) }}>Month</button>
-            </div>
-          </div>
+          )}
 
-          <div className="tp-table-wrap">
-            {loading ? (
-              <div style={{ padding: 32, display: "flex", flexDirection: "column", gap: 16 }}>{[1, 2, 3].map(i => <Skeleton key={i} h={40} r={8} />)}</div>
-            ) : (
-              <table className="tp-table tp-table-modern">
-                <thead><tr><th>EMPLOYEE</th><th>DATE</th><th>CLOCK IN</th><th>CLOCK OUT</th><th>STATUS</th><th>PHOTOS</th><th className="right">HOURS</th></tr></thead>
-                <tbody>
-                  {logs.map(l => (
-                    <tr key={l.id} className={!l.clock_out ? "tp-tr-active" : ""}>
-                      <td><div className="tp-emp-cell"><div className="tp-emp-avatar">{(l.employee_name || l.employee_username || "?").charAt(0).toUpperCase()}</div><div><div className="tp-emp-name tp-name-bold">{l.employee_name || l.employee_username || "Unknown"}</div>{l.employee_username && l.employee_name && <div className="tp-emp-username">@{l.employee_username}</div>}</div></div></td>
-                      <td className="tp-td-date">{l.work_date}</td>
-                      <td><div className="tp-time-cell tp-bold"><span>{formatDateTime(l.clock_in).split(",")[1]?.trim()}</span>{l.clock_in_photo && <a href={l.clock_in_photo} target="_blank" rel="noreferrer" className="tp-photo-chip tp-photo-chip--link" title="View photo"><Camera size={12} /></a>}</div></td>
-                      <td>{l.clock_out ? <div className="tp-time-cell tp-bold"><span className="tp-muted">{formatDateTime(l.clock_out).split(",")[1]?.trim()}</span>{l.clock_out_photo && <a href={l.clock_out_photo} target="_blank" rel="noreferrer" className="tp-photo-chip tp-photo-chip--link" title="View photo"><Camera size={12} /></a>}</div> : <span className="tp-pending-badge">● Active</span>}</td>
-                      <td>{l.clock_out ? (<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ padding: "4px 10px", borderRadius: 12, fontSize: 10, fontWeight: 800, textTransform: "uppercase", backgroundColor: l.status === 'approved' ? "#10B98115" : l.status === 'rejected' ? "#EF444415" : l.status === 'submitted' ? "#F59E0B15" : "#6B728015", color: l.status === 'approved' ? "#10B981" : l.status === 'rejected' ? "#EF4444" : l.status === 'submitted' ? "#F59E0B" : "#6B7280" }}>{l.status === 'submitted' ? 'In Review' : (l.status || 'Draft')}</span>{l.status === 'draft' && <button style={{ padding: "4px 8px", fontSize: 9, background: "#6366f1", color: "#fff", cursor: 'pointer', border: 'none', fontWeight: 800, borderRadius: 8 }} onClick={() => submitLog(l.id)}>Submit</button>}<button onClick={() => downloadLogPdf(l.id)} title="Download" style={{ background: "none", border: "none", color: "#6366F1", cursor: "pointer", display: 'flex', padding: "4px" }}><FileText size={14} /></button></div>) : <span className="tp-muted">—</span>}</td>
-                      <td>{(l.photos || []).length > 0 ? (<div style={{ display: 'flex', gap: 4 }}>{l.photos.map((p, idx) => <a key={idx} href={p.photo} target="_blank" rel="noreferrer"><div style={{ width: 24, height: 24, borderRadius: 6, overflow: 'hidden', border: '1px solid var(--stroke)' }}><img src={p.photo} alt="job" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div></a>)}</div>) : <span className="tp-muted">—</span>}</td>
-                      <td className="right"><div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}><span className={`tp-hours-pill ${!l.clock_out ? "tp-hours-pill--live" : ""}`} style={(!l.clock_out ? elapsed : l.worked_seconds) > 8 * 3600 ? { color: "#EF4444", fontWeight: 800, background: "#EF444410", border: "1px solid #EF444430" } : {}}>{!l.clock_out ? formatDuration(elapsed) : formatDuration(l.worked_seconds)}</span>{(!l.clock_out ? elapsed : l.worked_seconds) > 8 * 3600 && <span style={{ fontSize: 9, fontWeight: 900, color: "#EF4444" }}>OT +{formatDuration((!l.clock_out ? elapsed : l.worked_seconds) - 8 * 3600)}</span>}</div></td>
-                    </tr>
-                  ))}
-                  {logs.length === 0 && <tr><td colSpan={7} className="tp-empty">No records found</td></tr>}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ═══ RIGHT SLIDE-OUT PANEL ═══ */}
-      {panelOpen && <div className="tp-panel-overlay" onClick={() => setPanelOpen(false)} />}
-      <div className={`tp-slide-panel ${panelOpen ? 'tp-slide-panel--open' : ''}`}>
-        <div className="tp-slide-panel-inner">
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '24px 24px 20px', borderBottom: '1px solid var(--stroke)' }}>
-            <div>
-              <h3 style={{ fontSize: 20, fontWeight: 850, margin: 0, color: 'var(--fg)' }}>{openLog ? 'Confirm Clock Out' : 'Clock In'}</h3>
-              {openLog && <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, fontWeight: 600 }}>Clocking from GMT+5:30 • Started {formatDateTime(openLog.clock_in).split(",")[1]?.trim()}</div>}
-            </div>
-            <button onClick={() => setPanelOpen(false)} style={{ width: 32, height: 32, background: 'var(--bg)', border: '1px solid var(--stroke)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--muted)' }}>✕</button>
-          </div>
-
-          {/* User Info */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '20px 24px', borderBottom: '1px solid var(--stroke)' }}>
-            <div style={{ width: 44, height: 44, borderRadius: 14, background: 'linear-gradient(135deg, #F97316, #FBBF24)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800 }}>{displayName.charAt(0)}</div>
-            <div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--fg)' }}>{displayName}</div><div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>{resolvedAddr || "Locating..."}</div></div>
-          </div>
-
-          {/* Body */}
-          <div style={{ padding: '24px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-            {/* Time & Date */}
-            <div style={{ display: 'flex', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Time</label>
-                <div style={{ padding: '12px 14px', border: '1px solid var(--stroke2)', borderRadius: 12, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</span><Clock size={14} color="var(--muted)" />
-                </div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Date</label>
-                <div style={{ padding: '12px 14px', border: '1px solid var(--stroke2)', borderRadius: 12, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontWeight: 700, fontSize: 14 }}>Today</span><Calendar size={14} color="var(--muted)" />
-                </div>
-              </div>
-            </div>
-
-            {/* GPS */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: 'var(--surface2)', borderRadius: 12, border: '1px solid var(--stroke)' }}>
-              <MapPin size={16} color="#6366F1" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{resolvedAddr || "Waiting for GPS lock…"}</div>
-                {currentGPS && <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, marginTop: 2 }}>{Number(currentGPS.lat).toFixed(5)}, {Number(currentGPS.lon).toFixed(5)}</div>}
-              </div>
-              <div style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 6, background: gpsStatus === 'ok' ? '#10B98115' : gpsStatus === 'error' ? '#EF444415' : '#F59E0B15', color: gpsStatus === 'ok' ? '#10B981' : gpsStatus === 'error' ? '#EF4444' : '#F59E0B' }}>
-                {gpsStatus === 'ok' ? '● Live' : gpsStatus === 'error' ? '✕ Off' : '◌ ...'}
-              </div>
-            </div>
-
-            {geofenceError && geofenceStatus?.strict_mode && (
-              <div style={{ fontSize: 12, color: "#EF4444", fontWeight: 600, padding: "10px 14px", background: "#EF444410", borderRadius: 10, border: '1px solid #EF444420' }}>{geofenceError}</div>
-            )}
-
-            {/* Selfie (clock-in only) */}
-            {!openLog && (
-              <div>
-                <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Verification Selfie</label>
-                <div onClick={() => setShowSelfie(true)} style={{ width: '100%', height: 110, background: 'var(--bg)', border: '2px dashed var(--stroke2)', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                  {selfiePreview
-                    ? <img src={selfiePreview} alt="selfie" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 12 }} />
-                    : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: 'var(--muted)' }}><Camera size={22} opacity={0.5} /><span style={{ fontSize: 11, fontWeight: 700 }}>Tap to capture selfie</span></div>}
-                </div>
-                {selfiePreview && <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: '#10B981', marginTop: 6 }}><Check size={12} /> Photo captured</div>}
-                {!selfieFile && <div style={{ fontSize: 11, color: 'var(--warn-text)', fontWeight: 600, marginTop: 4 }}>⚠ Selfie is required</div>}
-              </div>
-            )}
-
-            {/* Notes */}
-            <div>
-              <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 6 }}>Add a note</label>
-              <textarea placeholder={openLog ? "End of day summary..." : "What will you work on?"} value={sessionNotes} onChange={e => setSessionNotes(e.target.value)} rows={3}
-                style={{ width: '100%', border: '1px solid var(--stroke2)', borderRadius: 12, padding: '12px 16px', fontSize: 13, fontWeight: 600, color: 'var(--fg)', background: 'var(--bg)', resize: 'vertical', outline: 'none', fontFamily: 'inherit' }} />
-            </div>
-
-            {/* Attachment (clock-in only) */}
-            {!openLog && (
-              <label htmlFor="tp-file-panel" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', border: '1px solid var(--stroke2)', borderRadius: 12, background: 'var(--bg)', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: sessionPhoto ? '#6366F1' : 'var(--muted)' }}>
-                <input id="tp-file-panel" type="file" style={{ display: "none" }} onChange={e => setSessionPhoto(e.target.files[0])} /><Paperclip size={14} /><span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sessionPhoto ? sessionPhoto.name : "Attach starting photo (optional)"}</span>
-              </label>
-            )}
-
-            {/* Job Site Photos (clocked-in only) */}
-            {openLog && (
-              <div style={{ padding: 14, borderRadius: 14, background: 'var(--surface2)', border: '1px solid var(--stroke)' }}>
-                <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--fg)' }}><Camera size={13} color="#6366F1" /> Job Site Photo</div>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                  {["before", "progress", "after"].map(t => (<button key={t} onClick={() => setJobPhotoType(t)} style={{ flex: 1, padding: "6px 4px", borderRadius: 6, fontSize: 10, fontWeight: 800, textTransform: "uppercase", cursor: "pointer", background: jobPhotoType === t ? "#6366F1" : "var(--surface)", color: jobPhotoType === t ? "#fff" : "var(--muted)", border: jobPhotoType === t ? "1px solid #6366F1" : "1px solid var(--stroke)" }}>{t}</button>))}
-                </div>
-                {!jobPhotoPreview ? (
-                  <button style={{ width: '100%', height: 40, borderRadius: 10, border: '1px dashed var(--stroke2)', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer', fontSize: 12, fontWeight: 700, color: 'var(--muted)' }} onClick={() => setShowJobPhotoCamera(true)}><Camera size={14} /> Capture {jobPhotoType} photo</button>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ position: 'relative', width: 56, height: 56 }}><img src={jobPhotoPreview} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} /><button onClick={() => { setJobPhotoFile(null); setJobPhotoPreview(null) }} style={{ position: 'absolute', top: -4, right: -4, background: '#EF4444', color: '#fff', border: 'none', borderRadius: '50%', width: 16, height: 16, cursor: 'pointer', fontSize: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button></div>
-                    <input placeholder="Caption..." value={jobPhotoCaption} onChange={e => setJobPhotoCaption(e.target.value)} style={{ height: 34, fontSize: 12, border: '1px solid var(--stroke)', borderRadius: 8, padding: '0 12px', background: 'var(--surface)', color: 'var(--fg)', outline: 'none' }} />
-                    <button onClick={uploadJobPhoto} disabled={busy} style={{ height: 34, borderRadius: 8, background: '#10B981', color: '#fff', border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>{busy ? <Loader2 size={14} className="spin" /> : <Check size={14} />} Upload</button>
+          {/* Verification Banners */}
+          <div className="space-y-4">
+            {faceVerifyStatus === 'verifying' && (
+              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center justify-between animate-in fade-in duration-300">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
+                    <Loader2 size={16} className="animate-spin text-indigo-600" />
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* Break Controls */}
-            {openLog && !openBreak && (
-              <div>
-                <label style={{ display: 'block', fontSize: 10, fontWeight: 800, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>Take a break</label>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {["lunch", "short", "personal"].map(t => (<button key={t} onClick={() => setBreakType(t)} style={{ flex: 1, padding: "8px 4px", borderRadius: 8, fontSize: 10, fontWeight: 800, textTransform: "uppercase", cursor: "pointer", background: breakType === t ? "#6366F1" : "var(--surface2)", color: breakType === t ? "#fff" : "var(--muted)", border: breakType === t ? "1px solid #6366F1" : "1px solid var(--stroke)" }}>{t}</button>))}
+                  <span className="text-sm font-bold text-indigo-900">Authenticating identity models...</span>
                 </div>
               </div>
             )}
-            {openBreak && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', background: '#FFFBEB', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 12 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F59E0B' }} />
-                <div style={{ flex: 1 }}><div style={{ fontWeight: 700, fontSize: 13, color: '#D97706' }}>{(openBreak.break_type || 'Break').charAt(0).toUpperCase() + (openBreak.break_type || 'Break').slice(1)} Break</div><div style={{ fontSize: 11, color: '#B45309' }}>{formatDuration(breakElapsed)}</div></div>
+            {faceVerifyStatus === 'mismatch' && (
+              <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center justify-between animate-in fade-in duration-300">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
+                    <AlertCircle size={16} className="text-red-600" />
+                  </div>
+                  <span className="text-sm font-bold text-red-900">Identity verification anomaly detected.</span>
+                </div>
+                <button onClick={() => { setFaceVerifyStatus(null); setError(''); setShowSelfie(true) }} className="px-4 py-1.5 bg-red-600 text-white text-[10px] font-black rounded-lg uppercase tracking-widest">Re-verify</button>
               </div>
             )}
-            {openLog && completedBreaks.length > 0 && <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}><Coffee size={12} /> {completedBreaks.length} break(s) • {formatDuration(totalBreakSecs)}</div>}
+            {faceVerifyStatus === 'matched' && (
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl flex items-center gap-3 animate-in fade-in duration-300">
+                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center">
+                  <CheckCircle2 size={16} className="text-emerald-600" />
+                </div>
+                <span className="text-sm font-bold text-emerald-900">Identity verified {faceVerifyScore && `(${faceVerifyScore}%)`}</span>
+              </div>
+            )}
           </div>
 
-          {/* Footer */}
-          <div style={{ padding: '16px 24px 24px', borderTop: '1px solid var(--stroke)', display: 'flex', gap: 12 }}>
-            <button onClick={() => setPanelOpen(false)} style={{ flex: 1, padding: '14px', borderRadius: 14, border: '1px solid var(--stroke2)', background: 'var(--surface)', color: 'var(--fg)', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>Cancel</button>
-            {openLog ? (
-              <button onClick={handleClockOut} disabled={busy} style={{ flex: 2, padding: '14px', borderRadius: 14, border: 'none', background: '#EF4444', color: '#fff', fontSize: 14, fontWeight: 800, cursor: 'pointer', boxShadow: '0 6px 20px rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                {busy ? <Loader2 size={16} className="spin" /> : <Square size={12} fill="currentColor" />} {openLog.task ? "Complete & Clock Out" : "Clock Out"}
-              </button>
-            ) : (
-              <button onClick={() => { setPanelOpen(false); action("/time/clock-in/") }} disabled={busy || (!resolvedAddr && gpsStatus !== "error") || !selfieFile || (!geofencePassed && geofenceStatus?.geofence_enabled && geofenceStatus?.strict_mode)} style={{ flex: 2, padding: '14px', borderRadius: 14, border: 'none', background: (!selfieFile || (!resolvedAddr && gpsStatus !== "error")) ? '#9ca3af' : '#10B981', color: '#fff', fontSize: 14, fontWeight: 800, cursor: (!selfieFile || (!resolvedAddr && gpsStatus !== "error")) ? 'not-allowed' : 'pointer', boxShadow: selfieFile ? '0 6px 20px rgba(16,185,129,0.3)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                {busy ? <Loader2 size={16} className="spin" /> : <Clock size={16} />} Save
-              </button>
-            )}
+          {/* KPI Dashboard */}
+          {!loading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <StatCard 
+                icon={<TrendingUp />} 
+                label="Weekly Total" 
+                value={formatHrMin(weekStats.total)} 
+                sub={weekStats.otSeconds > 0 ? `+${formatHrMin(weekStats.otSeconds)} OVERTIME` : "Standard Volume"}
+                color={weekStats.otSeconds > 0 ? "#EF4444" : "#6366F1"} 
+              />
+              <StatCard 
+                icon={<Calendar />} 
+                label="Persistence" 
+                value={`${weekStats.days} Days`} 
+                sub="Logged this week"
+                color="#10B981" 
+              />
+              <StatCard 
+                icon={<Timer />} 
+                label="Daily Intensity" 
+                value={formatHrMin(weekStats.avg)} 
+                sub="Average Session Length"
+                color="#F59E0B" 
+              />
+              {openLog && (
+                <StatCard 
+                  icon={<Clock />} 
+                  label="Live Session" 
+                  value={formatDuration(elapsed)} 
+                  sub="Active tracking"
+                  color="#EF4444" 
+                  pulse 
+                />
+              )}
+            </div>
+          )}
+
+          {/* Audit Ledger Section */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                <h2 className="text-lg font-black text-slate-900">Personal Ledger</h2>
+                <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-widest">{logs.length} Entries</span>
+              </div>
+              
+              <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                <button onClick={() => { setFilterFrom(todayStr); setFilterTo(todayStr) }} className="px-4 py-1.5 text-[10px] font-black text-slate-500 hover:text-indigo-600 uppercase tracking-widest">Today</button>
+                <button onClick={() => { setFilterFrom(weekAgo); setFilterTo(todayStr) }} className="px-4 py-1.5 bg-white shadow-sm rounded-lg text-[10px] font-black text-indigo-600 uppercase tracking-widest">Week</button>
+                <button onClick={() => { const m = new Date(); m.setDate(1); setFilterFrom(m.toLocaleDateString("en-CA")); setFilterTo(todayStr) }} className="px-4 py-1.5 text-[10px] font-black text-slate-500 hover:text-indigo-600 uppercase tracking-widest">Month</button>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-100">
+                      <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                      <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Timeline</th>
+                      <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Verification</th>
+                      <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Approval Status</th>
+                      <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Duration</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {loading ? (
+                      [1, 2, 3].map(i => (
+                        <tr key={i}>
+                          <td colSpan={5} className="p-6"><Skeleton h="40px" /></td>
+                        </tr>
+                      ))
+                    ) : logs.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-20 text-center">
+                          <div className="flex flex-col items-center gap-4 text-slate-400">
+                            <Clock size={48} className="opacity-10" />
+                            <div className="font-bold">No attendance records found</div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      logs.map(l => {
+                        const isRowActive = !l.clock_out
+                        const dur = isRowActive ? elapsed : l.worked_seconds
+                        return (
+                          <tr key={l.id} className={`group hover:bg-slate-50/50 transition-colors ${isRowActive ? 'bg-indigo-50/30' : ''}`}>
+                            <td className="p-6">
+                              <div className="text-sm font-bold text-slate-700">{l.work_date}</div>
+                            </td>
+                            <td className="p-6">
+                              <div className="flex items-center gap-4">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase">In</span>
+                                    <span className="text-sm font-bold text-slate-700">{formatDateTime(l.clock_in).split(",")[1]}</span>
+                                  </div>
+                                  {l.clock_out && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] font-black text-slate-400 uppercase">Out</span>
+                                      <span className="text-sm font-bold text-slate-700">{formatDateTime(l.clock_out).split(",")[1]}</span>
+                                    </div>
+                                  )}
+                                </div>
+                                {isRowActive && <div className="px-2 py-0.5 bg-indigo-600 text-white text-[9px] font-black rounded-full animate-pulse">LIVE</div>}
+                              </div>
+                            </td>
+                            <td className="p-6">
+                              <div className="flex items-center gap-2">
+                                {l.clock_in_photo && (
+                                  <a href={l.clock_in_photo} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg overflow-hidden border border-slate-100 shadow-sm hover:scale-110 transition-transform">
+                                    <img src={l.clock_in_photo} className="w-full h-full object-cover" />
+                                  </a>
+                                )}
+                                {l.clock_out_photo && (
+                                  <a href={l.clock_out_photo} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-lg overflow-hidden border border-slate-100 shadow-sm hover:scale-110 transition-transform">
+                                    <img src={l.clock_out_photo} className="w-full h-full object-cover" />
+                                  </a>
+                                )}
+                                {!l.clock_in_photo && !l.clock_out_photo && <span className="text-[10px] font-bold text-slate-300">N/A</span>}
+                              </div>
+                            </td>
+                            <td className="p-6">
+                              <div className="flex items-center gap-3">
+                                <Pill variant={l.status === 'approved' ? 'success' : l.status === 'rejected' ? 'danger' : l.status === 'submitted' ? 'warning' : 'neutral'}>
+                                  {l.status === 'submitted' ? 'In Review' : (l.status || (isRowActive ? 'Active' : 'Draft'))}
+                                </Pill>
+                                {l.status === 'draft' && <button onClick={() => submitLog(l.id)} className="px-3 py-1.5 bg-indigo-600 text-white text-[10px] font-black rounded-lg">SUBMIT</button>}
+                                {l.clock_out && <button onClick={() => downloadLogPdf(l.id)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"><FileText size={14} /></button>}
+                              </div>
+                            </td>
+                            <td className="p-6 text-right">
+                              <div className={`text-sm font-black ${dur > 8 * 3600 ? 'text-red-600' : 'text-slate-900'}`}>
+                                {formatDuration(dur)}
+                              </div>
+                              {dur > 8 * 3600 && <div className="text-[9px] font-black text-red-400 uppercase">OT +{formatDuration(dur - 8 * 3600)}</div>}
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* ═══ SLIDE-OUT OPERATION PANEL ═══ */}
+      {panelOpen && (
+        <div className="fixed inset-0 z-[1000] flex justify-end animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setPanelOpen(false)} />
+          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-500">
+            {/* Header */}
+            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">{openLog ? 'Complete Shift' : 'Initiate Session'}</h3>
+                {openLog && <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Started {formatDateTime(openLog.clock_in).split(",")[1]}</div>}
+              </div>
+              <button onClick={() => setPanelOpen(false)} className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 hover:text-slate-900 flex items-center justify-center transition-all">✕</button>
+            </div>
+
+            {/* Content Body */}
+            <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+              {/* Telemetry Status */}
+              <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+                  <MapPin size={18} className="text-indigo-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-black text-slate-900 truncate">{resolvedAddr || "Locating precision coordinates..."}</div>
+                  {currentGPS && <div className="text-[10px] font-bold text-slate-400 mt-0.5">{currentGPS.lat.toFixed(5)}, {currentGPS.lon.toFixed(5)}</div>}
+                </div>
+                <div className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${gpsStatus === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {gpsStatus === 'ok' ? 'LOCKED' : 'LINKING'}
+                </div>
+              </div>
+
+              {geofenceError && geofenceStatus?.strict_mode && (
+                <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-xs font-bold text-red-600 flex items-center gap-2">
+                  <AlertCircle size={14} /> {geofenceError}
+                </div>
+              )}
+
+              {/* Identity Verification (Clock-in only) */}
+              {!openLog && (
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Identity Verification</label>
+                  <button 
+                    onClick={() => setShowSelfie(true)} 
+                    className={`w-full h-40 rounded-3xl border-2 border-dashed transition-all overflow-hidden relative ${selfiePreview ? 'border-indigo-600' : 'border-slate-200 hover:border-indigo-400 bg-slate-50'}`}
+                  >
+                    {selfiePreview ? (
+                      <img src={selfiePreview} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-3">
+                        <Camera size={32} className="text-slate-300" />
+                        <span className="text-xs font-black text-slate-400">TAP TO CAPTURE SELFIE</span>
+                      </div>
+                    )}
+                  </button>
+                  {selfiePreview && (
+                    <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase">
+                      <Check size={12} strokeWidth={3} /> Verification Locked
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Operation Notes */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Operation Notes</label>
+                <textarea 
+                  value={sessionNotes} 
+                  onChange={e => setSessionNotes(e.target.value)} 
+                  placeholder={openLog ? "Summary of completed tasks..." : "Briefly describe your objectives..."}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-900 focus:border-indigo-500 outline-none transition-all" 
+                  rows={4}
+                />
+              </div>
+
+              {/* Job Site Intelligence (Clocked-in only) */}
+              {openLog && (
+                <div className="p-6 bg-slate-900 rounded-3xl space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Camera size={16} className="text-indigo-400" />
+                      <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Intelligence Report</span>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    {["before", "progress", "after"].map(t => (
+                      <button 
+                        key={t} 
+                        onClick={() => setJobPhotoType(t)}
+                        className={`py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${jobPhotoType === t ? 'bg-indigo-600 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+
+                  {!jobPhotoPreview ? (
+                    <button 
+                      onClick={() => setShowJobPhotoCamera(true)}
+                      className="w-full h-24 rounded-2xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-indigo-400 hover:border-indigo-500/50 transition-all"
+                    >
+                      <Camera size={20} />
+                      <span className="text-[9px] font-black uppercase">Capture Photo</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-16 h-16 rounded-xl overflow-hidden relative group">
+                          <img src={jobPhotoPreview} className="w-full h-full object-cover" />
+                          <button onClick={() => { setJobPhotoFile(null); setJobPhotoPreview(null) }} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">✕</button>
+                        </div>
+                        <input 
+                          placeholder="Brief caption..." 
+                          value={jobPhotoCaption} 
+                          onChange={e => setJobPhotoCaption(e.target.value)}
+                          className="flex-1 bg-white/5 border border-slate-700 rounded-xl h-12 px-4 text-xs font-bold text-white outline-none"
+                        />
+                      </div>
+                      <button 
+                        onClick={uploadJobPhoto} 
+                        disabled={busy}
+                        className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-xl flex items-center justify-center gap-2 transition-all"
+                      >
+                        {busy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} 
+                        {busy ? 'REPORTING...' : 'UPLOAD INTEL'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Break Operations */}
+              {openLog && (
+                <div className="space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Operational Break</label>
+                  {!openBreak ? (
+                    <div className="grid grid-cols-3 gap-3">
+                      {["lunch", "short", "personal"].map(t => (
+                        <button 
+                          key={t} 
+                          onClick={() => setBreakType(t)}
+                          className={`py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all ${breakType === t ? 'border-indigo-600 bg-indigo-50 text-indigo-600' : 'border-slate-100 bg-white text-slate-400'}`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Coffee size={18} className="text-amber-600 animate-bounce" />
+                        <div>
+                          <div className="text-sm font-black text-amber-900">On Break: {openBreak.break_type?.toUpperCase()}</div>
+                          <div className="text-xs font-bold text-amber-600 tabular-nums">{formatDuration(breakElapsed)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {completedBreaks.length > 0 && (
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Coffee size={12} /> {completedBreaks.length} Session(s) Completed • {formatDuration(totalBreakSecs)}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Sliding Panel Footer */}
+            <div className="px-8 pt-4 pb-2 border-t border-slate-100 bg-slate-50/50">
+              {/* Phase 5 — preflight pill: instant geofence feedback */}
+              {preflightPill && !openLog && (
+                <div
+                  className={`mb-4 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs font-bold ${
+                    preflightPill.tone === "ok"
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      : preflightPill.tone === "warn"
+                        ? "bg-amber-50 text-amber-800 border border-amber-200"
+                        : preflightPill.tone === "block"
+                          ? "bg-rose-50 text-rose-800 border border-rose-200"
+                          : "bg-slate-100 text-slate-600 border border-slate-200"
+                  }`}
+                  role="status"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`inline-block w-2 h-2 rounded-full ${
+                      preflightPill.tone === "ok"
+                        ? "bg-emerald-500"
+                        : preflightPill.tone === "warn"
+                          ? "bg-amber-500"
+                          : preflightPill.tone === "block"
+                            ? "bg-rose-500"
+                            : "bg-slate-400"
+                    }`}
+                  />
+                  {preflightPill.label}
+                </div>
+              )}
+            </div>
+            <div className="px-8 pb-8 bg-slate-50/50 flex gap-4">
+              <button
+                onClick={() => setPanelOpen(false)}
+                className="flex-1 py-4 rounded-2xl text-sm font-black text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-all"
+              >
+                Cancel
+              </button>
+              {openLog ? (
+                <button 
+                  onClick={handleClockOut} 
+                  disabled={busy}
+                  className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-red-500 hover:bg-red-600 shadow-xl shadow-red-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                >
+                  {busy ? <Loader2 size={18} className="animate-spin" /> : <Square size={14} fill="currentColor" />}
+                  {openLog.task ? "COMPLETE & EXIT" : "CLOCK OUT"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setPanelOpen(false); action("/time/clock-in/") }}
+                  disabled={
+                    busy
+                    || (!resolvedAddr && gpsStatus !== "error")
+                    || !selfieFile
+                    || (!geofencePassed && geofenceStatus?.geofence_enabled && geofenceStatus?.strict_mode)
+                    // Phase 5: also block client-side when the preflight came
+                    // back with allowed=false (server will reject too — this
+                    // just saves a network round-trip).
+                    || (preflight && preflight.allowed === false)
+                  }
+                  className={`flex-[2] py-4 rounded-2xl text-sm font-black text-white flex items-center justify-center gap-2 transition-all shadow-xl ${(!selfieFile || (!resolvedAddr && gpsStatus !== "error")) ? 'bg-slate-400' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-100'}`}
+                >
+                  {busy ? <Loader2 size={18} className="animate-spin" /> : <Clock size={18} />}
+                  SAVE SESSION
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

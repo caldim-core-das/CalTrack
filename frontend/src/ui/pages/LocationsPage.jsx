@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { MapContainer, TileLayer, Marker, Popup, Circle, Polygon, useMap } from "react-leaflet"
-import { Search, MapPin, X, ChevronDown, Info, Archive, Layers, UserCheck, Map } from "lucide-react"
+import { Search, MapPin, X, ChevronDown, Info, Archive, Layers, UserCheck, Map, Activity, Loader2, Plus, Globe, Navigation2, Target, Save, Building2 } from "lucide-react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 
 import { apiRequest, unwrapResults } from "../../api/client.js"
+import { Pill, Button, Card, Input, Select, TextArea } from "../components/kit.jsx"
 import { ZonesPanel } from "./locations/ZonesPanel.jsx"
 import { AssignmentsPanel } from "./locations/AssignmentsPanel.jsx"
+import { MapOverview } from "./locations/MapOverview.jsx"
+import { GeofenceEditorModal } from "./locations/GeofenceEditorModal.jsx"
 
 /* ── Fix default Leaflet icons ────────────────────────────────── */
 delete L.Icon.Default.prototype._getIconUrl
@@ -108,6 +111,15 @@ export function LocationsPage() {
   /* ── Saved locations from DB ───────────────────────────────── */
   const [savedLocations, setSavedLocations] = useState([])
   const [loadingSaved, setLoadingSaved] = useState(true)
+
+  /* ── Phase 4: polygon-draw modal ──────────────────────────── */
+  const [editingGeofenceFor, setEditingGeofenceFor] = useState(null)
+
+  /* When the modal saves, splice the updated location back into our list. */
+  const handleGeofenceSaved = (updated) => {
+    if (!updated?.id) return
+    setSavedLocations((prev) => prev.map((l) => (l.id === updated.id ? { ...l, ...updated } : l)))
+  }
 
   /* ── View toggle ───────────────────────────────────────────── */
   const [viewMode, setViewMode] = useState("map")
@@ -446,221 +458,166 @@ export function LocationsPage() {
 
   /* ─────────────────────────── RENDER ─────────────────────────── */
   return (
-    <div style={{
-      display: "flex", flexDirection: "column", height: "calc(100vh - 110px)", width: "100%",
-      backgroundColor: "var(--bg)", border: "1px solid var(--stroke)",
-      borderRadius: "var(--radius-lg)", overflow: "hidden", boxShadow: "var(--shadow)",
-    }}>
+    <div className="flex flex-col h-[calc(100vh-100px)] bg-white border border-slate-200 rounded-[2.5rem] overflow-hidden shadow-sm">
 
       {/* ── Tab Bar ──────────────────────────────────────────── */}
-      <div style={{ display: "flex", borderBottom: "1px solid var(--stroke)",
-        background: "var(--surface)", flexShrink: 0 }}>
-        {[
-          { id: "map",         label: "Map & Locations", Icon: Map },
-          { id: "zones",       label: "Zones",           Icon: Layers },
-          { id: "assignments", label: "Assignments",     Icon: UserCheck },
-        ].map(({ id, label, Icon }) => (
-          <button key={id} onClick={() => setActiveTab(id)}
-            style={{
-              padding: "12px 22px", border: "none", cursor: "pointer",
-              fontSize: 13, fontWeight: 700, display: "flex", alignItems: "center", gap: 7,
-              background: activeTab === id ? "var(--bg)" : "transparent",
-              color: activeTab === id ? "#4F46E5" : "var(--fg2)",
-              borderBottom: activeTab === id ? "2px solid #4F46E5" : "2px solid transparent",
-              transition: "all 0.15s",
-            }}>
-            <Icon size={15} /> {label}
-          </button>
-        ))}
+      <div className="flex items-center justify-between px-8 py-4 bg-slate-50/50 border-b border-slate-100 flex-shrink-0">
+        <div className="flex items-center gap-2 bg-slate-200/40 p-1.5 rounded-2xl">
+          {[
+            { id: "overview",    label: "Overview",        Icon: Activity },
+            { id: "map",         label: "Map & Sites",     Icon: Map },
+            { id: "zones",       label: "Zones",           Icon: Layers },
+            { id: "assignments", label: "Assignments",     Icon: UserCheck },
+          ].map(({ id, label, Icon }) => {
+            const isActive = activeTab === id
+            return (
+              <button 
+                key={id} 
+                onClick={() => setActiveTab(id)}
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all ${isActive ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-700'}`}
+              >
+                <Icon size={16} />
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <Pill tone="neutral" className="px-4 py-1.5 bg-white border border-slate-200 text-slate-600 font-bold">
+            {savedLocations.length} ACTIVE SITES
+          </Pill>
+        </div>
       </div>
 
-      {/* ── Tab Content ──────────────────────────────────────── */}
+      {/* ── Tab Content ──────────────────────────────────── */}
+      {activeTab === "overview" && (
+        <div className="flex-1 overflow-hidden animate-in fade-in duration-500">
+          <MapOverview />
+        </div>
+      )}
+
       {activeTab === "zones" && (
-        <div style={{ flex: 1, overflow: "hidden" }}>
+        <div className="flex-1 overflow-hidden animate-in fade-in duration-500">
           <ZonesPanel locations={savedLocations} />
         </div>
       )}
 
       {activeTab === "assignments" && (
-        <div style={{ flex: 1, overflow: "hidden" }}>
+        <div className="flex-1 overflow-hidden animate-in fade-in duration-500">
           <AssignmentsPanel locations={savedLocations} />
         </div>
       )}
 
       {activeTab === "map" && (
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        <div className="flex flex-1 overflow-hidden animate-in fade-in duration-500">
 
-        {/* LEFT: search + map stacked in a column */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", position: "relative" }}>
+          {/* LEFT: search + map stacked in a column */}
+          <div className="flex-1 flex flex-col relative min-w-0">
 
-        {/* ── Top Search Bar ──────────────────────────────────── */}
-        <div style={{
-          position: "relative", zIndex: 1000,
-          padding: "10px 16px",
-          display: "flex", gap: "12px", alignItems: "center",
-          borderBottom: "1px solid var(--stroke)",
-          backgroundColor: "var(--surface)",
-        }}>
-          {/* Search Input */}
-          <div ref={searchRef} style={{ position: "relative", flex: "0 1 480px" }}>
-            <div style={{
-              display: "flex", alignItems: "center", gap: "8px",
-              background: "var(--bg)", border: "1px solid var(--stroke)",
-              borderRadius: "8px", padding: "8px 12px",
-            }}>
-              <Search size={16} color="var(--muted)" />
-              <input
-                id="location-search-input"
-                type="text"
-                placeholder="Search all"
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value)
-                  if (e.target.value.length >= 2) setShowDropdown(true)
-                }}
-                onFocus={() => { if (searchResults.length > 0) setShowDropdown(true) }}
-                style={{
-                  border: "none", outline: "none", background: "transparent",
-                  fontSize: "14px", fontWeight: 500, color: "var(--fg)",
-                  width: "100%", fontFamily: "inherit",
-                }}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => { setSearchQuery(""); setSearchResults([]); setShowDropdown(false); setSelectedPlace(null) }}
-                  style={{ background: "none", border: "none", cursor: "pointer", display: "flex", padding: 0 }}
-                >
-                  <X size={14} color="var(--muted)" />
-                </button>
+            {/* ── Top Search Bar ──────────────────────────────────── */}
+            <div className="relative z-[1000] px-8 py-4 flex gap-4 items-center bg-white border-b border-slate-50 shadow-sm">
+              <div ref={searchRef} className="relative flex-1 max-w-2xl">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+                    <Search size={20} className="text-slate-300" />
+                  </div>
+                  <input
+                    id="location-search-input"
+                    type="text"
+                    placeholder="Search for an address, business, or landmark..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      if (e.target.value.length >= 2) setShowDropdown(true)
+                    }}
+                    onFocus={() => { if (searchResults.length > 0) setShowDropdown(true) }}
+                    className="w-full pl-14 pr-12 py-4 bg-slate-50/50 border-2 border-slate-100 rounded-[1.25rem] text-base font-semibold text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400 focus:bg-white focus:ring-8 focus:ring-indigo-50/50 transition-all"
+                  />
+                  {searching && (
+                    <div className="absolute inset-y-0 right-14 flex items-center">
+                      <Loader2 size={18} className="animate-spin text-indigo-400" />
+                    </div>
+                  )}
+                  {searchQuery && (
+                    <button
+                      onClick={() => { setSearchQuery(""); setSearchResults([]); setShowDropdown(false); setSelectedPlace(null) }}
+                      className="absolute inset-y-0 right-5 flex items-center text-slate-300 hover:text-slate-500 transition-colors"
+                    >
+                      <X size={20} />
+                    </button>
+                  )}
+                </div>
+
+                {/* ── Search Dropdown ─────────────────────────────── */}
+                {showDropdown && searchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-4 bg-white rounded-3xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.2)] border border-slate-100 z-[9999] overflow-hidden max-h-[28rem] overflow-y-auto animate-in fade-in slide-in-from-top-4 duration-300">
+                    {searchResults.map((r) => (
+                      <button
+                        key={r.id}
+                        onClick={() => handleSelectPlace(r)}
+                        className="w-full px-6 py-5 flex items-start gap-5 hover:bg-slate-50 text-left transition-colors border-b border-slate-50 last:border-0"
+                      >
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
+                          <MapPin size={24} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-base font-extrabold text-slate-900 mb-1">{r.name}</div>
+                          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                            {r.secondaryText || r.fullAddress.split(",").slice(1).join(",").trim()}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                    <button 
+                      className="w-full px-6 py-5 text-indigo-600 text-sm font-extrabold text-left hover:bg-indigo-50/50 transition-colors flex items-center gap-3"
+                      onClick={() => handleManualAdd()}
+                    >
+                      <Plus size={18} /> Add missing location manually
+                    </button>
+                  </div>
+                )}
+              </div>
+
+            {/* Radius filter dropdown */}
+            <div ref={radiusRef} className="relative">
+              <button 
+                onClick={() => setShowRadiusDropdown(!showRadiusDropdown)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all border-2 ${selectedRadiusFilters.length > 0 ? 'border-indigo-400 bg-indigo-50 text-indigo-600' : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-200'}`}
+              >
+                {radiusFilterLabel}
+                <ChevronDown size={14} className={`transition-transform duration-200 ${showRadiusDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showRadiusDropdown && (
+                <div className="absolute top-full left-0 mt-3 bg-white rounded-2xl shadow-2xl border border-slate-100 z-[9999] w-64 overflow-hidden p-2 animate-in fade-in slide-in-from-top-2">
+                  {radiusFilterOptions.map((opt) => {
+                    const isSelected = selectedRadiusFilters.some(f => f.id === opt.id)
+                    return (
+                      <button
+                        key={opt.id}
+                        onClick={() => toggleRadiusFilter(opt)}
+                        className={`w-full px-4 py-3 flex items-center justify-between rounded-xl text-sm transition-colors ${isSelected ? 'bg-indigo-50 text-indigo-600 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        {opt.label}
+                        {isSelected && (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </button>
+                    )
+                  })}
+                  <div className="h-px bg-slate-100 my-2" />
+                  <button
+                    onClick={clearRadiusFilters}
+                    className="w-full px-4 py-3 text-left text-sm font-bold text-rose-500 hover:bg-rose-50 rounded-xl transition-colors"
+                  >
+                    Clear selection
+                  </button>
+                </div>
               )}
             </div>
-            <ChevronDown size={14} color="var(--muted)" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }} />
-
-            {/* ── Search Dropdown ─────────────────────────────── */}
-            {showDropdown && searchResults.length > 0 && (
-              <div style={{
-                position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-                background: "var(--surface)", border: "1px solid var(--stroke)",
-                borderRadius: "10px", boxShadow: "0 12px 28px rgba(0,0,0,0.12)",
-                zIndex: 9999, overflow: "hidden",
-                maxHeight: 340, overflowY: "auto",
-              }}>
-                {searchResults.map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => handleSelectPlace(r)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: "12px",
-                      width: "100%", padding: "12px 16px",
-                      border: "none", borderBottom: "1px solid var(--stroke)",
-                      background: "transparent", cursor: "pointer",
-                      textAlign: "left", transition: "background 0.15s",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                  >
-                    <div style={{
-                      width: 32, height: 32, borderRadius: "50%",
-                      background: "rgba(249,115,22,0.1)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
-                    }}>
-                      <MapPin size={16} color="#F97316" />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--fg)", marginBottom: 2 }}>
-                        {r.name}
-                      </div>
-                      <div style={{
-                        fontSize: "12px",
-                        color: "var(--muted)",
-                        lineHeight: 1.4,
-                      }}>
-                        {r.secondaryText || r.fullAddress.split(",").slice(1).join(",").trim()}
-                      </div>
-                    </div>
-
-                  </button>
-                ))}
-                <button style={{
-                  display: "flex", alignItems: "center", gap: "8px",
-                  padding: "12px 16px", width: "100%",
-                  border: "none", background: "transparent",
-                  color: "#F97316", fontSize: "13px", fontWeight: 600,
-                  cursor: "pointer",
-                }}>
-                  + Add missing location
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Radius dropdown filter */}
-          <div ref={radiusRef} style={{ position: "relative" }}>
-            <div
-              onClick={() => setShowRadiusDropdown(!showRadiusDropdown)}
-              style={{
-                display: "flex", alignItems: "center", gap: "6px",
-                padding: "8px 14px", border: "1px solid var(--stroke)",
-                borderRadius: "8px", fontSize: "13px", fontWeight: 600,
-                color: selectedRadiusFilters.length > 0 ? "#F97316" : "var(--fg2)",
-                cursor: "pointer", background: "var(--bg)",
-                transition: "all 0.2s",
-                minWidth: 90,
-              }}
-            >
-              {radiusFilterLabel} <ChevronDown size={12} style={{ transform: showRadiusDropdown ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
-            </div>
-
-            {showRadiusDropdown && (
-              <div style={{
-                position: "absolute", top: "calc(100% + 4px)", left: 0,
-                background: "var(--surface)", border: "1px solid var(--stroke)",
-                borderRadius: "10px", boxShadow: "0 12px 28px rgba(0,0,0,0.12)",
-                zIndex: 9999, width: 220, overflow: "hidden",
-                padding: "8px 0",
-              }}>
-                {radiusFilterOptions.map((opt) => {
-                  const isSelected = selectedRadiusFilters.some(f => f.id === opt.id)
-                  return (
-                    <button
-                      key={opt.id}
-                      onClick={() => toggleRadiusFilter(opt)}
-                      style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        width: "100%", padding: "10px 16px", border: "none",
-                        background: "transparent", cursor: "pointer",
-                        textAlign: "left", transition: "background 0.1s",
-                        fontSize: "13px", color: "var(--fg)", fontWeight: 500,
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                    >
-                      {opt.label}
-                      {isSelected && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F97316" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </button>
-                  )
-                })}
-                <div style={{ height: 1, background: "var(--stroke)", margin: "8px 0" }} />
-                <button
-                  onClick={clearRadiusFilters}
-                  style={{
-                    width: "100%", padding: "10px 16px", border: "none",
-                    background: "transparent", cursor: "pointer",
-                    textAlign: "left", fontSize: "13px", color: "#F97316", fontWeight: 600,
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                >
-                  Clear selection
-                </button>
-              </div>
-            )}
-          </div>
 
           <div style={{ flex: 1 }} />
 
@@ -697,11 +654,11 @@ export function LocationsPage() {
 
         {/* ── Map View ───────────────────────────────────────── */}
         {viewMode === "map" ? (
-          <div style={{ flex: 1, position: "relative" }}>
+          <div className="flex-1 relative z-0">
             <MapContainer
               center={mapCenter}
               zoom={mapZoom}
-              style={{ width: "100%", height: "100%", zIndex: 0 }}
+              className="w-full h-full"
               zoomControl={true}
             >
               <MapUpdater center={mapCenter} zoom={mapZoom} />
@@ -717,43 +674,23 @@ export function LocationsPage() {
                     position={[selectedPlace.lat, selectedPlace.lng]}
                     icon={createOrangePin()}
                   >
-                    <Popup maxWidth={300} minWidth={250} autoPan>
-                      <div style={{ padding: "8px 4px", textAlign: "center" }}>
-                        <div style={{
-                          fontWeight: 800, fontSize: "16px",
-                          color: "#1a1a2e", marginBottom: "4px",
-                        }}>
+                    <Popup maxWidth={300} minWidth={260} autoPan>
+                      <div className="p-4 text-center">
+                        <div className="text-lg font-black text-slate-900 tracking-tight mb-1">
                           {selectedPlace.name}
                         </div>
-                        <div style={{
-                          fontSize: "13px", color: "#6b7280",
-                          marginBottom: "16px", lineHeight: 1.5,
-                        }}>
+                        <div className="text-sm font-medium text-slate-500 leading-relaxed mb-5">
                           {selectedPlace.fullAddress}
                         </div>
-                        <button
+                        <Button
                           onClick={handleOpenAddPanel}
-                          style={{
-                            background: "linear-gradient(135deg, #F97316 0%, #ea580c 100%)",
-                            color: "white",
-                            border: "none",
-                            padding: "10px 24px",
-                            borderRadius: "8px",
-                            fontSize: "14px",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            boxShadow: "0 4px 14px rgba(249,115,22,0.35)",
-                            transition: "all 0.2s",
-                            width: "100%",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-1px)")}
-                          onMouseLeave={(e) => (e.currentTarget.style.transform = "none")}
+                          className="w-full shadow-lg shadow-indigo-100 rounded-xl py-3"
                         >
                           Add New Location
-                        </button>
-                        <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "10px" }}>
-                          {savedLocations.length} of {savedLocations.length + 2} locations remaining.{" "}
-                          <span style={{ color: "#F97316", cursor: "pointer" }}>Upgrade for more</span>
+                        </Button>
+                        <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          {savedLocations.length} active sites · 
+                          <span className="text-indigo-600 cursor-pointer hover:underline">Upgrade Plan</span>
                         </div>
                       </div>
                     </Popup>
@@ -762,10 +699,11 @@ export function LocationsPage() {
                     center={[selectedPlace.lat, selectedPlace.lng]}
                     radius={formData.radius || 300}
                     pathOptions={{
-                      color: "#F97316",
-                      fillColor: "#F97316",
+                      color: "#6366F1",
+                      fillColor: "#6366F1",
                       fillOpacity: 0.1,
-                      weight: 1.5,
+                      weight: 2,
+                      dashArray: "10, 10"
                     }}
                   />
                 </>
@@ -779,17 +717,21 @@ export function LocationsPage() {
                     icon={createSavedPin()}
                   >
                     <Popup>
-                      <div style={{ fontWeight: 700, color: "#4F46E5" }}>{loc.name}</div>
-                      <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>{loc.address}</div>
-                      <div style={{ fontSize: "11px", fontWeight: 600, marginTop: "4px" }}>
-                        Radius: {loc.geofence_radius}m
+                      <div className="p-2 min-w-[200px]">
+                        <div className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">SAVED SITE</div>
+                        <div className="text-sm font-black text-slate-900">{loc.name}</div>
+                        <div className="text-xs text-slate-500 mt-1 font-medium">{loc.address}</div>
+                        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100">
+                          <Target size={12} className="text-indigo-500" />
+                          <span className="text-[11px] font-bold text-slate-700">{loc.geofence_radius}m Protection Zone</span>
+                        </div>
                       </div>
                     </Popup>
                   </Marker>
                   <Circle
                     center={[parseFloat(loc.lat), parseFloat(loc.lng)]}
                     radius={loc.geofence_radius || 300}
-                    pathOptions={{ color: "#4F46E5", fillColor: "#4F46E5", fillOpacity: 0.08, weight: 1.5 }}
+                    pathOptions={{ color: "#6366F1", fillColor: "#6366F1", fillOpacity: 0.08, weight: 1.5 }}
                   />
                 </React.Fragment>
               ))}
@@ -797,422 +739,281 @@ export function LocationsPage() {
 
             {/* Left info card when nothing is selected */}
             {!selectedPlace && !showAddPanel && (
-              <div style={{
-                position: "absolute", top: 16, left: 16, zIndex: 500,
-                width: 240, background: "var(--surface)",
-                borderRadius: "14px", padding: "24px 20px",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-                border: "1px solid var(--stroke)",
-                textAlign: "center",
-              }}>
-                <div style={{
-                  width: 72, height: 72, borderRadius: "16px",
-                  background: "linear-gradient(135deg, #e0e7ff, #c7d2fe)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  margin: "0 auto 16px",
-                }}>
-                  <MapPin size={32} color="#4F46E5" />
-                </div>
-                <div style={{ fontSize: "15px", fontWeight: 700, color: "var(--fg)", marginBottom: "8px" }}>
-                  Add locations to track time with GPS
-                </div>
-                <div style={{ fontSize: "12px", color: "var(--muted)", lineHeight: 1.6 }}>
-                  Search for a location on the map to begin.
-                </div>
-                <a
-                  href="#"
-                  style={{ fontSize: "13px", color: "#F97316", fontWeight: 600, marginTop: "14px", display: "inline-block", textDecoration: "none" }}
-                >
+              <div className="absolute top-6 left-6 z-[500] w-72 animate-in slide-in-from-left-4 duration-500">
+                <Card className="shadow-2xl shadow-indigo-100 rounded-3xl p-8 bg-white/95 backdrop-blur-sm border-none">
+                  <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-6 shadow-sm">
+                    <MapPin size={28} />
+                  </div>
+                  <h3 className="text-lg font-black text-slate-900 mb-2 tracking-tight">Global Presence</h3>
+                  <p className="text-sm text-slate-500 font-medium leading-relaxed mb-8">
+                    Select a location on the map or use the search bar to establish a new operational geofence.
+                  </p>
                   
-                </a>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                      <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-indigo-600 font-black shadow-sm">
+                        {savedLocations.length}
+                      </div>
+                      <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Active Sites</div>
+                    </div>
+                  </div>
+                </Card>
               </div>
             )}
           </div>
         ) : viewMode === "list" ? (
           /* ── List View ─────────────────────────────────────── */
-          <div style={{ flex: 1, padding: "24px", overflowY: "auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "var(--fg)" }}>
-                Saved Locations ({filteredLocations.length})
-              </h3>
-            </div>
-            {filteredLocations.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "64px 20px", color: "var(--muted)" }}>
-                <MapPin size={40} opacity={0.2} style={{ marginBottom: 12 }} />
-                <div style={{ fontWeight: 600 }}>No locations match your filter</div>
-                <div style={{ fontSize: "13px", marginTop: "4px" }}>Try clearing some filters to see more results.</div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {filteredLocations.map((loc) => (
-                  <div
-                    key={loc.id}
-                    style={{
-                      display: "flex", alignItems: "center", gap: "16px",
-                      padding: "16px 20px",
-                      background: "var(--surface)", border: "1px solid var(--stroke)",
-                      borderRadius: "10px", cursor: "pointer", transition: "all 0.2s",
-                    }}
-                    onClick={() => { setMapCenter([parseFloat(loc.lat), parseFloat(loc.lng)]); setMapZoom(15); setViewMode("map") }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#4F46E5"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(79,70,229,0.08)" }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--stroke)"; e.currentTarget.style.boxShadow = "none" }}
-                  >
-                    <div style={{
-                      width: 40, height: 40, borderRadius: "10px",
-                      background: "rgba(79,70,229,0.08)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
-                    }}>
-                      <MapPin size={18} color="#4F46E5" />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--fg)" }}>{loc.name}</div>
-                      <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{loc.address}</div>
-                    </div>
-                    <div style={{ fontSize: "12px", color: "var(--muted)", fontWeight: 600, flexShrink: 0 }}>{loc.geofence_radius}m</div>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleArchive(loc.id) }}
-                        style={{
-                          background: "none", border: "1px solid #e5e7eb", cursor: "pointer",
-                          color: "var(--fg2)", fontSize: "11px", fontWeight: 700,
-                          padding: "6px 10px", borderRadius: "6px",
-                        }}
-                      >
-                        Archive
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(loc.id) }}
-                        style={{
-                          background: "none", border: "none", cursor: "pointer",
-                          color: "#EF4444", fontSize: "11px", fontWeight: 700,
-                          padding: "6px 10px", borderRadius: "6px",
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
+          <div className="flex-1 overflow-y-auto p-8 bg-slate-50/50 animate-in fade-in duration-500">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex items-center justify-between mb-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-100">
+                    <Layers size={24} />
                   </div>
-                ))}
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Saved Locations</h3>
+                    <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">{filteredLocations.length} TOTAL SITES</p>
+                  </div>
+                </div>
               </div>
-            )}
+
+              {filteredLocations.length === 0 ? (
+                <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-100">
+                  <MapPin size={64} className="mx-auto text-slate-200 mb-6" />
+                  <div className="text-xl font-black text-slate-900 mb-2">No locations found</div>
+                  <div className="text-sm text-slate-500 font-medium">Try clearing your filters or search query.</div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {filteredLocations.map((loc) => (
+                    <Card 
+                      key={loc.id} 
+                      className="group hover:shadow-2xl hover:shadow-indigo-100 transition-all duration-300 rounded-[2.5rem] border-none bg-white overflow-hidden"
+                    >
+                      <div className="p-2">
+                        <div className="flex items-start justify-between mb-6">
+                          <div className="w-14 h-14 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center shadow-sm transition-all duration-300">
+                            <MapPin size={28} />
+                          </div>
+                          <div className="flex flex-col items-end gap-2">
+                            <Pill tone="neutral" className="bg-slate-50 border-slate-100 text-slate-500 font-black">
+                              {loc.geofence_radius}M RADIUS
+                            </Pill>
+                          </div>
+                        </div>
+                        <h3 className="text-lg font-black text-slate-900 mb-2 tracking-tight">{loc.name}</h3>
+                        <p className="text-sm text-slate-500 font-medium mb-8 line-clamp-2 leading-relaxed">
+                          {loc.address}
+                        </p>
+                        <div className="pt-6 border-t border-slate-50 flex items-center justify-between">
+                          <div className="flex gap-2">
+                            {/* Phase 4: open polygon editor for this site */}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setEditingGeofenceFor(loc) }}
+                              className={`p-2.5 rounded-xl transition-colors ${
+                                loc.geofence_polygon
+                                  ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                                  : "bg-slate-50 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
+                              }`}
+                              title={loc.geofence_polygon ? "Edit polygon geofence" : "Draw polygon geofence"}
+                            >
+                              <Layers size={18} />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleArchive(loc.id) }}
+                              className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                              title="Archive Site"
+                            >
+                              <Archive size={18} />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDelete(loc.id) }}
+                              className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                              title="Delete Site"
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            className="text-indigo-600 font-black text-xs hover:bg-indigo-50"
+                            onClick={() => {
+                              setActiveTab("map");
+                              setViewMode("map");
+                              setMapCenter([parseFloat(loc.lat), parseFloat(loc.lng)]);
+                              setMapZoom(17);
+                            }}
+                          >
+                            LOCATE
+                          </Button>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           /* ── Archived View ──────────────────────────────────── */
-          <div style={{ flex: 1, padding: "24px", overflowY: "auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <button
+          <div className="flex-1 overflow-y-auto p-8 bg-slate-50/50 animate-in fade-in duration-500">
+            <div className="max-w-7xl mx-auto">
+              <div className="flex items-center gap-4 mb-10">
+                <button 
                   onClick={() => setViewMode("map")}
-                  style={{
-                    background: "none", border: "none", cursor: "pointer",
-                    color: "#F97316", fontSize: "13px", fontWeight: 700,
-                    display: "flex", alignItems: "center", gap: "4px",
-                  }}
+                  className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200 flex items-center justify-center shadow-sm transition-all"
                 >
-                  ← Back
+                  <Navigation2 size={20} className="rotate-[-90deg]" />
                 </button>
-                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "var(--fg)" }}>
-                  Archived Locations ({archivedLocations.length})
-                </h3>
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900 tracking-tight">Archived Sites</h3>
+                  <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">{archivedLocations.length} INACTIVE SITES</p>
+                </div>
               </div>
+
+              {archivedLocations.length === 0 ? (
+                <div className="text-center py-32 bg-white rounded-[3rem] border-2 border-dashed border-slate-100">
+                  <Archive size={64} className="mx-auto text-slate-200 mb-6" />
+                  <div className="text-xl font-black text-slate-900 mb-2">Archive is empty</div>
+                  <div className="text-sm text-slate-500 font-medium">Locations you deactivate will appear here.</div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {archivedLocations.map((loc) => (
+                    <Card key={loc.id} className="rounded-[2.5rem] border-none bg-white opacity-70 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300">
+                      <div className="flex items-start justify-between mb-6">
+                        <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
+                          <Archive size={28} />
+                        </div>
+                        <Button 
+                          onClick={() => handleRestore(loc.id)}
+                          className="bg-indigo-600 text-white rounded-xl px-6 text-xs font-black"
+                        >
+                          RESTORE
+                        </Button>
+                      </div>
+                      <h3 className="text-lg font-black text-slate-900 mb-2 tracking-tight">{loc.name}</h3>
+                      <p className="text-sm text-slate-500 font-medium line-clamp-1">{loc.address}</p>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
-            {archivedLocations.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "64px 20px", color: "var(--muted)" }}>
-                <Archive size={40} opacity={0.2} style={{ marginBottom: 12 }} />
-                <div style={{ fontWeight: 600 }}>No archived locations</div>
-                <div style={{ fontSize: "13px", marginTop: "4px" }}>Locations you archive will appear here.</div>
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {archivedLocations.map((loc) => (
-                  <div
-                    key={loc.id}
-                    style={{
-                      display: "flex", alignItems: "center", gap: "16px",
-                      padding: "16px 20px",
-                      background: "rgba(0,0,0,0.02)", border: "1px dashed var(--stroke)",
-                      borderRadius: "10px",
-                    }}
-                  >
-                    <div style={{
-                      width: 40, height: 40, borderRadius: "10px",
-                      background: "rgba(107,114,128,0.1)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
-                    }}>
-                      <Archive size={18} color="var(--muted)" />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: "14px", color: "var(--muted)" }}>{loc.name}</div>
-                      <div style={{ fontSize: "12px", color: "var(--muted)", marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{loc.address}</div>
-                    </div>
-                    <button
-                      onClick={() => handleRestore(loc.id)}
-                      style={{
-                        background: "#F97316", border: "none", cursor: "pointer",
-                        color: "white", fontSize: "12px", fontWeight: 700,
-                        padding: "8px 16px", borderRadius: "6px",
-                      }}
-                    >
-                      Restore
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
         {/* ── Bottom: Archived Locations link ─────────────────── */}
         <div
-          onClick={() => setViewMode("archived")}
-          style={{
-            padding: "10px 16px",
-            borderTop: "1px solid var(--stroke)",
-            backgroundColor: viewMode === "archived" ? "rgba(249,115,22,0.08)" : "var(--surface)",
-            display: "flex", alignItems: "center", gap: "8px",
-            color: viewMode === "archived" ? "#F97316" : "var(--fg2)",
-            fontSize: "13px", fontWeight: 600,
-            cursor: "pointer",
-            transition: "all 0.2s",
-          }}
+          onClick={() => setViewMode(viewMode === "archived" ? "map" : "archived")}
+          className={`px-8 py-4 border-t border-slate-100 flex items-center justify-between cursor-pointer transition-all ${viewMode === 'archived' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
         >
-          <Archive size={16} /> Archived Locations
+          <div className="flex items-center gap-3">
+            <Archive size={18} className={viewMode === 'archived' ? 'text-white' : 'text-indigo-500'} />
+            <span className="text-sm font-black tracking-tight">
+              {viewMode === "archived" ? "Back to Operations Map" : "Access Archived Locations"}
+            </span>
+          </div>
+          <Pill tone={viewMode === 'archived' ? 'success' : 'neutral'} className="font-black">
+            {archivedLocations.length} SITES
+          </Pill>
         </div>
       </div>
 
-      {/* ── RIGHT PANEL: Add New Location Form ────────────────── */}
+      {/* ── Add New Location Panel (Overlay) ─────────────────── */}
       {showAddPanel && (
-        <div style={{
-          width: 400,
-          borderLeft: "1px solid var(--stroke)",
-          backgroundColor: "var(--surface)",
-          display: "flex", flexDirection: "column",
-          animation: "locSlideIn .3s ease-out",
-          zIndex: 10,
-        }}>
-          {/* Header */}
-          <div style={{
-            padding: "20px 24px",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            borderBottom: "1px solid var(--stroke)",
-          }}>
-            <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: "var(--fg)" }}>
-              Add New Location
-            </h2>
-            <button
-              onClick={() => setShowAddPanel(false)}
-              style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: "var(--muted)", display: "flex", padding: "6px", borderRadius: "6px",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg)")}
-              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-            >
-              <X size={20} />
-            </button>
-          </div>
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-6 animate-in fade-in duration-300">
+          <Card 
+            title="Configure Site Geofence"
+            className="w-full max-w-2xl shadow-[0_30px_70px_-10px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-300 rounded-[2.5rem]"
+          >
+            <div className="flex flex-col gap-8">
+              {saveError && (
+                <div className="p-4 bg-rose-50 text-rose-700 border-2 border-rose-100 rounded-2xl text-sm font-bold flex items-center gap-3 animate-in shake duration-500">
+                  <Activity size={20} className="text-rose-500" /> {saveError}
+                </div>
+              )}
 
-          {/* Body */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "24px" }}>
-            {saveError && (
-              <div style={{
-                padding: "10px 14px", marginBottom: "16px",
-                background: "#FEF2F2", border: "1px solid #FECACA",
-                borderRadius: "8px", fontSize: "13px", color: "#DC2626", fontWeight: 600,
-              }}>
-                {saveError}
-              </div>
-            )}
+              <div className="flex flex-col gap-6">
+                <Input
+                  label="Display Name"
+                  placeholder="e.g. Skyline Apartments Construction"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                  className="text-xl font-black tracking-tight"
+                />
 
-            {/* Location Name */}
-            <div style={{ marginBottom: "24px" }}>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "#1e3a5f", marginBottom: "8px" }}>
-                Location Name
-              </label>
-              <input
-                id="location-name-input"
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                style={{
-                  width: "100%", padding: "12px 14px",
-                  border: "1px solid var(--stroke)", borderRadius: "8px",
-                  fontSize: "14px", fontWeight: 500,
-                  color: "var(--fg)", background: "var(--bg)",
-                  outline: "none", fontFamily: "inherit", boxSizing: "border-box",
-                }}
-                onFocus={(e) => (e.target.style.borderColor = "#F97316")}
-                onBlur={(e) => (e.target.style.borderColor = "var(--stroke)")}
-              />
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Input
+                    label="Coordinates"
+                    placeholder="12.89241, 80.03912"
+                    value={formData.coordinates}
+                    onChange={(e) => setFormData({ ...formData, coordinates: e.target.value })}
+                    icon={<Target size={18} className="text-indigo-500" />}
+                    required
+                  />
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Verification Radius</label>
+                    <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border-2 border-slate-100">
+                      <input 
+                        type="range" 
+                        min="100" 
+                        max="2000" 
+                        step="100"
+                        value={formData.radius}
+                        onChange={(e) => setFormData({ ...formData, radius: parseInt(e.target.value) })}
+                        className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                      />
+                      <span className="w-16 text-center text-sm font-black text-indigo-600">{formData.radius}m</span>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Coordinates */}
-            <div style={{ marginBottom: "24px" }}>
-              <label style={{
-                display: "flex", alignItems: "center", gap: "6px",
-                fontSize: "13px", fontWeight: 700, color: "#1e3a5f", marginBottom: "8px",
-              }}>
-                Coordinates
-                <Info size={14} color="var(--muted)" style={{ cursor: "help" }} title="Latitude,Longitude" />
-              </label>
-              <input
-                id="location-coords-input"
-                type="text"
-                value={formData.coordinates}
-                onChange={(e) => setFormData({ ...formData, coordinates: e.target.value })}
-                style={{
-                  width: "100%", padding: "12px 14px",
-                  border: "1px solid var(--stroke)", borderRadius: "8px",
-                  fontSize: "14px", fontWeight: 500,
-                  color: "var(--fg)", background: "var(--bg)",
-                  outline: "none", fontFamily: "inherit", boxSizing: "border-box",
-                }}
-                placeholder="12.892,80.039"
-                onFocus={(e) => (e.target.style.borderColor = "#F97316")}
-                onBlur={(e) => (e.target.style.borderColor = "var(--stroke)")}
-              />
-            </div>
+                <div className="bg-slate-50 p-6 rounded-3xl border-2 border-slate-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Navigation2 size={16} className="text-indigo-500" />
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Selected Address</span>
+                  </div>
+                  <div className="text-sm text-slate-700 font-bold leading-relaxed">
+                    {formData.address || "Searching address..."}
+                  </div>
+                </div>
 
-            {/* Address (display only) */}
-            <div style={{ marginBottom: "28px" }}>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: 700, color: "#1e3a5f", marginBottom: "8px" }}>
-                Address
-              </label>
-              <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--fg)" }}>
-                {formData.name}
-              </div>
-              <div style={{ fontSize: "13px", color: "var(--muted)", marginTop: "4px", lineHeight: 1.5 }}>
-                {formData.address}
-              </div>
-            </div>
-
-            {/* Radius */}
-            <div style={{ marginBottom: "24px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                <label style={{ fontSize: "13px", fontWeight: 700, color: "#1e3a5f" }}>Radius</label>
-                <Info size={14} color="var(--muted)" style={{ cursor: "help" }} title="Geofence radius" />
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Quick Radius Presets</label>
+                  <div className="flex flex-wrap gap-3">
+                    {[100, 300, 500, 1000].map((val) => {
+                      const isActive = formData.radius === val
+                      return (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => { setFormData({ ...formData, radius: val }); setCustomRadius(false) }}
+                          className={`px-6 py-3 rounded-2xl text-xs font-black transition-all border-2 ${isActive ? 'border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'}`}
+                        >
+                          {val}m
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {radiusOptions.map((opt) => {
-                  const isActive = formData.radius === opt.value && !customRadius
-                  return (
-                    <label
-                      key={opt.value}
-                      onClick={() => { setFormData({ ...formData, radius: opt.value }); setCustomRadius(false) }}
-                      style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", padding: "2px 0" }}
-                    >
-                      <div style={{
-                        width: 22, height: 22, borderRadius: "50%",
-                        border: isActive ? "2px solid #059669" : "2px solid var(--stroke2)",
-                        background: isActive ? "#059669" : "transparent",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        transition: "all 0.15s", flexShrink: 0,
-                      }}>
-                        {isActive && (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </div>
-                      <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--fg)" }}>{opt.label}</span>
-                      {opt.recommended && (
-                        <span style={{
-                          fontSize: "10px", fontWeight: 800,
-                          color: "#F97316", border: "1px solid #F97316",
-                          padding: "2px 8px", borderRadius: "4px", letterSpacing: "0.5px",
-                        }}>
-                          RECOMMENDED
-                        </span>
-                      )}
-                    </label>
-                  )
-                })}
-
-                {/* Custom radius */}
-                <label
-                  onClick={() => setCustomRadius(true)}
-                  style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", padding: "2px 0" }}
+              <div className="flex gap-4 pt-4">
+                <Button variant="ghost" className="flex-1 bg-slate-100 border-none text-slate-500 rounded-2xl py-4" onClick={() => setShowAddPanel(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  className="flex-[1.5] shadow-2xl shadow-indigo-200 rounded-2xl py-4" 
+                  onClick={handleSave}
+                  disabled={saving}
                 >
-                  <div style={{
-                    width: 22, height: 22, borderRadius: "50%",
-                    border: customRadius ? "2px solid #059669" : "2px solid var(--stroke2)",
-                    background: customRadius ? "#059669" : "transparent",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    transition: "all 0.15s", flexShrink: 0,
-                  }}>
-                    {customRadius && (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </div>
-                  <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--fg)" }}>Custom radius</span>
-                </label>
-                {customRadius && (
-                  <div style={{ marginLeft: 34 }}>
-                    <input
-                      type="number"
-                      value={customRadiusValue}
-                      onChange={(e) => {
-                        setCustomRadiusValue(e.target.value)
-                        setFormData({ ...formData, radius: parseInt(e.target.value) || 300 })
-                      }}
-                      placeholder="Enter radius in meters"
-                      style={{
-                        width: "100%", padding: "10px 12px",
-                        border: "1px solid var(--stroke)", borderRadius: "8px",
-                        fontSize: "13px", fontWeight: 500,
-                        color: "var(--fg)", background: "var(--bg)",
-                        outline: "none", fontFamily: "inherit", boxSizing: "border-box",
-                      }}
-                      onFocus={(e) => (e.target.style.borderColor = "#F97316")}
-                      onBlur={(e) => (e.target.style.borderColor = "var(--stroke)")}
-                    />
-                  </div>
-                )}
+                  {saving ? <Loader2 size={20} className="animate-spin mr-2" /> : <Save size={20} className="mr-2" />}
+                  {saving ? "Deploying Site..." : "DEPLOY SITE GEOFENCE"}
+                </Button>
               </div>
             </div>
-          </div>
-
-          {/* Footer: Cancel / Save */}
-          <div style={{
-            padding: "16px 24px",
-            borderTop: "1px solid var(--stroke)",
-            display: "flex", justifyContent: "center", gap: "16px",
-          }}>
-            <button
-              onClick={() => setShowAddPanel(false)}
-              style={{
-                padding: "10px 28px", borderRadius: "8px",
-                border: "none", background: "transparent",
-                color: "#059669", fontSize: "14px", fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              style={{
-                padding: "10px 32px", borderRadius: "8px",
-                border: "none",
-                background: saving ? "#9ca3af" : "linear-gradient(135deg, #F97316 0%, #ea580c 100%)",
-                color: "white", fontSize: "14px", fontWeight: 700,
-                cursor: saving ? "not-allowed" : "pointer",
-                boxShadow: "0 4px 14px rgba(249,115,22,0.3)",
-                transition: "all 0.2s",
-                minWidth: 100,
-              }}
-              onMouseEnter={(e) => { if (!saving) e.currentTarget.style.transform = "translateY(-1px)" }}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "none")}
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-          </div>
+          </Card>
         </div>
       )}
 
@@ -1223,6 +1024,15 @@ export function LocationsPage() {
         }
       `}</style>
         </div>
+      )}
+
+      {/* ── Phase 4: Polygon geofence editor ──────────────────── */}
+      {editingGeofenceFor && (
+        <GeofenceEditorModal
+          location={editingGeofenceFor}
+          onClose={() => setEditingGeofenceFor(null)}
+          onSaved={handleGeofenceSaved}
+        />
       )}
     </div>
   )

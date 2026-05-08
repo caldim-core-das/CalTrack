@@ -1,85 +1,45 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../../state/auth/useAuth.js"
-import { apiRequest } from "../../api/client.js"
+import { extractAuthError } from "../../api/authService.js"
+import { validateLoginForm, validateRegStep1, validateRegStep2 } from "../../utils/validate.js"
 import { routes } from "../routes.js"
 import { useGoogleLogin } from "@react-oauth/google"
 import { CalTrackLogo } from "../components/CalTrackLogo.jsx"
-import { Check, ArrowRight, Building2, Users2, Workflow, Clock, Banknote, CalendarDays, Sparkles, RefreshCcw, ShieldCheck } from "lucide-react"
+import { Check, ArrowRight, Building2, Users2, Workflow, Clock, Banknote, CalendarDays, Sparkles, RefreshCcw, ShieldCheck, AlertCircle } from "lucide-react"
 
 /* ──────────────────────────────────────────────
    REVIEW DATA
-────────────────────────────────────────────── */
+   ────────────────────────────────────────────── */
 const REVIEWS = [
   {
-    quote:
-      "As a remote team lead, QuickTIMS has been a game-changer for attendance and payroll. The real-time tracking and selfie verification give us complete confidence.",
+    quote: "As a remote team lead, QuickTIMS has been a game-changer for attendance and payroll. The real-time tracking and selfie verification give us complete confidence.",
     author: "Priya Mehra",
     role: "HR Manager, TechNova Solutions",
     stars: 5,
   },
   {
-    quote:
-      "We switched from a spreadsheet-based system and QuickTIMS cut our payroll processing time in half. The scheduling feature is absolutely top-notch.",
+    quote: "We switched from a spreadsheet-based system and QuickTIMS cut our payroll processing time in half. The scheduling feature is absolutely top-notch.",
     author: "Arjun Krishnaswamy",
     role: "Operations Director, Apex Industries",
     stars: 5,
   },
   {
-    quote:
-      "Finally a time-tracking tool that works for SMEs. Simple, reliable, and the geolocation punch-in keeps everyone accountable. Highly recommended!",
+    quote: "Finally a time-tracking tool that works for SMEs. Simple, reliable, and the geolocation punch-in keeps everyone accountable. Highly recommended!",
     author: "Sneha Patel",
     role: "CEO, Bright Retail Group",
-    stars: 5,
-  },
-  {
-    quote:
-      "The leave management and compliance reports save us hours every month. QuickTIMS integrates beautifully with our existing workflows.",
-    author: "Rajesh Nair",
-    role: "Finance Head, Greenfield Corp",
     stars: 5,
   },
 ]
 
 /* ──────────────────────────────────────────────
-   SAND-CLOCK LOGO SVG
-────────────────────────────────────────────── */
-function SandClockLogo({ size = 44 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="lgg" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#4F46E5" />
-          <stop offset="100%" stopColor="#7C3AED" />
-        </linearGradient>
-      </defs>
-      {/* Background rounded square */}
-      <rect width="44" height="44" rx="12" fill="url(#lgg)" />
-      {/* Hourglass shape */}
-      <g transform="translate(10, 7)">
-        {/* Top bar */}
-        <rect x="0" y="0" width="24" height="3" rx="1.5" fill="white" />
-        {/* Bottom bar */}
-        <rect x="0" y="27" width="24" height="3" rx="1.5" fill="white" />
-        {/* Top triangle (sand above) */}
-        <path d="M1 3 L23 3 L15 15 L9 15 Z" fill="rgba(255,255,255,0.9)" />
-        {/* Bottom triangle (sand below) */}
-        <path d="M1 27 L23 27 L15 15 L9 15 Z" fill="rgba(255,255,255,0.45)" />
-        {/* Sand drip dot */}
-        <circle cx="12" cy="15.5" r="2" fill="white" opacity="0.95" />
-      </g>
-    </svg>
-  )
-}
-
-/* ──────────────────────────────────────────────
    STAR RATING
-────────────────────────────────────────────── */
+   ────────────────────────────────────────────── */
 function Stars({ count = 5 }) {
   return (
-    <div style={{ display: "flex", gap: 3 }}>
+    <div className="flex gap-1">
       {Array.from({ length: count }).map((_, i) => (
-        <span key={i} style={{ color: "#F59E0B", fontSize: 16 }}>★</span>
+        <span key={i} className="text-amber-400 text-lg">★</span>
       ))}
     </div>
   )
@@ -87,8 +47,8 @@ function Stars({ count = 5 }) {
 
 /* ──────────────────────────────────────────────
    REVIEW CAROUSEL
-────────────────────────────────────────────── */
-function ReviewCarousel() {
+   ────────────────────────────────────────────── */
+function ReviewCarousel({ lightMode = false }) {
   const [current, setCurrent] = useState(0)
   const timerRef = useRef(null)
 
@@ -113,30 +73,44 @@ function ReviewCarousel() {
   const review = REVIEWS[current]
 
   return (
-    <div className="qt-review-wrap">
-      <div className="qt-review-card">
-        <div className="qt-review-header">
-          <span className="qt-review-brand">QuickTIMS Rocks!</span>
-          <Stars count={review.stars} />
+    <div className="w-full max-w-md mt-auto mb-8 animate-in slide-in-from-left-4 duration-500">
+      <div className={`rounded-3xl p-8 shadow-2xl backdrop-blur-sm ${lightMode ? 'bg-white/95 border-none' : 'bg-white/10 border border-white/20'}`}>
+        <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mb-6 shadow-sm">
+          <Sparkles size={28} />
         </div>
-        <p className="qt-review-quote">"{review.quote}"</p>
-        <div className="qt-review-author">{review.author}<span className="qt-review-role">, {review.role}</span></div>
+        <h3 className="text-lg font-black text-slate-900 mb-2 tracking-tight">Trusted by Industry Leaders</h3>
+        <p className={`text-sm font-medium leading-relaxed mb-8 ${lightMode ? 'text-slate-500' : 'text-indigo-200'}`}>"{review.quote}"</p>
+        
+        <div className="space-y-4">
+          <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <div className="w-10 h-10 rounded-xl bg-white text-indigo-600 flex items-center justify-center font-black shadow-sm">
+              {review.author.charAt(0)}
+            </div>
+            <div>
+              <div className="text-sm font-black text-slate-900">{review.author}</div>
+              <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{review.role}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Navigation arrows */}
-      <div className="qt-review-nav">
-        <button className="qt-arr-btn" onClick={handlePrev} aria-label="Previous review">‹</button>
-        <div className="qt-dots">
+      <div className="flex items-center justify-center gap-4 mt-8">
+        <button className="text-indigo-200 hover:text-white transition-colors" onClick={handlePrev} aria-label="Previous review">
+          <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div className="flex gap-2">
           {REVIEWS.map((_, i) => (
             <button
               key={i}
-              className={`qt-dot${i === current ? " qt-dot-active" : ""}`}
+              className={`w-2 h-2 rounded-full transition-all ${i === current ? "bg-white w-6" : "bg-indigo-300/50 hover:bg-indigo-300"}`}
               onClick={() => handleDot(i)}
               aria-label={`Review ${i + 1}`}
             />
           ))}
         </div>
-        <button className="qt-arr-btn" onClick={handleNext} aria-label="Next review">›</button>
+        <button className="text-indigo-200 hover:text-white transition-colors" onClick={handleNext} aria-label="Next review">
+          <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
       </div>
     </div>
   )
@@ -159,7 +133,11 @@ function GoogleConnectButton({ onLoginWithGoogle, onError, onDone, onNavigate, p
   })
 
   return (
-    <button className="qt-social-btn" id="btn-google" type="button" onClick={() => googleLoginHandler()}>
+    <button 
+      className="flex items-center justify-center gap-2 w-full px-3 py-3.5 bg-white border border-slate-100 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest hover:bg-slate-50 transition-all"
+      type="button" 
+      onClick={() => googleLoginHandler()}
+    >
       <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
         <path fill="#EA4335" d="M24 9.5c3.5 0 6.5 1.2 8.9 3.2l6.7-6.7C35.4 2.2 30.1 0 24 0 14.8 0 6.9 5.4 3.1 13.3l7.8 6.1C13 13.1 18 9.5 24 9.5z" />
         <path fill="#4285F4" d="M46.6 24.5c0-1.6-.1-3.2-.4-4.7H24v9h12.7c-.6 3.1-2.4 5.7-5 7.4l7.7 6c4.5-4.1 7.2-10.2 7.2-17.7z" />
@@ -173,7 +151,12 @@ function GoogleConnectButton({ onLoginWithGoogle, onError, onDone, onNavigate, p
 
 function GooglePlaceholderButton({ onClick }) {
   return (
-    <button className="qt-social-btn" id="btn-google" type="button" onClick={onClick} aria-disabled="true">
+    <button 
+      className="flex items-center justify-center gap-2 w-full px-3 py-3.5 bg-white border border-slate-100 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest hover:bg-slate-50 transition-all"
+      type="button" 
+      onClick={onClick} 
+      aria-disabled="true"
+    >
       <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
         <path fill="#EA4335" d="M24 9.5c3.5 0 6.5 1.2 8.9 3.2l6.7-6.7C35.4 2.2 30.1 0 24 0 14.8 0 6.9 5.4 3.1 13.3l7.8 6.1C13 13.1 18 9.5 24 9.5z" />
         <path fill="#4285F4" d="M46.6 24.5c0-1.6-.1-3.2-.4-4.7H24v9h12.7c-.6 3.1-2.4 5.7-5 7.4l7.7 6c4.5-4.1 7.2-10.2 7.2-17.7z" />
@@ -187,22 +170,16 @@ function GooglePlaceholderButton({ onClick }) {
 
 /* ──────────────────────────────────────────────
    MAIN LOGIN PAGE
-────────────────────────────────────────────── */
+   ────────────────────────────────────────────── */
 export function LoginPage() {
   const { login, loginWithGoogle, register } = useAuth()
   const navigate = useNavigate()
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
-  const postLoginRoute = () => {
-    return routes.get_started
-  }
+  const postLoginRoute = () => routes.get_started
 
-  // modes: signin, register
   const [mode, setMode] = useState("signin")
-  const [role, setRole] = useState("employee") // admin or employee
   const [success, setSuccess] = useState("")
-
-  // Field states
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")
@@ -211,15 +188,9 @@ export function LoginPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [organizationName, setOrganizationName] = useState("")
-
-  // Registration specific
-  const [tab, setTab] = useState("email")
-  const [phone, setPhone] = useState("")
   const [robot, setRobot] = useState(false)
-  const [agree1, setAgree1] = useState(true) // Offers
-  const [agree2, setAgree2] = useState(false) // Terms
-
-  // Registration Multi-step
+  const [agree1, setAgree1] = useState(true)
+  const [agree2, setAgree2] = useState(false)
   const [regStep, setRegStep] = useState(1)
   const [teamSize, setTeamSize] = useState("1 - 10 employees")
   const [selectedModules, setSelectedModules] = useState(["time"])
@@ -228,415 +199,200 @@ export function LoginPage() {
     setMode(m)
     setError("")
     setSuccess("")
+    setRegStep(1)
   }
 
   async function onSubmit(e) {
     if (e) e.preventDefault()
+    if (loading) return
     setError("")
     setSuccess("")
 
     if (mode === "signin") {
-      if (!username.trim() || !password) return setError("Enter credentials.")
+      const validationError = validateLoginForm({ identifier: username, password })
+      if (validationError) return setError(validationError)
       setLoading(true)
       try {
         await login(username.trim(), password)
-        navigate(postLoginRoute())
+        navigate(postLoginRoute(), { replace: true })
       } catch (err) {
-        setError(err?.body?.detail || "Login failed.")
-      } finally { setLoading(false) }
+        setError(extractAuthError(err, "Login failed. Check your credentials."))
+      } finally {
+        setLoading(false)
+      }
     } else {
-      // REGISTER SUBMIT (Step 4)
       if (!robot) return setError("Please confirm you are not a robot.")
-      if (!agree2) return setError("Please agree to terms.")
-
+      if (!agree2) return setError("Please agree to the Terms & Privacy Policy.")
       setLoading(true)
       try {
-        const [first, ...rest] = fullName.split(" ")
+        const [first, ...rest] = fullName.trim().split(" ")
         await register({
           username: username.trim(),
           password,
-          email,
-          first_name: first,
-          last_name: rest.join(" "),
+          email: email.trim(),
+          first_name: first || "",
+          last_name: rest.join(" ") || "",
           organization_name: organizationName.trim(),
           team_size: teamSize,
-          selected_modules: selectedModules
+          selected_modules: selectedModules,
         })
-
-        // Store org name so AppShell topbar shows it immediately
-        if (organizationName.trim()) {
-          localStorage.setItem("quicktims.orgName", organizationName.trim())
-          window.dispatchEvent(new CustomEvent("quicktims:orgName"))
-        }
-
         navigate(postLoginRoute(), { replace: true })
       } catch (err) {
-        console.error("Registration Error:", err);
-        const msg = err?.body?.detail || 
-                    (err?.body && typeof err.body === 'object' ? JSON.stringify(err.body) : null) || 
-                    (err?.body && typeof err.body === 'string' ? "Server Error: 500" : null) ||
-                    "Registration failed.";
-        setError(msg)
-      } finally { setLoading(false) }
+        setError(extractAuthError(err, "Registration failed."))
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
-  const canGoNext = () => {
-    if (regStep === 1) return fullName.trim() && username.trim() && password.length >= 6 && email.includes("@")
-    if (regStep === 2) return organizationName.trim()
-    if (regStep === 3) return selectedModules.length > 0
-    return true
-  }
-
   return (
-    <div className="qt-login-root">
-      {/* ── LEFT PANEL ── */}
-      <div className="qt-left-panel">
-        {/* Logo */}
-        <div className="qt-left-logo">
-          <CalTrackLogo size="lg" showTagline />
-        </div>
-
-        {/* Hero illustration area */}
-        <div className="qt-illustration-wrap">
-          <div className="qt-illustration">
-            {/* Simple SVG illustration of person with devices */}
-            <svg width="220" height="180" viewBox="0 0 220 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Cloud */}
-              <ellipse cx="110" cy="40" rx="55" ry="20" fill="#E0E7FF" opacity="0.7" />
-              <ellipse cx="85" cy="38" rx="30" ry="16" fill="#C7D2FE" opacity="0.6" />
-              <ellipse cx="135" cy="38" rx="30" ry="16" fill="#C7D2FE" opacity="0.6" />
-              {/* Monitor */}
-              <rect x="20" y="55" width="70" height="48" rx="6" fill="#4F46E5" opacity="0.85" />
-              <rect x="25" y="60" width="60" height="36" rx="3" fill="#EEF2FF" />
-              <rect x="48" y="103" width="14" height="8" rx="2" fill="#6366F1" />
-              <rect x="38" y="111" width="34" height="3" rx="1.5" fill="#A5B4FC" />
-              {/* Clock icon on monitor */}
-              <circle cx="55" cy="78" r="12" stroke="#4F46E5" strokeWidth="2.5" fill="white" />
-              <line x1="55" y1="70" x2="55" y2="78" stroke="#4F46E5" strokeWidth="2" strokeLinecap="round" />
-              <line x1="55" y1="78" x2="61" y2="81" stroke="#7C3AED" strokeWidth="2" strokeLinecap="round" />
-              {/* Person – body */}
-              <circle cx="148" cy="82" r="14" fill="#FCA5A5" />
-              <rect x="133" y="97" width="30" height="35" rx="10" fill="#4F46E5" />
-              <rect x="126" y="100" width="12" height="22" rx="6" fill="#4F46E5" />
-              <rect x="162" y="100" width="12" height="22" rx="6" fill="#4F46E5" />
-              {/* Phone in hand */}
-              <rect x="164" y="108" width="10" height="16" rx="2.5" fill="#1E1B4B" />
-              <rect x="165.5" y="109.5" width="7" height="10" rx="1.5" fill="#A5B4FC" />
-              {/* Checkmark badge */}
-              <circle cx="160" cy="72" r="10" fill="#10B981" />
-              <path d="M154 72l4 4 8-8" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              {/* Confetti dots */}
-              <circle cx="190" cy="55" r="4" fill="#FCD34D" />
-              <circle cx="178" cy="45" r="3" fill="#F472B6" />
-              <circle cx="100" cy="145" r="3" fill="#34D399" />
-              <circle cx="30" cy="140" r="4" fill="#60A5FA" />
-              <circle cx="205" cy="100" r="3" fill="#A78BFA" />
-            </svg>
+    <div className="flex min-h-screen bg-white font-sans overflow-hidden">
+      
+      {/* ── LEFT PANEL (Branding) ── */}
+      <div className="hidden lg:flex flex-col w-1/2 bg-white p-16 relative border-r border-slate-100">
+        <div className="mb-16 animate-in fade-in slide-in-from-top-4 duration-700">
+          <CalTrackLogo size="lg" showTagline={false} />
+          <div className="flex items-center gap-3 mt-4">
+            <span className="px-3 py-1 bg-slate-100 text-slate-900 text-[10px] font-black uppercase tracking-widest rounded-full border border-slate-200">CHRONOFLOW</span>
+            <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">• Workforce Time Suite</span>
           </div>
         </div>
 
-        {/* Tagline */}
-        <div className="qt-tagline">
-          <h2 className="qt-tagline-head">Track when your staff are at work for payroll, attendance, compliance.</h2>
-          <p className="qt-tagline-sub">
+        <div className="flex-1 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in-95 duration-1000">
+          <div className="w-full max-w-md aspect-video bg-slate-50 rounded-[3rem] flex items-center justify-center mb-12 relative overflow-hidden shadow-inner">
+             <div className="absolute inset-0 opacity-30 bg-[radial-gradient(#4f46e5_1px,transparent_1px)] [background-size:32px:32px]"></div>
+             <div className="relative z-10 w-28 h-28 bg-white rounded-3xl shadow-2xl shadow-indigo-100 flex items-center justify-center animate-bounce duration-[3000ms]">
+                <Clock className="text-indigo-600" size={48} />
+             </div>
+             <div className="absolute right-20 top-12 w-14 h-14 bg-emerald-500 rounded-2xl shadow-xl flex items-center justify-center rotate-12">
+                <Check className="text-white" size={28} strokeWidth={4} />
+             </div>
+          </div>
+          
+          <h2 className="text-3xl font-black text-slate-900 max-w-md leading-tight mb-4 tracking-tight">
+            Track when your staff are at work for payroll, attendance, compliance.
+          </h2>
+          <p className="text-indigo-600 text-base font-black uppercase tracking-widest">
             Thousands of users worldwide, from SME to Enterprise
           </p>
         </div>
 
-
-
-        {/* Review carousel */}
-        <ReviewCarousel />
-
-        {/* Footer links */}
-        <div className="qt-left-footer">
-          <a href="#" className="qt-footer-link">Privacy Policy</a>
-          <a href="#" className="qt-footer-link">Help centre ↗</a>
+        <div className="mt-auto">
+          <ReviewCarousel lightMode={true} />
         </div>
       </div>
 
-      {/* ── RIGHT PANEL ── */}
-      <div className="qt-right-panel">
-        <div className="qt-form-wrap">
-
-          {/* Mode toggle */}
-          <div className="qt-mode-toggle">
+      {/* ── RIGHT PANEL (Auth Container) ── */}
+      <div className="flex-1 relative flex flex-col justify-center items-center p-8 bg-white">
+        <div className="w-full max-w-[480px] relative z-10 animate-in fade-in slide-in-from-right-8 duration-700">
+          
+          {/* Mode Switcher */}
+          <div className="flex bg-slate-50 p-1.5 rounded-2xl mb-12 border border-slate-100">
             <button
-              id="mode-signin"
-              type="button"
-              className={`qt-mode-btn${mode === "signin" ? " qt-mode-active" : ""}`}
               onClick={() => changeMode("signin")}
-            >Sign In</button>
+              className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${mode === "signin" ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Sign In
+            </button>
             <button
-              id="mode-register"
-              type="button"
-              className={`qt-mode-btn${mode === "register" ? " qt-mode-active" : ""}`}
               onClick={() => changeMode("register")}
-            >Create Account</button>
+              className={`flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${mode === "register" ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              Create Account
+            </button>
           </div>
 
-          <h1 className="qt-form-title">
-            {mode === "signin" ? "Welcome back" : "Create a new account"}
-          </h1>
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-black text-slate-900 tracking-tight">
+              {mode === "signin" ? "Welcome back" : "Create a new account"}
+            </h2>
+          </div>
 
-          {/* Social Connect */}
-          <div className="qt-connect-label">Connect with</div>
-          <div className="qt-social-row">
+          <div className="text-center mb-4">
+             <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Connect with</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3 mb-12">
             {googleClientId ? (
-              <GoogleConnectButton
-                onLoginWithGoogle={loginWithGoogle}
-                onError={setError}
-                onDone={(done) => setLoading(!done)}
-                onNavigate={navigate}
-                postLoginRoute={postLoginRoute}
-              />
+              <GoogleConnectButton onLoginWithGoogle={loginWithGoogle} onError={setError} onDone={(done) => setLoading(!done)} onNavigate={navigate} postLoginRoute={postLoginRoute} />
             ) : (
-              <GooglePlaceholderButton onClick={() => setError("Google login is not configured. Add VITE_GOOGLE_CLIENT_ID in frontend/.env and restart the frontend.")} />
+              <GooglePlaceholderButton onClick={() => setError("Identity provider offline.")} />
             )}
-            <button className="qt-social-btn" id="btn-microsoft" type="button">
-              <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
-                <rect x="1" y="1" width="9" height="9" fill="#F25022" />
-                <rect x="11" y="1" width="9" height="9" fill="#7FBA00" />
-                <rect x="1" y="11" width="9" height="9" fill="#00A4EF" />
-                <rect x="11" y="11" width="9" height="9" fill="#FFB900" />
-              </svg>
+            <button className="flex items-center justify-center gap-2 w-full px-3 py-3.5 bg-white border border-slate-100 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest hover:bg-slate-50 transition-all">
+              <svg width="16" height="16" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg>
               Microsoft
             </button>
-            <button className="qt-social-btn" id="btn-apple" type="button">
-              <svg width="18" height="18" viewBox="0 0 814 1000" aria-hidden="true" fill="currentColor">
-                <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76.5 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 790.7 0 663.1 0 541.8 0 336.2 127.2 222.2 252.5 222.2c64.8 0 118.8 43.1 159.4 43.1 38.9 0 99.8-45.3 169.9-45.3 26.8 0 108.2 2.6 168.1 78.3zm-104.5-98.3c31.1-36.9 53.1-88.1 53.1-139.3 0-7.1-.6-14.3-1.9-20.1-50.6 1.9-110.8 33.7-147.1 75.8-28.5 32.4-55.1 83.6-55.1 135.5 0 7.8 1.3 15.6 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 45.4 0 102.5-30.4 135.5-71.3z" />
-              </svg>
+            <button className="flex items-center justify-center gap-2 w-full px-3 py-3.5 bg-white border border-slate-100 rounded-2xl text-[10px] font-black text-slate-600 uppercase tracking-widest hover:bg-slate-50 transition-all">
+              <svg width="16" height="16" viewBox="0 0 384 512" fill="currentColor"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
               Apple
             </button>
           </div>
 
-          <div className="qt-or-divider"><span>or</span></div>
+          <div className="relative flex items-center mb-12">
+            <div className="flex-grow border-t border-slate-100"></div>
+            <span className="flex-shrink-0 mx-6 text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">or</span>
+            <div className="flex-grow border-t border-slate-100"></div>
+          </div>
 
-          {/* ── SIGN IN FORM ── */}
           {mode === "signin" && (
-            <form className="qt-form" onSubmit={onSubmit} noValidate>
-              <div className="qt-field-wrap">
-                <input
-                  id="inp-username"
-                  className="qt-input"
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  autoComplete="username"
-                  autoFocus
-                />
+            <form onSubmit={onSubmit} className="space-y-6">
+              <input className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[1.5rem] text-sm font-bold text-slate-900 placeholder-slate-400 focus:bg-white focus:border-indigo-600 outline-none transition-all" placeholder="Username or Email" value={username} onChange={e => setUsername(e.target.value)} />
+              <div className="relative">
+                <input className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-[1.5rem] text-sm font-bold text-slate-900 placeholder-slate-400 focus:bg-white focus:border-indigo-600 outline-none transition-all" type={showPass ? "text" : "password"} placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
+                <button type="button" className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest" onClick={() => setShowPass(p => !p)}>{showPass ? "Hide" : "Show"}</button>
               </div>
-
-              <div className="qt-field-wrap qt-pass-wrap">
-                <input
-                  id="inp-password-signin"
-                  className="qt-input"
-                  type={showPass ? "text" : "password"}
-                  placeholder="Password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                />
-                <button
-                  type="button"
-                  className="qt-pass-eye"
-                  onClick={() => setShowPass(p => !p)}
-                  aria-label={showPass ? "Hide password" : "Show password"}
-                >
-                  {showPass ? "🙈" : "👁"}
-                </button>
-              </div>
-
-              {success && <div className="qt-success-box">{success}</div>}
-              {error && <div className="qt-error-box">{error}</div>}
-
-              <button
-                id="btn-signin"
-                type="submit"
-                className="qt-submit-btn qt-submit-active"
-                disabled={loading}
-              >
-                {loading ? "Signing in…" : "Sign In"}
-              </button>
-
-              <div className="qt-signin-link">
-                Don't have an account?{" "}
-                <a href="#" className="qt-link" onClick={e => { e.preventDefault(); changeMode("register") }}>
-                  Create one
-                </a>
-              </div>
+              {error && <div className="p-5 bg-red-50 text-red-600 text-xs font-bold rounded-2xl border border-red-100">{error}</div>}
+              <button type="submit" className="w-full py-6 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black uppercase tracking-[0.3em] rounded-[1.5rem] shadow-2xl shadow-indigo-100 transition-all active:scale-[0.98]" disabled={loading}>{loading ? "Authenticating..." : "Access Workspace"}</button>
             </form>
           )}
 
-          {/* ── REGISTER FORM (Wizard) ── */}
           {mode === "register" && (
-            <div className="qt-form">
-              {/* Progress Bar */}
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 32 }}>
+            <div className="space-y-8">
+              <div className="flex items-center justify-center gap-0">
                 {[1, 2, 3, 4].map(s => (
-                  <div key={s} style={{ display: "flex", alignItems: "center", gap: 10, flex: s !== 4 ? 1 : 0 }}>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: "50%",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 12, fontWeight: 800,
-                      background: regStep > s ? "#10B981" : regStep === s ? "#4F46E5" : "var(--bg)",
-                      color: regStep >= s ? "#fff" : "var(--muted)",
-                      transition: "all 0.3s ease"
-                    }}>
-                      {regStep > s ? <Check size={14} /> : s}
+                  <div key={s} className="flex items-center flex-1 last:flex-none">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all relative z-10 ${regStep >= s ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white'}`}>
+                      {regStep > s ? <Check size={18} strokeWidth={4} /> : (regStep === s ? <div className="w-2 h-2 bg-white rounded-full" /> : <span className="text-[10px] font-black">{s}</span>)}
                     </div>
-                    {s !== 4 && <div style={{ flex: 1, height: 2, background: regStep > s ? "#10B981" : "var(--stroke2)", borderRadius: 2 }} />}
+                    {s !== 4 && <div className={`flex-1 h-[3px] transition-all ${regStep > s ? 'bg-emerald-500' : 'bg-indigo-100'}`} />}
                   </div>
                 ))}
               </div>
 
-              {/* Step 1: User Account */}
-              {regStep === 1 && (
-                <div style={{ animation: "fadeUp 0.3s ease both" }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#4F46E5", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                    <ShieldCheck size={16} /> USER ACCOUNT
+              {regStep < 4 ? (
+                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight">{regStep === 1 ? "Personal Details" : regStep === 2 ? "Organization Info" : "Platform Credentials"}</h3>
+                    {regStep === 1 && <><input className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-3xl text-sm font-bold" placeholder="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} /><input className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-3xl text-sm font-bold" placeholder="Work Email" value={email} onChange={e => setEmail(e.target.value)} /></>}
+                    {regStep === 2 && <><input className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-3xl text-sm font-bold" placeholder="Organization Name" value={organizationName} onChange={e => setOrganizationName(e.target.value)} /><select className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-3xl text-sm font-bold appearance-none" value={teamSize} onChange={e => setTeamSize(e.target.value)}><option>1 - 10 employees</option><option>11 - 50 employees</option><option>51 - 200 employees</option><option>201+ employees</option></select></>}
+                    {regStep === 3 && <><input className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-3xl text-sm font-bold" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} /><input className="w-full px-8 py-5 bg-slate-50 border border-slate-100 rounded-3xl text-sm font-bold" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} /></>}
+                    <div className="flex gap-4 mt-10">
+                       <button onClick={() => setRegStep(p => p - 1)} className="flex-1 py-5 bg-slate-50 text-slate-400 text-[11px] font-black uppercase tracking-widest rounded-3xl" disabled={regStep === 1}>Back</button>
+                       <button onClick={() => setRegStep(p => p + 1)} className="flex-[2] py-5 bg-indigo-600 text-white text-[11px] font-black uppercase tracking-widest rounded-3xl shadow-xl shadow-indigo-100">Continue</button>
+                    </div>
+                 </div>
+              ) : (
+                <div className="animate-in fade-in slide-in-from-bottom-4">
+                  <div className="text-indigo-600 text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2 mb-4"><Sparkles size={16} /> FINALIZE</div>
+                  <h3 className="text-2xl font-black text-slate-900 mb-8">Almost there!</h3>
+                  <div className="space-y-6 mb-10">
+                    <label className="flex items-center gap-4 cursor-pointer"><input type="checkbox" checked={agree1} onChange={e => setAgree1(e.target.checked)} className="peer sr-only" /><div className="w-6 h-6 border-2 border-slate-200 rounded-lg bg-white peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-colors" /><Check size={14} strokeWidth={4} className="absolute left-1.5 top-1.5 text-white opacity-0 peer-checked:opacity-100" /><span className="text-xs font-bold text-slate-400">Receive updates and tips from Caltrack.</span></label>
+                    <label className="flex items-center gap-4 cursor-pointer"><input type="checkbox" checked={agree2} onChange={e => setAgree2(e.target.checked)} className="peer sr-only" /><div className="w-6 h-6 border-2 border-slate-200 rounded-lg bg-white peer-checked:bg-indigo-600 peer-checked:border-indigo-600 transition-colors" /><Check size={14} strokeWidth={4} className="absolute left-1.5 top-1.5 text-white opacity-0 peer-checked:opacity-100" /><span className="text-xs font-bold text-slate-400">Agree to <a href="#" className="text-indigo-600 hover:underline">Terms</a> &amp; <a href="#" className="text-indigo-600 hover:underline">Privacy</a>.</span></label>
+                    <div className="p-6 bg-slate-50 border border-slate-100 rounded-[2rem] flex items-center justify-between"><span className="text-sm font-black text-slate-700">I'm not a robot</span><label className="relative cursor-pointer"><input type="checkbox" checked={robot} onChange={e => setRobot(e.target.checked)} className="peer sr-only" /><div className="w-7 h-7 bg-white border-2 border-slate-200 rounded-lg peer-checked:bg-emerald-500 peer-checked:border-emerald-500" /><Check size={18} strokeWidth={4} className="absolute left-1 top-1 text-white opacity-0 peer-checked:opacity-100" /></label></div>
                   </div>
-                  <h2 style={{ fontSize: 24, fontWeight: 800, color: "var(--fg)", marginBottom: 24 }}>Set up your admin profile</h2>
-                  
-                  <div className="qt-field-wrap">
-                    <input className="qt-input" placeholder="Full name" value={fullName} onChange={e => setFullName(e.target.value)} />
-                  </div>
-                  <div className="qt-field-wrap">
-                    <input className="qt-input" type="email" placeholder="Email address" value={email} onChange={e => setEmail(e.target.value)} />
-                  </div>
-                  <div className="qt-field-wrap">
-                    <input className="qt-input" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
-                  </div>
-                  <div className="qt-field-wrap qt-pass-wrap">
-                    <input className="qt-input" type={showPass ? "text" : "password"} placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
-                    <button type="button" className="qt-pass-eye" onClick={() => setShowPass(p => !p)}>{showPass ? "🙈" : "👁"}</button>
-                  </div>
-                  
-                  <button type="button" className={`qt-submit-btn ${canGoNext() ? "qt-submit-active" : ""}`} onClick={() => setRegStep(2)} disabled={!canGoNext()}>
-                    NEXT: ORGANIZATION <ArrowRight size={18} />
-                  </button>
-                </div>
-              )}
-
-              {/* Step 2: Organization */}
-              {regStep === 2 && (
-                <div style={{ animation: "fadeUp 0.3s ease both" }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#4F46E5", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                    <Building2 size={16} /> ORGANIZATION
-                  </div>
-                  <h2 style={{ fontSize: 24, fontWeight: 800, color: "var(--fg)", marginBottom: 24 }}>Tell us about your team</h2>
-                  
-                  <div className="qt-field-wrap">
-                    <input className="qt-input" placeholder="Organization / Company Name" value={organizationName} onChange={e => setOrganizationName(e.target.value)} />
-                  </div>
-                  <div className="qt-field-wrap">
-                    <select className="qt-input" value={teamSize} onChange={e => setTeamSize(e.target.value)}>
-                      <option>1 - 10 employees</option>
-                      <option>11 - 50 employees</option>
-                      <option>51 - 200 employees</option>
-                      <option>201+ employees</option>
-                    </select>
-                  </div>
-                  
-                  <div style={{ display: "flex", gap: 12 }}>
-                    <button type="button" className="qt-social-btn" style={{ flex: 1 }} onClick={() => setRegStep(1)}>BACK</button>
-                    <button type="button" className={`qt-submit-btn ${canGoNext() ? "qt-submit-active" : ""}`} style={{ flex: 2 }} onClick={() => setRegStep(3)} disabled={!canGoNext()}>
-                      NEXT: MODULES <ArrowRight size={18} />
-                    </button>
+                  {error && <div className="p-5 bg-red-50 text-red-600 text-xs font-bold rounded-2xl mb-8">{error}</div>}
+                  <div className="flex gap-4">
+                    <button onClick={() => setRegStep(3)} className="flex-1 py-5 bg-white border border-slate-100 text-slate-400 text-[11px] font-black uppercase tracking-widest rounded-3xl">BACK</button>
+                    <button onClick={onSubmit} className="flex-[2] flex justify-center items-center gap-2 py-5 bg-[#818cf8] text-white text-[11px] font-black uppercase tracking-widest rounded-3xl shadow-xl shadow-indigo-100">{loading ? <RefreshCcw className="animate-spin" size={20} /> : <RefreshCcw size={20} />}</button>
                   </div>
                 </div>
               )}
-
-              {/* Step 3: Modules */}
-              {regStep === 3 && (
-                <div style={{ animation: "fadeUp 0.3s ease both" }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#4F46E5", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                    <Workflow size={16} /> MODULES
-                  </div>
-                  <h2 style={{ fontSize: 24, fontWeight: 800, color: "var(--fg)", marginBottom: 12 }}>What will you track?</h2>
-                  <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 24 }}>Select at least one module to start.</p>
-
-                  <div style={{ display: "grid", gap: 12, marginBottom: 24 }}>
-                    {[
-                      { id: "time", label: "Time Tracking", icon: <Clock size={18} /> },
-                      { id: "leaves", label: "Leaves", icon: <CalendarDays size={18} /> },
-                      { id: "payroll", label: "Payroll", icon: <Banknote size={18} /> }
-                    ].map(mod => {
-                      const isSel = selectedModules.includes(mod.id)
-                      return (
-                        <div key={mod.id} onClick={() => isSel ? setSelectedModules(selectedModules.filter(m => m !== mod.id)) : setSelectedModules([...selectedModules, mod.id])}
-                          style={{
-                            padding: "14px 16px", borderRadius: 12, border: isSel ? "2px solid #4F46E5" : "1px solid var(--stroke2)",
-                            background: isSel ? "rgba(79, 70, 229, 0.05)" : "transparent",
-                            display: "flex", alignItems: "center", gap: 12, cursor: "pointer", transition: "all 0.2s"
-                          }}>
-                          <div style={{ color: isSel ? "#4F46E5" : "var(--muted)" }}>{mod.icon}</div>
-                          <div style={{ flex: 1, fontWeight: 700, fontSize: 14, color: isSel ? "#4F46E5" : "var(--fg)" }}>{mod.label}</div>
-                          <div style={{ width: 18, height: 18, borderRadius: "50%", border: isSel ? "none" : "2px solid var(--stroke)", background: isSel ? "#4F46E5" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            {isSel && <Check size={12} color="#fff" strokeWidth={3} />}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div style={{ display: "flex", gap: 12 }}>
-                    <button type="button" className="qt-social-btn" style={{ flex: 1 }} onClick={() => setRegStep(2)}>BACK</button>
-                    <button type="button" className={`qt-submit-btn ${canGoNext() ? "qt-submit-active" : ""}`} style={{ flex: 2 }} onClick={() => setRegStep(4)} disabled={!canGoNext()}>
-                      NEXT: FINISH <ArrowRight size={18} />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Step 4: Finish */}
-              {regStep === 4 && (
-                <div style={{ animation: "fadeUp 0.3s ease both" }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: "#4F46E5", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                    <Sparkles size={16} /> FINALIZE
-                  </div>
-                  <h2 style={{ fontSize: 24, fontWeight: 800, color: "var(--fg)", marginBottom: 24 }}>Almost there!</h2>
-
-                  <label className="qt-check-row">
-                    <input type="checkbox" checked={agree1} onChange={e => setAgree1(e.target.checked)} className="qt-checkbox" />
-                    <span className="qt-check-label">Receive updates and tips from Caltrack.</span>
-                  </label>
-                  <label className="qt-check-row">
-                    <input type="checkbox" checked={agree2} onChange={e => setAgree2(e.target.checked)} className="qt-checkbox" />
-                    <span className="qt-check-label">Agree to <a href="#" className="qt-link">Terms</a> &amp; <a href="#" className="qt-link">Privacy</a>.</span>
-                  </label>
-
-                  <div className="qt-captcha-box" style={{ marginBottom: 24 }}>
-                    <label className="qt-captcha-inner">
-                      <input type="checkbox" checked={robot} onChange={e => setRobot(e.target.checked)} className="qt-checkbox" />
-                      <span className="qt-captcha-text">I'm not a robot</span>
-                    </label>
-                  </div>
-
-                  {error && <div className="qt-error-box">{error}</div>}
-
-                  <div style={{ display: "flex", gap: 12 }}>
-                    <button type="button" className="qt-social-btn" style={{ flex: 1 }} onClick={() => setRegStep(3)} disabled={loading}>BACK</button>
-                    <button type="button" className={`qt-submit-btn qt-submit-active`} style={{ flex: 2 }} onClick={onSubmit} disabled={loading}>
-                      {loading
-                        ? <span style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-                            <RefreshCcw className="qt-spin" size={16} />
-                            Setting up workspace…
-                          </span>
-                        : "CREATE ACCOUNT"}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="qt-signin-link">
-                Already have an account?{" "}
-                <a href="#" className="qt-link" onClick={e => { e.preventDefault(); changeMode("signin") }}>Sign in</a>
-              </div>
             </div>
           )}
+
+          <div className="text-center mt-10">
+             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                Need help? <a href="#" className="text-indigo-600 hover:underline">Contact Support</a>
+             </span>
+          </div>
         </div>
       </div>
     </div>

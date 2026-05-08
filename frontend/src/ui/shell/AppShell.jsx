@@ -132,63 +132,33 @@ function displayName(username) {
 /* ── Sidebar Tooltip (JS portal, never clipped) ──────────────── */
 function SidebarTooltip({ tooltip }) {
   if (!tooltip) return null
-  const style = {
-    position: "fixed",
-    top: tooltip.y,
-    left: tooltip.x + 12,
-    transform: "translateY(-50%)",
-    background: "rgba(15, 23, 42, 0.95)",
-    backdropFilter: "blur(8px)",
-    color: "#fff",
-    padding: "6px 12px",
-    borderRadius: "8px",
-    fontSize: "12px",
-    fontWeight: 600,
-    whiteSpace: "nowrap",
-    pointerEvents: "none",
-    zIndex: 999999,
-    boxShadow: "0 10px 25px -5px rgba(0,0,0,0.4), 0 8px 10px -6px rgba(0,0,0,0.4)",
-    border: "1px solid rgba(255, 255, 255, 0.1)",
-  }
-  return <div style={style}>{tooltip.label}</div>
+  return (
+    <div 
+      className="fixed z-[999999] bg-slate-900/95 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shadow-xl border border-white/10 pointer-events-none transition-all"
+      style={{ top: tooltip.y, left: tooltip.x + 12, transform: "translateY(-50%)" }}
+    >
+      {tooltip.label}
+    </div>
+  )
 }
 
 /* ── Submenu Flyout ────────────────────────────────────────── */
-function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user }) {
+function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user, onClose }) {
   if (!flyout) return null
-  const style = {
-    position: "fixed",
-    top: flyout.y !== null ? flyout.y : "auto",
-    bottom: flyout.bottom !== null ? flyout.bottom : "auto",
-    left: flyout.x - 12, // Larger overlap with sidebar
-    background: "transparent",
-    paddingLeft: "20px", // Larger bridge area to "catch" the mouse
-    zIndex: 999998,
-    pointerEvents: "auto", // Ensure it catches events
-  }
-
-  const innerStyle = {
-    background: "#fff",
-    color: "#0f172a",
-    padding: "8px",
-    borderRadius: "12px",
-    minWidth: "200px",
-    boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
-    border: "1px solid rgba(0, 0, 0, 0.05)",
-    display: "flex",
-    flexDirection: "column",
-    gap: "2px",
-  }
-
+  const isBottom = flyout.bottom !== null
   return (
     <div
-      style={style}
+      className="fixed z-[999998] bg-transparent pl-5 pointer-events-auto"
+      style={{
+        top: isBottom ? "auto" : flyout.y,
+        bottom: isBottom ? flyout.bottom : "auto",
+        left: flyout.x - 12
+      }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
-      className="submenuFlyout"
     >
-      <div style={innerStyle} onMouseEnter={onMouseEnter}>
-        <div style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+      <div className="bg-white text-slate-900 p-2 rounded-xl min-w-[200px] shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1)] border border-slate-200/60 flex flex-col gap-0.5">
+        <div className="px-3 py-2 text-[11px] font-extrabold text-slate-500 uppercase tracking-widest">
           {flyout.label}
         </div>
         {flyout.children
@@ -196,24 +166,12 @@ function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user }) {
           .map((child) => (
             <NavLink
               key={child.to}
-            to={child.to}
-            style={({ isActive }) => ({
-              display: "flex",
-              alignItems: "center",
-              padding: "10px 12px",
-              borderRadius: "8px",
-              fontSize: "13.5px",
-              fontWeight: 600,
-              color: isActive ? "#2563eb" : "#475569",
-              background: isActive ? "#f1f5f9" : "transparent",
-              textDecoration: "none",
-              transition: "all 0.15s ease",
-            })}
-            className="flyoutItem"
-            onClick={() => setFlyout(null)}
-          >
-            {child.label}
-          </NavLink>
+              to={child.to}
+              className={({ isActive }) => `flex items-center px-3 py-2.5 rounded-lg text-[13.5px] font-semibold transition-all ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+              onClick={onClose}
+            >
+              {child.label}
+            </NavLink>
         ))}
       </div>
     </div>
@@ -502,8 +460,8 @@ export function AppShell() {
       }
     }
 
-    // Check every 2 minutes for geofence entry/exit
-    const timer = setInterval(checkGeofence, 120000)
+    // Check every 5 minutes for geofence entry/exit (reduces DB connection pressure)
+    const timer = setInterval(checkGeofence, 300000)
     checkGeofence() // Initial check
 
     return () => clearInterval(timer)
@@ -630,21 +588,21 @@ export function AppShell() {
   }
 
   return (
-    <div className={["app", sidebarCollapsed ? "app-collapsed" : ""].filter(Boolean).join(" ")}>
+    <div className="flex flex-col h-screen w-full overflow-hidden bg-slate-50 text-slate-900 font-sans">
       <CommandPalette open={cmdOpen} setOpen={setCmdOpen} />
       {/* ── Topbar ───────────────────────────── */}
-      <header className="topbar">
+      <header className="flex items-center justify-between h-[64px] px-6 bg-white border-b border-slate-200 z-50 shrink-0">
         {/* Left: Brand */}
-        <div className="topbarLeft">
-          <div className="brand">
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
             <CalTrackLogo size="sm" />
-            <span className="brandOrgName" title={orgName || workspace}>
+            <span className="font-extrabold text-slate-900 text-lg truncate max-w-[150px] sm:max-w-[300px] tracking-tight" title={orgName || workspace}>
               {orgName || workspace}
             </span>
-            <div className="workspaceMenuWrap">
+            <div className="relative workspaceMenuWrap">
               <button
                 type="button"
-                className="workspaceDotsBtn"
+                className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors focus:outline-none"
                 aria-label="Workspace menu"
                 title="Workspace menu"
                 onClick={() => setWorkspaceMenuOpen((v) => !v)}
@@ -652,28 +610,27 @@ export function AppShell() {
                 <MoreHorizontal size={18} strokeWidth={2.5} />
               </button>
               {workspaceMenuOpen && (
-                <div className="workspaceDropdown" role="menu" aria-label="Workspace actions" style={{ zIndex: 99999 }}>
+                <div className="absolute top-full left-0 mt-2 w-60 bg-white rounded-xl shadow-xl border border-slate-200/60 py-2 z-[99999]">
+                  <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Workspace</div>
                   <button
                     type="button"
-                    className="wsMenuRow"
+                    className="flex items-center w-full px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-colors"
                     onClick={() => {
                       setWorkspaceMenuOpen(false)
                       navigate(`${routes.settings}?section=organization`)
                     }}
                   >
-                    <span className="wsMenuIcon"><Settings size={18} /></span>
-                    <span>Workspace settings</span>
+                    <Settings size={16} className="mr-3" /> Workspace settings
                   </button>
                   <button
                     type="button"
-                    className="wsMenuRow"
+                    className="flex items-center w-full px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-colors"
                     onClick={() => {
                       setWorkspaceMenuOpen(false)
                       navigate(`${routes.settings}?section=plan`)
                     }}
                   >
-                    <span className="wsMenuIcon"><CreditCard size={18} /></span>
-                    <span>Subscription</span>
+                    <CreditCard size={16} className="mr-3" /> Subscription
                   </button>
                 </div>
               )}
@@ -682,75 +639,78 @@ export function AppShell() {
         </div>
 
         {/* Right: Actions & Profile */}
-        <div className="topbarRight">
+        <div className="flex items-center gap-4">
           {offline && (
-            <span className="topbarBadge warnPulse" title="Backend unreachable — showing demo data">
-              <span className="pulseDot"></span> Demo Mode
+            <span className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold rounded-full" title="Backend unreachable — showing demo data">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Demo Mode
             </span>
           )}
 
           <button
             type="button"
-            className="topbar-search-btn"
+            className="hidden md:flex items-center gap-3 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-500 transition-colors"
             onClick={() => setCmdOpen(true)}
             title="Search command palette (⌘K)"
           >
-            <Search size={15} className="searchIcon" />
-            <span className="searchText">Search everywhere...</span>
-            <span className="searchKbd">⌘K</span>
+            <Search size={15} />
+            <span className="hidden lg:inline-block font-medium">Search everywhere...</span>
+            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-white border border-slate-200 rounded text-slate-400">⌘K</span>
           </button>
 
-          <div className="topbarDivider"></div>
+          <div className="w-px h-6 bg-slate-200 mx-1"></div>
 
-          <div className="topbarActions">
+          <div className="flex items-center gap-1">
             <NotificationCenter />
             <ThemeToggle />
           </div>
 
-          <div className="topbarDivider"></div>
+          <div className="w-px h-6 bg-slate-200 mx-1"></div>
 
           <div
-            className="profileMenuWrap"
+            className="relative profileMenuWrap"
             onMouseEnter={() => setProfileOpen(true)}
             onMouseLeave={() => setProfileOpen(false)}
           >
-            <button className="userIconBtn" type="button" aria-label="Account menu" title="Account">
-              <div className="userAvatarWrap">
-                <div className="userAvatar">{user.username.charAt(0).toUpperCase()}</div>
-                <div className="activeStatus"></div>
+            <button className="flex items-center justify-center w-9 h-9 rounded-full bg-indigo-100 border-2 border-white shadow-sm hover:ring-2 hover:ring-indigo-500/30 transition-all focus:outline-none" type="button" aria-label="Account menu" title="Account">
+              <div className="relative w-full h-full flex items-center justify-center rounded-full">
+                <span className="text-indigo-700 font-bold text-sm">{user.username.charAt(0).toUpperCase()}</span>
+                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></div>
               </div>
             </button>
 
             {profileOpen && (
-              <div className="acctDropdown" role="menu">
-                <div className="acctDropTop">
-                  <div className="acctAvatarSq">{initials(user.username)}</div>
-                  <div className="acctDropName">{displayName(user.username)}</div>
-                  <div className="acctDropEmail">{email}</div>
-                  <button type="button" className="acctManageBtn" onClick={openMyProfile}>
-                    Manage CALDIM.com account
-                  </button>
+              <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200/60 z-[99999] overflow-hidden">
+                <div className="p-5 bg-slate-50 border-b border-slate-200/60">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-600 text-white text-lg font-bold shadow-sm">{initials(user.username)}</div>
+                    <div>
+                      <div className="font-bold text-slate-900">{displayName(user.username)}</div>
+                      <div className="text-xs text-slate-500 truncate max-w-[160px]">{email}</div>
+                    </div>
+                  </div>
+                  <div className={`inline-flex items-center gap-1.5 mt-4 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${user.role === 'admin' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${user.role === 'admin' ? 'bg-violet-500' : 'bg-blue-500'}`}></span>
+                    {user.role === "admin" ? "Administrator" : "Employee"}
+                  </div>
                 </div>
 
-                <div className="acctMenuList">
-                  <button type="button" className="acctMenuRow" onClick={openMyProfile}>
-                    <span className="acctMenuIcon"><User size={18} /></span>
-                    <span>My profile</span>
+                <div className="p-2 flex flex-col gap-1">
+                  <button type="button" className="flex items-center w-full px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-indigo-600 rounded-lg transition-colors" onClick={openMyProfile}>
+                    <User size={16} className="mr-3 text-slate-400" /> My profile
                   </button>
-                  <button type="button" className="acctMenuRow" onClick={openPreferences}>
-                    <span className="acctMenuIcon"><SlidersHorizontal size={18} /></span>
-                    <span>Preferences</span>
+                  <button type="button" className="flex items-center w-full px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-indigo-600 rounded-lg transition-colors" onClick={openPreferences}>
+                    <SlidersHorizontal size={16} className="mr-3 text-slate-400" /> Preferences
                   </button>
+                  <div className="h-px bg-slate-100 my-1"></div>
                   <button
                     type="button"
-                    className="acctMenuRow danger"
+                    className="flex items-center w-full px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
                     onClick={() => {
                       setProfileOpen(false)
                       logout()
                     }}
                   >
-                    <span className="acctMenuIcon"><LogOut size={18} /></span>
-                    <span>Log out</span>
+                    <LogOut size={16} className="mr-3" /> Log out
                   </button>
                 </div>
               </div>
@@ -1147,109 +1107,99 @@ export function AppShell() {
       )}
 
       {/* ── Body ─────────────────────────────── */}
-      <div className="layout">
-        <aside className="sidebar" onMouseLeave={() => { hideTooltip(); hideFlyout(); }}>
-          <nav className="nav">
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <aside className={`flex flex-col bg-white border-r border-slate-200 transition-all duration-300 z-40 ${sidebarCollapsed ? 'w-[72px]' : 'w-[260px]'}`} onMouseLeave={() => { hideTooltip(); hideFlyout(); }}>
+          <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1.5 scrollbar-hide">
             {items.map((item) => (
-              <div key={item.label} className="navGroup">
+              <div key={item.label} className="flex flex-col gap-1">
                 {item.children ? (
                   <>
                     <button
                       type="button"
-                      className={["navItem", location.pathname.startsWith(item.to) ? "active" : ""].filter(Boolean).join(" ")}
+                      className={`flex items-center px-3 py-2.5 rounded-lg transition-all group ${location.pathname.startsWith(item.to) ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
                       onClick={(e) => {
                         if (sidebarCollapsed) {
                           navigate(item.to)
                           if (flyout) setFlyout(null)
                           else showFlyout(item, e)
                         } else {
-                          // For parents with children (like Settings):
-                          // 1. Navigate to the parent route
-                          // 2. Expand the section
                           navigate(item.to)
                           setSettingsExpanded(true)
                         }
                       }}
-                      onMouseEnter={(e) => {
-                        showTooltip(item.label, e)
-                        showFlyout(item, e)
-                      }}
-                      onMouseLeave={() => {
-                        hideTooltip()
-                        hideFlyout()
-                      }}
+                      onMouseEnter={(e) => { showTooltip(item.label, e); showFlyout(item, e); }}
+                      onMouseLeave={() => { hideTooltip(); hideFlyout(); }}
                     >
-                      <span className="navIcon">
+                      <span className={`flex items-center justify-center transition-transform group-hover:scale-110 ${sidebarCollapsed ? 'mx-auto' : 'mr-3'}`}>
                         {item.icon}
-                        {sidebarCollapsed && <span className="submoduleIndicator"></span>}
+                        {sidebarCollapsed && <span className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-indigo-400"></span>}
                       </span>
-                      <span className="navLabel">{item.label}</span>
+                      {!sidebarCollapsed && <span className="flex-1 text-left text-sm">{item.label}</span>}
                       {!sidebarCollapsed && (
-                        <span className="navChevron">
+                        <span className="text-slate-400">
                           {settingsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         </span>
                       )}
                     </button>
                     {!sidebarCollapsed && settingsExpanded && (
-                      <div className="navChildren">
+                      <div className="flex flex-col gap-0.5 pl-9 mt-1 mb-2 border-l-2 border-slate-100 ml-4">
                         {item.children
                           .filter(child => !child.adminOnly || user?.role === 'admin')
                           .map((child) => (
                             <NavLink
                               key={child.to}
                               to={child.to}
-                            className={({ isActive }) =>
-                              ["navItem subItem", isActive ? "active" : ""].filter(Boolean).join(" ")
-                            }
-                          >
-                            <span className="navIcon">{child.icon}</span>
-                            <span className="navLabel">{child.label}</span>
-                          </NavLink>
-                        ))}
+                              className={({ isActive }) => `flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-all ${isActive ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+                            >
+                              <span className="mr-2 opacity-70">{child.icon}</span>
+                              {child.label}
+                            </NavLink>
+                          ))}
                       </div>
                     )}
                   </>
                 ) : (
                   <NavLink
                     to={item.to}
-                    className={({ isActive }) =>
-                      ["navItem", isActive || (item.to !== "/" && location.pathname.startsWith(item.to)) ? "active" : ""]
-                        .filter(Boolean)
-                        .join(" ")
-                    }
+                    className={({ isActive }) => `flex items-center px-3 py-2.5 rounded-lg transition-all group ${isActive || (item.to !== "/" && location.pathname.startsWith(item.to)) ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
                     end={item.to === "/"}
                     onMouseEnter={(e) => showTooltip(item.label, e)}
                     onMouseLeave={hideTooltip}
                   >
-                    <span className="navIcon">{item.icon}</span>
-                    <span className="navLabel">{item.label}</span>
+                    <span className={`flex items-center justify-center transition-transform group-hover:scale-110 ${sidebarCollapsed ? 'mx-auto' : 'mr-3'}`}>
+                      {item.icon}
+                    </span>
+                    {!sidebarCollapsed && <span className="text-sm">{item.label}</span>}
                   </NavLink>
                 )}
               </div>
             ))}
           </nav>
-          <div className="sidebarFooter">
+          <div className="p-3 border-t border-slate-200 bg-slate-50/50">
             <button
-              className="sidebarToggleBtn"
+              className="flex items-center justify-center w-full py-2.5 rounded-lg text-slate-500 hover:bg-slate-200/50 hover:text-slate-800 transition-colors"
               onClick={() => { setSidebarCollapsed(!sidebarCollapsed); hideTooltip() }}
               title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-              {!sidebarCollapsed && <span>Collapse</span>}
+              {sidebarCollapsed ? <ChevronRight size={18} /> : <><ChevronLeft size={18} /> <span className="ml-2 text-sm font-semibold">Collapse</span></>}
             </button>
           </div>
         </aside>
 
-        <main className="content">
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto bg-slate-50 relative">
           <Outlet />
         </main>
       </div>
+
       <SidebarTooltip tooltip={tooltip} />
       <SubmenuFlyout
         flyout={flyout}
         onMouseEnter={cancelHideFlyout}
         onMouseLeave={hideFlyout}
         user={user}
+        onClose={() => setFlyout(null)}
       />
     </div>
   )

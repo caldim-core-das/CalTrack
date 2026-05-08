@@ -1,148 +1,137 @@
+/**
+ * AuthProvider.jsx
+ * Central authentication state for the application.
+ *
+ * Responsibilities:
+ *  - Rehydrate auth state on page load (via /auth/me/)
+ *  - Expose login / register / loginWithGoogle / logout actions
+ *  - Listen for session-expired events dispatched by the API client
+ *  - Ensure no stale tokens survive across sessions
+ */
 import { useCallback, useEffect, useMemo, useState } from "react"
 
-import { apiRequest } from "../../api/client.js"
+import {
+  apiLogin,
+  apiFetchMe,
+  apiRegister,
+  apiGoogleLogin,
+  extractAuthError,
+} from "../../api/authService.js"
 import { AuthContext } from "./AuthContext.js"
 import { getJwtCompanyId, getJwtRole, getJwtUsername } from "./jwt.js"
-import { getTokens, setTokens } from "./tokens.js"
-
-/* ─── Demo / offline login ──────────────────────────────────────────────
-   When the backend is unreachable we synthesize a minimal JWT-shaped token
-   so the app can still work with mock data.
-   The payload is NOT verified – it's purely for offline demo.
-─────────────────────────────────────────────────────────────────────── */
-function b64(obj) {
-  return btoa(JSON.stringify(obj))
-    .replace(/=/g, "")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-}
-
-function makeDemoToken(username, role) {
-  const header  = b64({ alg: "HS256", typ: "JWT" })
-  const payload = b64({
-    username,
-    role,
-    exp: Math.floor(Date.now() / 1000) + 86400 * 365  // 1 year
-  })
-  return `${header}.${payload}.demo-signature`
-}
-
-// Credentials accepted in offline demo mode
-const DEMO_USERS = {
-  admin:    { password: "admin",    role: "admin" },
-  employee: { password: "employee", role: "employee" },
-  // Accept any username with password "demo"
-}
+import { getTokens, setTokens, clearTokens } from "./tokens.js"
 
 export function AuthProvider({ children }) {
   const [isReady, setIsReady] = useState(false)
   const [user, setUser]       = useState(null)
 
+  // ── Rehydrate user from /auth/me/ ─────────────────────────────────────────
+
   const refreshMe = useCallback(async () => {
     const tokens = getTokens()
-    if (!tokens?.access) { setUser(null); return }
+    if (!tokens?.access) {
+      setUser(null)
+      return
+    }
 
-    try {
-      const me = await apiRequest("/auth/me/")
-      if (me?.username && me?.role) {
-        if (!me?.company) {
-          // User has no company — cannot use the app, must re-register
-          // Clearing tokens breaks the App.jsx login→onboarding→login loop
-          setTokens(null)
-          setUser(null)
-          return
-        }
-        setUser({ 
-          username: me.username, 
-          email: me.email, 
-          role: me.role, 
-          companyId: me.company 
-        })
-        // Auto-persist company name so AppShell topbar always shows it
-        if (me.company_name) {
-          localStorage.setItem("quicktims.orgName", me.company_name)
-          window.dispatchEvent(new CustomEvent("quicktims:orgName"))
-        }
-      } else {
+    const me = await apiFetchMe()
+
+    if (me?.username && me?.role) {
+      if (!me.company) {
+        // User exists but has no company — force them to re-register/onboard
+        clearTokens()
         setUser(null)
+        return
       }
-    } catch {
-      // Fallback to JWT if API fails (useful for offline demo)
-      const username  = getJwtUsername(tokens.access)
-      const role      = getJwtRole(tokens.access)
-      const companyId = getJwtCompanyId(tokens.access)
-      // Require companyId — token without company cannot access the app
-      if (username && role && companyId) {
-        setUser({ username, role, companyId })
-      } else {
-        setUser(null)
+      setUser({
+        username:  me.username,
+        email:     me.email    ?? "",
+        firstName: me.first_name ?? "",
+        lastName:  me.last_name  ?? "",
+        role:      me.role,
+        companyId: me.company,
+      })
+      // Persist org name so AppShell topbar shows it immediately
+      if (me.company_name) {
+        localStorage.setItem("quicktims.orgName", me.company_name)
+        window.dispatchEvent(new CustomEvent("quicktims:orgName"))
       }
+      return
+    }
+
+    // Fallback: parse claims directly from the token (works offline too)
+    const username  = getJwtUsername(tokens.access)
+    const role      = getJwtRole(tokens.access)
+    const companyId = getJwtCompanyId(tokens.access)
+
+    if (username && role && companyId) {
+      setUser({ username, email: "", firstName: "", lastName: "", role, companyId })
+    } else {
+      // Token is present but invalid/incomplete — log out cleanly
+      clearTokens()
+      setUser(null)
     }
   }, [])
 
+  // ── Login ─────────────────────────────────────────────────────────────────
+
   const login = useCallback(
-    async (username, password) => {
-      try {
-        // Try the real backend first
-        const data = await apiRequest("/auth/login/", {
-          method: "POST",
-          json: { username, password }
-        })
-        setTokens({ access: data.access, refresh: data.refresh })
-        await refreshMe()
-      } catch (err) {
-        // If backend is down, allow demo credentials
-        const known = DEMO_USERS[username.toLowerCase()]
-        const isDemo =
-          (known && known.password === password) ||
-          password === "demo"
-
-        if (!isDemo) {
-          // Re-throw so the login form shows the real error
-          throw err
-        }
-
-        const role  = known?.role ?? "employee"
-        const token = makeDemoToken(username, role)
-        setTokens({ access: token, refresh: token })
-        setUser({ username, role })
-      }
+    async (identifier, password) => {
+      const data = await apiLogin(identifier, password)
+      setTokens({ access: data.access, refresh: data.refresh })
+      await refreshMe()
     },
     [refreshMe]
   )
+
+  // ── Register ──────────────────────────────────────────────────────────────
 
   const register = useCallback(
     async (payload) => {
-      const data = await apiRequest("/auth/register/", {
-        method: "POST",
-        json: payload
-      })
+      const data = await apiRegister(payload)
       setTokens({ access: data.access, refresh: data.refresh })
       await refreshMe()
     },
     [refreshMe]
   )
+
+  // ── Google OAuth ──────────────────────────────────────────────────────────
 
   const loginWithGoogle = useCallback(
-    async (accessToken) => {
-      const data = await apiRequest("/auth/google/", {
-        method: "POST",
-        json: { access_token: accessToken }
-      })
+    async (googleAccessToken) => {
+      const data = await apiGoogleLogin(googleAccessToken)
       setTokens({ access: data.access, refresh: data.refresh })
       await refreshMe()
     },
     [refreshMe]
   )
 
+  // ── Logout ────────────────────────────────────────────────────────────────
+
   const logout = useCallback(() => {
-    setTokens(null)
+    clearTokens()
+    localStorage.removeItem("quicktims.orgName")
     setUser(null)
   }, [])
+
+  // ── Bootstrap on mount ────────────────────────────────────────────────────
 
   useEffect(() => {
     refreshMe().finally(() => setIsReady(true))
   }, [refreshMe])
+
+  // ── Session expiry event (fired by API client on 401) ─────────────────────
+
+  useEffect(() => {
+    const handle = () => {
+      clearTokens()
+      setUser(null)
+    }
+    window.addEventListener("quicktims:session-expired", handle)
+    return () => window.removeEventListener("quicktims:session-expired", handle)
+  }, [])
+
+  // ── Context value ─────────────────────────────────────────────────────────
 
   const value = useMemo(
     () => ({ isReady, user, login, register, loginWithGoogle, logout, refreshMe }),

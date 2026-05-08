@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
-import { Pill } from "../components/kit.jsx"
+import { Pill, Button, Card, Input, Select, TextArea } from "../components/kit.jsx"
 import { ClipboardList, Clock, CheckCircle2, AlertCircle, MapPin, Calendar as CalIcon, Play, Save, Trash2, Tag, Loader2, Paperclip, User, Flag, ListChecks, Plus, X, Building2, Camera } from "lucide-react"
 import { SelfieCapture, getPosition } from "./TimePage.jsx"
 
@@ -20,10 +20,10 @@ const CATEGORIES = [
 ]
 
 const PRIORITIES = [
-  { value: "low", label: "Low", color: "#6B7280" },
-  { value: "medium", label: "Medium", color: "#2563EB" },
-  { value: "high", label: "High", color: "#D97706" },
-  { value: "urgent", label: "Urgent", color: "#DC2626" },
+  { value: "low", label: "Low", color: "bg-slate-500" },
+  { value: "medium", label: "Medium", color: "bg-blue-600" },
+  { value: "high", label: "High", color: "bg-amber-600" },
+  { value: "urgent", label: "Urgent", color: "bg-rose-600" },
 ]
 
 const STATUS_FILTERS = ["all", "pending", "in_progress", "completed", "cancelled"]
@@ -31,7 +31,7 @@ const STATUS_FILTERS = ["all", "pending", "in_progress", "completed", "cancelled
 function categoryLabel(val) { return CATEGORIES.find(c => c.value === val)?.label ?? val }
 function statusTone(s) { return s === "completed" ? "good" : s === "in_progress" ? "warn" : s === "cancelled" ? "bad" : "neutral" }
 function statusLabel(s) { return { pending: "Pending", in_progress: "In Progress", completed: "Completed", cancelled: "Cancelled" }[s] ?? s }
-function priorityColor(p) { return PRIORITIES.find(x => x.value === p)?.color ?? "#6B7280" }
+function priorityColorClass(p) { return PRIORITIES.find(x => x.value === p)?.color ?? "bg-slate-500" }
 
 const EMPTY_FORM = {
   title: "", description: "", category: "other", priority: "medium",
@@ -129,47 +129,57 @@ function TaskCard({ task, onAction, busy }) {
   }
 
   return (
-    <div className="tsk-card">
-      <div className="tsk-card-head">
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span className="tsk-badge tsk-badge-cat"><Tag size={12} /> {categoryLabel(task.category)}</span>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: priorityColor(task.priority), display: "block" }} title={task.priority} />
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-300 p-5 flex flex-col gap-4">
+      <div className="flex justify-between items-start">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
+            <Tag size={10} /> {categoryLabel(task.category)}
+          </span>
+          <div className={`w-2 h-2 rounded-full ${priorityColorClass(task.priority)}`} title={`Priority: ${task.priority}`} />
         </div>
         <Pill tone={statusTone(task.status)}>
           {task.status === "in_progress" ? (liveHours ? `🟢 ${liveHours}` : "In Progress") : statusLabel(task.status)}
         </Pill>
       </div>
 
-      <div>
-        <div className="tsk-card-title">{task.title}</div>
+      <div className="flex-1">
+        <h3 className="text-lg font-bold text-slate-900 leading-tight">{task.title}</h3>
         {task.description && (
-          <div className="tsk-card-desc" style={{ marginTop: 8, maxHeight: expanded ? "none" : "2.8em", overflow: "hidden" }}>
+          <div className={`text-slate-500 text-sm mt-2 line-clamp-${expanded ? 'none' : '3'} whitespace-pre-wrap`}>
             {task.description}
           </div>
         )}
-        {task.description && task.description.length > 100 && (
-          <button style={{ color: "#6366F1", fontSize: 12, fontWeight: 600, background: "none", border: "none", padding: 0, marginTop: 4, cursor: "pointer" }} onClick={() => setExpanded(v => !v)}>
+        {task.description && task.description.length > 120 && (
+          <button className="text-indigo-600 text-xs font-bold mt-1 hover:underline" onClick={() => setExpanded(v => !v)}>
             {expanded ? "Show less" : "Read more"}
           </button>
         )}
       </div>
 
-      <div className="tsk-card-meta">
-        {task.job_site_name ? (
-          <div className="tsk-card-meta-item"><Building2 size={13} /> {task.job_site_name}</div>
-        ) : task.job_address ? (
-          <div className="tsk-card-meta-item"><MapPin size={13} /> {task.job_address}</div>
-        ) : task.location && (
-          <div className="tsk-card-meta-item"><MapPin size={13} /> {task.location}</div>
+      <div className="grid grid-cols-2 gap-y-2 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="flex items-center gap-1.5 truncate">
+          <Building2 size={12} className="text-slate-300" />
+          <span className="truncate">{task.job_site_name || task.client_name || "No site"}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <CalIcon size={12} className="text-slate-300" />
+          <span>Due: {task.due_date}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Clock size={12} className="text-slate-300" />
+          <span>Est: {task.estimated_hours}h</span>
+        </div>
+        {task.actual_hours > 0 && (
+          <div className="flex items-center gap-1.5 text-emerald-600">
+            <CheckCircle2 size={12} />
+            <span>Actual: {task.actual_hours}h</span>
+          </div>
         )}
-        <div className="tsk-card-meta-item"><CalIcon size={13} /> {task.due_date}</div>
-        <div className="tsk-card-meta-item"><Clock size={13} /> {task.estimated_hours}h est.</div>
-        {task.actual_hours > 0 && <div className="tsk-card-meta-item"><CheckCircle2 size={13} /> {task.actual_hours}h actual</div>}
       </div>
         
       {task.admin_notes && (
-        <div style={{ background: "#FEF3C7", color: "#92400E", padding: "10px 14px", borderRadius: 8, fontSize: 13 }}>
-          <strong>Admin note:</strong> {task.admin_notes}
+        <div className="bg-amber-50 text-amber-800 p-3 rounded-xl text-xs border border-amber-100">
+          <strong className="uppercase tracking-tight mr-1">Admin note:</strong> {task.admin_notes}
         </div>
       )}
 
@@ -181,44 +191,45 @@ function TaskCard({ task, onAction, busy }) {
       )}
 
       {task.status !== "completed" && task.status !== "cancelled" && (
-        <div style={{ borderTop: "1px solid var(--stroke)", margin: "10px -20px -20px", padding: 20 }}>
+        <div className="mt-2 pt-4 border-t border-slate-100">
           {task.status === "pending" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {gpsStatus && <div style={{ fontSize: 13, color: "var(--accent)" }}>{gpsStatus}</div>}
-              <button
-                className="tsk-btn tsk-btn-primary"
+            <div className="flex flex-col gap-3">
+              {gpsStatus && <div className="text-xs text-indigo-600 font-medium">{gpsStatus}</div>}
+              <Button
                 disabled={busy || startFlow}
                 onClick={beginStartFlow}
-                style={{ width: "100%", justifyContent: "center" }}
+                className="w-full py-3 gap-2"
               >
-                {startFlow ? <Loader2 size={15} className="spin" /> : <Play size={15} />}
+                {startFlow ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
                 {startFlow ? "Processing..." : "START TASK & CLOCK IN"}
-              </button>
+              </Button>
             </div>
           )}
           {task.status === "in_progress" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div className="flex flex-col gap-4">
               {task.require_before_after_photos && (
-                <div style={{ padding: "10px", background: "var(--surface2)", borderRadius: 8, border: "1px solid var(--stroke)", fontSize: 13 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 8 }}><Camera size={14} style={{ verticalAlign: "bottom", marginRight: 4 }} /> Requirement: After Photo</div>
-                  <input type="file" accept="image/*" onChange={handleAfterPhotoChange} style={{ fontSize: 13 }} />
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <div className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+                    <Camera size={14} /> Requirement: After Photo
+                  </div>
+                  <input type="file" accept="image/*" onChange={handleAfterPhotoChange} className="text-xs w-full" />
                 </div>
               )}
 
-              <textarea
-                className="tsk-input"
+              <TextArea
                 rows={2}
                 placeholder="Optional completion notes..."
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
+                className="min-h-[60px]"
               />
-              <div style={{ display: "flex", gap: 10 }}>
-                <button className="tsk-btn tsk-btn-outline" style={{ flex: 1, justifyContent: "center" }} disabled={busy} onClick={() => onAction(task.id, "notes", { employee_notes: note })}>
-                  <Save size={15} /> Save Note
-                </button>
-                <button className="tsk-btn tsk-btn-primary" style={{ flex: 1.5, justifyContent: "center", background: "#10B981" }} disabled={busy} onClick={handleComplete}>
-                  <CheckCircle2 size={15} /> COMPLETE & CLOCK OUT
-                </button>
+              <div className="flex gap-3">
+                <Button variant="ghost" className="flex-1 border border-slate-200" disabled={busy} onClick={() => onAction(task.id, "notes", { employee_notes: note })}>
+                  <Save size={16} className="mr-2" /> Save
+                </Button>
+                <Button className="flex-[1.5] bg-emerald-600 hover:bg-emerald-700 hover:shadow-emerald-200/50" disabled={busy} onClick={handleComplete}>
+                  <CheckCircle2 size={16} className="mr-2" /> COMPLETE
+                </Button>
               </div>
             </div>
           )}
@@ -306,168 +317,208 @@ function AssignTaskPanel({ employees, jobSites, onAssigned, onClose }) {
   }
 
   return (
-    <div className="tsk-panel">
-      <form className="tsk-assign-body" onSubmit={submit}>
-        <div className="tsk-assign-meta">General</div>
-        <input className="tsk-assign-title" value={form.title} onChange={e => set("title", e.target.value)} placeholder="Untitled" />
+    <form className="flex flex-col gap-6" onSubmit={submit}>
+      <div>
+        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">General Details</div>
+        <Input 
+          value={form.title} 
+          onChange={e => set("title", e.target.value)} 
+          placeholder="e.g. Repair HVAC unit in Block B" 
+          label="Task Title"
+          className="text-lg font-bold"
+          required
+        />
+      </div>
 
-        {err && <div style={{ color: "#DC2626", fontSize: 13, fontWeight: 600 }}><AlertCircle size={14} style={{ verticalAlign: "middle", marginRight: 4 }} /> {err}</div>}
+      {err && (
+        <div className="p-3 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-sm font-semibold flex items-center gap-2">
+          <AlertCircle size={16} /> {err}
+        </div>
+      )}
 
-        <div className="tsk-props">
-          <div className="tsk-prop-row">
-            <div className="tsk-prop-left"><User size={14} /> Assign To</div>
-            <div className="tsk-prop-right">
-              <select className="tsk-input tsk-select" value={form.assigned_to} onChange={e => set("assigned_to", e.target.value)} required>
-                <option value="">— Select employee —</option>
-                {employees.map(emp => (
-                  <option key={emp.id} value={emp.user?.id}>{emp.user?.first_name || emp.user?.username} {emp.user?.last_name || ""}</option>
-                ))}
-              </select>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Select 
+          label="Assign To"
+          value={form.assigned_to} 
+          onChange={e => set("assigned_to", e.target.value)}
+          required
+          options={[
+            { value: "", label: "— Select employee —" },
+            ...employees.map(emp => ({
+              value: emp.user?.id,
+              label: `${emp.user?.first_name || emp.user?.username} ${emp.user?.last_name || ""}`
+            }))
+          ]}
+        />
+
+        <Select 
+          label="Job Site"
+          value={form.job_site} 
+          onChange={e => set("job_site", e.target.value)}
+          options={[
+            { value: "", label: "— No specified site —" },
+            ...jobSites.map(site => ({ value: site.id, label: site.name }))
+          ]}
+        />
+
+        <Select 
+          label="Category"
+          value={form.category} 
+          onChange={e => set("category", e.target.value)}
+          options={CATEGORIES}
+        />
+
+        <Input 
+          label="Due Date"
+          type="date" 
+          value={form.due_date} 
+          onChange={e => set("due_date", e.target.value)} 
+        />
+
+        <Select 
+          label="Priority"
+          value={form.priority} 
+          onChange={e => set("priority", e.target.value)}
+          options={PRIORITIES.map(p => ({ value: p.value, label: p.label }))}
+        />
+
+        <Select 
+          label="Status"
+          value={form.status} 
+          onChange={e => set("status", e.target.value)}
+          options={STATUS_FILTERS.filter(x => x !== "all").map(s => ({ value: s, label: statusLabel(s) }))}
+        />
+      </div>
+
+      <button type="button" className="text-indigo-600 text-sm font-bold hover:underline flex items-center gap-1" onClick={() => setShowMore(v => !v)}>
+        {showMore ? "- Hide advanced options" : "+ Add more properties (GPS, Client, Requirements)"}
+      </button>
+
+      {showMore && (
+        <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2">
+          <Input 
+            label="Estimated Hours"
+            type="number" 
+            min="0.5" 
+            step="0.5" 
+            value={form.estimated_hours} 
+            onChange={e => set("estimated_hours", e.target.value)} 
+          />
+          <Input 
+            label="Client Name"
+            value={form.client_name} 
+            onChange={e => set("client_name", e.target.value)} 
+            placeholder="e.g. Acme Corp" 
+          />
+          <div className="md:col-span-2">
+            <Input 
+              label="Job Address"
+              value={form.job_address} 
+              onChange={e => set("job_address", e.target.value)} 
+              onBlur={geocodeAddress} 
+              placeholder="Full street address" 
+            />
           </div>
-
-          <div className="tsk-prop-row">
-            <div className="tsk-prop-left"><Building2 size={14} /> Job Site</div>
-            <div className="tsk-prop-right">
-              <select className="tsk-input tsk-select" value={form.job_site} onChange={e => set("job_site", e.target.value)}>
-                <option value="">— No specified site —</option>
-                {jobSites.map(site => (
-                  <option key={site.id} value={site.id}>{site.name}</option>
-                ))}
-              </select>
-            </div>
+          <div className="flex gap-4">
+            <Input 
+              label="Latitude"
+              type="number" 
+              step="any" 
+              value={form.location_lat} 
+              onChange={e => set("location_lat", e.target.value)} 
+            />
+            <Input 
+              label="Longitude"
+              type="number" 
+              step="any" 
+              value={form.location_lon} 
+              onChange={e => set("location_lon", e.target.value)} 
+            />
           </div>
-
-          <div className="tsk-prop-row">
-            <div className="tsk-prop-left"><Tag size={14} /> Label</div>
-            <div className="tsk-prop-right">
-              <select className="tsk-input tsk-select" value={form.category} onChange={e => set("category", e.target.value)}>
-                {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="tsk-prop-row">
-            <div className="tsk-prop-left"><CalIcon size={14} /> Due Date</div>
-            <div className="tsk-prop-right">
-              <input className="tsk-input" type="date" value={form.due_date} onChange={e => set("due_date", e.target.value)} />
-            </div>
-          </div>
-
-          <div className="tsk-prop-row">
-            <div className="tsk-prop-left"><Flag size={14} /> Priority</div>
-            <div className="tsk-prop-right">
-              <select className="tsk-input tsk-select" value={form.priority} onChange={e => set("priority", e.target.value)}>
-                {PRIORITIES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="tsk-prop-row">
-            <div className="tsk-prop-left"><ListChecks size={14} /> Status</div>
-            <div className="tsk-prop-right">
-              <select className="tsk-input tsk-select" value={form.status} onChange={e => set("status", e.target.value)}>
-                {STATUS_FILTERS.filter(x => x !== "all").map(s => (
-                  <option key={s} value={s}>{statusLabel(s)}</option>
-                ))}
-              </select>
+          <Input 
+            label="Geofence Radius (m)"
+            type="number" 
+            value={form.geofence_radius} 
+            onChange={e => set("geofence_radius", e.target.value)} 
+            placeholder="Default 200m" 
+          />
+          <div className="md:col-span-2">
+            <div className="text-sm font-semibold text-slate-700 mb-3">Verification Requirements</div>
+            <div className="flex gap-8">
+              <label className="flex items-center gap-2.5 text-sm font-medium text-slate-600 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" checked={form.require_selfie} onChange={e => set("require_selfie", e.target.checked)} />
+                Require Selfie at Start
+              </label>
+              <label className="flex items-center gap-2.5 text-sm font-medium text-slate-600 cursor-pointer">
+                <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" checked={form.require_before_after_photos} onChange={e => set("require_before_after_photos", e.target.checked)} />
+                Before/After Photos
+              </label>
             </div>
           </div>
         </div>
+      )}
 
-        <button type="button" className="tsk-prop-more" onClick={() => setShowMore(v => !v)}>
-          + Add more properties
-        </button>
+      <div className="h-px bg-slate-100 w-full" />
 
-        {showMore && (
-          <div className="tsk-props" style={{ marginTop: 0 }}>
-            <div className="tsk-prop-row">
-              <div className="tsk-prop-left"><Clock size={14} /> Est. Hours</div>
-              <div className="tsk-prop-right">
-                <input className="tsk-input" type="number" min="0.5" step="0.5" value={form.estimated_hours} onChange={e => set("estimated_hours", e.target.value)} />
-              </div>
-            </div>
-            <div className="tsk-prop-row">
-              <div className="tsk-prop-left"><Building2 size={14} /> Client Name</div>
-              <div className="tsk-prop-right">
-                <input className="tsk-input" value={form.client_name} onChange={e => set("client_name", e.target.value)} placeholder="e.g. Acme Corp" />
-              </div>
-            </div>
-            <div className="tsk-prop-row">
-              <div className="tsk-prop-left"><MapPin size={14} /> Job Address</div>
-              <div className="tsk-prop-right" style={{ display: "flex", gap: 8 }}>
-                <input className="tsk-input" style={{ flex: 1 }} value={form.job_address} onChange={e => set("job_address", e.target.value)} onBlur={geocodeAddress} placeholder="Street Address" />
-              </div>
-            </div>
-            <div className="tsk-prop-row">
-              <div className="tsk-prop-left"><MapPin size={14} /> GPS Loc.</div>
-              <div className="tsk-prop-right" style={{ display: "flex", gap: 8 }}>
-                <input className="tsk-input" style={{ flex: 1 }} type="number" step="any" value={form.location_lat} onChange={e => set("location_lat", e.target.value)} placeholder="Lat" />
-                <input className="tsk-input" style={{ flex: 1 }} type="number" step="any" value={form.location_lon} onChange={e => set("location_lon", e.target.value)} placeholder="Lon" />
-              </div>
-            </div>
-            <div className="tsk-prop-row">
-              <div className="tsk-prop-left"><Activity size={14} /> GPS Radius</div>
-              <div className="tsk-prop-right">
-                <input className="tsk-input" type="number" value={form.geofence_radius} onChange={e => set("geofence_radius", e.target.value)} placeholder="Default 200m" />
-              </div>
-            </div>
-            <div className="tsk-prop-row">
-              <div className="tsk-prop-left"><Camera size={14} /> Security</div>
-              <div className="tsk-prop-right" style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
-                  <input type="checkbox" checked={form.require_selfie} onChange={e => set("require_selfie", e.target.checked)} /> Require Selfie
-                </label>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}>
-                  <input type="checkbox" checked={form.require_before_after_photos} onChange={e => set("require_before_after_photos", e.target.checked)} /> Before/After Photos
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="tsk-form-divider" />
-
-        <div className="tsk-section-title">ATTACHMENTS</div>
+      <div>
+        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Attachments & Documentation</div>
         <div
-          className={`tsk-dropzone ${dragging ? "dragging" : ""}`}
+          className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all ${dragging ? "border-indigo-500 bg-indigo-50" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
           onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
           onDrop={(e) => { e.preventDefault(); setDragging(false); addFiles(e.dataTransfer.files) }}
         >
-          <div className="tsk-dropzone-inner">
-            <div className="tsk-dropzone-label">Drag & drop your files here</div>
-            <div className="tsk-dropzone-or">OR</div>
-            <button type="button" className="tsk-btn tsk-btn-outline" onClick={() => fileInputRef.current?.click()}>
-              <Paperclip size={15} /> Browse files
-            </button>
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-slate-400">
+              <Paperclip size={24} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-700">Drag & drop files here</p>
+              <p className="text-xs text-slate-400 mt-1">or click to browse your computer</p>
+            </div>
+            <Button type="button" variant="ghost" className="mt-2 border border-slate-200 bg-white" onClick={() => fileInputRef.current?.click()}>
+              Choose Files
+            </Button>
             <input ref={fileInputRef} type="file" multiple style={{ display: "none" }} onChange={(e) => addFiles(e.target.files)} />
           </div>
         </div>
 
         {files.length > 0 && (
-          <div className="tsk-file-list">
+          <div className="mt-4 flex flex-wrap gap-2">
             {files.map((f, idx) => (
-              <div key={`${f.name}:${f.size}:${f.lastModified}`} className="tsk-file-item">
-                <div className="tsk-file-name">{f.name}</div>
-                <button type="button" className="tsk-file-remove" onClick={() => removeFile(idx)}>Remove</button>
+              <div key={`${f.name}:${f.size}:${f.lastModified}`} className="flex items-center gap-2 pl-3 pr-1.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-700">
+                <span className="truncate max-w-[150px]">{f.name}</span>
+                <button type="button" className="p-1 rounded-md hover:bg-rose-50 hover:text-rose-600 transition-colors" onClick={() => removeFile(idx)}>
+                  <X size={14} />
+                </button>
               </div>
             ))}
           </div>
         )}
+      </div>
 
-        <div className="tsk-form-divider" />
+      <TextArea 
+        label="Description"
+        rows={3} 
+        value={form.description} 
+        onChange={e => set("description", e.target.value)} 
+        placeholder="Add a more detailed description or instructions..." 
+      />
 
-        <div className="tsk-section-title">DESCRIPTION</div>
-        <textarea className="tsk-input" rows={3} value={form.description} onChange={e => set("description", e.target.value)} placeholder="Add a more detailed description..." />
+      <Input 
+        label="Internal Admin Notes"
+        value={form.admin_notes} 
+        onChange={e => set("admin_notes", e.target.value)} 
+        placeholder="Private notes for admins only..." 
+      />
 
-        <input className="tsk-input" value={form.admin_notes} onChange={e => set("admin_notes", e.target.value)} placeholder="Add a comment..." />
-
-        <button type="submit" className="tsk-btn tsk-btn-primary tsk-save-btn" disabled={busy}>
-          {busy ? <Loader2 size={16} className="spin" /> : <Save size={16} />} Save
-        </button>
-      </form>
-    </div>
+      <div className="pt-4">
+        <Button type="submit" className="w-full py-4 text-base shadow-lg shadow-indigo-200/50" disabled={busy}>
+          {busy ? <Loader2 size={20} className="animate-spin mr-2" /> : <Save size={20} className="mr-2" />} 
+          CREATE WORK ORDER
+        </Button>
+      </div>
+    </form>
   )
 }
 
@@ -486,50 +537,73 @@ function AdminTasksTable({ tasks, employees, jobSites, onRefresh }) {
   function getEmp(id) { return employees.find((x) => x.user?.id === id) }
 
   return (
-    <div className="tsk-table-wrap">
-      <table className="tsk-table">
+    <Card className="overflow-x-auto">
+      <table className="w-full text-left border-collapse">
         <thead>
-          <tr>
-            <th>Task Details</th>
-            <th>Assigned To</th>
-            <th>Due Date</th>
-            <th>Status</th>
-            <th style={{ textAlign: "right" }}>Actions</th>
+          <tr className="border-b border-slate-100">
+            <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Task Details</th>
+            <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Assigned To</th>
+            <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Due Date</th>
+            <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Status</th>
+            <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
           </tr>
         </thead>
-        <tbody>
-          {tasks.length === 0 && <tr><td colSpan={5} style={{ textAlign: "center", color: "var(--muted)", padding: 40 }}>No tasks actively assigned.</td></tr>}
+        <tbody className="divide-y divide-slate-50">
+          {tasks.length === 0 && (
+            <tr>
+              <td colSpan={5} className="px-4 py-16 text-center text-slate-400 italic">
+                <div className="flex flex-col items-center gap-3">
+                  <ClipboardList size={40} className="opacity-20" />
+                  No tasks actively assigned.
+                </div>
+              </td>
+            </tr>
+          )}
           {tasks.map(t => {
             const emp = getEmp(t.assigned_to)
             return (
-              <tr key={t.id} className="tsk-row">
-                <td>
-                  <div className="tsk-table-title">{t.title}</div>
-                  <div className="tsk-table-sub">
-                    <span style={{ color: priorityColor(t.priority) }}>● {t.priority}</span> · {categoryLabel(t.category)} {t.job_site_name ? `· 🏢 ${t.job_site_name}` : (t.job_address && `· 📍 ${t.job_address}`)}
+              <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
+                <td className="px-4 py-4">
+                  <div className="font-bold text-slate-900 text-sm">{t.title}</div>
+                  <div className="flex items-center gap-2 mt-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    <span className="flex items-center gap-1">
+                      <div className={`w-1.5 h-1.5 rounded-full ${priorityColorClass(t.priority)}`} />
+                      {t.priority}
+                    </span>
+                    <span>·</span>
+                    <span>{categoryLabel(t.category)}</span>
+                    {t.job_site_name && (
+                      <><span>·</span><span className="text-slate-500">🏢 {t.job_site_name}</span></>
+                    )}
                   </div>
                   {(t.require_selfie || t.require_before_after_photos) && (
-                    <div className="tsk-table-sub" style={{ color: "var(--primary)", marginTop: 4 }}>
-                      <Camera size={11} style={{ verticalAlign: "middle", marginRight: 3 }} />
-                      {t.require_selfie && "Selfie "}
-                      {t.require_selfie && t.require_before_after_photos && "· "}
-                      {t.require_before_after_photos && "Before/After"} required
+                    <div className="flex items-center gap-1.5 mt-2 text-[10px] font-bold text-indigo-600 uppercase tracking-wider">
+                      <Camera size={12} />
+                      {t.require_selfie && "Selfie"}
+                      {t.require_selfie && t.require_before_after_photos && " + "}
+                      {t.require_before_after_photos && "Photos"} Required
                     </div>
                   )}
                 </td>
-                <td>
+                <td className="px-4 py-4">
                   {emp && emp.user ? (
-                    <div className="tsk-avatar-wrap">
-                      <div className="tsk-avatar">{(emp.user.first_name || emp.user.username || "?").charAt(0).toUpperCase()}</div>
-                      <div style={{ fontWeight: 600 }}>{emp.user.first_name || emp.user.username} {emp.user.last_name || ""}</div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
+                        {(emp.user.first_name || emp.user.username || "?").charAt(0).toUpperCase()}
+                      </div>
+                      <div className="text-sm font-bold text-slate-700">
+                        {emp.user.first_name || emp.user.username} {emp.user.last_name || ""}
+                      </div>
                     </div>
-                  ) : <span className="muted">Unassigned</span>}
+                  ) : <span className="text-slate-300 italic text-sm">Unassigned</span>}
                 </td>
-                <td style={{ fontWeight: 500 }}>{t.due_date}</td>
-                <td><Pill tone={statusTone(t.status)}>{statusLabel(t.status)}</Pill></td>
-                <td style={{ textAlign: "right" }}>
-                  <button style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer", padding: 8 }} onClick={() => deleteTask(t.id)} disabled={busy} title="Delete">
-                    <Trash2 size={16} />
+                <td className="px-4 py-4 text-sm font-semibold text-slate-600">{t.due_date}</td>
+                <td className="px-4 py-4">
+                  <Pill tone={statusTone(t.status)}>{statusLabel(t.status)}</Pill>
+                </td>
+                <td className="px-4 py-4 text-right">
+                  <button className="p-2 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-all" onClick={() => deleteTask(t.id)} disabled={busy} title="Delete">
+                    <Trash2 size={18} />
                   </button>
                 </td>
               </tr>
@@ -537,7 +611,7 @@ function AdminTasksTable({ tasks, employees, jobSites, onRefresh }) {
           })}
         </tbody>
       </table>
-    </div>
+    </Card>
   )
 }
 
@@ -600,46 +674,45 @@ function AdminTasksPage({ tasks, employees, jobSites, loadTasks }) {
   return (
     <>
       {open && (
-        <div
-          style={{ position: "fixed", inset: 0, zIndex: 9999, pointerEvents: "none" }}
-        >
+        <div className="fixed inset-0 z-[9999] pointer-events-none">
           <div
             ref={modalRef}
-            style={{ position: "absolute", left: pos.x, top: pos.y, width: "min(880px, calc(100vw - 32px))", maxHeight: "calc(100vh - 32px)", overflow: "auto", background: "var(--surface)", borderRadius: 16, boxShadow: "0 20px 40px rgba(0,0,0,0.2), 0 0 0 1px var(--stroke)", pointerEvents: "auto" }}
+            className="absolute w-[min(880px,calc(100vw-32px))] max-h-[calc(100vh-32px)] overflow-auto bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-slate-200 pointer-events-auto animate-in zoom-in-95 duration-200"
+            style={{ left: pos.x, top: pos.y }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px", borderBottom: "1px solid var(--stroke)" }}>
+            <div className="flex justify-between items-center px-6 py-5 border-b border-slate-100">
               <div
                 onPointerDown={startDrag}
                 onPointerMove={moveDrag}
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
-                style={{ display: "flex", flexDirection: "column", flex: 1, cursor: "grab", userSelect: "none" }}
+                className="flex flex-col flex-1 cursor-grab active:cursor-grabbing user-select-none"
               >
-                <div style={{ fontSize: 16, fontWeight: 800 }}>Add Task</div>
-                <div style={{ fontSize: 12.5, color: "var(--muted)", fontWeight: 600 }}>Fill the details and save to push into the task queue.</div>
+                <div className="text-xl font-extrabold text-slate-900 tracking-tight">Create Work Order</div>
+                <div className="text-sm text-slate-400 font-medium mt-0.5">Define tasks, assign personnel, and set location constraints.</div>
               </div>
-              <button type="button" className="tsk-btn tsk-btn-outline" onClick={() => setOpen(false)} aria-label="Close">
-                <X size={16} /> Close
+              <button type="button" className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors" onClick={() => setOpen(false)}>
+                <X size={24} />
               </button>
             </div>
 
-            <div style={{ padding: 14 }}>
+            <div className="p-6">
               <AssignTaskPanel employees={employees} jobSites={jobSites} onAssigned={loadTasks} onClose={() => setOpen(false)} />
             </div>
           </div>
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Task Queue</h2>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--muted)" }}>{tasks.length} Total</span>
+      <div className="flex flex-col gap-6">
+        <div className="flex justify-between items-center">
+          <div className="flex items-baseline gap-3">
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Task Queue</h2>
+            <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">{tasks.length} Total</span>
           </div>
 
-          <button type="button" className="tsk-btn tsk-btn-primary" onClick={() => setOpen(true)}>
-            <Plus size={16} /> Add Task
-          </button>
+          <Button onClick={() => setOpen(true)} className="shadow-indigo-100 shadow-xl gap-2">
+            <Plus size={18} /> New Work Order
+          </Button>
         </div>
 
         <AdminTasksTable tasks={tasks} employees={employees} jobSites={jobSites} onRefresh={loadTasks} />
@@ -654,28 +727,40 @@ function EmployeeTasksPage({ tasks, handleAction, busy }) {
   const filtered = filter === "all" ? tasks : tasks.filter(t => t.status === filter)
 
   return (
-    <>
-      <div className="tsk-filters">
-        {STATUS_FILTERS.map(f => (
-          <button key={f} className={`tsk-filter-btn ${filter === f ? "active" : ""}`} onClick={() => setFilter(f)}>
-            {f === "all" ? "All Tasks" : statusLabel(f)}
-            {f !== "all" && <span className="tsk-count">{tasks.filter(t => t.status === f).length}</span>}
-          </button>
-        ))}
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-wrap gap-2 bg-slate-100 p-1.5 rounded-2xl self-start">
+        {STATUS_FILTERS.map(f => {
+          const isActive = filter === f
+          const count = tasks.filter(t => t.status === f).length
+          return (
+            <button 
+              key={f} 
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${isActive ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`} 
+              onClick={() => setFilter(f)}
+            >
+              <span className="flex items-center gap-2">
+                {f === "all" ? "All Tasks" : statusLabel(f)}
+                {f !== "all" && count > 0 && <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${isActive ? 'bg-slate-100 text-slate-600' : 'bg-slate-200 text-slate-500'}`}>{count}</span>}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "80px 20px", background: "var(--surface)", border: "1px dashed var(--stroke)", borderRadius: 16 }}>
-          <ClipboardList size={48} color="var(--stroke2)" style={{ marginBottom: 16 }} />
-          <div style={{ fontSize: 18, fontWeight: 700 }}>No tasks found</div>
-          <div style={{ color: "var(--muted)", marginTop: 8 }}>You're all caught up for now!</div>
+        <div className="flex flex-col items-center justify-center py-24 px-6 bg-white border border-slate-200 border-dashed rounded-[2rem] text-center">
+          <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center text-slate-200 mb-6">
+            <ClipboardList size={40} />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900">No tasks found</h3>
+          <p className="text-slate-400 mt-2 max-w-xs">You're all caught up! Enjoy your break or check back later for new assignments.</p>
         </div>
       ) : (
-        <div className="tsk-kanban">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map(t => <TaskCard key={t.id} task={t} onAction={handleAction} busy={busy} />)}
         </div>
       )}
-    </>
+    </div>
   )
 }
 
@@ -744,23 +829,29 @@ export function TasksPage() {
   }
 
   return (
-    <div className="tsk-layout">
-      <div className="tsk-header">
-        <div className="tsk-title-group">
-          <h1>Tasks & Work Orders</h1>
-          <p>{isAdmin ? "Dispatch and monitor work activity across all employees." : "Your personal task feed and execution queue."}</p>
+    <div className="flex flex-col gap-8">
+      <div className="flex justify-between items-end">
+        <div>
+          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
+            <ClipboardList className="text-indigo-600" size={32} />
+            Tasks & Orders
+          </h1>
+          <p className="text-slate-500 mt-2 text-lg">
+            {isAdmin ? "Dispatch and monitor work activity across all employees." : "Your personal task feed and execution queue."}
+          </p>
         </div>
       </div>
 
       {error && (
-        <div style={{ background: "#FEF2F2", color: "#B91C1C", padding: "16px", borderRadius: "12px", border: "1px solid #FECACA", display: "flex", alignItems: "center", gap: 8, fontWeight: 600 }}>
-          <AlertCircle size={18} /> {error}
+        <div className="p-4 bg-rose-50 text-rose-700 border border-rose-200 rounded-2xl font-bold flex items-center gap-3 animate-in shake duration-500">
+          <AlertCircle size={20} /> {error}
         </div>
       )}
 
       {loading ? (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 80, color: "var(--muted)", gap: 10 }}>
-          <Loader2 className="spin" size={24} /> Syncing tasks...
+        <div className="flex flex-col items-center justify-center py-32 text-slate-400 gap-4">
+          <Loader2 className="animate-spin" size={40} /> 
+          <span className="text-lg font-medium">Syncing work orders...</span>
         </div>
       ) : isAdmin ? (
         <AdminTasksPage tasks={tasks} employees={employees} jobSites={jobSites} loadTasks={loadTasks} />

@@ -8,6 +8,10 @@ __pycache__/
 *.py[cod]
 *.sqlite3
 
+backend/.venv/
+**/__pycache__/
+*.pyc
+
 # Virtual Environment
 .venv/
 venv/

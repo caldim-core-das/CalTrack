@@ -61,16 +61,32 @@ class CurrentLocationsListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminRole]
 
     def get(self, request):
+        from django.db.models import OuterRef, Subquery
         company = getattr(request, 'company', None)
-        open_logs = TimeLog.objects.filter(clock_out__isnull=True, employee__company=company).select_related('employee', 'employee__user')
+        
+        # Optimize N+1: Get latest location ID for each log
+        latest_loc_id_subquery = EmployeeLocation.objects.filter(
+            time_log=OuterRef('pk')
+        ).order_by('-timestamp').values('id')[:1]
+        
+        open_logs = TimeLog.objects.filter(
+            clock_out__isnull=True, 
+            employee__company=company
+        ).annotate(
+            latest_location_id=Subquery(latest_loc_id_subquery)
+        ).select_related('employee', 'employee__user', 'employee__assigned_job_site')
+        
+        # Fetch all latest locations in one go
+        loc_ids = [log.latest_location_id for log in open_logs if log.latest_location_id]
+        locations_dict = {loc.id: loc for loc in EmployeeLocation.objects.filter(id__in=loc_ids)}
         
         results = []
         for log in open_logs:
-            latest_loc = EmployeeLocation.objects.filter(time_log=log).order_by('-timestamp').first()
+            latest_loc = locations_dict.get(log.latest_location_id)
             if latest_loc:
                 results.append(EmployeeLocationSerializer(latest_loc, context={'request': request}).data)
             else:
-                # Construct data manually to match serializer output
+                # Fallback to clock-in data
                 clock_in_photo_url = None
                 if log.clock_in_photo:
                     clock_in_photo_url = request.build_absolute_uri(log.clock_in_photo.url)

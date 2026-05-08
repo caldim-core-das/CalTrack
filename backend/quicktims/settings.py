@@ -75,13 +75,20 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD", ""),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "5432"),
-        # Required for Supabase — enforces SSL on all direct connections
+        # Required for Supabase — enforces SSL on all connections
         "OPTIONS": {
             "sslmode": "require",
         },
-        # Keep connections alive longer to avoid the 2.5s pooler reconnect overhead.
-        # With Supabase session pooler, longer CONN_MAX_AGE = fewer reconnects.
-        "CONN_MAX_AGE": 300,
+        # IMPORTANT: Keep this at 0 for Supabase Session Pooler.
+        # Supabase Session Mode (port 5432) has a hard limit of 15 simultaneous
+        # connections. CONN_MAX_AGE=0 means Django closes the connection after
+        # every request/command, so connections are never held open between
+        # requests. This keeps usage well within the 15-connection limit.
+        # Setting this to any positive value (e.g. 300) will cause connections
+        # to pile up across threads and stale processes → EMAXCONNSESSION error.
+        "CONN_MAX_AGE": 0,
+        # Auto-detect and replace broken/timed-out connections silently.
+        "CONN_HEALTH_CHECKS": True,
     }
 }
 
@@ -120,6 +127,11 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
+
+AUTHENTICATION_BACKENDS = [
+    "accounts.backends.EmailOrUsernameModelBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
 
 # Use syncdb for all apps — avoids migration dependency issues with MongoDB
 # (MongoDB doesn't benefit from SQL migration approach; collections are created on first use)
