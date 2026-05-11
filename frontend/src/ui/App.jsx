@@ -68,6 +68,8 @@ export function App() {
           
           {/* Settings Routes */}
           <Route path={routes.settings} element={<SettingsPage />} />
+          <Route path={routes.settings_profile} element={<SettingsPage section="profile" />} />
+          <Route path={routes.settings_preferences} element={<SettingsPage section="preferences" />} />
           <Route path={routes.settings_people} element={<PeopleSettingsPage />} />
           <Route path={routes.settings_timetracking} element={<TimeTrackingSettingsPage />} />
           <Route path={routes.settings_attendance} element={<SettingsPage section="attendance" />} />
