@@ -937,27 +937,3 @@ const primaryBtnStyle = {
   padding: "10px 0", borderRadius: 10, background: "#5d5fef", color: "white",
   border: "none", fontWeight: 800, fontSize: 14, cursor: "pointer", width: "100%",
 }
-        </AnimatePresence >
-      </div >
-
-  <style>{`
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-        .premium-sos-popup .leaflet-popup-content-wrapper { background: white !important; border-radius: 24px !important; padding: 0 !important; overflow: hidden; }
-        .premium-sos-popup .leaflet-popup-content { margin: 0 !important; width: 240px !important; }
-      `}</style>
-    </div >
-  )
-}
-
-// ── Shared styles ─────────────────────────────────────────────────────────
-const inputStyle = {
-  padding: "9px 12px", borderRadius: 10, border: "1.5px solid var(--stroke)",
-  background: "var(--bg)", color: "var(--fg)", fontSize: 13, fontWeight: 600,
-  outline: "none", width: "100%", boxSizing: "border-box",
-}
-
-const primaryBtnStyle = {
-  padding: "10px 0", borderRadius: 10, background: "#5d5fef", color: "white",
-  border: "none", fontWeight: 800, fontSize: 14, cursor: "pointer", width: "100%",
-}

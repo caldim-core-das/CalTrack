@@ -14,12 +14,12 @@ import {
 function SectionHeader({ icon, title, sub }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
-      <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ width: 36, height: 36, borderRadius: 8, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--stroke)" }}>
         {icon}
       </div>
       <div>
-        <div className="professional-title text-[15px]">{title}</div>
-        {sub && <div className="professional-subtitle text-[11px] text-slate-500 mt-0.5">{sub}</div>}
+        <div className="professional-title text-[15px] text-[var(--fg)]">{title}</div>
+        {sub && <div className="professional-subtitle text-[11px] text-[var(--muted)] mt-0.5">{sub}</div>}
       </div>
     </div>
   )
@@ -58,7 +58,8 @@ function Stat3DCard({ label, value, colorClass }) {
       className="relative group cursor-default flex-1 min-w-[140px] max-w-[200px]"
     >
       <div
-        className="relative h-[110px] rounded-2xl p-4 bg-white border border-slate-100/50 shadow-lg overflow-hidden transition-all duration-200 ease-out"
+      <div
+        className="relative h-[110px] rounded-2xl p-4 bg-[var(--surface)] border border-[var(--stroke)] shadow-lg overflow-hidden transition-all duration-200 ease-out"
         style={{
           transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
           transformStyle: "preserve-3d",
@@ -74,7 +75,7 @@ function Stat3DCard({ label, value, colorClass }) {
           <div className={`text-4xl professional-title drop-shadow-sm mb-1 bg-clip-text text-transparent bg-gradient-to-br ${colorClass}`}>
             {value}
           </div>
-          <div className="text-[10px] professional-subtitle text-slate-500 text-center leading-tight mt-1">
+          <div className="text-[10px] professional-subtitle text-[var(--muted)] text-center leading-tight mt-1">
             {label}
           </div>
         </div>
@@ -124,8 +125,8 @@ function OTRiskPanel() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {alerts.map((a, i) => (
                 <div key={i} style={{
-                  background: a.alert_type?.includes("double") ? "#fef2f2" : a.alert_type?.includes("approaching") ? "#fffbeb" : "#fff7ed",
-                  border: `1px solid ${a.alert_type?.includes("double") ? "#fca5a5" : a.alert_type?.includes("approaching") ? "#fde68a" : "#fed7aa"}`,
+                  background: a.alert_type?.includes("double") ? "rgba(220,38,38,0.1)" : a.alert_type?.includes("approaching") ? "rgba(217,119,6,0.1)" : "rgba(251,146,60,0.1)",
+                  border: `1px solid ${a.alert_type?.includes("double") ? "#dc262644" : a.alert_type?.includes("approaching") ? "#d9770644" : "#fb923c44"}`,
                   borderRadius: 8, padding: "6px 12px", fontSize: 12,
                 }}>
                   <span style={{ fontWeight: 700, color: a.alert_type?.includes("double") ? "#dc2626" : "#d97706" }}>
@@ -294,7 +295,7 @@ function RTWPanel() {
       </div>
 
       {alertResult && (
-        <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: alertResult.ok ? "#f0fdf4" : "#fef2f2", fontSize: 13 }}>
+        <div style={{ marginBottom: 12, padding: "8px 12px", borderRadius: 8, background: alertResult.ok ? "rgba(5,150,105,0.1)" : "rgba(220,38,38,0.1)", border: `1px solid ${alertResult.ok ? "#05966944" : "#dc262644"}`, fontSize: 13, color: alertResult.ok ? "#059669" : "#dc2626" }}>
           {alertResult.ok ? `✓ ${alertResult.count} RTW alert email(s) sent.` : "Failed to send alerts."}
         </div>
       )}
@@ -302,7 +303,7 @@ function RTWPanel() {
       {expiring.length > 0 && (
         <div style={{ marginBottom: 14, display: "flex", flexWrap: "wrap", gap: 6 }}>
           {expiring.map((e, i) => (
-            <div key={i} style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 8, padding: "5px 10px", fontSize: 12 }}>
+            <div key={i} style={{ background: "rgba(234,88,12,0.1)", border: "1px solid #ea580c44", borderRadius: 8, padding: "5px 10px", fontSize: 12 }}>
               <span style={{ fontWeight: 700, color: "#ea580c" }}>⚠ {e.employee_name}</span>
               <span style={{ color: "var(--muted)", marginLeft: 6 }}>expires in {e.days_until_expiry}d</span>
             </div>
@@ -459,11 +460,11 @@ function WageFloorPanel() {
             </thead>
             <tbody>
               {violations.map((v, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid var(--stroke2)", background: "#fef2f2" }}>
-                  <td style={{ padding: "8px 10px", fontWeight: 600 }}>{v.employee_name || v.employee_id}</td>
+                <tr key={i} style={{ borderBottom: "1px solid var(--stroke2)", background: "rgba(220,38,38,0.05)" }}>
+                  <td style={{ padding: "8px 10px", fontWeight: 600, color: "var(--fg)" }}>{v.employee_name || v.employee_id}</td>
                   <td style={{ padding: "8px 10px", color: "var(--muted)" }}>{v.country}{v.state ? ` (${v.state})` : ""}</td>
-                  <td style={{ padding: "8px 10px", textAlign: "right" }}>{v.currency}{v.employee_rate?.toFixed(2)}</td>
-                  <td style={{ padding: "8px 10px", textAlign: "right" }}>{v.currency}{v.minimum_wage_floor?.toFixed(2)}</td>
+                  <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--fg)" }}>{v.currency}{v.employee_rate?.toFixed(2)}</td>
+                  <td style={{ padding: "8px 10px", textAlign: "right", color: "var(--fg)" }}>{v.currency}{v.minimum_wage_floor?.toFixed(2)}</td>
                   <td style={{ padding: "8px 10px", textAlign: "right", color: "#dc2626", fontWeight: 700 }}>
                     {v.currency}{v.shortfall_per_hour?.toFixed(2)}/hr
                   </td>
@@ -890,7 +891,7 @@ export function CompliancePage() {
         </div>
         <div className="flex-1 overflow-y-auto p-10 space-y-10">
           <Card>
-            <div className="text-slate-400 italic">Compliance tools are only available to administrators.</div>
+            <div className="text-[var(--muted)] italic">Compliance tools are only available to administrators.</div>
           </Card>
         </div>
       </div>
@@ -898,17 +899,17 @@ export function CompliancePage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-[var(--bg)] overflow-hidden">
       {/* ── HEADER ── */}
-      <div className="h-24 bg-white border-b border-slate-100 px-10 flex items-center justify-between shrink-0 relative overflow-hidden">
+      <div className="h-24 bg-[var(--surface)] border-b border-[var(--stroke)] px-10 flex items-center justify-between shrink-0 relative overflow-hidden">
         <div className="flex items-center gap-6">
           <div>
-            <h1 className="text-2xl professional-title text-slate-900 flex items-center gap-3">
+            <h1 className="text-2xl professional-title text-[var(--fg)] flex items-center gap-3">
               <ShieldAlert className="text-indigo-600" size={24} />
               Compliance Centre
             </h1>
             <div className="flex items-center gap-3 mt-2">
-              <span className="text-[10px] professional-subtitle text-slate-500">
+              <span className="text-[10px] professional-subtitle text-[var(--muted)]">
                 US FLSA · UK WTR · PAYE/NI · Right to Work · Audit Trail
               </span>
             </div>

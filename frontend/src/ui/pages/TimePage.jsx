@@ -629,7 +629,7 @@ function AdminTimePage() {
                   const empLogs = logs.filter(l => l.employee === e.id)
                   const presentCount = empLogs.filter(l => !!l.clock_in).length
                   const pct = monthStats.workDaysInMonth > 0 ? Math.round((presentCount / monthStats.workDaysInMonth) * 100) : 0
-                  
+
                   return (
                     <div key={e.id} className="group p-5 bg-white rounded-[2rem] border border-slate-100 hover:border-indigo-100 hover:shadow-xl hover:shadow-indigo-50/50 hover:-translate-y-1 transition-all cursor-pointer">
                       <div className="flex items-center gap-4 mb-4">
@@ -671,11 +671,10 @@ function AdminTimePage() {
                 <button
                   key={m}
                   onClick={() => setSelectedMonth(idx)}
-                  className={`px-8 py-3.5 rounded-2xl text-[11px] font-black transition-all duration-200 uppercase tracking-widest shrink-0 border ${
-                    selectedMonth === idx 
-                    ? `bg-white -translate-y-1 ${monthThemes[idx].nav}` 
-                    : 'bg-transparent text-slate-400 border-transparent hover:bg-white hover:text-slate-700 hover:shadow-[0_4px_0_#E2E8F0,0_6px_15px_rgba(0,0,0,0.05)] hover:-translate-y-1 hover:border-slate-100 active:shadow-none active:translate-y-0'
-                  }`}
+                  className={`px-8 py-3.5 rounded-2xl text-[11px] font-black transition-all duration-200 uppercase tracking-widest shrink-0 border ${selectedMonth === idx
+                      ? `bg-white -translate-y-1 ${monthThemes[idx].nav}`
+                      : 'bg-transparent text-slate-400 border-transparent hover:bg-white hover:text-slate-700 hover:shadow-[0_4px_0_#E2E8F0,0_6px_15px_rgba(0,0,0,0.05)] hover:-translate-y-1 hover:border-slate-100 active:shadow-none active:translate-y-0'
+                    }`}
                 >
                   {m}
                 </button>
@@ -816,7 +815,7 @@ function AdminTimePage() {
             <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
               {/* Table Filters */}
               <div className="flex flex-col xl:flex-row items-center justify-between gap-4 p-3 bg-slate-50/50 border border-slate-100 rounded-3xl">
-                
+
                 {/* Search Bar */}
                 <div className="flex items-center gap-3 bg-white rounded-2xl px-5 py-3 border border-slate-200/60 shadow-sm w-full xl:w-auto xl:flex-1 xl:max-w-md focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all">
                   <Search size={18} className="text-indigo-400" />
@@ -1960,24 +1959,24 @@ function EmployeeTimePage() {
               {preflightPill && !openLog && (
                 <div
                   className={`mb-4 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs font-bold ${preflightPill.tone === "ok"
-                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                      : preflightPill.tone === "warn"
-                        ? "bg-amber-50 text-amber-800 border border-amber-200"
-                        : preflightPill.tone === "block"
-                          ? "bg-rose-50 text-rose-800 border border-rose-200"
-                          : "bg-slate-100 text-slate-600 border border-slate-200"
+                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                    : preflightPill.tone === "warn"
+                      ? "bg-amber-50 text-amber-800 border border-amber-200"
+                      : preflightPill.tone === "block"
+                        ? "bg-rose-50 text-rose-800 border border-rose-200"
+                        : "bg-slate-100 text-slate-600 border border-slate-200"
                     }`}
                   role="status"
                 >
                   <span
                     aria-hidden="true"
                     className={`inline-block w-2 h-2 rounded-full ${preflightPill.tone === "ok"
-                        ? "bg-emerald-500"
-                        : preflightPill.tone === "warn"
-                          ? "bg-amber-500"
-                          : preflightPill.tone === "block"
-                            ? "bg-rose-500"
-                            : "bg-slate-400"
+                      ? "bg-emerald-500"
+                      : preflightPill.tone === "warn"
+                        ? "bg-amber-500"
+                        : preflightPill.tone === "block"
+                          ? "bg-rose-500"
+                          : "bg-slate-400"
                       }`}
                   />
                   {preflightPill.label}

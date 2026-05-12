@@ -6,6 +6,7 @@ import { isOffline } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { routes } from "../routes.js"
 import { ThemeToggle } from "./ThemeToggle.jsx"
+import ThemeSwitch from "@/components/ui/theme-switch"
 import { CommandPalette } from "./CommandPalette.jsx"
 import { NotificationCenter } from "./NotificationCenter.jsx"
 import { CalTrackLogo } from "../components/CalTrackLogo.jsx"
@@ -36,7 +37,6 @@ const NAV = [
   { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, adminOnly: true, color: "#FACC15" },
   { label: "Compliance", to: routes.compliance, icon: <ShieldAlert size={20} />, adminOnly: true, color: "#2563EB" },
   {
-    label: "Settings",
     to: routes.settings,
     icon: <Settings size={20} />,
     color: "#64748B",
@@ -302,7 +302,7 @@ export function AppShell() {
 
           <div className="flex items-center gap-3">
             <NotificationCenter />
-            <ThemeToggle />
+            <ThemeSwitch />
           </div>
 
           <div className="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
@@ -376,24 +376,22 @@ export function AppShell() {
                       backgroundColor: active ? `${color}15` : 'transparent',
                       color: active ? color : undefined
                     }}
-                    onMouseEnter={(e) => showTooltip(item.label, e)}
-                    onMouseLeave={hideTooltip}
                   >
-                    <motion.span 
+                    <motion.span
                       animate={active ? { scale: [1, 1.1, 1] } : {}}
                       transition={{ repeat: Infinity, duration: 4 }}
                       className={`transition-all duration-300 ${active ? '' : 'group-hover:scale-110'}`}
                     >
                       {item.icon}
                     </motion.span>
-                    <span 
+                    <span
                       className={`text-[9px] font-black text-center px-1 leading-tight uppercase tracking-tighter transition-all ${active ? 'text-black dark:text-white opacity-100' : 'text-black/60 dark:text-white/60 group-hover:text-black dark:group-hover:text-white group-hover:opacity-100'}`}
                     >
                       {item.label}
                     </span>
-                    
+
                     {active && (
-                      <motion.div 
+                      <motion.div
                         layoutId="active-indicator-main"
                         className="absolute -right-0 w-1 h-10 rounded-full"
                         style={{ backgroundColor: color }}
@@ -401,7 +399,7 @@ export function AppShell() {
                     )}
 
                     {/* Hover Glow */}
-                    <div 
+                    <div
                       className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
                       style={{ background: `radial-gradient(circle at center, ${color}10 0%, transparent 70%)` }}
                     />
@@ -416,16 +414,15 @@ export function AppShell() {
         <AnimatePresence mode="wait">
           {drillDownParent && (
             <motion.aside
-              initial={{ x: -140, opacity: 0, width: 0 }}
-              animate={{ x: 0, opacity: 1, width: 'var(--sub-sidebar-width)' }}
-              exit={{ x: -140, opacity: 0, width: 0 }}
+              initial={{ x: -260, opacity: 0, width: 0 }}
+              animate={{ x: 0, opacity: 1, width: 260 }}
+              exit={{ x: -260, opacity: 0, width: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="flex flex-col bg-slate-50/50 dark:bg-slate-900/20 backdrop-blur-xl border-r border-stroke dark:border-slate-800 z-40 overflow-hidden shrink-0"
             >
               <div className="p-4 flex flex-col gap-1 h-full">
-                <div className="mb-4 px-2">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{drillDownParent.label}</h4>
-                  <div className="h-0.5 w-8 bg-slate-200 dark:bg-slate-700 rounded-full" />
+                <div className="mb-4 px-3">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-black dark:text-white mb-1">{drillDownParent.label}</h4>
                 </div>
 
                 <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col gap-1">
@@ -438,20 +435,18 @@ export function AppShell() {
                         <NavLink
                           key={child.label}
                           to={child.to}
-                          className={`flex flex-col items-center justify-center w-full py-4 rounded-xl transition-all duration-300 relative group gap-1.5 ${active ? 'bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700' : 'text-slate-400 hover:bg-white/50'}`}
-                          onMouseEnter={(e) => showTooltip(child.label, e)}
-                          onMouseLeave={hideTooltip}
+                          className={`flex flex-row items-center justify-start w-full px-5 py-4 rounded-xl transition-all duration-300 relative group gap-4 ${active ? 'bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700' : 'text-slate-400 hover:bg-white/50'}`}
                         >
-                          <span className={`transition-all duration-300 ${active ? 'scale-110' : 'opacity-40 group-hover:opacity-100 group-hover:scale-105'}`} style={{ color }}>
+                          <span className={`shrink-0 transition-all duration-300 ${active ? 'scale-110' : 'opacity-40 group-hover:opacity-100 group-hover:scale-105'}`} style={{ color }}>
                             {child.icon}
                           </span>
-                          <span className={`text-[10px] font-black text-center px-1 uppercase tracking-tighter transition-colors ${active ? 'text-black dark:text-white' : 'text-slate-500 group-hover:text-black dark:group-hover:text-white'}`}>
+                          <span className={`text-[10px] font-black text-left uppercase tracking-tighter transition-colors ${active ? 'text-black dark:text-white' : 'text-slate-500 group-hover:text-black dark:group-hover:text-white'}`}>
                             {child.label}
                           </span>
                           {active && (
-                            <motion.div 
+                            <motion.div
                               layoutId="active-indicator-sub"
-                              className="absolute right-2 w-1 h-6 rounded-full"
+                              className="absolute right-2 w-1 h-4 rounded-full"
                               style={{ backgroundColor: color }}
                             />
                           )}
@@ -480,7 +475,6 @@ export function AppShell() {
         </main>
       </div>
 
-      <SidebarTooltip tooltip={tooltip} />
       <SubmenuFlyout
         flyout={flyout}
         onMouseEnter={cancelHideFlyout}

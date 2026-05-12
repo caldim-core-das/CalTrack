@@ -1,7 +1,5 @@
-import { TealGlowBackground } from "./gradient-backgrounds";
+import ThemeSwitch from "@/components/ui/theme-switch";
 
-export default function Demo() {
-  return (
-    <TealGlowBackground />
-  );
+export default function DemoOne() {
+  return <ThemeSwitch />;
 }

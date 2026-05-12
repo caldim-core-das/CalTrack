@@ -16,44 +16,68 @@ const CH = 130
 /* ─── Card grid layout — 4 columns x 3 rows, centered in visible area ─── */
 const CARDS = [
   // Row 1 (top)
-  { id: 1,  src: "/mockups/caltrack_dashboard_mockup_1778231495839.png",  x: -250, y: -150, z: 80,  r: -6,
+  {
+    id: 1, src: "/mockups/caltrack_dashboard_mockup_1778231495839.png", x: -250, y: -150, z: 80, r: -6,
     title: "Executive Dashboard",
-    desc: "1. Real-time KPI overview with productivity scores\n2. Total labor cost tracking across departments\n3. Employee engagement metrics with trend analysis\n4. Active headcount monitoring per location\n5. Monthly labor cost trend with bar & line charts\n6. Productivity score distribution (donut chart)\n7. AI-driven anomaly detection alerts\n8. Top productive teams ranking table\n9. Department-wise cost breakdown\n10. One-click drill-down into any metric" },
-  { id: 2,  src: "/mockups/caltrack_scheduling_mockup_1778231584856.png",  x:  -80, y: -160, z: 50,  r:  4,
+    desc: "1. Real-time KPI overview with productivity scores\n2. Total labor cost tracking across departments\n3. Employee engagement metrics with trend analysis\n4. Active headcount monitoring per location\n5. Monthly labor cost trend with bar & line charts\n6. Productivity score distribution (donut chart)\n7. AI-driven anomaly detection alerts\n8. Top productive teams ranking table\n9. Department-wise cost breakdown\n10. One-click drill-down into any metric"
+  },
+  {
+    id: 2, src: "/mockups/caltrack_scheduling_mockup_1778231584856.png", x: -80, y: -160, z: 50, r: 4,
     title: "Smart Scheduling",
-    desc: "1. Drag-and-drop shift assignment calendar\n2. Auto-fill shifts based on availability rules\n3. Overtime threshold alerts & compliance flags\n4. Shift swap requests with manager approval\n5. Break scheduling with labor law compliance\n6. Multi-location coverage visualization\n7. Skills-based shift matching engine\n8. Recurring schedule templates\n9. Real-time understaffing notifications\n10. Export schedules to PDF or calendar sync" },
-  { id: 3,  src: "/mockups/caltrack_live_map_mockup_1778231560076.png",    x:   80, y: -145, z: 70,  r: -3,
+    desc: "1. Drag-and-drop shift assignment calendar\n2. Auto-fill shifts based on availability rules\n3. Overtime threshold alerts & compliance flags\n4. Shift swap requests with manager approval\n5. Break scheduling with labor law compliance\n6. Multi-location coverage visualization\n7. Skills-based shift matching engine\n8. Recurring schedule templates\n9. Real-time understaffing notifications\n10. Export schedules to PDF or calendar sync"
+  },
+  {
+    id: 3, src: "/mockups/caltrack_live_map_mockup_1778231560076.png", x: 80, y: -145, z: 70, r: -3,
     title: "Live Tracking Map",
-    desc: "1. Real-time GPS tracking of field employees\n2. Geofenced work zones with entry/exit alerts\n3. Route history playback for each worker\n4. Active employee count per zone\n5. Speed and movement status indicators\n6. Site boundary polygon editor\n7. Employee activity feed with timestamps\n8. Satellite and road map toggle views\n9. Restricted zone violation notifications\n10. Multi-site dashboard with zone summaries" },
-  { id: 4,  src: "/mockups/caltrack_mobile_app_mockup_1778231517495.png",  x:  250, y: -155, z: 40,  r:  8,
+    desc: "1. Real-time GPS tracking of field employees\n2. Geofenced work zones with entry/exit alerts\n3. Route history playback for each worker\n4. Active employee count per zone\n5. Speed and movement status indicators\n6. Site boundary polygon editor\n7. Employee activity feed with timestamps\n8. Satellite and road map toggle views\n9. Restricted zone violation notifications\n10. Multi-site dashboard with zone summaries"
+  },
+  {
+    id: 4, src: "/mockups/caltrack_mobile_app_mockup_1778231517495.png", x: 250, y: -155, z: 40, r: 8,
     title: "Mobile Field App",
-    desc: "1. Geolocation-based punch in/out\n2. Selfie verification at clock-in\n3. Weekly timesheet with daily hours\n4. Current week total and pending approvals\n5. Geolocation map with red pin for HQ\n6. Face verification capture & validation\n7. Activity feed with task assignments\n8. Break timer with auto-deduction\n9. Push notifications for schedule changes\n10. Offline mode with auto-sync on reconnect" },
+    desc: "1. Geolocation-based punch in/out\n2. Selfie verification at clock-in\n3. Weekly timesheet with daily hours\n4. Current week total and pending approvals\n5. Geolocation map with red pin for HQ\n6. Face verification capture & validation\n7. Activity feed with task assignments\n8. Break timer with auto-deduction\n9. Push notifications for schedule changes\n10. Offline mode with auto-sync on reconnect"
+  },
   // Row 2 (middle)
-  { id: 5,  src: "/mockups/caltrack_analytics_mockup_1778231608789.png",   x: -220, y:    0, z: 60,  r:  5,
+  {
+    id: 5, src: "/mockups/caltrack_analytics_mockup_1778231608789.png", x: -220, y: 0, z: 60, r: 5,
     title: "Workforce Analytics",
-    desc: "1. Attendance trend analysis over 12 months\n2. Department-level productivity heatmap\n3. Overtime distribution across teams\n4. Late arrival pattern detection\n5. Leave utilization rate by category\n6. Cost-per-employee benchmarking\n7. Predictive staffing recommendations\n8. Custom date range filtering\n9. Export reports to Excel/PDF\n10. Scheduled report email delivery" },
-  { id: 6,  src: "/mockups/caltrack_payroll_mockup_1778231538875.png",     x:  -60, y:   10, z: 90,  r: -4,
+    desc: "1. Attendance trend analysis over 12 months\n2. Department-level productivity heatmap\n3. Overtime distribution across teams\n4. Late arrival pattern detection\n5. Leave utilization rate by category\n6. Cost-per-employee benchmarking\n7. Predictive staffing recommendations\n8. Custom date range filtering\n9. Export reports to Excel/PDF\n10. Scheduled report email delivery"
+  },
+  {
+    id: 6, src: "/mockups/caltrack_payroll_mockup_1778231538875.png", x: -60, y: 10, z: 90, r: -4,
     title: "Payroll Processing",
-    desc: "1. Automated payroll calculation from timesheets\n2. Tax deduction and compliance engine\n3. Overtime rate multiplier configuration\n4. Department-wise salary breakdown\n5. Bonus and incentive management\n6. Payslip generation with PDF export\n7. Bank transfer file generation\n8. Year-to-date earnings summary\n9. Multi-currency support for global teams\n10. Audit trail for all payroll changes" },
-  { id: 7,  src: "/mockups/caltrack_dashboard_mockup_1778231495839.png",   x:  100, y:   -5, z: 30,  r:  3,
+    desc: "1. Automated payroll calculation from timesheets\n2. Tax deduction and compliance engine\n3. Overtime rate multiplier configuration\n4. Department-wise salary breakdown\n5. Bonus and incentive management\n6. Payslip generation with PDF export\n7. Bank transfer file generation\n8. Year-to-date earnings summary\n9. Multi-currency support for global teams\n10. Audit trail for all payroll changes"
+  },
+  {
+    id: 7, src: "/mockups/caltrack_dashboard_mockup_1778231495839.png", x: 100, y: -5, z: 30, r: 3,
     title: "Performance Overview",
-    desc: "1. Individual employee performance scores\n2. Team comparison leaderboards\n3. Goal tracking with progress bars\n4. Performance review cycle management\n5. 360-degree feedback collection\n6. Skill gap analysis visualization\n7. Training completion tracking\n8. Monthly performance trend lines\n9. Manager notes and action items\n10. Integration with HR systems" },
-  { id: 8,  src: "/mockups/caltrack_live_map_mockup_1778231560076.png",    x:  260, y:    5, z: 55,  r: -7,
+    desc: "1. Individual employee performance scores\n2. Team comparison leaderboards\n3. Goal tracking with progress bars\n4. Performance review cycle management\n5. 360-degree feedback collection\n6. Skill gap analysis visualization\n7. Training completion tracking\n8. Monthly performance trend lines\n9. Manager notes and action items\n10. Integration with HR systems"
+  },
+  {
+    id: 8, src: "/mockups/caltrack_live_map_mockup_1778231560076.png", x: 260, y: 5, z: 55, r: -7,
     title: "Zone Management",
-    desc: "1. Custom geofence zone creation\n2. Multi-polygon boundary drawing\n3. Zone-based attendance rules\n4. Entry/exit time logging per zone\n5. Restricted area access control\n6. Zone capacity monitoring\n7. Historical zone activity reports\n8. Alert configuration per zone\n9. Integration with access control systems\n10. Zone-wise labor cost allocation" },
+    desc: "1. Custom geofence zone creation\n2. Multi-polygon boundary drawing\n3. Zone-based attendance rules\n4. Entry/exit time logging per zone\n5. Restricted area access control\n6. Zone capacity monitoring\n7. Historical zone activity reports\n8. Alert configuration per zone\n9. Integration with access control systems\n10. Zone-wise labor cost allocation"
+  },
   // Row 3 (bottom)
-  { id: 9,  src: "/mockups/caltrack_mobile_app_mockup_1778231517495.png",  x: -240, y:  150, z: 35,  r:  6,
+  {
+    id: 9, src: "/mockups/caltrack_mobile_app_mockup_1778231517495.png", x: -240, y: 150, z: 35, r: 6,
     title: "Employee Self-Service",
-    desc: "1. Personal profile and document management\n2. Leave request submission with calendar\n3. Timesheet review and approval status\n4. Expense claim submission with receipts\n5. Team directory with org chart\n6. Company announcements feed\n7. Benefits enrollment dashboard\n8. Training module access\n9. Helpdesk ticket creation\n10. Personal analytics and hours summary" },
-  { id: 10, src: "/mockups/caltrack_scheduling_mockup_1778231584856.png",  x:  -70, y:  155, z: 65,  r: -5,
+    desc: "1. Personal profile and document management\n2. Leave request submission with calendar\n3. Timesheet review and approval status\n4. Expense claim submission with receipts\n5. Team directory with org chart\n6. Company announcements feed\n7. Benefits enrollment dashboard\n8. Training module access\n9. Helpdesk ticket creation\n10. Personal analytics and hours summary"
+  },
+  {
+    id: 10, src: "/mockups/caltrack_scheduling_mockup_1778231584856.png", x: -70, y: 155, z: 65, r: -5,
     title: "Shift Planning",
-    desc: "1. Weekly and monthly shift calendar views\n2. Employee availability preferences\n3. Conflict detection and resolution\n4. Minimum rest period enforcement\n5. Holiday and leave integration\n6. Cost optimization suggestions\n7. Bulk shift assignment tools\n8. Notification to employees on changes\n9. Coverage gap highlighting\n10. Historical shift pattern analytics" },
-  { id: 11, src: "/mockups/caltrack_payroll_mockup_1778231538875.png",     x:   90, y:  145, z: 45,  r:  4,
+    desc: "1. Weekly and monthly shift calendar views\n2. Employee availability preferences\n3. Conflict detection and resolution\n4. Minimum rest period enforcement\n5. Holiday and leave integration\n6. Cost optimization suggestions\n7. Bulk shift assignment tools\n8. Notification to employees on changes\n9. Coverage gap highlighting\n10. Historical shift pattern analytics"
+  },
+  {
+    id: 11, src: "/mockups/caltrack_payroll_mockup_1778231538875.png", x: 90, y: 145, z: 45, r: 4,
     title: "Compensation Reports",
-    desc: "1. Comprehensive salary reports by department\n2. Overtime cost analysis and trends\n3. Benefits cost per employee tracking\n4. Tax liability forecasting\n5. Budget vs actual labor cost comparison\n6. Compensation band analysis\n7. Equal pay audit reports\n8. Contractor vs employee cost analysis\n9. Annual compensation review tools\n10. Custom report builder with filters" },
-  { id: 12, src: "/mockups/caltrack_analytics_mockup_1778231608789.png",   x:  240, y:  160, z: 75,  r: -8,
+    desc: "1. Comprehensive salary reports by department\n2. Overtime cost analysis and trends\n3. Benefits cost per employee tracking\n4. Tax liability forecasting\n5. Budget vs actual labor cost comparison\n6. Compensation band analysis\n7. Equal pay audit reports\n8. Contractor vs employee cost analysis\n9. Annual compensation review tools\n10. Custom report builder with filters"
+  },
+  {
+    id: 12, src: "/mockups/caltrack_analytics_mockup_1778231608789.png", x: 240, y: 160, z: 75, r: -8,
     title: "Insights Engine",
-    desc: "1. AI-powered workforce trend predictions\n2. Attrition risk scoring per employee\n3. Engagement survey result analysis\n4. Absenteeism pattern recognition\n5. Seasonal demand forecasting\n6. Cost saving opportunity identification\n7. Benchmark against industry standards\n8. Custom KPI dashboard builder\n9. Real-time data pipeline monitoring\n10. Automated insight notifications" },
+    desc: "1. AI-powered workforce trend predictions\n2. Attrition risk scoring per employee\n3. Engagement survey result analysis\n4. Absenteeism pattern recognition\n5. Seasonal demand forecasting\n6. Cost saving opportunity identification\n7. Benchmark against industry standards\n8. Custom KPI dashboard builder\n9. Real-time data pipeline monitoring\n10. Automated insight notifications"
+  },
 ]
 
 /* ─── HOLOGRAPHIC CARD ─── */
@@ -118,10 +142,10 @@ function GoogleLoginButton({ onLogin, onError, onLoadingChange, navigate, postLo
   return (
     <button onClick={() => handler()} className="flex items-center justify-center gap-3 w-full px-6 py-4 bg-white border border-[#E2E8F0] rounded-2xl text-[14px] font-bold text-[#334155] hover:bg-[#F8FAFF] hover:border-indigo-200 transition-all shadow-sm">
       <svg width="20" height="20" viewBox="0 0 48 48">
-        <path fill="#EA4335" d="M24 9.5c3.5 0 6.5 1.2 8.9 3.2l6.7-6.7C35.4 2.2 30.1 0 24 0 14.8 0 6.9 5.4 3.1 13.3l7.8 6.1C13 13.1 18 9.5 24 9.5z"/>
-        <path fill="#4285F4" d="M46.6 24.5c0-1.6-.1-3.2-.4-4.7H24v9h12.7c-.6 3.1-2.4 5.7-5 7.4l7.7 6c4.5-4.1 7.2-10.2 7.2-17.7z"/>
-        <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6L2.5 13.3A24 24 0 0 0 0 24c0 3.8.9 7.4 2.5 10.7l8.4-6.1z"/>
-        <path fill="#34A853" d="M24 48c6.1 0 11.2-2 14.9-5.5l-7.7-6c-2 1.4-4.6 2.2-7.2 2.2-5.9 0-11-4-12.8-9.4l-8 6.1C6.9 42.6 14.8 48 24 48z"/>
+        <path fill="#EA4335" d="M24 9.5c3.5 0 6.5 1.2 8.9 3.2l6.7-6.7C35.4 2.2 30.1 0 24 0 14.8 0 6.9 5.4 3.1 13.3l7.8 6.1C13 13.1 18 9.5 24 9.5z" />
+        <path fill="#4285F4" d="M46.6 24.5c0-1.6-.1-3.2-.4-4.7H24v9h12.7c-.6 3.1-2.4 5.7-5 7.4l7.7 6c4.5-4.1 7.2-10.2 7.2-17.7z" />
+        <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6L2.5 13.3A24 24 0 0 0 0 24c0 3.8.9 7.4 2.5 10.7l8.4-6.1z" />
+        <path fill="#34A853" d="M24 48c6.1 0 11.2-2 14.9-5.5l-7.7-6c-2 1.4-4.6 2.2-7.2 2.2-5.9 0-11-4-12.8-9.4l-8 6.1C6.9 42.6 14.8 48 24 48z" />
       </svg>
       Continue with Google
     </button>
@@ -183,16 +207,16 @@ export function LoginPage() {
       <div className="hidden lg:flex flex-col w-[60%] bg-[#FDFDFF] relative border-r border-[#F1F5F9] overflow-hidden">
 
         {/* Golden Glow Gradient Background */}
-        <div 
+        <div
           className="absolute inset-0 pointer-events-none"
           style={{
             backgroundImage: "radial-gradient(125% 125% at 50% 10%, #ffffff 40%, #fbbf24 100%)",
             backgroundSize: "100% 100%",
           }}
         />
-        
+
         <div className="absolute inset-0 pointer-events-none">
-          
+
           {/* Animated Field Tracking Network */}
           <div className="absolute inset-0 overflow-hidden opacity-[0.2]">
             <svg width="100%" height="100%" className="absolute inset-0">
@@ -202,7 +226,7 @@ export function LoginPage() {
                   <stop offset="100%" stopColor="#4338CA" stopOpacity="0" />
                 </radialGradient>
               </defs>
-              
+
               {/* Animated Connection Lines */}
               {[...Array(6)].map((_, i) => (
                 <motion.line
@@ -221,17 +245,17 @@ export function LoginPage() {
                   key={`node-${i}`}
                   cx={`${15 + i * 10}%`} cy={`${25 + (i % 4) * 15}%`}
                   r="3" fill="url(#nodeGlow)"
-                  animate={{ 
-                    scale: [1, 1.5, 1], 
+                  animate={{
+                    scale: [1, 1.5, 1],
                     opacity: [0.3, 0.7, 0.3],
                     x: [0, 15, 0],
                     y: [0, 20, 0]
                   }}
-                  transition={{ 
-                    duration: 12 + i * 3, 
-                    repeat: Infinity, 
+                  transition={{
+                    duration: 12 + i * 3,
+                    repeat: Infinity,
                     ease: "easeInOut",
-                    delay: i * 0.5 
+                    delay: i * 0.5
                   }}
                 />
               ))}
@@ -248,7 +272,7 @@ export function LoginPage() {
             >
               {/* Cube Faces (Wireframe) */}
               {[
-                { rY: 0, z: 200 }, { rY: 90, z: 200 }, { rY: 180, z: 200 }, 
+                { rY: 0, z: 200 }, { rY: 90, z: 200 }, { rY: 180, z: 200 },
                 { rY: 270, z: 200 }, { rX: 90, z: 200 }, { rX: -90, z: 200 }
               ].map((face, i) => (
                 <div
@@ -261,7 +285,7 @@ export function LoginPage() {
                   }}
                 />
               ))}
-              
+
               {/* Inner floating nodes */}
               {[...Array(4)].map((_, i) => (
                 <motion.div
@@ -269,8 +293,8 @@ export function LoginPage() {
                   animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
                   transition={{ duration: 5 + i, repeat: Infinity }}
                   className="absolute w-4 h-4 bg-indigo-400 rounded-full blur-md"
-                  style={{ 
-                    top: `${20 + i * 20}%`, 
+                  style={{
+                    top: `${20 + i * 20}%`,
                     left: `${20 + (i % 2) * 40}%`,
                     transform: "translateZ(100px)"
                   }}
@@ -384,14 +408,14 @@ export function LoginPage() {
 
           {/* Toggle Sign In / Create Account */}
           <div className="flex bg-[#F8FAFC] p-1.5 rounded-2xl mb-12 border border-[#F1F5F9] shadow-sm max-w-[320px] mx-auto">
-            <button 
-              onClick={() => { setMode("signin"); setError(""); setRegStep(1) }} 
+            <button
+              onClick={() => { setMode("signin"); setError(""); setRegStep(1) }}
               className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${mode === "signin" ? "bg-white text-indigo-600 shadow-md shadow-indigo-100/50 border border-indigo-50/50" : "text-[#94A3B8]"}`}
             >
               Sign In
             </button>
-            <button 
-              onClick={() => { setMode("register"); setError(""); setRegStep(1) }} 
+            <button
+              onClick={() => { setMode("register"); setError(""); setRegStep(1) }}
               className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${mode === "register" ? "bg-white text-indigo-600 shadow-md shadow-indigo-100/50 border border-indigo-50/50" : "text-[#94A3B8]"}`}
             >
               Create Account
@@ -410,16 +434,16 @@ export function LoginPage() {
             <div className="grid grid-cols-3 gap-3">
               <button className="flex items-center justify-center py-4 px-2 border border-[#F1F5F9] rounded-2xl hover:bg-[#F8FAFC] transition-all group">
                 <svg width="18" height="18" viewBox="0 0 48 48">
-                  <path fill="#EA4335" d="M24 9.5c3.5 0 6.5 1.2 8.9 3.2l6.7-6.7C35.4 2.2 30.1 0 24 0 14.8 0 6.9 5.4 3.1 13.3l7.8 6.1C13 13.1 18 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.6 24.5c0-1.6-.1-3.2-.4-4.7H24v9h12.7c-.6 3.1-2.4 5.7-5 7.4l7.7 6c4.5-4.1 7.2-10.2 7.2-17.7z"/>
-                  <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6L2.5 13.3A24 24 0 0 0 0 24c0 3.8.9 7.4 2.5 10.7l8.4-6.1z"/>
-                  <path fill="#34A853" d="M24 48c6.1 0 11.2-2 14.9-5.5l-7.7-6c-2 1.4-4.6 2.2-7.2 2.2-5.9 0-11-4-12.8-9.4l-8 6.1C6.9 42.6 14.8 48 24 48z"/>
+                  <path fill="#EA4335" d="M24 9.5c3.5 0 6.5 1.2 8.9 3.2l6.7-6.7C35.4 2.2 30.1 0 24 0 14.8 0 6.9 5.4 3.1 13.3l7.8 6.1C13 13.1 18 9.5 24 9.5z" />
+                  <path fill="#4285F4" d="M46.6 24.5c0-1.6-.1-3.2-.4-4.7H24v9h12.7c-.6 3.1-2.4 5.7-5 7.4l7.7 6c4.5-4.1 7.2-10.2 7.2-17.7z" />
+                  <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6L2.5 13.3A24 24 0 0 0 0 24c0 3.8.9 7.4 2.5 10.7l8.4-6.1z" />
+                  <path fill="#34A853" d="M24 48c6.1 0 11.2-2 14.9-5.5l-7.7-6c-2 1.4-4.6 2.2-7.2 2.2-5.9 0-11-4-12.8-9.4l-8 6.1C6.9 42.6 14.8 48 24 48z" />
                 </svg>
                 <span className="hidden lg:block ml-2 text-[10px] font-black uppercase text-[#475569]">Google</span>
               </button>
               <button className="flex items-center justify-center py-4 px-2 border border-[#F1F5F9] rounded-2xl hover:bg-[#F8FAFC] transition-all">
                 <svg width="18" height="18" viewBox="0 0 23 23">
-                  <path fill="#f35325" d="M1 1h10v10H1z"/><path fill="#81bc06" d="M12 1h10v10H12z"/><path fill="#05a6f0" d="M1 12h10v10H1z"/><path fill="#ffba08" d="M12 12h10v10H12z"/>
+                  <path fill="#f35325" d="M1 1h10v10H1z" /><path fill="#81bc06" d="M12 1h10v10H12z" /><path fill="#05a6f0" d="M1 12h10v10H1z" /><path fill="#ffba08" d="M12 12h10v10H12z" />
                 </svg>
                 <span className="hidden lg:block ml-2 text-[10px] font-black uppercase text-[#475569]">Microsoft</span>
               </button>
@@ -439,18 +463,17 @@ export function LoginPage() {
           {mode === "register" && (
             <div className="mb-10 flex items-center justify-between relative px-2">
               <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[#F1F5F9] -translate-y-1/2 z-0 mx-8" />
-              <div 
-                className="absolute top-1/2 left-0 h-0.5 bg-[#10B981] -translate-y-1/2 z-0 transition-all duration-500 mx-8" 
+              <div
+                className="absolute top-1/2 left-0 h-0.5 bg-[#10B981] -translate-y-1/2 z-0 transition-all duration-500 mx-8"
                 style={{ width: `calc(${(regStep - 1) / 3 * 100}%)` }}
               />
               {[1, 2, 3, 4].map((s) => (
                 <div key={s} className="relative z-10 flex flex-col items-center">
-                  <div 
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-black transition-all duration-300 border-4 ${
-                      regStep > s ? "bg-[#10B981] border-[#D1FAE5] text-white" : 
-                      regStep === s ? "bg-indigo-600 border-[#EEF2FF] text-white" : 
-                      "bg-[#F8FAFC] border-[#F1F5F9] text-[#94A3B8]"
-                    }`}
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-black transition-all duration-300 border-4 ${regStep > s ? "bg-[#10B981] border-[#D1FAE5] text-white" :
+                        regStep === s ? "bg-indigo-600 border-[#EEF2FF] text-white" :
+                          "bg-[#F8FAFC] border-[#F1F5F9] text-[#94A3B8]"
+                      }`}
                   >
                     {regStep > s ? <Check size={18} strokeWidth={3} /> : s}
                   </div>
@@ -465,23 +488,23 @@ export function LoginPage() {
                 <div className="space-y-2">
                   <div className="relative group">
                     <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8] group-focus-within:text-indigo-600 transition-colors" size={18} />
-                    <input 
-                      className="w-full pl-14 pr-5 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]" 
-                      placeholder="Work Email" 
-                      value={username} 
-                      onChange={e => setUsername(e.target.value)} 
+                    <input
+                      className="w-full pl-14 pr-5 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]"
+                      placeholder="Work Email"
+                      value={username}
+                      onChange={e => setUsername(e.target.value)}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <div className="relative group">
                     <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8] group-focus-within:text-indigo-600 transition-colors" size={18} />
-                    <input 
-                      className="w-full pl-14 pr-14 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]" 
-                      type={showPass ? "text" : "password"} 
-                      placeholder="Password" 
-                      value={password} 
-                      onChange={e => setPassword(e.target.value)} 
+                    <input
+                      className="w-full pl-14 pr-14 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]"
+                      type={showPass ? "text" : "password"}
+                      placeholder="Password"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
                     />
                     <button type="button" className="absolute right-5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#334155]" onClick={() => setShowPass(p => !p)}>
                       {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -527,7 +550,7 @@ export function LoginPage() {
                       <ShieldCheck size={14} /> Finalize
                     </div>
                     <h2 className="text-[28px] font-black text-[#0F172A] leading-tight">Almost there!</h2>
-                    
+
                     <div className="space-y-4 pt-2">
                       <label className="flex items-start gap-3 cursor-pointer group">
                         <div className={`mt-1 w-5 h-5 rounded-md flex items-center justify-center transition-all border ${agreedUpdates ? "bg-indigo-600 border-indigo-600 text-white" : "border-[#E2E8F0] bg-white group-hover:border-indigo-200"}`}>
@@ -562,25 +585,25 @@ export function LoginPage() {
 
             <div className="flex gap-3">
               {mode === "register" && regStep > 1 && (
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setRegStep(p => p - 1)}
                   className="flex-1 py-5 bg-[#F8FAFC] text-[#64748B] text-[13px] font-black uppercase tracking-widest rounded-2xl border border-[#F1F5F9] hover:bg-white transition-all"
                 >
                   Back
                 </button>
               )}
-              <button 
-                type={mode === "register" && regStep < 4 ? "button" : "submit"} 
+              <button
+                type={mode === "register" && regStep < 4 ? "button" : "submit"}
                 disabled={loading || (mode === "register" && regStep === 4 && !agreedTerms)}
                 onClick={() => {
                   if (mode === "register" && regStep < 4) setRegStep(p => p + 1)
                 }}
                 className={`flex-[2] py-5 bg-indigo-600 text-white text-[13px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-100/50 hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:shadow-none`}
               >
-                {loading ? <RefreshCcw className="animate-spin" size={18} /> : 
-                  mode === "signin" ? "Sign In" : 
-                  regStep === 4 ? (agreedTerms ? "Continue" : <RefreshCcw size={18} />) : "Continue"}
+                {loading ? <RefreshCcw className="animate-spin" size={18} /> :
+                  mode === "signin" ? "Sign In" :
+                    regStep === 4 ? (agreedTerms ? "Continue" : <RefreshCcw size={18} />) : "Continue"}
               </button>
             </div>
           </form>

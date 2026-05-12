@@ -60,8 +60,8 @@ function ToggleSwitch({ checked, onChange, accent = "#1A56DB" }) {
 function SectionHeader({ title, subtitle }) {
   return (
     <div className="mb-10 space-y-2">
-      <h3 className="text-2xl font-black text-slate-900 tracking-tight font-sans">{title}</h3>
-      <p className="text-sm font-medium text-slate-500 italic opacity-80 leading-relaxed font-sans">{subtitle}</p>
+      <h3 className="text-2xl font-black text-[var(--fg)] tracking-tight font-sans">{title}</h3>
+      <p className="text-sm font-medium text-[var(--muted)] italic opacity-80 leading-relaxed font-sans">{subtitle}</p>
     </div>
   )
 }
@@ -131,21 +131,21 @@ export function SettingsPage({ section: sectionProp }) {
   const activeSub = filteredTabs.find(s => s.id === activeSection) || filteredTabs[0]
 
   return (
-    <div className="flex h-screen bg-bg overflow-hidden">
+    <div className="flex h-screen bg-[var(--bg)] overflow-hidden">
       {/* ── FLEXIBLE CONTENT AREA ── */}
-      <main className="flex-1 overflow-y-auto bg-bg relative custom-scrollbar">
+      <main className="flex-1 overflow-y-auto bg-[var(--bg)] relative custom-scrollbar">
         <div className="max-w-4xl mx-auto px-10 py-16 space-y-12 pb-40">
           {/* Header */}
           <header className="space-y-6">
-            <div className="flex items-center gap-2 text-[10px] font-black text-fg-subtle uppercase tracking-[0.2em]">
+            <div className="flex items-center gap-2 text-[10px] font-black text-[var(--muted)] uppercase tracking-[0.2em]">
               <span className="opacity-50">Settings</span>
               <ChevronRight size={10} />
-              <span className="text-primary">{activeSub.label}</span>
+              <span className="text-blue-500">{activeSub.label}</span>
             </div>
 
             <div className="space-y-2">
-              <h1 className="text-5xl font-black text-fg tracking-tighter">{activeSub.label}</h1>
-              <p className="text-lg text-fg-muted font-medium italic opacity-80 leading-relaxed">
+              <h1 className="text-5xl font-black text-[var(--fg)] tracking-tighter">{activeSub.label}</h1>
+              <p className="text-lg text-[var(--muted)] font-medium italic opacity-80 leading-relaxed">
                 "{activeSub.subtitle}"
               </p>
             </div>
@@ -211,16 +211,16 @@ export function SettingsPage({ section: sectionProp }) {
               exit={{ y: 100, opacity: 0 }}
               className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[50] w-full max-w-2xl"
             >
-              <div className="mx-8 p-4 bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-[2rem] shadow-2xl flex items-center justify-between">
+              <div className="mx-8 p-4 bg-[var(--surface)] backdrop-blur-2xl border border-[var(--stroke)] rounded-[2rem] shadow-2xl flex items-center justify-between">
                 <div className="flex items-center gap-4 pl-4">
                   <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                  <div className="text-white">
+                  <div className="text-[var(--fg)]">
                     <div className="text-xs font-black uppercase tracking-widest">Unsaved Protocols</div>
-                    <div className="text-[10px] font-bold text-white/50 italic">Deployment pending local changes.</div>
+                    <div className="text-[10px] font-bold text-[var(--muted)] italic">Deployment pending local changes.</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={handleDiscard} className="px-6 py-2 text-xs font-black text-white/60 hover:text-white transition-colors">Revert</button>
+                  <button onClick={handleDiscard} className="px-6 py-2 text-xs font-black text-[var(--muted)] hover:text-[var(--fg)] transition-colors">Revert</button>
                   <Button
                     variant="primary"
                     onClick={handleSave}
@@ -246,7 +246,7 @@ export function SettingsPage({ section: sectionProp }) {
 function Field({ label, children, half }) {
   return (
     <div className={`space-y-2 ${half ? "w-1/2" : "w-full"}`}>
-      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 font-sans">{label}</label>
+      <label className="text-[10px] font-black text-[var(--muted)] uppercase tracking-widest pl-1 font-sans">{label}</label>
       <div className="relative group font-sans">
         {children}
       </div>
@@ -320,7 +320,7 @@ function CompanySettingsSection({ markDirty, showToast }) {
   return (
     <div className="stPanel">
       <div className="stCard" style={{ width: "100%" }}>
-        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "#475569", letterSpacing: "0.05em", background: "#f8fafc", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
+        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "var(--muted)", letterSpacing: "0.05em", background: "var(--surface2)", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
           ORGANIZATION DETAILS
         </h4>
         <div className="stFormGrid">
@@ -462,7 +462,7 @@ function PreferencesSection({ markDirty, showToast }) {
   return (
     <div className="stPanel">
       <div className="stCard">
-        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "#475569", letterSpacing: "0.05em", background: "#f8fafc", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
+        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "var(--muted)", letterSpacing: "0.05em", background: "var(--surface2)", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
           APPEARANCE & LANGUAGE
         </h4>
         <div className="stFormGrid">
@@ -495,7 +495,7 @@ function PreferencesSection({ markDirty, showToast }) {
       </div>
 
       <div className="stCard">
-        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "#475569", letterSpacing: "0.05em", background: "#f8fafc", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
+        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "var(--muted)", letterSpacing: "0.05em", background: "var(--surface2)", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
           DATE & TIME FORMATS
         </h4>
         <div className="stFormGrid">
@@ -525,7 +525,7 @@ function WorkflowSection({ markDirty, showToast }) {
   return (
     <div className="stPanel">
       <div className="stCard" style={{ width: "100%" }}>
-        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "#475569", letterSpacing: "0.05em", background: "#f8fafc", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
+        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "var(--muted)", letterSpacing: "0.05em", background: "var(--surface2)", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
           APPROVAL CHAINS
         </h4>
         <h4 style={{ margin: "0 0 16px 0", fontSize: 16, fontWeight: 900, textAlign: "left" }}>Leave Approval Chain</h4>
@@ -567,7 +567,7 @@ function SecuritySection({ markDirty, showToast }) {
   return (
     <div className="stPanel">
       <div className="stCard">
-        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "#475569", letterSpacing: "0.05em", background: "#f8fafc", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
+        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "var(--muted)", letterSpacing: "0.05em", background: "var(--surface2)", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
           SECURITY & ACCESS
         </h4>
         <div className="stToggleRow">
@@ -611,7 +611,7 @@ function LogoSection({ markDirty }) {
   return (
     <div className="stPanel">
       <div className="stCard">
-        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "#475569", letterSpacing: "0.05em", background: "#f8fafc", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
+        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "var(--muted)", letterSpacing: "0.05em", background: "var(--surface2)", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
           BRAND ASSETS
         </h4>
         <div className="stLogoGrid">
@@ -690,7 +690,7 @@ function LocalizationSection({ markDirty }) {
   return (
     <div className="stPanel">
       <div className="stCard">
-        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "#475569", letterSpacing: "0.05em", background: "#f8fafc", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
+        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "var(--muted)", letterSpacing: "0.05em", background: "var(--surface2)", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
           REGIONAL SETTINGS
         </h4>
         <div className="stFormGrid">
@@ -746,7 +746,7 @@ function PaceSection({ markDirty }) {
   return (
     <div className="stPanel">
       <div className="stCard">
-        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "#475569", letterSpacing: "0.05em", background: "#f8fafc", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
+        <h4 style={{ margin: "0 0 24px 0", fontSize: 12, fontWeight: 800, color: "var(--muted)", letterSpacing: "0.05em", background: "var(--surface2)", padding: "10px 16px", borderRadius: 6, display: "inline-block" }}>
           SYSTEM PACE
         </h4>
         <div className="stField" style={{ marginBottom: 24 }}>

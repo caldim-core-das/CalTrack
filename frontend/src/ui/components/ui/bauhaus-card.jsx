@@ -207,7 +207,7 @@ export const BauhausCard = ({
             {progressBarInscription}
           </span>
           <div
-            style={{ 
+            style={{
               transform: mirrored ? 'scaleX(-1)' : 'none',
               backgroundColor: 'var(--card-progress-bar-bg)'
             }}

@@ -66,15 +66,15 @@ function CircularProgress({ pct }) {
     return (
         <div className="relative w-20 h-20 flex items-center justify-center">
             <svg className="w-full h-full -rotate-90 transform">
-                <circle cx="40" cy="40" r={r} fill="transparent" stroke="currentColor" strokeWidth="6" className="text-border/20" />
+                <circle cx="40" cy="40" r={r} fill="transparent" stroke="currentColor" strokeWidth="6" className="text-[var(--stroke2)]" />
                 <motion.circle 
                     cx="40" cy="40" r={r} fill="transparent" stroke="currentColor" strokeWidth="6" 
                     strokeDasharray={circ} initial={{ strokeDashoffset: circ }} animate={{ strokeDashoffset: circ - (pct / 100) * circ }}
                     transition={{ duration: 1.5, ease: "circOut" }}
-                    className="text-primary" strokeLinecap="round"
+                    className="text-blue-500" strokeLinecap="round"
                 />
             </svg>
-            <span className="absolute text-sm font-black text-fg font-sans select-none">{pct}%</span>
+            <span className="absolute text-sm font-black text-[var(--fg)] font-sans select-none">{pct}%</span>
         </div>
     )
 }
@@ -108,7 +108,7 @@ export function GetStartedPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#F6F8FA] p-8 flex flex-col gap-12 overflow-x-hidden font-sans">
+        <div className="min-h-screen bg-[var(--bg)] p-8 flex flex-col gap-12 overflow-x-hidden font-sans transition-colors duration-300">
             {/* ── CINEMATIC HERO ── */}
             <motion.div 
                 initial={{ opacity: 0, scale: 0.98 }}
@@ -181,7 +181,7 @@ export function GetStartedPage() {
                         <div className="flex items-center gap-6">
                             <Button 
                                 variant="primary" 
-                                className="!bg-white !text-slate-900 hover:bg-slate-50 px-14 py-6 text-base font-black rounded-2xl shadow-2xl shadow-black/50 tracking-tight font-sans"
+                                className="!bg-[var(--surface)] !text-[var(--fg)] hover:bg-[var(--surface2)] border border-[var(--stroke)] px-14 py-6 text-base font-black rounded-2xl shadow-2xl shadow-black/50 tracking-tight font-sans"
                                 onClick={() => document.getElementById('onboarding-grid')?.scrollIntoView({ behavior: 'smooth' })}
                             >
                                 Initialize Sequence <ArrowRight className="ml-3" size={20} />
@@ -211,7 +211,7 @@ export function GetStartedPage() {
                 initial={{ y: 40, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.7 }}
-                className="max-w-6xl mx-auto w-full flex flex-col md:flex-row items-center gap-12 p-10 bg-white dark:bg-slate-900 rounded-[3.5rem] border border-slate-200 shadow-xl relative group"
+                className="max-w-6xl mx-auto w-full flex flex-col md:flex-row items-center gap-12 p-10 bg-[var(--surface)] rounded-[3.5rem] border border-[var(--stroke)] shadow-xl relative group"
             >
                 <div className="relative">
                     <CircularProgress pct={pct} />
@@ -220,7 +220,7 @@ export function GetStartedPage() {
                 
                 <div className="flex-1 space-y-4 w-full">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-2xl font-black text-[#0E1116] tracking-tight flex items-center gap-3 font-sans uppercase">
+                        <h3 className="text-2xl font-black text-[var(--fg)] tracking-tight flex items-center gap-3 font-sans uppercase">
                             Organization Neural Sync
                             <div className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
                         </h3>
@@ -238,7 +238,7 @@ export function GetStartedPage() {
                 </div>
 
                 {/* Simplified Right-Side Social View */}
-                <div className="hidden lg:flex items-center gap-6 pl-10 border-l border-slate-100">
+                <div className="hidden lg:flex items-center gap-6 pl-10 border-l border-[var(--stroke)]">
                     <div className="flex -space-x-3">
                         <div className="w-10 h-10 rounded-full border-2 border-white bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-[9px] font-black text-white shadow-md z-30 font-sans">JD</div>
                         <div className="w-10 h-10 rounded-full border-2 border-white bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-[9px] font-black text-white shadow-md z-20 font-sans">RK</div>
@@ -305,7 +305,7 @@ export function GetStartedPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 1.8 }}
-                className="flex flex-col items-center gap-6 py-16 border-t border-slate-100"
+                className="flex flex-col items-center gap-6 py-16 border-t border-[var(--stroke)]"
             >
                 <div className="flex items-center gap-3 text-slate-400 text-sm font-bold uppercase tracking-[0.2em] opacity-60">
                     Deployment Safeguard Active

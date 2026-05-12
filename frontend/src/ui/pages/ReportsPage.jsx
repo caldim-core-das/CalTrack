@@ -26,11 +26,11 @@ function Report3DCard({ label, value }) {
     const y = e.clientY - rect.top
     const centerX = rect.width / 2
     const centerY = rect.height / 2
-    
+
     // Calculate rotation (-12 to 12 degrees)
     const rotateX = ((y - centerY) / centerY) * -12
     const rotateY = ((x - centerX) / centerX) * 12
-    
+
     setRotation({ x: rotateX, y: rotateY })
   }
 
@@ -64,11 +64,11 @@ function Report3DCard({ label, value }) {
         }}
       >
         {/* Glossy Reflection Overlay */}
-        <div 
+        <div
           className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/60 to-white/0 opacity-0 transition-opacity duration-300 pointer-events-none"
           style={{ opacity: isHovered ? 0.9 : 0 }}
         />
-        
+
         {/* Background gradient blur */}
         <div className={`absolute -bottom-10 -right-10 w-48 h-48 rounded-full bg-gradient-to-br ${config.color} opacity-[0.15] blur-3xl group-hover:opacity-30 transition-opacity duration-500`} />
 
@@ -78,7 +78,7 @@ function Report3DCard({ label, value }) {
               <Icon size={28} />
             </div>
           </div>
-          
+
           <div className="mt-auto">
             <div className="text-6xl professional-title text-slate-900 leading-none mb-1">
               {value ?? "—"}
@@ -195,33 +195,33 @@ export function ReportsPage() {
 
       <div className="flex-1 overflow-y-auto p-10 space-y-10">
 
-      {error ? <div className="errorBox">{error}</div> : null}
+        {error ? <div className="errorBox">{error}</div> : null}
 
-      <Card
-        title="Range"
-        actions={
-          <Button variant="ghost" type="button" onClick={() => load(range)} disabled={loading}>
-            Refresh
-          </Button>
-        }
-      >
-        <div className="grid2Tight">
-          <Input label="Start" type="date" value={range.start} onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))} />
-          <Input label="End" type="date" value={range.end} onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))} />
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-        {loading ? (
-          <div className="col-span-full flex justify-center py-20 text-slate-400">
-            Fetching metrics…
+        <Card
+          title="Range"
+          actions={
+            <Button variant="ghost" type="button" onClick={() => load(range)} disabled={loading}>
+              Refresh
+            </Button>
+          }
+        >
+          <div className="grid2Tight">
+            <Input label="Start" type="date" value={range.start} onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))} />
+            <Input label="End" type="date" value={range.end} onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))} />
           </div>
-        ) : (
-          summary.map((s) => (
-            <Report3DCard key={s.label} label={s.label} value={s.value} />
-          ))
-        )}
-      </div>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+          {loading ? (
+            <div className="col-span-full flex justify-center py-20 text-slate-400">
+              Fetching metrics…
+            </div>
+          ) : (
+            summary.map((s) => (
+              <Report3DCard key={s.label} label={s.label} value={s.value} />
+            ))
+          )}
+        </div>
       </div>
     </div>
   )
