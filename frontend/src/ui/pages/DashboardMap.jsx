@@ -33,18 +33,18 @@ function createLocationDotIcon(loc) {
   const half = size / 2
 
   let color = "#6366F1"
-  let glow  = "rgba(99,102,241,0.35)"
+  let glow = "rgba(99,102,241,0.35)"
   let pulse = false
   if (clockedIn > 0) {
     color = "#10B981"
-    glow  = "rgba(16,185,129,0.35)"
+    glow = "rgba(16,185,129,0.35)"
     pulse = true
   } else if (clockedOut > 0) {
     color = "#F43F5E"
-    glow  = "rgba(244,63,94,0.25)"
+    glow = "rgba(244,63,94,0.25)"
   } else if (employees === 0 && total === 0) {
     color = "#94A3B8"
-    glow  = "rgba(148,163,184,0.2)"
+    glow = "rgba(148,163,184,0.2)"
   }
 
   const label = employees > 0 ? employees : (total > 0 ? total : "")

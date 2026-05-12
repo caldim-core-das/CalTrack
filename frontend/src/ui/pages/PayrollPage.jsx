@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { Button, Card, Input, Pill } from "../components/kit.jsx"
+import { Banknote } from "lucide-react"
 
 function formatEmployeeId(value) {
   if (!value) return ""
@@ -70,13 +71,25 @@ export function PayrollPage() {
   }
 
   return (
-    <div className="stackLg">
-      <div className="pageHeader">
-        <div>
-          <h1 className="pageTitle">Payroll</h1>
-          <div className="pageSub">Transparent pay: regular, overtime, and leave all reconciled.</div>
+    <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 overflow-hidden">
+      {/* ── HEADER ── */}
+      <div className="h-24 bg-white border-b border-slate-100 px-10 flex items-center justify-between shrink-0 relative overflow-hidden">
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-2xl professional-title text-slate-900 flex items-center gap-3">
+              <Banknote className="text-indigo-600" size={24} />
+              Payroll
+            </h1>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-[10px] professional-subtitle text-slate-500">
+                Transparent pay: regular, overtime, and leave all reconciled.
+              </span>
+            </div>
+          </div>
         </div>
       </div>
+
+      <div className="flex-1 overflow-y-auto p-10 space-y-10">
 
       {error ? <div className="errorBox">{error}</div> : null}
 
@@ -190,6 +203,7 @@ export function PayrollPage() {
           <div className="muted">No payroll records yet.</div>
         )}
       </Card>
+      </div>
     </div>
   )
 }

@@ -13,25 +13,21 @@ DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 
-# ---------------------------------------------------------------------------
-# Database Configuration - django-tenants + PostgreSQL (Supabase)
-# ---------------------------------------------------------------------------
-
 SHARED_APPS = [
-    "django_tenants",  # mandatory
-    "companies",  # you must list the app where your tenant model is in both shared and tenant
+    "django_tenants",
+    "companies",
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
-    "accounts",  # users are shared
+    "accounts",
     "corsheaders",
     "rest_framework",
-    "channels",            # WebSocket support
-    "django_celery_beat",  # Celery periodic tasks
+    "channels",
+    "django_celery_beat",
 ]
 
 TENANT_APPS = [
-    "django.contrib.contenttypes", # contenttypes must be in both
+    "django.contrib.contenttypes",
     "employees",
     "time_tracking",
     "leaves",
@@ -40,7 +36,7 @@ TENANT_APPS = [
     "reports",
     "tasks",
     "live_locations",
-    "compliance",  # US FLSA + UK WTR compliance engine
+    "compliance",
 ]
 
 INSTALLED_APPS = list(set(SHARED_APPS + TENANT_APPS))
@@ -49,9 +45,9 @@ TENANT_MODEL = "companies.Company"
 TENANT_DOMAIN_MODEL = "companies.Domain"
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",          # MUST be first to handle CORS preflight
+    "corsheaders.middleware.CorsMiddleware",
     "django_tenants.middleware.main.TenantMainMiddleware",
-    "django.middleware.gzip.GZipMiddleware",          # Compress responses
+    "django.middleware.gzip.GZipMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -61,40 +57,45 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-# Fall back to public schema if no tenant matches the domain (needed for localhost)
 SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 
-# Note: CompanyMiddleware is replaced by TenantMainMiddleware for DB routing.
-# If you still need specific logic from companies.middleware, keep it after TenantMainMiddleware.
+# ---------------------------------------------------------------------------
+# Database Configuration - PostgreSQL (Production) or SQLite (Local Dev)
+# ---------------------------------------------------------------------------
 
-DATABASE_ROUTERS = (
-    'django_tenants.routers.TenantSyncRouter',
-)
+USE_POSTGRES = os.getenv("DB_NAME") or os.getenv("DB_HOST")
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django_tenants.postgresql_backend",
-        "NAME": os.getenv("DB_NAME", "postgres"),
-        "USER": os.getenv("DB_USER", "postgres"),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
-        "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5432"),
-        # Required for Supabase — enforces SSL on all connections
-        "OPTIONS": {
-            "sslmode": "require",
-        },
-        # IMPORTANT: Keep this at 0 for Supabase Session Pooler.
-        # Supabase Session Mode (port 5432) has a hard limit of 15 simultaneous
-        # connections. CONN_MAX_AGE=0 means Django closes the connection after
-        # every request/command, so connections are never held open between
-        # requests. This keeps usage well within the 15-connection limit.
-        # Setting this to any positive value (e.g. 300) will cause connections
-        # to pile up across threads and stale processes → EMAXCONNSESSION error.
-        "CONN_MAX_AGE": 0,
-        # Auto-detect and replace broken/timed-out connections silently.
-        "CONN_HEALTH_CHECKS": True,
+if USE_POSTGRES:
+    DATABASE_ROUTERS = ('django_tenants.routers.TenantSyncRouter',)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django_tenants.postgresql_backend",
+            "NAME": os.getenv("DB_NAME", "postgres"),
+            "USER": os.getenv("DB_USER", "postgres"),
+            "PASSWORD": os.getenv("DB_PASSWORD", ""),
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+            "OPTIONS": {"sslmode": "require"},
+            "CONN_MAX_AGE": 0,
+            "CONN_HEALTH_CHECKS": True,
+        }
     }
-}
+else:
+    # Local Development Fallback to SQLite
+    DATABASE_ROUTERS = ()
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+    # Remove tenant middleware if using SQLite
+    MIDDLEWARE = [m for m in MIDDLEWARE if "django_tenants" not in m]
+    # Remove django_tenants from installed apps if using SQLite
+    if "django_tenants" in INSTALLED_APPS:
+        INSTALLED_APPS.remove("django_tenants")
+
+
 
 ROOT_URLCONF = "quicktims.urls"
 
@@ -176,15 +177,10 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-CORS_ALLOWED_ORIGINS = [
-    o
-    for o in os.getenv(
-        "CORS_ALLOWED_ORIGINS",
-        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174",
-    ).split(",")
-    if o
-]
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

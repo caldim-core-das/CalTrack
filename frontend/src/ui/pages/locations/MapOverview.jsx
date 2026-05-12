@@ -29,33 +29,33 @@ import { apiRequest, unwrapResults } from "../../../api/client.js"
 
 // ── Status → colour mapping (single source of truth, Phase 3 contract) ───────
 const STATUS_COLOURS = {
-  active:      "#22C55E", // green
-  alert:       "#EF4444", // red
+  active: "#22C55E", // green
+  alert: "#EF4444", // red
   overcrowded: "#F59E0B", // amber
-  inactive:    "#94A3B8", // gray
+  inactive: "#94A3B8", // gray
 }
 
 function markerColor(loc) {
   // Prefer Phase 3 `status` field; fall back to legacy heuristic so old
   // backend versions still render (defensive — no breaking change).
   if (loc.status && STATUS_COLOURS[loc.status]) return STATUS_COLOURS[loc.status]
-  if (!loc.is_active)            return STATUS_COLOURS.inactive
-  if (loc.violation_count > 0)   return STATUS_COLOURS.alert
-  if (loc.on_site_count > 0)     return "#F97316" // legacy orange
-  if (loc.employee_count === 0)  return STATUS_COLOURS.alert
+  if (!loc.is_active) return STATUS_COLOURS.inactive
+  if (loc.violation_count > 0) return STATUS_COLOURS.alert
+  if (loc.on_site_count > 0) return "#F97316" // legacy orange
+  if (loc.employee_count === 0) return STATUS_COLOURS.alert
   return STATUS_COLOURS.active
 }
 
 function markerLabel(loc) {
   switch (loc.status) {
-    case "alert":       return "Alert"
+    case "alert": return "Alert"
     case "overcrowded": return "Overcrowded"
-    case "inactive":    return "Inactive"
-    case "active":      return loc.on_site_count > 0 ? `${loc.on_site_count} on site` : "Active"
+    case "inactive": return "Inactive"
+    case "active": return loc.on_site_count > 0 ? `${loc.on_site_count} on site` : "Active"
     default:
-      if (!loc.is_active)              return "Inactive"
-      if (loc.on_site_count > 0)       return `${loc.on_site_count} on site`
-      if (loc.employee_count === 0)    return "No assignments"
+      if (!loc.is_active) return "Inactive"
+      if (loc.on_site_count > 0) return `${loc.on_site_count} on site`
+      if (loc.employee_count === 0) return "No assignments"
       return "Active"
   }
 }
@@ -79,8 +79,8 @@ function OverviewMarkers({ locations, onSelect }) {
         let color = STATUS_COLOURS.active
         for (const m of c.getAllChildMarkers()) {
           const s = m.options._status
-          if (s === "alert")             { color = STATUS_COLOURS.alert; break }
-          if (s === "overcrowded")       color = STATUS_COLOURS.overcrowded
+          if (s === "alert") { color = STATUS_COLOURS.alert; break }
+          if (s === "overcrowded") color = STATUS_COLOURS.overcrowded
           else if (s === "inactive" && color === STATUS_COLOURS.active) color = STATUS_COLOURS.inactive
         }
         const size = count < 10 ? 36 : count < 50 ? 44 : 52
@@ -130,7 +130,7 @@ function OverviewMarkers({ locations, onSelect }) {
       const onSiteHtml = loc.on_site_employees?.length
         ? `<div style="margin-top:8px">
             <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px">ON SITE NOW</div>
-            ${loc.on_site_employees.slice(0,5).map(n => `
+            ${loc.on_site_employees.slice(0, 5).map(n => `
               <div style="font-size:12px;color:#1e293b;padding:2px 0">${n}</div>
             `).join("")}
             ${loc.on_site_employees.length > 5 ? `<div style="font-size:11px;color:#94a3b8">+${loc.on_site_employees.length - 5} more</div>` : ""}
@@ -144,7 +144,7 @@ function OverviewMarkers({ locations, onSelect }) {
         ? `<div style="margin-top:8px;padding:8px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px">
             <div style="font-size:11px;font-weight:700;color:#b91c1c;margin-bottom:4px">ALERTS</div>
             ${violations > 0 ? `<div style="font-size:12px;color:#991b1b">${violations} geofence violation${violations === 1 ? "" : "s"}</div>` : ""}
-            ${late > 0      ? `<div style="font-size:12px;color:#991b1b">${late} late arrival${late === 1 ? "" : "s"}</div>` : ""}
+            ${late > 0 ? `<div style="font-size:12px;color:#991b1b">${late} late arrival${late === 1 ? "" : "s"}</div>` : ""}
            </div>`
         : ""
 
@@ -214,28 +214,40 @@ function OverviewMarkers({ locations, onSelect }) {
 
 // ── Stats bar ─────────────────────────────────────────────────────────────────
 function StatsBar({ locations }) {
-  const total    = locations.length
-  const active   = locations.filter(l => l.is_active).length
-  const onSite   = locations.reduce((s, l) => s + (l.on_site_count || 0), 0)
+  const total = locations.length
+  const active = locations.filter(l => l.is_active).length
+  const onSite = locations.reduce((s, l) => s + (l.on_site_count || 0), 0)
   // Phase 4: alerts come from the Phase 3 status field, not a heuristic.
-  const alerts   = locations.filter(l => (l.status === "alert") || (l.violation_count || 0) > 0).length
+  const alerts = locations.filter(l => (l.status === "alert") || (l.violation_count || 0) > 0).length
 
   const stat = (icon, label, val, color) => (
     <div style={{
-      display: "flex", alignItems: "center", gap: 8,
-      padding: "10px 16px", background: "var(--surface)",
-      borderRadius: 10, border: "1px solid var(--stroke)", flex: 1,
+      display: "flex", alignItems: "center", gap: 10,
+      padding: "12px 18px", background: "#ffffff",
+      borderRadius: 14, border: "1.5px solid #f1f5f9", flex: 1,
+      boxShadow: "0 2px 10px rgba(0,0,0,0.04)"
     }}>
-      <div style={{ color, opacity: 0.8 }}>{icon}</div>
+      <div style={{
+        width: 36, height: 36, borderRadius: 10, background: `${color}15`,
+        display: "flex", alignItems: "center", justifyContent: "center", color, flexShrink: 0
+      }}>
+        {icon}
+      </div>
       <div>
-        <div style={{ fontSize: 18, fontWeight: 800, color: "var(--fg)", lineHeight: 1 }}>{val}</div>
-        <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, marginTop: 2 }}>{label}</div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: "#0f172a", lineHeight: 1 }}>{val}</div>
+        <div style={{ fontSize: 11, color: "#64748b", fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.02em" }}>{label}</div>
       </div>
     </div>
   )
 
   return (
-    <div style={{ display: "flex", gap: 10, padding: "12px 16px", borderBottom: "1px solid var(--stroke)" }}>
+    <div style={{
+      display: "flex",
+      gap: 12,
+      padding: "16px 20px",
+      background: "#f8fafc",
+      borderBottom: "1px solid #f1f5f9"
+    }}>
       {stat(<MapPin size={18} />, "Total Sites", total, "#4F46E5")}
       {stat(<Activity size={18} />, "Active", active, "#22C55E")}
       {stat(<Users size={18} />, "On Site Now", onSite, "#F97316")}
@@ -247,10 +259,10 @@ function StatsBar({ locations }) {
 // ── Legend ────────────────────────────────────────────────────────────────────
 function Legend() {
   const items = [
-    { color: STATUS_COLOURS.active,      label: "Active — running clean" },
-    { color: STATUS_COLOURS.alert,       label: "Alert — geofence violation" },
+    { color: STATUS_COLOURS.active, label: "Active — running clean" },
+    { color: STATUS_COLOURS.alert, label: "Alert — geofence violation" },
     { color: STATUS_COLOURS.overcrowded, label: "Overcrowded — over capacity" },
-    { color: STATUS_COLOURS.inactive,    label: "Inactive" },
+    { color: STATUS_COLOURS.inactive, label: "Inactive" },
   ]
   return (
     <div style={{
@@ -275,8 +287,8 @@ function AlertsBanner({ locations, onShowAlerts, onShowOvercrowded }) {
     let violations = 0, lates = 0, alertSites = 0, overcrowdedSites = 0
     for (const l of locations) {
       violations += l.violation_count || 0
-      lates      += l.late_arrival_count || 0
-      if (l.status === "alert")       alertSites++
+      lates += l.late_arrival_count || 0
+      if (l.status === "alert") alertSites++
       if (l.status === "overcrowded") overcrowdedSites++
     }
     return { violations, lates, alertSites, overcrowdedSites }
@@ -375,23 +387,23 @@ function LocationDetailPanel({ location, onClose }) {
     if (!location) return
     let cancelled = false
     setLoading(true); setError("")
-    ;(async () => {
-      try {
-        // Admin-scoped: returns all logs for the company. Filter client-side
-        // to this location + open shifts to keep payloads small enough.
-        const res = await apiRequest(`/time/logs/?date_from=${today}`)
-        const all = unwrapResults(res) || []
-        if (cancelled) return
-        const filtered = all.filter((l) =>
-          String(l.location) === String(location.id) && !l.clock_out
-        )
-        setLogs(filtered)
-      } catch (e) {
-        if (!cancelled) setError("Failed to load shifts at this site.")
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
+      ; (async () => {
+        try {
+          // Admin-scoped: returns all logs for the company. Filter client-side
+          // to this location + open shifts to keep payloads small enough.
+          const res = await apiRequest(`/time/logs/?date_from=${today}`)
+          const all = unwrapResults(res) || []
+          if (cancelled) return
+          const filtered = all.filter((l) =>
+            String(l.location) === String(location.id) && !l.clock_out
+          )
+          setLogs(filtered)
+        } catch (e) {
+          if (!cancelled) setError("Failed to load shifts at this site.")
+        } finally {
+          if (!cancelled) setLoading(false)
+        }
+      })()
     return () => { cancelled = true }
   }, [location, today])
 
@@ -459,9 +471,9 @@ function LocationDetailPanel({ location, onClose }) {
         gridTemplateColumns: "repeat(3, 1fr)", gap: 8,
       }}>
         {[
-          { label: "On site",     val: location.on_site_count || 0,        color: STATUS_COLOURS.active },
-          { label: "Violations",  val: location.violation_count || 0,      color: STATUS_COLOURS.alert },
-          { label: "Late",        val: location.late_arrival_count || 0,   color: STATUS_COLOURS.overcrowded },
+          { label: "On site", val: location.on_site_count || 0, color: STATUS_COLOURS.active },
+          { label: "Violations", val: location.violation_count || 0, color: STATUS_COLOURS.alert },
+          { label: "Late", val: location.late_arrival_count || 0, color: STATUS_COLOURS.overcrowded },
         ].map(({ label, val, color }) => (
           <div key={label} style={{
             background: "#f8fafc", borderRadius: 10, padding: "8px 10px",
@@ -538,7 +550,7 @@ function LocationDetailPanel({ location, onClose }) {
                   {log.distance_from_site_meters != null && (
                     <span> · {log.distance_from_site_meters < 1000
                       ? `${log.distance_from_site_meters}m off`
-                      : `${(log.distance_from_site_meters/1000).toFixed(1)}km off`
+                      : `${(log.distance_from_site_meters / 1000).toFixed(1)}km off`
                     }</span>
                   )}
                 </div>
@@ -577,9 +589,9 @@ function LocationDetailPanel({ location, onClose }) {
 // ── Main component ────────────────────────────────────────────────────────────
 export function MapOverview() {
   const [locations, setLocations] = useState([])
-  const [loading, setLoading]     = useState(true)
+  const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
-  const [selected, setSelected]   = useState(null)
+  const [selected, setSelected] = useState(null)
   const [filterZone, setFilterZone] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
 
@@ -604,10 +616,10 @@ export function MapOverview() {
   // Phase 4: filters now read the Phase 3 `status` field (with legacy fallback).
   const filtered = locations.filter((loc) => {
     const status = loc.status || (loc.is_active ? "active" : "inactive")
-    if (filterStatus === "active"      && status !== "active") return false
-    if (filterStatus === "inactive"    && status !== "inactive") return false
-    if (filterStatus === "onsite"      && (loc.on_site_count || 0) === 0) return false
-    if (filterStatus === "alerts"      && status !== "alert") return false
+    if (filterStatus === "active" && status !== "active") return false
+    if (filterStatus === "inactive" && status !== "inactive") return false
+    if (filterStatus === "onsite" && (loc.on_site_count || 0) === 0) return false
+    if (filterStatus === "alerts" && status !== "alert") return false
     if (filterStatus === "overcrowded" && status !== "overcrowded") return false
     return true
   })
@@ -630,39 +642,40 @@ export function MapOverview() {
 
       {/* Filter bar */}
       <div style={{
-        display: "flex", gap: 8, padding: "10px 16px", alignItems: "center",
-        borderBottom: "1px solid var(--stroke)", flexWrap: "wrap",
+        display: "flex", gap: 10, padding: "12px 20px", alignItems: "center",
+        background: "white", borderBottom: "1px solid #f1f5f9", flexWrap: "wrap",
       }}>
         {[
-          { val: "all",         label: "All Sites" },
-          { val: "active",      label: "Active" },
-          { val: "onsite",      label: "On Site" },
-          { val: "alerts",      label: "Alerts" },
+          { val: "all", label: "All Sites" },
+          { val: "active", label: "Active" },
+          { val: "onsite", label: "On Site" },
+          { val: "alerts", label: "Alerts" },
           { val: "overcrowded", label: "Overcrowded" },
-          { val: "inactive",    label: "Inactive" },
+          { val: "inactive", label: "Inactive" },
         ].map(({ val, label }) => (
           <button key={val} onClick={() => setFilterStatus(val)}
             style={{
-              padding: "5px 12px", borderRadius: 99, fontSize: 12, fontWeight: 600,
-              border: "1px solid var(--stroke)", cursor: "pointer",
+              padding: "6px 14px", borderRadius: 99, fontSize: 12, fontWeight: 700,
+              border: "1px solid #e2e8f0", cursor: "pointer",
               background: filterStatus === val ? "#4F46E5" : "transparent",
-              color: filterStatus === val ? "#fff" : "var(--fg2)",
+              color: filterStatus === val ? "#fff" : "#64748b",
+              transition: "all 0.2s"
             }}>
             {label}
           </button>
         ))}
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
           {lastUpdated && (
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>
+            <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
               Updated {lastUpdated.toLocaleTimeString()}
             </span>
           )}
           <button onClick={load} style={{
-            display: "flex", alignItems: "center", gap: 5,
-            padding: "5px 10px", borderRadius: 8,
-            border: "1px solid var(--stroke)", background: "transparent",
-            fontSize: 12, fontWeight: 600, cursor: "pointer", color: "var(--fg2)",
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "6px 12px", borderRadius: 10,
+            border: "1px solid #e2e8f0", background: "white",
+            fontSize: 12, fontWeight: 700, cursor: "pointer", color: "#475569",
           }}>
             <RefreshCw size={13} /> Refresh
           </button>

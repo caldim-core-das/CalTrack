@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from "react"
+import { createPortal } from "react-dom"
 
 import { apiRequest, unwrapResults, API_BASE_URL } from "../../api/client.js"
 import { getTokens } from "../../state/auth/tokens.js"
@@ -189,7 +190,7 @@ function useLocationTracker(isClockedIn) {
         if (pos) {
           // Only update if location changed significantly (> 10m) or it's first time
           const dist = lastPos.current ? calculateDistance(pos.lat, pos.lon, lastPos.current.lat, lastPos.current.lon) : 999
-          
+
           if (dist > 10) {
             await apiRequest("/live-locations/update/", {
               method: "POST",
@@ -243,10 +244,10 @@ function useWsLocationTracker(isClockedIn) {
           apiRequest("/live-locations/update/", {
             method: "POST",
             json: { lat: payload.lat, lng: payload.lng },
-          }).catch(() => {})
+          }).catch(() => { })
         }
       },
-      () => {},
+      () => { },
       { enableHighAccuracy: true, timeout: 10000 }
     )
   }, [isClockedIn])
@@ -272,7 +273,7 @@ function useWsLocationTracker(isClockedIn) {
           reconnectRef.current = setTimeout(connect, 5000)
         }
       }
-      ws.onerror = () => {}
+      ws.onerror = () => { }
     }
 
     connect()
@@ -306,9 +307,9 @@ function useWsLocationTracker(isClockedIn) {
 
 function Skeleton({ w = "100%", h = "16px", r = "8px", className = "" }) {
   return (
-    <div 
-      className={`animate-pulse bg-slate-100 ${className}`} 
-      style={{ width: w, height: h, borderRadius: r }} 
+    <div
+      className={`animate-pulse bg-slate-100 ${className}`}
+      style={{ width: w, height: h, borderRadius: r }}
     />
   )
 }
@@ -341,7 +342,7 @@ function StatCard({ icon, label, value, sub, color = "#6366F1", pulse }) {
           </div>
         )}
       </div>
-      
+
       {/* Decorative background element */}
       <div className={`absolute bottom-[-20%] right-[-10%] w-24 h-24 rounded-full opacity-[0.03] transition-transform duration-500 group-hover:scale-150 ${isOT ? 'bg-red-600' : 'bg-indigo-600'}`}></div>
     </Card>
@@ -387,9 +388,9 @@ export function SelfieCapture({ onCapture, onCancel }) {
   }
   const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 
-  return (
-    <div className="selfieOverlay">
-      <div className="selfieSheet">
+  return createPortal(
+    <div className="modal-overlay">
+      <div className="modal-sheet max-w-[440px] w-full p-8">
         <div className="selfieHeader">
           <button className="selfieClose" onClick={onCancel} type="button">✕</button>
           <div><h2 className="selfieTitle">Verify Identity</h2><div className="selfieSubtitle" style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}><Clock size={12} /> {timeStr}, IST</div></div>
@@ -414,7 +415,8 @@ export function SelfieCapture({ onCapture, onCancel }) {
           ) : <button className="selfieBtnPrimary" onClick={captureFrame} disabled={!ready || !!camError} type="button">Capture Selfie</button>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -444,6 +446,20 @@ function AdminTimePage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+  const monthThemes = [
+    { nav: "text-blue-600 shadow-[0_4px_0_#BFDBFE,0_8px_20px_rgba(59,130,246,0.2)] border-blue-100", calBg: "hover:bg-blue-50 hover:border-blue-200 hover:shadow-blue-500/20", calText: "group-hover:text-blue-700", dot: "bg-blue-200 group-hover:bg-blue-500", badge: "bg-blue-500" },
+    { nav: "text-rose-600 shadow-[0_4px_0_#FECDD3,0_8px_20px_rgba(225,29,72,0.2)] border-rose-100", calBg: "hover:bg-rose-50 hover:border-rose-200 hover:shadow-rose-500/20", calText: "group-hover:text-rose-700", dot: "bg-rose-200 group-hover:bg-rose-500", badge: "bg-rose-500" },
+    { nav: "text-emerald-600 shadow-[0_4px_0_#A7F3D0,0_8px_20px_rgba(16,185,129,0.2)] border-emerald-100", calBg: "hover:bg-emerald-50 hover:border-emerald-200 hover:shadow-emerald-500/20", calText: "group-hover:text-emerald-700", dot: "bg-emerald-200 group-hover:bg-emerald-500", badge: "bg-emerald-500" },
+    { nav: "text-violet-600 shadow-[0_4px_0_#DDD6FE,0_8px_20px_rgba(139,92,246,0.2)] border-violet-100", calBg: "hover:bg-violet-50 hover:border-violet-200 hover:shadow-violet-500/20", calText: "group-hover:text-violet-700", dot: "bg-violet-200 group-hover:bg-violet-500", badge: "bg-violet-500" },
+    { nav: "text-amber-600 shadow-[0_4px_0_#FDE68A,0_8px_20px_rgba(245,158,11,0.2)] border-amber-100", calBg: "hover:bg-amber-50 hover:border-amber-200 hover:shadow-amber-500/20", calText: "group-hover:text-amber-700", dot: "bg-amber-200 group-hover:bg-amber-500", badge: "bg-amber-500" },
+    { nav: "text-cyan-600 shadow-[0_4px_0_#CFFAFE,0_8px_20px_rgba(6,182,212,0.2)] border-cyan-100", calBg: "hover:bg-cyan-50 hover:border-cyan-200 hover:shadow-cyan-500/20", calText: "group-hover:text-cyan-700", dot: "bg-cyan-200 group-hover:bg-cyan-500", badge: "bg-cyan-500" },
+    { nav: "text-red-600 shadow-[0_4px_0_#FECACA,0_8px_20px_rgba(239,68,68,0.2)] border-red-100", calBg: "hover:bg-red-50 hover:border-red-200 hover:shadow-red-500/20", calText: "group-hover:text-red-700", dot: "bg-red-200 group-hover:bg-red-500", badge: "bg-red-500" },
+    { nav: "text-orange-600 shadow-[0_4px_0_#FFEDD5,0_8px_20px_rgba(249,115,22,0.2)] border-orange-100", calBg: "hover:bg-orange-50 hover:border-orange-200 hover:shadow-orange-500/20", calText: "group-hover:text-orange-700", dot: "bg-orange-200 group-hover:bg-orange-500", badge: "bg-orange-500" },
+    { nav: "text-teal-600 shadow-[0_4px_0_#CCFBF1,0_8px_20px_rgba(20,184,166,0.2)] border-teal-100", calBg: "hover:bg-teal-50 hover:border-teal-200 hover:shadow-teal-500/20", calText: "group-hover:text-teal-700", dot: "bg-teal-200 group-hover:bg-teal-500", badge: "bg-teal-500" },
+    { nav: "text-fuchsia-600 shadow-[0_4px_0_#F5D0FE,0_8px_20px_rgba(217,70,239,0.2)] border-fuchsia-100", calBg: "hover:bg-fuchsia-50 hover:border-fuchsia-200 hover:shadow-fuchsia-500/20", calText: "group-hover:text-fuchsia-700", dot: "bg-fuchsia-200 group-hover:bg-fuchsia-500", badge: "bg-fuchsia-500" },
+    { nav: "text-yellow-600 shadow-[0_4px_0_#FEF08A,0_8px_20px_rgba(234,179,8,0.2)] border-yellow-100", calBg: "hover:bg-yellow-50 hover:border-yellow-200 hover:shadow-yellow-500/20", calText: "group-hover:text-yellow-700", dot: "bg-yellow-200 group-hover:bg-yellow-500", badge: "bg-yellow-500" },
+    { nav: "text-indigo-600 shadow-[0_4px_0_#C7D2FE,0_8px_20px_rgba(79,70,229,0.2)] border-indigo-100", calBg: "hover:bg-indigo-50 hover:border-indigo-200 hover:shadow-indigo-500/20", calText: "group-hover:text-indigo-700", dot: "bg-indigo-200 group-hover:bg-indigo-500", badge: "bg-indigo-500" },
+  ]
 
   const load = useCallback(async () => {
     setLoading(true); setError("")
@@ -475,17 +491,17 @@ function AdminTimePage() {
     const uniqueDays = new Set(logs.map(l => l.work_date)).size
     const attendanceEntries = logs.length
     const totalWorkingDays = employees.length > 0 ? employees.length * 22 : 0 // hypothetical target
-    
+
     // Days in current selected month
     const totalDaysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate()
-    
+
     // Count weekdays (Mon-Fri) in the month
     let workDaysCount = 0
     for (let d = 1; d <= totalDaysInMonth; d++) {
       const day = new Date(selectedYear, selectedMonth, d).getDay()
       if (day !== 0 && day !== 6) workDaysCount++
     }
-    
+
     const expectedAttendance = workDaysCount * employees.length
     const actualAttendance = logs.filter(l => !!l.clock_in).length
     const attendancePct = expectedAttendance > 0 ? ((actualAttendance / expectedAttendance) * 100).toFixed(1) : "0.0"
@@ -556,30 +572,27 @@ function AdminTimePage() {
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] w-full bg-white overflow-hidden">
       {/* ── HEADER ── */}
-      <div className="h-20 bg-white border-b border-slate-100 px-8 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-100">
-            <Clock size={24} className="animate-pulse" />
-          </div>
+      <div className="h-24 bg-white border-b border-slate-100 px-10 flex items-center justify-between shrink-0 relative overflow-hidden">
+        <div className="flex items-center gap-6">
           <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">Attendance Ledger</h1>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Enterprise Administrative View</span>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight font-[Manrope]">Attendance Intelligence</h1>
+            <div className="flex items-center gap-3 mt-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)] animate-pulse" />
+              <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Enterprise Administrative Ledger</span>
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 rounded-xl border border-slate-100">
-            <Users size={16} className="text-slate-400" />
-            <span className="text-xs font-black text-slate-700">{employees.length} Personnel Managed</span>
+          <div className="flex items-center gap-3 px-6 py-3 bg-slate-50 rounded-2xl border border-slate-100">
+            <Users size={18} className="text-slate-400" />
+            <span className="text-[13px] font-black text-slate-700 tracking-tight">{employees.length} Personnel Managed</span>
           </div>
-          <button 
+          <button
             onClick={load}
-            className="p-2.5 bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-xl border border-slate-100 transition-all"
+            className="w-12 h-12 bg-white text-slate-400 hover:text-indigo-600 hover:border-indigo-200 rounded-2xl border border-slate-100 shadow-sm transition-all flex items-center justify-center group"
           >
-            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+            <RefreshCw size={20} className={`${loading ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`} />
           </button>
         </div>
       </div>
@@ -593,41 +606,56 @@ function AdminTimePage() {
 
         {/* ── Attendance Dashboard Container ── */}
         <div className="flex flex-col xl:flex-row gap-8">
-          {/* Left Panel: Stats & Quick Roster */}
-          <div className="w-full xl:w-80 shrink-0 space-y-8">
-            <Card className="p-6 bg-indigo-600 text-white border-none shadow-2xl shadow-indigo-200">
-              <div className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-1">Monthly Attendance</div>
-              <div className="text-4xl font-black tracking-tight">{monthStats.attendancePct}%</div>
-              <div className="mt-4 text-xs font-bold text-indigo-100">{monthNames[selectedMonth]} Performance</div>
-              <div className="mt-6 h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                <div className="h-full bg-white rounded-full" style={{ width: `${monthStats.attendancePct}%` }}></div>
+          {/* Left Panel: Insights & Roster */}
+          <div className="w-full xl:w-[340px] shrink-0 space-y-8">
+            <div className="p-8 bg-yellow-400 text-yellow-950 rounded-[2.5rem] shadow-[0_20px_50px_-12px_rgba(250,204,21,0.4)] relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/30 rounded-full -translate-y-16 translate-x-16 group-hover:scale-110 transition-transform duration-700" />
+              <div className="relative z-10">
+                <div className="text-[11px] font-black text-yellow-900/60 uppercase tracking-widest mb-2">Monthly Compliance</div>
+                <div className="text-5xl font-black tracking-tight">{monthStats.attendancePct}%</div>
+                <div className="mt-4 text-[13px] font-bold text-yellow-900/80">{monthNames[selectedMonth]} Operational Efficiency</div>
+                <div className="mt-8 h-2.5 w-full bg-yellow-500/30 rounded-full overflow-hidden">
+                  <div className="h-full bg-white rounded-full shadow-[0_0_12px_rgba(255,255,255,0.5)] transition-all duration-1000" style={{ width: `${monthStats.attendancePct}%` }}></div>
+                </div>
               </div>
-            </Card>
+            </div>
 
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="flex items-center justify-between px-2">
-                <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Personnel Cards</h2>
-                <ChevronDown size={14} className="text-slate-400" />
+                <h2 className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Personnel Directory</h2>
+                <div className="px-2.5 py-1 bg-slate-100 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-widest">{employees.length} Members</div>
               </div>
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar scrollbar-hide">
                 {empStatus.map(e => {
                   const empLogs = logs.filter(l => l.employee === e.id)
                   const presentCount = empLogs.filter(l => !!l.clock_in).length
+                  const pct = monthStats.workDaysInMonth > 0 ? Math.round((presentCount / monthStats.workDaysInMonth) * 100) : 0
+                  
                   return (
-                    <div key={e.id} className="group p-4 bg-slate-50 rounded-2xl border border-transparent hover:border-slate-200 hover:bg-white transition-all">
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-8 h-8 rounded-lg bg-white border border-slate-100 flex items-center justify-center font-black text-slate-400 text-xs group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-all">
-                          {e.avatarLetter}
+                    <div key={e.id} className="group p-5 bg-white rounded-[2rem] border border-slate-100 hover:border-indigo-100 hover:shadow-xl hover:shadow-indigo-50/50 hover:-translate-y-1 transition-all cursor-pointer">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="relative">
+                          <div className="w-12 h-12 rounded-2xl bg-slate-50 border-2 border-slate-100 flex items-center justify-center font-black text-slate-400 text-sm group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-all shadow-sm">
+                            {e.avatarLetter}
+                          </div>
+                          {e.log && (
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-4 border-white bg-emerald-500 animate-pulse shadow-sm"></div>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-xs font-black text-slate-900 truncate">{e.name}</div>
-                          <div className="text-[9px] font-bold text-slate-400">@{e.username}</div>
+                          <div className="text-[14px] font-black text-slate-900 truncate tracking-tight">{e.name}</div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">@{e.username}</div>
                         </div>
-                        {e.log && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>}
+                        <div className="text-right">
+                          <div className="text-[13px] font-black text-slate-900 leading-none">{pct}%</div>
+                          <div className="text-[9px] font-black text-slate-300 uppercase mt-1">Score</div>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="px-2 py-1 bg-white rounded-lg text-[9px] font-bold text-slate-400">Days: {monthStats.daysInMonth}</div>
-                        <div className="px-2 py-1 bg-white rounded-lg text-[9px] font-black text-emerald-500">Present: {presentCount}</div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="px-4 py-2 bg-slate-50 rounded-xl text-[10px] font-black text-slate-400 uppercase tracking-tight text-center">Duty: {presentCount}</div>
+                        <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-tight text-center ${pct > 80 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                          {pct > 80 ? 'Optimal' : 'Standard'}
+                        </div>
                       </div>
                     </div>
                   )
@@ -639,27 +667,31 @@ function AdminTimePage() {
           {/* Main Content Area */}
           <div className="flex-1 space-y-8">
             {/* Month Navigation */}
-            <div className="bg-slate-50/50 p-1.5 rounded-2xl flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <div className="bg-slate-50 p-3 rounded-[2.5rem] flex items-center gap-2 overflow-x-auto scrollbar-hide border border-slate-200/60 shadow-inner">
               {monthNames.map((m, idx) => (
                 <button
                   key={m}
                   onClick={() => setSelectedMonth(idx)}
-                  className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${selectedMonth === idx ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  className={`px-8 py-3.5 rounded-2xl text-[11px] font-black transition-all duration-200 uppercase tracking-widest shrink-0 border ${
+                    selectedMonth === idx 
+                    ? `bg-white -translate-y-1 ${monthThemes[idx].nav}` 
+                    : 'bg-transparent text-slate-400 border-transparent hover:bg-white hover:text-slate-700 hover:shadow-[0_4px_0_#E2E8F0,0_6px_15px_rgba(0,0,0,0.05)] hover:-translate-y-1 hover:border-slate-100 active:shadow-none active:translate-y-0'
+                  }`}
                 >
-                  {m.toUpperCase()}
+                  {m}
                 </button>
               ))}
             </div>
 
             {/* Calendar & KPIs Row */}
             <div className="flex flex-col lg:flex-row gap-8">
-              {/* Calendar Grid */}
-              <Card className="flex-1 p-6 bg-white border-slate-100 shadow-sm">
-                <div className="grid grid-cols-8 gap-px bg-slate-100 rounded-xl overflow-hidden border border-slate-100">
+              {/* Calendar Grid — The Temporal Matrix */}
+              <div className="flex-1 p-8 bg-white border border-slate-100 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.05)] rounded-[2.5rem]">
+                <div className="grid gap-2" style={{ gridTemplateColumns: "50px repeat(7, 1fr)" }}>
                   {/* Header */}
-                  <div className="bg-slate-50 p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">WEEK</div>
+                  <div className="py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center opacity-60">WEEK</div>
                   {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
-                    <div key={day} className="bg-slate-50 p-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center">{day}</div>
+                    <div key={day} className="py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-center">{day}</div>
                   ))}
 
                   {/* Dynamic Weeks */}
@@ -673,55 +705,88 @@ function AdminTimePage() {
 
                     return weeks.map((week, wIdx) => (
                       <React.Fragment key={`w-${wIdx}`}>
-                        <div className="bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-300">W{wIdx + 1}</div>
+                        <div className="flex items-center justify-center text-[10px] font-black text-slate-300 uppercase tracking-widest bg-slate-50/50 rounded-2xl">W{wIdx + 1}</div>
                         {week.map((day, dIdx) => {
                           const dateStr = day ? `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : null
                           const dayLogs = day ? logs.filter(l => l.work_date === dateStr) : []
                           const isWeekend = dIdx === 0 || dIdx === 6
                           const attendancePct = dayLogs.length > 0 && employees.length > 0 ? Math.round((dayLogs.length / employees.length) * 100) : 0
-                          
+                          const isToday = day && dateStr === todayStr
+
                           return (
-                            <div key={`d-${wIdx}-${dIdx}`} className={`bg-white aspect-square p-2 relative ${!day ? 'bg-slate-50/30' : ''}`}>
+                            <div key={`d-${wIdx}-${dIdx}`} className={`group flex flex-col items-center justify-center min-h-[90px] rounded-[1.5rem] p-2 relative transition-all duration-300 ${!day ? 'bg-transparent' : isToday ? 'bg-white shadow-[0_15px_30px_-5px_rgba(0,0,0,0.1)] ring-1 ring-slate-100 scale-[1.05] z-20 cursor-pointer' : `bg-slate-50 border border-transparent hover:scale-105 hover:bg-white z-10 cursor-pointer ${monthThemes[selectedMonth].calBg}`}`}>
                               {day && (
                                 <>
-                                  <span className={`text-[11px] font-black ${isWeekend ? 'text-slate-300' : 'text-slate-900'}`}>{day}</span>
-                                  <div className="absolute bottom-2 left-0 right-0 flex flex-col items-center gap-1">
+                                  {isToday && (
+                                    <div className={`absolute top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-[3px] rounded-full text-[7px] font-black text-white uppercase tracking-widest shadow-sm ${monthThemes[selectedMonth].badge}`}>
+                                      Today
+                                    </div>
+                                  )}
+                                  <span className={`text-lg font-black tracking-tight transition-colors ${isToday ? 'text-slate-900' : isWeekend ? 'text-slate-400' : `text-slate-800 ${monthThemes[selectedMonth].calText}`}`}>{day}</span>
+                                  <div className="mt-1 flex flex-col items-center gap-1.5 min-h-[16px]">
                                     {dayLogs.length > 0 ? (
-                                      <div className={`w-1 h-1 rounded-full ${attendancePct > 50 ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
-                                    ) : !isWeekend && (
-                                      <div className="w-1 h-1 rounded-full bg-red-400"></div>
+                                      <div className={`w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.1)] transition-colors ${isToday ? monthThemes[selectedMonth].badge : attendancePct > 80 ? 'bg-emerald-500' : attendancePct > 50 ? 'bg-amber-500' : 'bg-rose-500'}`}></div>
+                                    ) : day && !isWeekend && (
+                                      <div className={`w-1.5 h-1.5 rounded-full transition-colors ${isToday ? monthThemes[selectedMonth].badge : monthThemes[selectedMonth].dot}`}></div>
                                     )}
-                                    {dayLogs.length > 0 && <span className="text-[8px] font-black text-slate-400">{attendancePct}%</span>}
+                                    {dayLogs.length > 0 && (
+                                      <span className={`absolute bottom-2 text-[9px] font-black uppercase tracking-widest ${isToday ? 'text-slate-400' : `text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity ${monthThemes[selectedMonth].calText}`}`}>
+                                        {attendancePct}%
+                                      </span>
+                                    )}
                                   </div>
                                 </>
                               )}
                             </div>
                           )
                         })}
-                        {week.length < 7 && [...Array(7 - week.length)].map((_, i) => <div key={`pad-${i}`} className="bg-slate-50/30"></div>)}
+                        {week.length < 7 && [...Array(7 - week.length)].map((_, i) => <div key={`pad-${i}`} className="min-h-[90px]"></div>)}
                       </React.Fragment>
                     ))
                   })()}
                 </div>
-              </Card>
+              </div>
 
               {/* KPI Summary Cards */}
-              <div className="w-full lg:w-72 grid grid-cols-2 lg:grid-cols-1 gap-4">
-                <Card className="p-5 border-slate-100 bg-slate-50/50">
-                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Monthly Activity</div>
-                  <div className="text-2xl font-black text-slate-900">{monthStats.totalDays}</div>
-                  <div className="text-[10px] font-bold text-slate-400 mt-1">Logs Captured</div>
-                </Card>
-                <Card className="p-5 border-slate-100 bg-slate-50/50">
-                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Headcount Active</div>
-                  <div className="text-2xl font-black text-slate-900">{monthStats.totalAttendance}</div>
-                  <div className="text-[10px] font-bold text-slate-400 mt-1">Unique Personnel</div>
-                </Card>
-                <Card className="p-5 border-slate-100 bg-slate-50/50">
-                  <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">System Target</div>
-                  <div className="text-2xl font-black text-slate-900">{monthStats.totalWorkingDays}</div>
-                  <div className="text-[10px] font-bold text-slate-400 mt-1">Expected Log Count</div>
-                </Card>
+              <div className="w-full lg:w-[320px] flex flex-col gap-4 shrink-0">
+                {/* Card 1 */}
+                <div className="relative p-6 bg-slate-50 border border-slate-100/50 rounded-[2rem] flex items-center justify-between group hover:bg-white hover:border-indigo-100 hover:shadow-[0_10px_40px_-10px_rgba(79,70,229,0.15)] hover:-translate-y-1 transition-all duration-300 overflow-hidden">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-indigo-500/20 border border-indigo-500/50 group-hover:bg-indigo-500 group-hover:animate-pulse"></div>
+                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Logs</div>
+                    </div>
+                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-2">Monthly Captured</div>
+                  </div>
+                  <div className="text-4xl font-black text-slate-900 tracking-tight">{monthStats.totalDays}</div>
+                </div>
+
+                {/* Card 2 */}
+                <div className="relative p-6 bg-slate-50 border border-slate-100/50 rounded-[2rem] flex items-center justify-between group hover:bg-white hover:border-emerald-100 hover:shadow-[0_10px_40px_-10px_rgba(16,185,129,0.15)] hover:-translate-y-1 transition-all duration-300 overflow-hidden">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500/20 border border-emerald-500/50 group-hover:bg-emerald-500 group-hover:animate-pulse"></div>
+                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Active Roster</div>
+                    </div>
+                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-2">Unique Personnel</div>
+                  </div>
+                  <div className="text-4xl font-black text-slate-900 tracking-tight">{monthStats.totalAttendance}</div>
+                </div>
+
+                {/* Card 3 */}
+                <div className="relative p-6 bg-slate-50 border border-slate-100/50 rounded-[2rem] flex items-center justify-between group hover:bg-white hover:border-amber-100 hover:shadow-[0_10px_40px_-10px_rgba(245,158,11,0.15)] hover:-translate-y-1 transition-all duration-300 overflow-hidden">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-amber-500/20 border border-amber-500/50 group-hover:bg-amber-500 group-hover:animate-pulse"></div>
+                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">System Target</div>
+                    </div>
+                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-2">Expected Records</div>
+                  </div>
+                  <div className="text-4xl font-black text-slate-900 tracking-tight">{monthStats.totalWorkingDays}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -730,14 +795,16 @@ function AdminTimePage() {
         {/* ── DETAILED LOGS SECTION ── */}
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
-              <h2 className="text-lg font-black text-slate-900">Audit Ledger</h2>
-              <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-widest">{filteredLogs.length} Records</span>
+            <div className="flex items-center gap-5">
+              <div className="w-2 h-10 bg-indigo-600 rounded-full shadow-[0_0_15px_rgba(79,70,229,0.4)]"></div>
+              <div>
+                <h2 className="text-xl font-black text-slate-900 tracking-tight font-[Manrope]">Audit Ledger</h2>
+                <div className="text-[11px] font-black text-slate-500 uppercase tracking-widest mt-1">{filteredLogs.length} Records synchronized</div>
+              </div>
             </div>
-            
+
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={() => setLogsOpen(!logsOpen)}
                 className={`p-2 rounded-xl border transition-all ${logsOpen ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-200'}`}
               >
@@ -749,42 +816,48 @@ function AdminTimePage() {
           {logsOpen && (
             <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
               {/* Table Filters */}
-              <Card className="p-4 bg-white border-slate-100 flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-3 flex-1 min-w-[300px]">
-                  <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-4 py-2 border border-slate-100 flex-1">
-                    <Search size={16} className="text-slate-300" />
-                    <input 
-                      type="text" 
-                      placeholder="Search personnel or date..." 
-                      value={searchQ}
-                      onChange={e => setSearchQ(e.target.value)}
-                      className="bg-transparent border-none text-sm font-bold outline-none w-full"
-                    />
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <div className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Filter</div>
-                    <select 
-                      value={statusFilter} 
-                      onChange={e => setStatusFilter(e.target.value)}
-                      className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 text-sm font-bold outline-none"
-                    >
-                      <option value="all">All Records</option>
-                      <option value="live">Live Now</option>
-                      <option value="submitted">In Review</option>
-                      <option value="done">Completed</option>
-                    </select>
-                  </div>
+              <div className="flex flex-col xl:flex-row items-center justify-between gap-4 p-3 bg-slate-50/50 border border-slate-100 rounded-3xl">
+                
+                {/* Search Bar */}
+                <div className="flex items-center gap-3 bg-white rounded-2xl px-5 py-3 border border-slate-200/60 shadow-sm w-full xl:w-auto xl:flex-1 xl:max-w-md focus-within:border-indigo-300 focus-within:ring-4 focus-within:ring-indigo-500/10 transition-all">
+                  <Search size={18} className="text-indigo-400" />
+                  <input
+                    type="text"
+                    placeholder="Search personnel by name or ID..."
+                    value={searchQ}
+                    onChange={e => setSearchQ(e.target.value)}
+                    className="bg-transparent border-none text-[13px] font-bold text-slate-700 outline-none w-full placeholder:text-slate-400"
+                  />
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 bg-slate-50 border border-slate-100 rounded-xl p-1">
-                    <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} className="bg-transparent text-[10px] font-black px-2 outline-none" />
-                    <ChevronRight size={12} className="text-slate-300" />
-                    <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} className="bg-transparent text-[10px] font-black px-2 outline-none" />
+                <div className="flex flex-col md:flex-row items-center gap-4 w-full xl:w-auto">
+                  {/* Status Filter Segmented Control */}
+                  <div className="flex items-center bg-white border border-slate-200/60 rounded-2xl p-1 shadow-sm w-full md:w-auto overflow-x-auto scrollbar-hide">
+                    {["all", "live", "submitted", "done"].map(status => (
+                      <button
+                        key={status}
+                        onClick={() => setStatusFilter(status)}
+                        className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shrink-0 ${statusFilter === status ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        {status === "all" ? "All" : status === "live" ? "Active" : status === "submitted" ? "Review" : "Completed"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Date Range Filter */}
+                  <div className="flex items-center gap-2 bg-white border border-slate-200/60 rounded-2xl p-1.5 shadow-sm w-full md:w-auto">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 group hover:border-indigo-200 transition-colors cursor-text">
+                      <Calendar size={14} className="text-slate-400 group-hover:text-indigo-500" />
+                      <input type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} className="bg-transparent text-[11px] font-black text-slate-700 outline-none cursor-pointer" />
+                    </div>
+                    <ChevronRight size={14} className="text-slate-300" />
+                    <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-100 group hover:border-indigo-200 transition-colors cursor-text">
+                      <Calendar size={14} className="text-slate-400 group-hover:text-indigo-500" />
+                      <input type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} className="bg-transparent text-[11px] font-black text-slate-700 outline-none cursor-pointer" />
+                    </div>
                   </div>
                 </div>
-              </Card>
+              </div>
 
               {/* Data Table */}
               <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
@@ -792,13 +865,13 @@ function AdminTimePage() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50/50 border-b border-slate-100">
-                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee</th>
-                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Shift Date</th>
-                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Timeline</th>
-                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Photos</th>
-                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Verification</th>
-                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Duration</th>
-                        <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
+                        <th className="p-6 professional-subtitle text-slate-400">Employee</th>
+                        <th className="p-6 professional-subtitle text-slate-400">Shift Date</th>
+                        <th className="p-6 professional-subtitle text-slate-400">Timeline</th>
+                        <th className="p-6 professional-subtitle text-slate-400">Photos</th>
+                        <th className="p-6 professional-subtitle text-slate-400">Verification</th>
+                        <th className="p-6 professional-subtitle text-slate-400 text-right">Duration</th>
+                        <th className="p-6 professional-subtitle text-slate-400 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -932,7 +1005,7 @@ function AdminLogRow({ log, onAction }) {
           ) : (
             <>
               {isLive && (
-                <button 
+                <button
                   disabled={busy}
                   onClick={() => { if (window.confirm("Force clock out?")) handleApprove("force_clock_out") }}
                   className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
@@ -942,7 +1015,7 @@ function AdminLogRow({ log, onAction }) {
                 </button>
               )}
               {log.clock_out && (
-                <button 
+                <button
                   onClick={() => downloadLogPdf(log.id)}
                   className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                   title="Download Summary"
@@ -952,8 +1025,8 @@ function AdminLogRow({ log, onAction }) {
               )}
             </>
           )}
-          
-          <button 
+
+          <button
             disabled={busy}
             onClick={() => { if (window.confirm("Permanently delete?")) handleApprove("delete") }}
             className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
@@ -1178,7 +1251,7 @@ function EmployeeTimePage() {
     const dist = preflight.distance_m
     const distStr = dist == null
       ? ""
-      : dist < 1000 ? ` · ${dist}m` : ` · ${(dist/1000).toFixed(1)}km`
+      : dist < 1000 ? ` · ${dist}m` : ` · ${(dist / 1000).toFixed(1)}km`
 
     if (preflight.allowed && preflight.geofence_passed) {
       const name = preflight.matched_location?.name || "your site"
@@ -1372,9 +1445,9 @@ function EmployeeTimePage() {
       )}
 
       {/* ═══ MOOD SURVEY OVERLAY ═══ */}
-      {showMoodSurvey && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
-          <Card className="max-w-md w-full p-10 text-center shadow-2xl animate-in slide-in-from-bottom-8 duration-500">
+      {showMoodSurvey && createPortal(
+        <div className="modal-overlay">
+          <div className="modal-sheet max-w-md w-full p-10 text-center">
             <h2 className="text-2xl font-black text-slate-900 mb-8 tracking-tight">How was work today?</h2>
             <div className="flex justify-center gap-4 mb-10">
               {[
@@ -1382,9 +1455,9 @@ function EmployeeTimePage() {
                 { key: 'normal', emoji: '😐', label: 'Normal' },
                 { key: 'great', emoji: '😄', label: 'Great' },
               ].map(m => (
-                <button 
-                  key={m.key} 
-                  onClick={() => setMoodRating(m.key)} 
+                <button
+                  key={m.key}
+                  onClick={() => setMoodRating(m.key)}
                   className={`flex flex-col items-center gap-3 flex-1 p-4 rounded-2xl border-2 transition-all duration-300 ${moodRating === m.key ? 'border-orange-500 bg-orange-50 scale-105' : 'border-slate-100 bg-white hover:border-slate-200'}`}
                 >
                   <span className="text-4xl">{m.emoji}</span>
@@ -1392,34 +1465,35 @@ function EmployeeTimePage() {
                 </button>
               ))}
             </div>
-            
+
             <div className="text-left space-y-2 mb-8">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Additional Context</label>
-              <textarea 
-                value={moodNote} 
-                onChange={e => setMoodNote(e.target.value)} 
-                placeholder="Share your thoughts..." 
+              <textarea
+                value={moodNote}
+                onChange={e => setMoodNote(e.target.value)}
+                placeholder="Share your thoughts..."
                 rows={3}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-bold text-slate-900 focus:border-orange-500 outline-none transition-all" 
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm font-bold text-slate-900 focus:border-orange-500 outline-none transition-all"
               />
             </div>
-            
+
             <div className="flex gap-4">
-              <button 
+              <button
                 onClick={() => { setShowMoodSurvey(false); setMoodRating(null); setMoodNote("") }}
                 className="flex-1 py-4 rounded-2xl text-sm font-black text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={submitMoodAndClockOut}
                 className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-orange-600 hover:bg-orange-700 shadow-xl shadow-orange-200 transition-all"
               >
                 Submit & Finish
               </button>
             </div>
-          </Card>
-        </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* ═══ MAIN PAGE ═══ */}
@@ -1431,10 +1505,10 @@ function EmployeeTimePage() {
               <Clock size={24} className={openLog ? 'animate-pulse' : ''} />
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight">Personal Timesheets</h1>
+              <h1 className="text-xl professional-title text-slate-900">Personal Timesheets</h1>
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${openLog ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <span className="text-[10px] professional-subtitle text-slate-400">
                   {openLog ? (openLog.task ? `Working on: ${openLog.task.title}` : (openBreak ? 'Currently on Break' : 'On Active Duty')) : 'System Standby'}
                 </span>
               </div>
@@ -1485,8 +1559,8 @@ function EmployeeTimePage() {
               </div>
             )}
             {!openLog && (
-              <button 
-                onClick={() => setPanelOpen(true)} 
+              <button
+                onClick={() => setPanelOpen(true)}
                 disabled={busy}
                 className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black rounded-2xl shadow-xl shadow-indigo-200 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
               >
@@ -1539,35 +1613,35 @@ function EmployeeTimePage() {
           {/* KPI Dashboard */}
           {!loading && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard 
-                icon={<TrendingUp />} 
-                label="Weekly Total" 
-                value={formatHrMin(weekStats.total)} 
+              <StatCard
+                icon={<TrendingUp />}
+                label="Weekly Total"
+                value={formatHrMin(weekStats.total)}
                 sub={weekStats.otSeconds > 0 ? `+${formatHrMin(weekStats.otSeconds)} OVERTIME` : "Standard Volume"}
-                color={weekStats.otSeconds > 0 ? "#EF4444" : "#6366F1"} 
+                color={weekStats.otSeconds > 0 ? "#EF4444" : "#6366F1"}
               />
-              <StatCard 
-                icon={<Calendar />} 
-                label="Persistence" 
-                value={`${weekStats.days} Days`} 
+              <StatCard
+                icon={<Calendar />}
+                label="Persistence"
+                value={`${weekStats.days} Days`}
                 sub="Logged this week"
-                color="#10B981" 
+                color="#10B981"
               />
-              <StatCard 
-                icon={<Timer />} 
-                label="Daily Intensity" 
-                value={formatHrMin(weekStats.avg)} 
+              <StatCard
+                icon={<Timer />}
+                label="Daily Intensity"
+                value={formatHrMin(weekStats.avg)}
                 sub="Average Session Length"
-                color="#F59E0B" 
+                color="#F59E0B"
               />
               {openLog && (
-                <StatCard 
-                  icon={<Clock />} 
-                  label="Live Session" 
-                  value={formatDuration(elapsed)} 
+                <StatCard
+                  icon={<Clock />}
+                  label="Live Session"
+                  value={formatDuration(elapsed)}
                   sub={openLog.task ? `Task: ${openLog.task.title}` : (geofenceStatus?.job_site?.name || "Corporate Site")}
-                  color="#EF4444" 
-                  pulse 
+                  color="#EF4444"
+                  pulse
                 />
               )}
             </div>
@@ -1581,7 +1655,7 @@ function EmployeeTimePage() {
                 <h2 className="text-lg font-black text-slate-900">Personal Ledger</h2>
                 <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-widest">{logs.length} Entries</span>
               </div>
-              
+
               <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-xl border border-slate-100">
                 <button onClick={() => { setFilterFrom(todayStr); setFilterTo(todayStr) }} className="px-4 py-1.5 text-[10px] font-black text-slate-500 hover:text-indigo-600 uppercase tracking-widest">Today</button>
                 <button onClick={() => { setFilterFrom(weekAgo); setFilterTo(todayStr) }} className="px-4 py-1.5 bg-white shadow-sm rounded-lg text-[10px] font-black text-indigo-600 uppercase tracking-widest">Week</button>
@@ -1595,11 +1669,11 @@ function EmployeeTimePage() {
                 <div className="font-bold text-xs uppercase tracking-widest">Synchronizing Ledger...</div>
               </div>
             }>
-              <AuditLedger 
-                logs={logs} 
-                loading={loading} 
-                elapsed={elapsed} 
-                downloadLogPdf={downloadLogPdf} 
+              <AuditLedger
+                logs={logs}
+                loading={loading}
+                elapsed={elapsed}
+                downloadLogPdf={downloadLogPdf}
                 submitLog={submitLog}
                 formatDuration={formatDuration}
               />
@@ -1652,7 +1726,7 @@ function EmployeeTimePage() {
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors">
                       <CheckSquare size={18} />
                     </div>
-                    <select 
+                    <select
                       value={selectedTaskId}
                       onChange={e => setSelectedTaskId(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-900 focus:border-indigo-500 outline-none appearance-none transition-all"
@@ -1681,8 +1755,8 @@ function EmployeeTimePage() {
               {!openLog && (
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Identity Verification</label>
-                  <button 
-                    onClick={() => setShowSelfie(true)} 
+                  <button
+                    onClick={() => setShowSelfie(true)}
                     className={`w-full h-40 rounded-3xl border-2 border-dashed transition-all overflow-hidden relative ${selfiePreview ? 'border-indigo-600' : 'border-slate-200 hover:border-indigo-400 bg-slate-50'}`}
                   >
                     {selfiePreview ? (
@@ -1705,11 +1779,11 @@ function EmployeeTimePage() {
               {/* Operation Notes */}
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Operation Notes</label>
-                <textarea 
-                  value={sessionNotes} 
-                  onChange={e => setSessionNotes(e.target.value)} 
+                <textarea
+                  value={sessionNotes}
+                  onChange={e => setSessionNotes(e.target.value)}
                   placeholder={openLog ? "Summary of completed tasks..." : "Briefly describe your objectives..."}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-900 focus:border-indigo-500 outline-none transition-all" 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-sm font-bold text-slate-900 focus:border-indigo-500 outline-none transition-all"
                   rows={4}
                 />
               </div>
@@ -1723,11 +1797,11 @@ function EmployeeTimePage() {
                       <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">Intelligence Report</span>
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-3 gap-2">
                     {["before", "progress", "after"].map(t => (
-                      <button 
-                        key={t} 
+                      <button
+                        key={t}
                         onClick={() => setJobPhotoType(t)}
                         className={`py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${jobPhotoType === t ? 'bg-indigo-600 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
                       >
@@ -1737,7 +1811,7 @@ function EmployeeTimePage() {
                   </div>
 
                   {!jobPhotoPreview ? (
-                    <button 
+                    <button
                       onClick={() => setShowJobPhotoCamera(true)}
                       className="w-full h-24 rounded-2xl border-2 border-dashed border-slate-700 flex flex-col items-center justify-center gap-2 text-slate-500 hover:text-indigo-400 hover:border-indigo-500/50 transition-all"
                     >
@@ -1751,19 +1825,19 @@ function EmployeeTimePage() {
                           <img src={jobPhotoPreview} className="w-full h-full object-cover" />
                           <button onClick={() => { setJobPhotoFile(null); setJobPhotoPreview(null) }} className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">✕</button>
                         </div>
-                        <input 
-                          placeholder="Brief caption..." 
-                          value={jobPhotoCaption} 
+                        <input
+                          placeholder="Brief caption..."
+                          value={jobPhotoCaption}
                           onChange={e => setJobPhotoCaption(e.target.value)}
                           className="flex-1 bg-white/5 border border-slate-700 rounded-xl h-12 px-4 text-xs font-bold text-white outline-none"
                         />
                       </div>
-                      <button 
-                        onClick={uploadJobPhoto} 
+                      <button
+                        onClick={uploadJobPhoto}
                         disabled={busy}
                         className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black rounded-xl flex items-center justify-center gap-2 transition-all"
                       >
-                        {busy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} 
+                        {busy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
                         {busy ? 'REPORTING...' : 'UPLOAD INTEL'}
                       </button>
                     </div>
@@ -1789,8 +1863,8 @@ function EmployeeTimePage() {
                     <div className="space-y-4">
                       <div className="grid grid-cols-3 gap-3">
                         {["tea", "lunch", "personal"].map(t => (
-                          <button 
-                            key={t} 
+                          <button
+                            key={t}
                             disabled={busy}
                             onClick={() => setBreakType(t)}
                             className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center gap-2 ${breakType === t ? 'border-indigo-600 bg-indigo-50 text-indigo-600 shadow-lg shadow-indigo-100' : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'}`}
@@ -1802,7 +1876,7 @@ function EmployeeTimePage() {
                           </button>
                         ))}
                       </div>
-                      <button 
+                      <button
                         onClick={() => action("/time/break/start/")}
                         disabled={busy}
                         className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-sm font-black shadow-xl shadow-amber-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
@@ -1843,7 +1917,7 @@ function EmployeeTimePage() {
                         </div>
                       </div>
 
-                      <button 
+                      <button
                         onClick={() => action("/time/break/end/")}
                         disabled={busy}
                         className="w-full py-4 bg-slate-900 hover:bg-black text-white rounded-2xl text-sm font-black shadow-xl shadow-slate-200 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
@@ -1887,28 +1961,26 @@ function EmployeeTimePage() {
               {/* Phase 5 — preflight pill: instant geofence feedback */}
               {preflightPill && !openLog && (
                 <div
-                  className={`mb-4 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs font-bold ${
-                    preflightPill.tone === "ok"
+                  className={`mb-4 rounded-xl px-4 py-2.5 flex items-center gap-2 text-xs font-bold ${preflightPill.tone === "ok"
                       ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
                       : preflightPill.tone === "warn"
                         ? "bg-amber-50 text-amber-800 border border-amber-200"
                         : preflightPill.tone === "block"
                           ? "bg-rose-50 text-rose-800 border border-rose-200"
                           : "bg-slate-100 text-slate-600 border border-slate-200"
-                  }`}
+                    }`}
                   role="status"
                 >
                   <span
                     aria-hidden="true"
-                    className={`inline-block w-2 h-2 rounded-full ${
-                      preflightPill.tone === "ok"
+                    className={`inline-block w-2 h-2 rounded-full ${preflightPill.tone === "ok"
                         ? "bg-emerald-500"
                         : preflightPill.tone === "warn"
                           ? "bg-amber-500"
                           : preflightPill.tone === "block"
                             ? "bg-rose-500"
                             : "bg-slate-400"
-                    }`}
+                      }`}
                   />
                   {preflightPill.label}
                 </div>
@@ -1922,8 +1994,8 @@ function EmployeeTimePage() {
                 Cancel
               </button>
               {openLog ? (
-                <button 
-                  onClick={handleClockOut} 
+                <button
+                  onClick={handleClockOut}
                   disabled={busy}
                   className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-red-500 hover:bg-red-600 shadow-xl shadow-red-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                 >

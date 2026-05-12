@@ -30,10 +30,10 @@ export function Input({ label, hint, ...props }) {
   return (
     <label className="flex flex-col gap-1.5" htmlFor={id}>
       <div className="text-sm font-semibold text-slate-700">{label}</div>
-      <input 
-        {...props} 
-        id={id} 
-        className={["w-full px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm", props.className].filter(Boolean).join(" ")} 
+      <input
+        {...props}
+        id={id}
+        className={["w-full px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm", props.className].filter(Boolean).join(" ")}
       />
       {hint ? <div className="text-xs text-slate-500 mt-0.5">{hint}</div> : null}
     </label>
@@ -45,9 +45,9 @@ export function Select({ label, options, hint, ...props }) {
   return (
     <label className="flex flex-col gap-1.5" htmlFor={id}>
       <div className="text-sm font-semibold text-slate-700">{label}</div>
-      <select 
-        {...props} 
-        id={id} 
+      <select
+        {...props}
+        id={id}
         className={["w-full px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm", props.className].filter(Boolean).join(" ")}
       >
         {options.map((o) => (
@@ -66,10 +66,10 @@ export function TextArea({ label, hint, ...props }) {
   return (
     <label className="flex flex-col gap-1.5" htmlFor={id}>
       <div className="text-sm font-semibold text-slate-700">{label}</div>
-      <textarea 
-        {...props} 
-        id={id} 
-        className={["w-full px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm min-h-[100px]", props.className].filter(Boolean).join(" ")} 
+      <textarea
+        {...props}
+        id={id}
+        className={["w-full px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm min-h-[100px]", props.className].filter(Boolean).join(" ")}
       />
       {hint ? <div className="text-xs text-slate-500 mt-0.5">{hint}</div> : null}
     </label>

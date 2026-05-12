@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { Button, Card, Input, Pill, TextArea, formatDateTime } from "../components/kit.jsx"
+import { CalendarRange } from "lucide-react"
 import { fireSparkleFromEl } from "../sparkle.js"
 
 function toIsoLocal(datetimeLocal) {
@@ -147,18 +148,31 @@ export function SchedulingPage() {
   }
 
   return (
-    <div className="stackLg">
-      <div className="pageHeader">
-        <div>
-          <h1 className="pageTitle">Scheduling</h1>
-          <div className="pageSub">Plan shifts like a timeline, not a spreadsheet.</div>
+    <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 overflow-hidden">
+      {/* ── HEADER ── */}
+      <div className="h-24 bg-white border-b border-slate-100 px-10 flex items-center justify-between shrink-0 relative overflow-hidden">
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-2xl professional-title text-slate-900 flex items-center gap-3">
+              <CalendarRange className="text-indigo-600" size={24} />
+              Scheduling
+            </h1>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-[10px] professional-subtitle text-slate-500">
+                Plan shifts like a timeline, not a spreadsheet.
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="row">
-          <Pill tone="neutral">{isAdmin ? "Admin" : "Employee"} view</Pill>
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="flex items-center gap-3 px-6 py-3 bg-slate-50 rounded-2xl border border-slate-100">
+            <span className="text-[13px] font-black text-slate-700 tracking-tight uppercase">{isAdmin ? "Admin" : "Employee"} View</span>
+          </div>
         </div>
       </div>
 
-      {error ? <div className="errorBox">{error}</div> : null}
+      <div className="flex-1 overflow-y-auto p-10 space-y-10">
+        {error ? <div className="errorBox">{error}</div> : null}
 
       {isAdmin ? (
         <Card title="Create Shift">
@@ -194,6 +208,7 @@ export function SchedulingPage() {
       <div className="grid2">
         <Card title="Upcoming">{loading ? <div className="muted">Loading…</div> : renderTable(upcoming)}</Card>
         <Card title="Past">{loading ? <div className="muted">Loading…</div> : renderTable(past.slice(0, 20))}</Card>
+      </div>
       </div>
     </div>
   )

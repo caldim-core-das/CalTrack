@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react"
 import { Plus, Pencil, Trash2, X, Check, Layers } from "lucide-react"
 import { apiRequest, unwrapResults } from "../../../api/client.js"
 
-const COLOURS = ["#4F46E5","#F97316","#10B981","#EF4444","#8B5CF6","#F59E0B","#06B6D4","#EC4899"]
+const COLOURS = ["#4F46E5", "#F97316", "#10B981", "#EF4444", "#8B5CF6", "#F59E0B", "#06B6D4", "#EC4899"]
 
 function ZoneForm({ zone, locations, onSave, onCancel }) {
   const [name, setName] = useState(zone?.name || "")
@@ -34,11 +34,15 @@ function ZoneForm({ zone, locations, onSave, onCancel }) {
         {zone?.id ? "Edit Zone" : "New Zone"}
       </div>
       <input value={name} onChange={e => setName(e.target.value)} placeholder="Zone name"
-        style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid var(--stroke)",
-          background: "var(--bg)", color: "var(--fg)", fontSize: 14, marginBottom: 10, boxSizing: "border-box" }} />
+        style={{
+          width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid var(--stroke)",
+          background: "var(--bg)", color: "var(--fg)", fontSize: 14, marginBottom: 10, boxSizing: "border-box"
+        }} />
       <textarea value={desc} onChange={e => setDesc(e.target.value)} placeholder="Description (optional)" rows={2}
-        style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid var(--stroke)",
-          background: "var(--bg)", color: "var(--fg)", fontSize: 14, marginBottom: 10, resize: "none", boxSizing: "border-box" }} />
+        style={{
+          width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid var(--stroke)",
+          background: "var(--bg)", color: "var(--fg)", fontSize: 14, marginBottom: 10, resize: "none", boxSizing: "border-box"
+        }} />
 
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", marginBottom: 6 }}>ZONE COLOUR</div>
@@ -56,8 +60,10 @@ function ZoneForm({ zone, locations, onSave, onCancel }) {
           {locations.map(loc => {
             const on = selected.includes(String(loc.id))
             return (
-              <label key={loc.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
-                padding: "6px 8px", borderRadius: 6, background: on ? "rgba(79,70,229,0.06)" : "transparent" }}>
+              <label key={loc.id} style={{
+                display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                padding: "6px 8px", borderRadius: 6, background: on ? "rgba(79,70,229,0.06)" : "transparent"
+              }}>
                 <input type="checkbox" checked={on} onChange={() => toggle(loc.id)}
                   style={{ accentColor: "#4F46E5" }} />
                 <span style={{ fontSize: 13, color: "var(--fg)", fontWeight: on ? 600 : 400 }}>{loc.name}</span>
@@ -70,14 +76,18 @@ function ZoneForm({ zone, locations, onSave, onCancel }) {
 
       {err && <div style={{ color: "#EF4444", fontSize: 12, marginBottom: 8 }}>{err}</div>}
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={onCancel} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid var(--stroke)",
-          background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--fg2)" }}>
+        <button onClick={onCancel} style={{
+          flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid var(--stroke)",
+          background: "transparent", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "var(--fg2)"
+        }}>
           Cancel
         </button>
         <button onClick={submit} disabled={saving}
-          style={{ flex: 2, padding: "9px 0", borderRadius: 8, border: "none",
+          style={{
+            flex: 2, padding: "9px 0", borderRadius: 8, border: "none",
             background: "linear-gradient(135deg,#4F46E5,#6366F1)", color: "#fff",
-            cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+            cursor: "pointer", fontSize: 13, fontWeight: 700
+          }}>
           {saving ? "Saving…" : "Save Zone"}
         </button>
       </div>
@@ -119,16 +129,20 @@ export function ZonesPanel({ locations }) {
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Header */}
-      <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--stroke)",
-        display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{
+        padding: "16px 20px", borderBottom: "1px solid var(--stroke)",
+        display: "flex", alignItems: "center", justifyContent: "space-between"
+      }}>
         <div>
           <div style={{ fontWeight: 800, fontSize: 16, color: "var(--fg)" }}>Location Zones</div>
           <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>Group locations into named zones</div>
         </div>
         <button onClick={() => { setEditing(null); setShowForm(true) }}
-          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+          style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
             borderRadius: 8, border: "none", background: "#4F46E5", color: "#fff",
-            fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            fontSize: 13, fontWeight: 700, cursor: "pointer"
+          }}>
           <Plus size={14} /> New Zone
         </button>
       </div>
@@ -146,8 +160,10 @@ export function ZonesPanel({ locations }) {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {zones.map(zone => (
-              <div key={zone.id} style={{ borderRadius: 12, border: "1px solid var(--stroke)",
-                background: "var(--surface)", overflow: "hidden" }}>
+              <div key={zone.id} style={{
+                borderRadius: 12, border: "1px solid var(--stroke)",
+                background: "var(--surface)", overflow: "hidden"
+              }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px" }}>
                   <div style={{ width: 12, height: 12, borderRadius: "50%", background: zone.color, flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>

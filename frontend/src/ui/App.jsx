@@ -168,12 +168,12 @@ export function App() {
             <Route path={routes.settings} element={<SettingsPage />} />
             <Route path={routes.settings_profile} element={<SettingsPage section="profile" />} />
             <Route path={routes.settings_preferences} element={<SettingsPage section="preferences" />} />
-            <Route path={routes.settings_people} element={<PeopleSettingsPage />} />
-            <Route path={routes.settings_timetracking} element={<TimeTrackingSettingsPage />} />
+            <Route path={routes.settings_people} element={<SettingsPage section="people" />} />
+            <Route path={routes.settings_timetracking} element={<SettingsPage section="time-tracking" />} />
             <Route path={routes.settings_attendance} element={<SettingsPage section="attendance" />} />
-            <Route path={routes.settings_schedules} element={<WorkSchedulesSettingsPage />} />
+            <Route path={routes.settings_schedules} element={<SettingsPage section="schedules" />} />
             <Route path={routes.settings_shiftplanner} element={<SettingsPage section="shift-planner" />} />
-            <Route path={routes.settings_holidays} element={<HolidaysSettingsPage />} />
+            <Route path={routes.settings_holidays} element={<SettingsPage section="holidays" />} />
             <Route path={routes.settings_payroll} element={<SettingsPage section="payroll" />} />
             <Route path={routes.settings_expenses} element={<SettingsPage section="expenses" />} />
             <Route path={routes.settings_workflows} element={<SettingsPage section="workflows" />} />
@@ -184,7 +184,7 @@ export function App() {
             <Route path={routes.settings_rbac} element={<SettingsPage section="rbac" />} />
             <Route path={routes.settings_audit} element={<SettingsPage section="audit" />} />
             <Route path={routes.settings_devices} element={<SettingsPage section="devices" />} />
-            <Route path={routes.settings_location} element={<LocationsSettingsPage />} />
+            <Route path={routes.settings_location} element={<SettingsPage section="location" />} />
             <Route path={routes.settings_branding} element={<SettingsPage section="branding" />} />
             <Route path={routes.settings_organization} element={<SettingsPage section="organization" />} />
             <Route path={routes.settings_integrations} element={<SettingsPage section="integrations" />} />

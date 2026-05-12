@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { Button, Card, Input, Pill } from "../components/kit.jsx"
-import { Loader2, ShieldCheck, ShieldOff, AlertTriangle, ChevronDown, ChevronUp } from "lucide-react"
+import { Loader2, ShieldCheck, ShieldOff, AlertTriangle, ChevronDown, ChevronUp, Users } from "lucide-react"
 import { fireSparkleFromEl } from "../sparkle.js"
 
 // ── Exempt status badge ─────────────────────────────────────────────────────
@@ -133,17 +133,30 @@ export function EmployeesPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Employees</h1>
-          <div className="text-slate-500 mt-1">Manage roster, rates, and compliance classification.</div>
+    <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 overflow-hidden">
+      {/* ── HEADER ── */}
+      <div className="h-24 bg-white border-b border-slate-100 px-10 flex items-center justify-between shrink-0 relative overflow-hidden">
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-2xl professional-title text-slate-900 flex items-center gap-3">
+              <Users className="text-indigo-600" size={24} />
+              Employees
+            </h1>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-[10px] professional-subtitle text-slate-500">
+                Manage roster, rates, and compliance classification.
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Pill tone="neutral">{items.length} total</Pill>
-          <Pill tone="good">{activeCount} active</Pill>
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="flex items-center gap-3 px-6 py-3 bg-slate-50 rounded-2xl border border-slate-100">
+            <span className="text-[13px] font-black text-slate-700 tracking-tight uppercase">{items.length} Total</span>
+          </div>
         </div>
       </div>
+
+      <div className="flex-1 overflow-y-auto p-10 space-y-10">
 
       {error && <div className="p-4 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg font-medium">{error}</div>}
       {successMsg && (
@@ -404,6 +417,7 @@ export function EmployeesPage() {
           <div className="text-slate-400 italic">No employees found.</div>
         )}
       </Card>
+      </div>
     </div>
   )
 }

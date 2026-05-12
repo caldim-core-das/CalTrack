@@ -75,11 +75,11 @@ L.Icon.Default.mergeOptions({
 
 // ── Status config ─────────────────────────────────────────────────────────
 const STATUS = {
-  active:           { color: "#059669", label: "Active",            ring: "#D1FAE5" },
-  on_break:         { color: "#f59e0b", label: "On Break",          ring: "#FEF3C7" },
-  idle:             { color: "#f97316", label: "Idle",              ring: "#FFEDD5" },
-  offline:          { color: "#94a3b8", label: "Offline",           ring: "#F1F5F9" },
-  outside_geofence: { color: "#E94560", label: "Outside Geofence",  ring: "#FEE2E2" },
+  active: { color: "#059669", label: "Active", ring: "#D1FAE5" },
+  on_break: { color: "#f59e0b", label: "On Break", ring: "#FEF3C7" },
+  idle: { color: "#f97316", label: "Idle", ring: "#FFEDD5" },
+  offline: { color: "#94a3b8", label: "Offline", ring: "#F1F5F9" },
+  outside_geofence: { color: "#E94560", label: "Outside Geofence", ring: "#FEE2E2" },
 }
 const getStatus = (s) => STATUS[s] || STATUS.active
 
@@ -103,9 +103,9 @@ function createEmployeeMarker(photoUrl, name, statusKey, isSelected) {
           transition:all 0.25s ease;transform:${isSelected ? "scale(1.12)" : "scale(1)"}
         ">
           ${photoUrl
-            ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover"/>`
-            : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${border}22;color:${border};font-weight:900;font-size:${isSelected ? 20 : 16}px;font-family:sans-serif">${name.charAt(0).toUpperCase()}</div>`
-          }
+        ? `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover"/>`
+        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${border}22;color:${border};font-weight:900;font-size:${isSelected ? 20 : 16}px;font-family:sans-serif">${name.charAt(0).toUpperCase()}</div>`
+      }
         </div>
         <div style="width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:10px solid ${border};margin-top:-4px;filter:drop-shadow(0 3px 2px rgba(0,0,0,.12))"></div>
         <div style="position:absolute;bottom:4px;right:2px;width:12px;height:12px;border-radius:50%;background:${cfg.color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.3)"></div>
@@ -248,14 +248,14 @@ export function LiveLocationsPage() {
     if (!showHeatmap) return
     apiRequest("/live-locations/heatmap/")
       .then((res) => setHeatmapPoints(res?.points || []))
-      .catch(() => {})
+      .catch(() => { })
   }, [showHeatmap])
 
   // ── Pending tasks for dispatcher ──────────────────────────────────────
   useEffect(() => {
     apiRequest("/tasks/admin/?status=pending")
       .then((res) => setPendingTasks(unwrapResults(res) || []))
-      .catch(() => {})
+      .catch(() => { })
   }, [])
 
   // ── Detail view for selected employee ────────────────────────────────
@@ -274,7 +274,7 @@ export function LiveLocationsPage() {
           setMapZoom(16)
         }
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoadingDetail(false))
   }, [selectedEmpId])
 
@@ -375,7 +375,7 @@ export function LiveLocationsPage() {
             <Activity size={20} />
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: "var(--fg)" }}>Live Operations</h1>
+            <h1 className="text-xl professional-title text-slate-900">Live Operations</h1>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: connected ? "#059669" : "#E94560", boxShadow: connected ? "0 0 0 4px rgba(5,150,105,.2)" : "none", transition: "all 0.3s" }} />
               <span style={{ fontSize: 10, fontWeight: 800, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
@@ -923,6 +923,30 @@ function Modal({ title, onClose, children }) {
         {children}
       </div>
     </div>
+  )
+}
+
+// ── Shared styles ─────────────────────────────────────────────────────────
+const inputStyle = {
+  padding: "9px 12px", borderRadius: 10, border: "1.5px solid var(--stroke)",
+  background: "var(--bg)", color: "var(--fg)", fontSize: 13, fontWeight: 600,
+  outline: "none", width: "100%", boxSizing: "border-box",
+}
+
+const primaryBtnStyle = {
+  padding: "10px 0", borderRadius: 10, background: "#5d5fef", color: "white",
+  border: "none", fontWeight: 800, fontSize: 14, cursor: "pointer", width: "100%",
+}
+        </AnimatePresence >
+      </div >
+
+  <style>{`
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .premium-sos-popup .leaflet-popup-content-wrapper { background: white !important; border-radius: 24px !important; padding: 0 !important; overflow: hidden; }
+        .premium-sos-popup .leaflet-popup-content { margin: 0 !important; width: 240px !important; }
+      `}</style>
+    </div >
   )
 }
 

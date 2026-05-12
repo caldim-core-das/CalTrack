@@ -487,6 +487,7 @@ class WageFloorCheckView(APIView):
                 "violations": violations,
                 "compliant_count": len(compliant),
                 "violation_count": len(violations),
+                "total_checked": len(compliant) + len(violations),
             }
         })
 

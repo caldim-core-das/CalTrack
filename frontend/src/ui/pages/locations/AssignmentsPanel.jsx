@@ -69,8 +69,10 @@ export function AssignmentsPanel({ locations }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 10 }}>ADD ASSIGNMENT</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <select value={selEmployee} onChange={e => setSelEmployee(e.target.value)}
-            style={{ flex: "1 1 160px", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--stroke)",
-              background: "var(--bg)", color: "var(--fg)", fontSize: 13 }}>
+            style={{
+              flex: "1 1 160px", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--stroke)",
+              background: "var(--bg)", color: "var(--fg)", fontSize: 13
+            }}>
             <option value="">Select employee…</option>
             {employees.map(e => (
               <option key={e.id} value={e.id}>
@@ -80,23 +82,29 @@ export function AssignmentsPanel({ locations }) {
           </select>
 
           <select value={selLocation} onChange={e => setSelLocation(e.target.value)}
-            style={{ flex: "1 1 160px", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--stroke)",
-              background: "var(--bg)", color: "var(--fg)", fontSize: 13 }}>
+            style={{
+              flex: "1 1 160px", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--stroke)",
+              background: "var(--bg)", color: "var(--fg)", fontSize: 13
+            }}>
             <option value="">Select location…</option>
             {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
 
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13,
-            color: "var(--fg2)", cursor: "pointer", whiteSpace: "nowrap" }}>
+          <label style={{
+            display: "flex", alignItems: "center", gap: 6, fontSize: 13,
+            color: "var(--fg2)", cursor: "pointer", whiteSpace: "nowrap"
+          }}>
             <input type="checkbox" checked={isPrimary} onChange={e => setIsPrimary(e.target.checked)}
               style={{ accentColor: "#4F46E5" }} />
             Primary
           </label>
 
           <button onClick={handleAssign} disabled={saving}
-            style={{ padding: "8px 16px", borderRadius: 8, border: "none",
+            style={{
+              padding: "8px 16px", borderRadius: 8, border: "none",
               background: "#4F46E5", color: "#fff", fontSize: 13, fontWeight: 700,
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 6
+            }}>
             <Plus size={14} /> {saving ? "…" : "Assign"}
           </button>
         </div>
@@ -107,8 +115,10 @@ export function AssignmentsPanel({ locations }) {
       <div style={{ padding: "10px 20px", borderBottom: "1px solid var(--stroke)", display: "flex", gap: 8, alignItems: "center" }}>
         <span style={{ fontSize: 12, color: "var(--muted)", fontWeight: 600 }}>FILTER BY LOCATION:</span>
         <select value={filterLoc} onChange={e => setFilterLoc(e.target.value)}
-          style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--stroke)",
-            background: "var(--bg)", color: "var(--fg)", fontSize: 13 }}>
+          style={{
+            padding: "6px 10px", borderRadius: 8, border: "1px solid var(--stroke)",
+            background: "var(--bg)", color: "var(--fg)", fontSize: 13
+          }}>
           <option value="">All locations</option>
           {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
         </select>
@@ -132,20 +142,26 @@ export function AssignmentsPanel({ locations }) {
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {visible.map(a => (
-              <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 12,
+              <div key={a.id} style={{
+                display: "flex", alignItems: "center", gap: 12,
                 padding: "12px 14px", borderRadius: 10, border: "1px solid var(--stroke)",
-                background: "var(--surface)" }}>
-                <div style={{ width: 34, height: 34, borderRadius: "50%",
+                background: "var(--surface)"
+              }}>
+                <div style={{
+                  width: 34, height: 34, borderRadius: "50%",
                   background: "rgba(79,70,229,0.1)",
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+                }}>
                   <Users size={16} color="#4F46E5" />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 13, color: "var(--fg)" }}>
                     {a.employee_name}
                     {a.is_primary && (
-                      <span style={{ marginLeft: 6, fontSize: 10, background: "#4F46E5",
-                        color: "#fff", padding: "1px 6px", borderRadius: 99, fontWeight: 700 }}>
+                      <span style={{
+                        marginLeft: 6, fontSize: 10, background: "#4F46E5",
+                        color: "#fff", padding: "1px 6px", borderRadius: 99, fontWeight: 700
+                      }}>
                         PRIMARY
                       </span>
                     )}
@@ -155,8 +171,10 @@ export function AssignmentsPanel({ locations }) {
                   </div>
                 </div>
                 <button onClick={() => handleRemove(a.id)}
-                  style={{ background: "none", border: "none", cursor: "pointer",
-                    color: "#EF4444", padding: 4 }}>
+                  style={{
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "#EF4444", padding: 4
+                  }}>
                   <Trash2 size={14} />
                 </button>
               </div>

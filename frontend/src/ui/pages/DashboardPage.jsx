@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef, lazy, Suspense } from "react"
+import { motion, useMotionValue, useTransform, useSpring, AnimatePresence } from "framer-motion"
 import { Clock, Users, Briefcase, CalendarDays, DollarSign, Loader2, AlertCircle, Timer, Activity, MapPin, ShieldAlert, TrendingUp, FileWarning, BadgeCheck, XCircle } from "lucide-react"
 
 import { apiRequest } from "../../api/client.js"
@@ -65,6 +66,14 @@ function formatMoney(n) {
 }
 
 
+function ChartPlaceholder() {
+  return (
+    <div className="flex items-center justify-center h-full w-full bg-slate-50/50 rounded-xl border border-dashed border-slate-200 animate-pulse">
+      <Loader2 className="text-slate-200 animate-spin" size={20} />
+    </div>
+  )
+}
+
 export function DashboardPage() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
@@ -99,12 +108,12 @@ export function DashboardPage() {
         // OT risk
         const otData = await apiRequest("/compliance/ot-risk/")
         if (!cancelled && otData?.data?.alerts) setOtAlerts(otData.data.alerts)
-      } catch (_) {}
+      } catch (_) { }
       try {
         // Wage floor violations
         const wfData = await apiRequest("/compliance/wage-floor/")
         if (!cancelled && wfData?.data?.violations) setWageViolations(wfData.data.violations)
-      } catch (_) {}
+      } catch (_) { }
       try {
         // RTW expiry (UK)
         const rtwData = await apiRequest("/compliance/rtw/expiry-check/")
@@ -115,7 +124,7 @@ export function DashboardPage() {
           ]
           setRtwExpiring(expiring)
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     if (user) {
@@ -185,50 +194,116 @@ export function DashboardPage() {
   const kpiPay = kpiCards[4]
   const kpiShft = kpiCards[5]
 
+  function ThreeDKpiCard({ children, color, side }) {
+    const x = useMotionValue(0);
+    const y = useMotionValue(0);
+
+    const rotateX = useTransform(y, [-100, 100], [15, -15]);
+    const rotateY = useTransform(x, [-100, 100], [-15, 15]);
+
+    const springConfig = { damping: 25, stiffness: 200 };
+    const rX = useSpring(rotateX, springConfig);
+    const rY = useSpring(rotateY, springConfig);
+
+    function handleMouse(event) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      x.set(event.clientX - centerX);
+      y.set(event.clientY - centerY);
+    }
+
+    function handleMouseLeave() {
+      x.set(0);
+      y.set(0);
+    }
+
+    return (
+      <motion.div
+        style={{
+          perspective: 1200,
+          rotateX: rX,
+          rotateY: rY,
+          transformStyle: "preserve-3d",
+        }}
+        onMouseMove={handleMouse}
+        onMouseLeave={handleMouseLeave}
+        className="relative cursor-pointer"
+        initial={{ opacity: 0, x: side === 'left' ? -30 : 30 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.8, delay: 0.2, type: "spring" }}
+      >
+        {/* Dynamic Glow */}
+        <motion.div
+          className="absolute -inset-6 opacity-0 group-hover:opacity-40 blur-3xl transition-opacity duration-700 rounded-full pointer-events-none"
+          style={{
+            background: `radial-gradient(circle at center, ${color}, transparent 70%)`,
+            transform: "translateZ(-20px)",
+          }}
+        />
+        <div style={{ transform: "translateZ(40px)" }}>
+          {children}
+        </div>
+      </motion.div>
+    );
+  }
+
   function KpiDiagramSide({ card, side }) {
     const desc = (
-      <div className={`flex flex-col ${side === 'left' ? 'items-end text-right max-lg:items-start max-lg:text-left' : 'items-start text-left'} max-w-[320px] mb-2`}>
-        <div className="font-bold text-[0.95rem] tracking-[0.02em]" style={{ color: card.color }}>
+      <div className={`flex flex-col ${side === 'left' ? 'items-end text-right' : 'items-start text-left'} min-w-[140px]`}>
+        <div className="professional-title text-[1.4rem] leading-none" style={{ color: card.color }}>
           {card.value}
         </div>
-        <div className="text-slate-400 text-[0.9rem] mt-1">{card.sub}</div>
+        <div className="professional-subtitle text-slate-400 text-[0.7rem] mt-1.5 opacity-60 whitespace-nowrap">
+          {card.sub}
+        </div>
       </div>
     )
 
     const pill = (
-      <div className={`inline-flex items-center rounded-full min-h-[54px] shadow-[0_10px_22px_rgba(15,23,42,0.08)] px-2.5 py-2 gap-2.5`} style={{ backgroundColor: card.color }}>
-        <div className="py-1 px-3">
-          <div className="text-white font-bold text-[0.92rem] tracking-[0.01em]">{card.title}</div>
+      <motion.div
+        whileHover={{ scale: 1.05, y: -2 }}
+        className={`flex items-center rounded-2xl min-h-[58px] shadow-[0_20px_40px_rgba(0,0,0,0.12)] px-4 py-2 gap-4 border border-white/20 relative overflow-hidden group`}
+        style={{
+          background: `linear-gradient(135deg, ${card.color} 0%, ${card.color}dd 100%)`,
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="text-white professional-subtitle text-[0.9rem] whitespace-nowrap">{card.title}</div>
+        <div className="w-[40px] h-[40px] rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center flex-none border border-white/20 shadow-inner">
+          <span style={{ color: "white", display: "flex" }}>{card.icon}</span>
         </div>
-        <div className="w-[42px] h-[42px] rounded-full bg-white flex items-center justify-center flex-none">
-          <span style={{ color: card.color, display: "flex" }}>{card.icon}</span>
-        </div>
-      </div>
+      </motion.div>
     )
 
     const connector = (
-      <div className={`flex items-center gap-2 mt-2.5 ${side === 'left' ? 'justify-end max-lg:justify-start' : 'justify-start'}`}>
-        <span className="h-[2px] bg-slate-300/35 max-lg:w-[38px] lg:w-[62px]" />
-        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
+      <div className={`flex items-center ${side === 'left' ? 'justify-end' : 'justify-start'} w-[60px]`}>
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: "100%" }}
+          className="h-[2px] relative"
+          style={{
+            background: `linear-gradient(${side === 'left' ? 'to right' : 'to left'}, transparent, ${card.color}44)`
+          }}
+        >
+          <motion.div
+            animate={{ x: side === 'left' ? [0, 60, 0] : [0, -60, 0], opacity: [0, 1, 0] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            className="absolute top-1/2 -translate-y-1/2 w-1 h-1 rounded-full"
+            style={{ backgroundColor: card.color }}
+          />
+        </motion.div>
       </div>
     )
 
-    if (side === "left") {
-      return (
-        <div className="grid grid-cols-1 items-center max-lg:justify-items-stretch max-lg:text-left lg:justify-items-end lg:text-right">
+    return (
+      <ThreeDKpiCard color={card.color} side={side}>
+        <div className={`flex items-center gap-6 ${side === 'left' ? 'flex-row' : 'flex-row-reverse'}`}>
           {desc}
           {pill}
           {connector}
         </div>
-      )
-    }
-
-    return (
-      <div className="grid grid-cols-1 items-center max-lg:justify-items-stretch max-lg:text-left lg:justify-items-start lg:text-left">
-        {connector}
-        {pill}
-        {desc}
-      </div>
+      </ThreeDKpiCard>
     )
   }
 
@@ -777,25 +852,41 @@ export function DashboardPage() {
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 pt-5 pb-1.5">
-          <div className="text-[1.25rem] font-bold text-slate-900 tracking-tight">Key Performance Indicators</div>
+          <div className="text-[1.25rem] professional-title text-slate-900">Key Performance Indicators</div>
           <div className="text-[0.9rem] text-slate-400 font-medium mt-1">Strategic overview</div>
         </div>
 
-        <div className="p-[18px] pb-[22px] grid grid-cols-1 lg:grid-cols-[1fr_220px_1fr] lg:grid-rows-[repeat(3,minmax(96px,auto))] gap-x-[18px] gap-y-[14px] items-center">
+        <div className="p-8 pb-12 grid grid-cols-1 lg:grid-cols-[1fr_260px_1fr] lg:grid-rows-[repeat(3,minmax(110px,auto))] gap-x-24 gap-y-12 items-center">
           <div className="flex justify-center items-center max-lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:row-span-3">
-            <div className="relative w-[180px] h-[180px] grid place-items-center">
-              <div className="absolute inset-0 rounded-full border-2 border-dashed border-slate-400/60">
-                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] -top-[7px] left-1/2 -translate-x-1/2" style={{ backgroundColor: kpiEmp.color }} />
-                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] top-[24px] right-[12px]" style={{ backgroundColor: kpiHrs.color }} />
-                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] top-1/2 -right-[7px] -translate-y-1/2" style={{ backgroundColor: kpiPay.color }} />
-                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] bottom-[24px] right-[12px]" style={{ backgroundColor: kpiShft.color }} />
-                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] -bottom-[7px] left-1/2 -translate-x-1/2" style={{ backgroundColor: kpiLvs.color }} />
-                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_6px_14px_rgba(15,23,42,0.12)] top-1/2 -left-[7px] -translate-y-1/2" style={{ backgroundColor: kpiTsk.color }} />
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 1, type: "spring" }}
+              className="relative w-[180px] h-[180px] grid place-items-center"
+            >
+              <div className="absolute inset-0 rounded-full border-2 border-dashed border-slate-400/60 animate-[spin_20s_linear_infinite]">
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_0_15px_rgba(0,0,0,0.1)] -top-[7px] left-1/2 -translate-x-1/2" style={{ backgroundColor: kpiEmp.color }} />
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_0_15px_rgba(0,0,0,0.1)] top-[24px] right-[12px]" style={{ backgroundColor: kpiHrs.color }} />
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_0_15px_rgba(0,0,0,0.1)] top-1/2 -right-[7px] -translate-y-1/2" style={{ backgroundColor: kpiPay.color }} />
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_0_15px_rgba(0,0,0,0.1)] bottom-[24px] right-[12px]" style={{ backgroundColor: kpiShft.color }} />
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_0_15px_rgba(0,0,0,0.1)] -bottom-[7px] left-1/2 -translate-x-1/2" style={{ backgroundColor: kpiLvs.color }} />
+                <span className="absolute w-[14px] h-[14px] rounded-full border-[3px] border-white shadow-[0_0_15px_rgba(0,0,0,0.1)] top-1/2 -left-[7px] -translate-y-1/2" style={{ backgroundColor: kpiTsk.color }} />
               </div>
-              <div className="w-[86px] h-[86px] rounded-full bg-white border border-slate-200 shadow-[0_10px_25px_rgba(15,23,42,0.08)] flex items-center justify-center text-slate-900 z-10">
-                <Activity size={26} />
-              </div>
-            </div>
+              <motion.div
+                whileHover={{ scale: 1.1, rotate: 5 }}
+                className="w-[96px] h-[96px] rounded-3xl bg-white border border-slate-200 shadow-[0_15px_40px_rgba(0,0,0,0.1)] flex items-center justify-center text-slate-900 z-10 relative overflow-hidden group"
+              >
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Activity size={32} className="text-indigo-600 group-hover:animate-pulse" />
+              </motion.div>
+
+              {/* Outer Pulse Rings */}
+              <motion.div
+                animate={{ scale: [1, 1.4, 1], opacity: [0.1, 0, 0.1] }}
+                transition={{ duration: 4, repeat: Infinity }}
+                className="absolute w-[120px] h-[120px] rounded-full border border-indigo-200"
+              />
+            </motion.div>
           </div>
 
           <div className="max-lg:col-span-1 lg:col-start-1 lg:row-start-1">
@@ -984,28 +1075,28 @@ export function DashboardPage() {
       {/* ── Row 5: Location Map — Innovative Full-Width ── */}
       <div className="grid gap-6 grid-cols-1">
         <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(15,23,42,0.08)] border border-slate-200 overflow-hidden">
-          {/* Dark Gradient Header */}
-          <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 px-7 py-5 flex justify-between items-center flex-wrap gap-3">
+          {/* White Header */}
+          <div className="bg-white border-b border-slate-100 px-7 py-5 flex justify-between items-center flex-wrap gap-3">
             <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2.5 text-[1.15rem] font-bold text-slate-100 tracking-tight">
-                <MapPin size={20} />
-                <span>Location <span className="bg-gradient-to-br from-indigo-400 to-indigo-300 text-transparent bg-clip-text italic">Distribution</span> of Employees</span>
+              <div className="flex items-center gap-2.5 text-[1.15rem] professional-title text-slate-900">
+                <MapPin size={20} className="text-indigo-600" />
+                <span>Location <span className="text-indigo-600 italic">Distribution</span> of Employees</span>
               </div>
-              <div className="text-[0.82rem] text-slate-400 font-medium pl-[30px]">
+              <div className="text-[0.82rem] text-slate-500 font-medium pl-[30px]">
                 {locationSummary.length} locations · {locationSummary.reduce((s, l) => s + (l.employees || 0), 0)} total employees
               </div>
             </div>
             <div className="flex gap-4.5">
-              <div className="flex items-center gap-1.5 text-[0.78rem] font-semibold text-slate-300 tracking-wide">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(255,255,255,0.15)]" />
+              <div className="flex items-center gap-1.5 text-[0.78rem] font-bold text-slate-600 tracking-wide">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]" />
                 Clocked In
               </div>
-              <div className="flex items-center gap-1.5 text-[0.78rem] font-semibold text-slate-300 tracking-wide ml-4">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(255,255,255,0.15)]" />
+              <div className="flex items-center gap-1.5 text-[0.78rem] font-bold text-slate-600 tracking-wide ml-4">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.3)]" />
                 Clocked Out
               </div>
-              <div className="flex items-center gap-1.5 text-[0.78rem] font-semibold text-slate-300 tracking-wide ml-4">
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_6px_rgba(255,255,255,0.15)]" />
+              <div className="flex items-center gap-1.5 text-[0.78rem] font-bold text-slate-600 tracking-wide ml-4">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.3)]" />
                 Assigned
               </div>
             </div>

@@ -66,6 +66,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class LoginView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+    
+    def post(self, request, *args, **kwargs):
+        print(f"DEBUG: LoginView - POST request received: {request.data}")
+        return super().post(request, *args, **kwargs)
 
 
 class RefreshView(TokenRefreshView):
@@ -122,6 +126,7 @@ class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
+        print(f"DEBUG: RegisterView - POST request received: {request.data}")
         username = request.data.get("username")
         password = request.data.get("password")
         email = request.data.get("email", "")

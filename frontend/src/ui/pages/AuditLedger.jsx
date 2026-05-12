@@ -9,11 +9,11 @@ export default function AuditLedger({ logs, loading, elapsed, downloadLogPdf, su
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-slate-50/50 border-b border-slate-100">
-              <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
-              <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Timeline</th>
-              <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Verification</th>
-              <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Approval Status</th>
-              <th className="p-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Total Duration</th>
+              <th className="p-6 professional-subtitle text-slate-400">Date</th>
+              <th className="p-6 professional-subtitle text-slate-400">Timeline</th>
+              <th className="p-6 professional-subtitle text-slate-400">Verification</th>
+              <th className="p-6 professional-subtitle text-slate-400">Approval Status</th>
+              <th className="p-6 professional-subtitle text-slate-400 text-right">Total Duration</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">

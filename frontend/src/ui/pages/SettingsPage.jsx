@@ -1,6 +1,8 @@
-import { useState, useRef, useCallback, useEffect, lazy, Suspense } from "react"
+import { useState, useRef, useCallback, useEffect, useMemo, lazy, Suspense } from "react"
 import { useLocation, NavLink } from "react-router-dom"
+import { motion, AnimatePresence } from "framer-motion"
 import { routes } from "../routes.js"
+import { Button } from "../components/kit.jsx"
 import { useAuth } from "../../state/auth/useAuth.js"
 import {
   Building2, Palette, CreditCard, Users2, History, ScrollText,
@@ -57,93 +59,55 @@ function ToggleSwitch({ checked, onChange, accent = "#1A56DB" }) {
 
 function SectionHeader({ title, subtitle }) {
   return (
-    <div style={{ marginBottom: 32 }}>
-      <h3 style={{ fontSize: 24, fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>{title}</h3>
-      <p style={{ fontSize: 14, color: "#64748b", margin: 0, lineHeight: 1.5 }}>{subtitle}</p>
+    <div className="mb-10 space-y-2">
+      <h3 className="text-2xl font-black text-slate-900 tracking-tight font-sans">{title}</h3>
+      <p className="text-sm font-medium text-slate-500 italic opacity-80 leading-relaxed font-sans">{subtitle}</p>
     </div>
   )
 }
 
 /* ── Main Page ───────────────────────────────────────────────── */
 const TABS = [
-  {
-    id: "general", label: "General",
-    subs: [
-      { id: "profile", label: "My Profile", subtitle: "Update your personal information visible across the system.", icon: <User size={14} /> },
-      { id: "preferences", label: "Preferences", subtitle: "Manage your theme, language, and interface settings.", icon: <SlidersHorizontal size={14} /> },
-      { id: "branding", label: "Branding", subtitle: "Upload your logo and define your organization's brand identity.", icon: <Palette size={14} />, adminOnly: true },
-      { id: "organization", label: "Organization", subtitle: "Manage organization details, address, and legal info.", icon: <Building2 size={14} />, adminOnly: true },
-    ]
-  },
-  {
-    id: "ai", label: "AI & Automation", adminOnly: true,
-    subs: [
-      { id: "ai-automation", label: "AI & Automation", subtitle: "Configure AI models and automated workflow assistants.", icon: <Zap size={14} /> },
-    ]
-  },
-  {
-    id: "workforce", label: "Workforce",
-    subs: [
-      { id: "people", label: "People", subtitle: "Manage employee directories, teams, and departments.", icon: <Users2 size={14} />, adminOnly: true },
-      { id: "time-tracking", label: "Time Tracking", subtitle: "Define clock-in methods and time capture rules.", icon: <Clock size={14} /> },
-      { id: "attendance", label: "Attendance Policies", subtitle: "Define rules for late marks, grace periods, and overtime.", icon: <SlidersHorizontal size={14} /> },
-      { id: "schedules", label: "Work Schedules", subtitle: "Define standard work days and hours for your organization.", icon: <Sun size={14} /> },
-      { id: "shift-planner", label: "Shift Planning", subtitle: "Manage complex shift patterns and rotations.", icon: <CalendarRange size={14} />, adminOnly: true },
-      { id: "holidays", label: "Time Off & Holidays", subtitle: "Configure leave types and holiday calendars.", icon: <Briefcase size={14} /> },
-    ]
-  },
-  {
-    id: "financials", label: "Financials", adminOnly: true,
-    subs: [
-      { id: "payroll", label: "Payroll", subtitle: "Configure payroll frequency, tax settings, and payout dates.", icon: <Banknote size={14} /> },
-      { id: "expenses", label: "Expenses", subtitle: "Manage expense categories and reimbursement limits.", icon: <CreditCard size={14} /> },
-    ]
-  },
-  {
-    id: "operations", label: "Operations",
-    subs: [
-      { id: "workflows", label: "Approval Workflows", subtitle: "Design multi-level approval chains for leaves and expenses.", icon: <Workflow size={14} />, adminOnly: true },
-      { id: "productivity", label: "Productivity", subtitle: "Analyze workforce output and efficiency metrics.", icon: <Timer size={14} />, adminOnly: true },
-      { id: "reports", label: "Reports & Analytics", subtitle: "Configure scheduled reports and dashboard views.", icon: <BarChart3 size={14} />, adminOnly: true },
-      { id: "notifications", label: "Notifications", subtitle: "Manage delivery channels and notification triggers.", icon: <Bell size={14} /> },
-    ]
-  },
-  {
-    id: "system", label: "System & Security",
-    subs: [
-      { id: "security", label: "Security", subtitle: "Manage session safety, 2FA, and login restrictions.", icon: <Shield size={14} /> },
-      { id: "rbac", label: "Permissions / RBAC", subtitle: "Define user roles and granular access permissions.", icon: <ShieldCheck size={14} />, adminOnly: true },
-      { id: "audit", label: "Audit Log", subtitle: "Track system changes and administrative activities.", icon: <ScrollText size={14} />, adminOnly: true },
-      { id: "devices", label: "Devices", subtitle: "Manage authorized devices and mobile app access.", icon: <Smartphone size={14} />, adminOnly: true },
-      { id: "location", label: "Location Tracking", subtitle: "Configure geofencing and GPS tracking accuracy.", icon: <MapPin size={14} />, adminOnly: true },
-    ]
-  },
-  {
-    id: "enterprise", label: "Enterprise",
-    subs: [
-      { id: "integrations", label: "App Integrations", subtitle: "Connect Caltrack with your favorite tools and APIs.", icon: <Plug size={14} /> },
-      { id: "developer", label: "Developer / API", subtitle: "Manage API keys and webhook endpoints for custom integrations.", icon: <Terminal size={14} />, adminOnly: true },
-      { id: "billing", label: "Billing & Plans", subtitle: "Manage your subscription, invoices, and usage limits.", icon: <CreditCard size={14} />, adminOnly: true },
-      { id: "data", label: "Data & Backups", subtitle: "Export organization data and manage retention policies.", icon: <Database size={14} />, adminOnly: true },
-    ]
-  },
+  { id: "profile", label: "My Profile", subtitle: "Update your personal information visible across the system.", icon: <User size={14} />, to: routes.settings_profile },
+  { id: "preferences", label: "Preferences", subtitle: "Manage your theme, language, and interface settings.", icon: <SlidersHorizontal size={14} />, to: routes.settings_preferences },
+  { id: "people", label: "People", subtitle: "Manage employee directories, teams, and departments.", icon: <Users2 size={14} />, adminOnly: true, to: routes.settings_people },
+  { id: "time-tracking", label: "Time Tracking", subtitle: "Define clock-in methods and time capture rules.", icon: <Clock size={14} />, to: routes.settings_timetracking },
+  { id: "attendance", label: "Attendance Policies", subtitle: "Define rules for late marks, grace periods, and overtime.", icon: <SlidersHorizontal size={14} />, to: routes.settings_attendance },
+  { id: "schedules", label: "Work Schedules", subtitle: "Define standard work days and hours for your organization.", icon: <Sun size={14} />, to: routes.settings_schedules },
+  { id: "shift-planner", label: "Shift Planning", subtitle: "Manage complex shift patterns and rotations.", icon: <CalendarRange size={14} />, adminOnly: true, to: routes.settings_shiftplanner },
+  { id: "holidays", label: "Time Off & Holidays", subtitle: "Configure leave types and holiday calendars.", icon: <Briefcase size={14} />, to: routes.settings_holidays },
+  { id: "payroll", label: "Payroll", subtitle: "Configure payroll frequency, tax settings, and payout dates.", icon: <Banknote size={14} />, adminOnly: true, to: routes.settings_payroll },
+  { id: "expenses", label: "Expenses", subtitle: "Manage expense categories and reimbursement limits.", icon: <CreditCard size={14} />, adminOnly: true, to: routes.settings_expenses },
+  { id: "workflows", label: "Approval Workflows", subtitle: "Design multi-level approval chains for leaves and expenses.", icon: <Workflow size={14} />, adminOnly: true, to: routes.settings_workflows },
+  { id: "productivity", label: "Productivity", subtitle: "Analyze workforce output and efficiency metrics.", icon: <Timer size={14} />, adminOnly: true, to: routes.settings_productivity },
+  { id: "reports", label: "Reports & Analytics", subtitle: "Configure scheduled reports and dashboard views.", icon: <BarChart3 size={14} />, adminOnly: true, to: routes.settings_reports },
+  { id: "notifications", label: "Notifications", subtitle: "Manage delivery channels and notification triggers.", icon: <Bell size={14} />, to: routes.settings_notifications },
+  { id: "security", label: "Security", subtitle: "Manage session safety, 2FA, and login restrictions.", icon: <Shield size={14} />, to: routes.settings_security },
+  { id: "rbac", label: "Permissions / RBAC", subtitle: "Define user roles and granular access permissions.", icon: <ShieldCheck size={14} />, adminOnly: true, to: routes.settings_rbac },
+  { id: "audit", label: "Audit Log", subtitle: "Track system changes and administrative activities.", icon: <ScrollText size={14} />, adminOnly: true, to: routes.settings_audit },
+  { id: "devices", label: "Devices", subtitle: "Manage authorized devices and mobile app access.", icon: <Smartphone size={14} />, adminOnly: true, to: routes.settings_devices },
+  { id: "location", label: "Location Tracking", subtitle: "Configure geofencing and GPS tracking accuracy.", icon: <MapPin size={14} />, adminOnly: true, to: routes.settings_location },
+  { id: "branding", label: "Branding", subtitle: "Upload your logo and define your organization's brand identity.", icon: <Palette size={14} />, adminOnly: true, to: routes.settings_branding },
+  { id: "organization", label: "Organization", subtitle: "Manage organization details, address, and legal info.", icon: <Building2 size={14} />, adminOnly: true, to: routes.settings_organization },
+  { id: "integrations", label: "App Integrations", subtitle: "Connect Caltrack with your favorite tools and APIs.", icon: <Plug size={14} />, to: routes.settings_integrations },
+  { id: "developer", label: "Developer / API", subtitle: "Manage API keys and webhook endpoints for custom integrations.", icon: <Terminal size={14} />, adminOnly: true, to: routes.settings_developer },
+  { id: "billing", label: "Billing & Plans", subtitle: "Manage your subscription, invoices, and usage limits.", icon: <CreditCard size={14} />, adminOnly: true, to: routes.settings_billing },
+  { id: "data", label: "Data & Backups", subtitle: "Export organization data and manage retention policies.", icon: <Database size={14} />, adminOnly: true, to: routes.settings_data },
 ]
-
 
 export function SettingsPage({ section: sectionProp }) {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin"
   const location = useLocation()
+
   const [activeSection, setActiveSection] = useState("profile")
-  const [activeTab, setActiveTab] = useState("general")
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState(null)
 
-  const filteredTabs = TABS.filter(t => !t.adminOnly || isAdmin).map(t => ({
-    ...t,
-    subs: t.subs.filter(s => !s.adminOnly || isAdmin)
-  })).filter(t => t.subs.length > 0)
+  const filteredTabs = useMemo(() => {
+    return TABS.filter(t => !t.adminOnly || isAdmin)
+  }, [isAdmin])
 
   const markDirty = useCallback(() => setDirty(true), [])
   const showToast = useCallback((msg, type = "success") => setToast({ msg, type, id: Date.now() }), [])
@@ -151,117 +115,129 @@ export function SettingsPage({ section: sectionProp }) {
   useEffect(() => {
     const section = sectionProp || new URLSearchParams(location.search).get("section")
     if (!section) return
-    const tab = filteredTabs.find((t) => t.subs.some((s) => s.id === section)) || filteredTabs[0]
-    setActiveTab(tab.id)
-    setActiveSection(tab.subs.some((s) => s.id === section) ? section : tab.subs[0].id)
-  }, [location.search, sectionProp, isAdmin])
+    const sub = filteredTabs.find(s => s.id === section)
+    if (sub) {
+      setActiveSection(sub.id)
+    }
+  }, [location.search, sectionProp, filteredTabs])
 
   const handleSave = async () => {
     setSaving(true); await new Promise(r => setTimeout(r, 800)); setSaving(false); setDirty(false)
-    showToast("Changes saved successfully!")
+    showToast("System configurations synchronized.")
   }
-  const handleDiscard = () => { setDirty(false); showToast("Changes discarded.", "warn") }
 
-  const navigate = (tabId, secId) => { setActiveTab(tabId); setActiveSection(secId); }
+  const handleDiscard = () => { setDirty(false); showToast("Changes reverted.", "warn") }
 
-  /* left card items for current tab */
-  const currentTab = filteredTabs.find(t => t.subs.some(s => s.id === activeSection)) || filteredTabs[0]
-  const currentSubs = currentTab.subs
-
-  /* Find active sub for title */
-  const activeSub = currentTab.subs.find(s => s.id === activeSection) || currentTab.subs[0]
+  const activeSub = filteredTabs.find(s => s.id === activeSection) || filteredTabs[0]
 
   return (
-    <div className="stPage" style={{ padding: "40px 60px", width: "100%", background: "#f8fafc", minHeight: "100vh" }}>
-      <div style={{ maxWidth: 1400, margin: 0 }}>
-        {/* ── Page Header ── */}
-        <div style={{ marginBottom: 48, textAlign: "left" }}>
-          <h1 className="stPageTitle" style={{ fontSize: 42, fontWeight: 900, color: "#0f172a", marginBottom: 16, borderBottom: "none" }}>
-            {activeSub.label}
-          </h1>
-          
-          {/* Internal Tabs (Aligned Left) */}
-          <div style={{ display: "flex", gap: 40, borderBottom: "1px solid #e2e8f0", marginBottom: 24 }}>
-            <button style={{
-              padding: "0 0 16px 0",
-              fontSize: 16,
-              fontWeight: 800,
-              color: "#f97316",
-              borderTop: 0,
-              borderLeft: 0,
-              borderRight: 0,
-              borderBottom: "3px solid #f97316",
-              background: "none",
-              cursor: "pointer"
-            }}>
-              {activeSub.label}
-            </button>
-            <button style={{
-              padding: "0 0 16px 0",
-              fontSize: 16,
-              fontWeight: 700,
-              color: "#94a3b8",
-              background: "none",
-              border: 0,
-              cursor: "pointer"
-            }}>
-              Management
-            </button>
-          </div>
+    <div className="flex h-screen bg-bg overflow-hidden">
+      {/* ── FLEXIBLE CONTENT AREA ── */}
+      <main className="flex-1 overflow-y-auto bg-bg relative custom-scrollbar">
+        <div className="max-w-4xl mx-auto px-10 py-16 space-y-12 pb-40">
+          {/* Header */}
+          <header className="space-y-6">
+            <div className="flex items-center gap-2 text-[10px] font-black text-fg-subtle uppercase tracking-[0.2em]">
+              <span className="opacity-50">Settings</span>
+              <ChevronRight size={10} />
+              <span className="text-primary">{activeSub.label}</span>
+            </div>
 
-          <p style={{ fontSize: 16, color: "#64748b", margin: 0, lineHeight: 1.7, maxWidth: 900 }}>
-            {activeSub.subtitle}
-          </p>
+            <div className="space-y-2">
+              <h1 className="text-5xl font-black text-fg tracking-tighter">{activeSub.label}</h1>
+              <p className="text-lg text-fg-muted font-medium italic opacity-80 leading-relaxed">
+                "{activeSub.subtitle}"
+              </p>
+            </div>
+          </header>
+
+          {/* Section Content with Animation */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeSection}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.3, ease: "circOut" }}
+              className="space-y-10"
+            >
+              <Suspense fallback={<div className="flex items-center justify-center py-40"><div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" /></div>}>
+                {activeSection === "profile" && <ProfileSection markDirty={markDirty} showToast={showToast} Field={Field} SectionHeader={SectionHeader} />}
+                {activeSection === "preferences" && <PreferencesSection markDirty={markDirty} showToast={showToast} />}
+                {activeSection === "branding" && <LogoSection markDirty={markDirty} />}
+                {activeSection === "organization" && <CompanySettingsSection markDirty={markDirty} showToast={showToast} />}
+
+                {/* Workforce */}
+                {activeSection === "people" && <ProfileRequirementsSection markDirty={markDirty} />}
+                {activeSection === "time-tracking" && <ClockInMethodsSection markDirty={markDirty} />}
+                {activeSection === "attendance" && <AttendancePolicySection markDirty={markDirty} showToast={showToast} />}
+                {activeSection === "schedules" && <FlexibleHoursSection markDirty={markDirty} />}
+                {activeSection === "shift-planner" && <ShiftPlanningSection markDirty={markDirty} />}
+                {activeSection === "holidays" && <PublicHolidaysSection markDirty={markDirty} />}
+
+                {/* Financials */}
+                {activeSection === "payroll" && <PayCycleSection markDirty={markDirty} />}
+                {activeSection === "expenses" && <ExpensesSection markDirty={markDirty} showToast={showToast} />}
+
+                {/* Operations */}
+                {activeSection === "workflows" && <WorkflowSection markDirty={markDirty} showToast={showToast} />}
+                {activeSection === "productivity" && <ProductivitySection markDirty={markDirty} />}
+                {activeSection === "reports" && <ReportsSection showToast={showToast} />}
+                {activeSection === "notifications" && <DeliveryChannelsSection markDirty={markDirty} />}
+
+                {/* System */}
+                {activeSection === "security" && <SecuritySection markDirty={markDirty} showToast={showToast} />}
+                {activeSection === "rbac" && <RolesPermissionsSection markDirty={markDirty} />}
+                {activeSection === "audit" && <ActivitySection />}
+                {activeSection === "devices" && <DevicesSection markDirty={markDirty} showToast={showToast} />}
+                {activeSection === "location" && <GeofencingSection markDirty={markDirty} />}
+
+                {/* Enterprise */}
+                {activeSection === "integrations" && <IntegrationsSection showToast={showToast} />}
+                {activeSection === "developer" && <DeveloperSection showToast={showToast} />}
+                {activeSection === "billing" && <PlanSection />}
+                {activeSection === "data" && <DataBackupsSection showToast={showToast} />}
+              </Suspense>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
-        {/* ── Body ── */}
-        <main className="stMain" style={{ marginTop: 32, paddingBottom: 100 }}>
-          <Suspense fallback={<div className="p-20 text-center text-slate-400">Loading section...</div>}>
-            {/* General */}
-            {activeSection === "profile" && <ProfileSection markDirty={markDirty} showToast={showToast} Field={Field} SectionHeader={SectionHeader} />}
-            {activeSection === "preferences" && <PreferencesSection markDirty={markDirty} showToast={showToast} />}
-            {activeSection === "branding" && <LogoSection markDirty={markDirty} />}
-            {activeSection === "organization" && <CompanySettingsSection markDirty={markDirty} showToast={showToast} />}
+        {/* ── PREMIUM ACTION BAR ── */}
+        <AnimatePresence>
+          {dirty && (
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[50] w-full max-w-2xl"
+            >
+              <div className="mx-8 p-4 bg-slate-900/90 backdrop-blur-xl border border-white/10 rounded-[2rem] shadow-2xl flex items-center justify-between">
+                <div className="flex items-center gap-4 pl-4">
+                  <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+                  <div className="text-white">
+                    <div className="text-xs font-black uppercase tracking-widest">Unsaved Protocols</div>
+                    <div className="text-[10px] font-bold text-white/50 italic">Deployment pending local changes.</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onClick={handleDiscard} className="px-6 py-2 text-xs font-black text-white/60 hover:text-white transition-colors">Revert</button>
+                  <Button
+                    variant="primary"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-8 py-3 rounded-2xl shadow-xl shadow-primary/20"
+                    icon={saving ? <RefreshCcw size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                  >
+                    {saving ? "Synchronizing..." : "Commit Changes"}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-            {/* AI */}
-            {activeSection === "ai-automation" && <AISettingsSection markDirty={markDirty} showToast={showToast} SectionHeader={SectionHeader} ToggleSwitch={ToggleSwitch} />}
-
-            {/* Workforce */}
-            {activeSection === "people" && <ProfileRequirementsSection markDirty={markDirty} />}
-            {activeSection === "time-tracking" && <ClockInMethodsSection markDirty={markDirty} />}
-            {activeSection === "attendance" && <AttendancePolicySection markDirty={markDirty} showToast={showToast} />}
-            {activeSection === "schedules" && <FlexibleHoursSection markDirty={markDirty} />}
-            {activeSection === "shift-planner" && <ShiftPlanningSection markDirty={markDirty} />}
-            {activeSection === "holidays" && <PublicHolidaysSection markDirty={markDirty} />}
-
-            {/* Financials */}
-            {activeSection === "payroll" && <PayCycleSection markDirty={markDirty} />}
-            {activeSection === "expenses" && <ExpensesSection markDirty={markDirty} showToast={showToast} />}
-
-            {/* Operations */}
-            {activeSection === "workflows" && <WorkflowSection markDirty={markDirty} showToast={showToast} />}
-            {activeSection === "productivity" && <ProductivitySection markDirty={markDirty} />}
-            {activeSection === "reports" && <ReportsSection showToast={showToast} />}
-            {activeSection === "notifications" && <DeliveryChannelsSection markDirty={markDirty} />}
-
-            {/* System */}
-            {activeSection === "security" && <SecuritySection markDirty={markDirty} showToast={showToast} />}
-            {activeSection === "rbac" && <RolesPermissionsSection markDirty={markDirty} />}
-            {activeSection === "audit" && <ActivitySection />}
-            {activeSection === "devices" && <DevicesSection markDirty={markDirty} showToast={showToast} />}
-            {activeSection === "location" && <GeofencingSection markDirty={markDirty} />}
-
-            {/* Enterprise */}
-            {activeSection === "integrations" && <IntegrationsSection showToast={showToast} />}
-            {activeSection === "developer" && <DeveloperSection showToast={showToast} />}
-            {activeSection === "billing" && <PlanSection />}
-            {activeSection === "data" && <DataBackupsSection showToast={showToast} />}
-          </Suspense>
-        </main>
-
-        <SaveBar dirty={dirty} onSave={handleSave} onDiscard={handleDiscard} saving={saving} />
-      </div>
-      {toast && <Toast key={toast.id} message={toast.msg} type={toast.type} onDismiss={() => setToast(null)} />}
+        {toast && <Toast key={toast.id} message={toast.msg} type={toast.type} onDismiss={() => setToast(null)} />}
+      </main>
     </div>
   )
 }
@@ -269,9 +245,11 @@ export function SettingsPage({ section: sectionProp }) {
 /* ── Field Helper ─────────────────────────────────────────────── */
 function Field({ label, children, half }) {
   return (
-    <div className={`stField ${half ? "half" : ""}`}>
-      <label className="stLabel">{label}</label>
-      {children}
+    <div className={`space-y-2 ${half ? "w-1/2" : "w-full"}`}>
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 font-sans">{label}</label>
+      <div className="relative group font-sans">
+        {children}
+      </div>
     </div>
   )
 }

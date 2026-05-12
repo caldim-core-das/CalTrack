@@ -5,11 +5,11 @@ export default function AISettingsSection({ markDirty, showToast, SectionHeader,
   const [enabled, setEnabled] = useState(true)
   const [anomaly, setAnomaly] = useState(true)
   const [autoApproval, setAutoApproval] = useState(false)
-  
+
   return (
     <div className="stPanel">
       <SectionHeader title="AI & Automation" subtitle="Leverage machine learning for attendance insights and smart operations." />
-      
+
       <div className="stCard">
         <div className="stToggleRow">
           <div>
@@ -18,7 +18,7 @@ export default function AISettingsSection({ markDirty, showToast, SectionHeader,
           </div>
           <ToggleSwitch checked={enabled} onChange={v => { setEnabled(v); markDirty() }} />
         </div>
-        
+
         <div className="stToggleRow">
           <div>
             <div className="stToggleLabel">Anomaly Detection</div>

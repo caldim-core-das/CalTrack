@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { Button, Card, Input, Pill, Select, TextArea } from "../components/kit.jsx"
+import { CalendarDays } from "lucide-react"
 import { fireSparkleFromEl } from "../sparkle.js"
 
 const LEAVE_TYPES = [
@@ -98,16 +99,31 @@ export function LeavesPage() {
   }
 
   return (
-    <div className="stackLg leaves-module">
-      <div className="pageHeader">
-        <div>
-          <h1 className="pageTitle">Leaves</h1>
-          <div className="pageSub">Request time off, track approvals, keep the team aligned.</div>
+    <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 overflow-hidden">
+      {/* ── HEADER ── */}
+      <div className="h-24 bg-white border-b border-slate-100 px-10 flex items-center justify-between shrink-0 relative overflow-hidden">
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-2xl professional-title text-slate-900 flex items-center gap-3">
+              <CalendarDays className="text-indigo-600" size={24} />
+              Leaves
+            </h1>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-[10px] professional-subtitle text-slate-500">
+                Request time off, track approvals, keep the team aligned.
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="row">
-          <Pill tone={pendingCount ? "warn" : "good"}>{pendingCount} pending</Pill>
+        <div className="flex items-center gap-4 relative z-10">
+          <div className="flex items-center gap-3 px-6 py-3 bg-slate-50 rounded-2xl border border-slate-100">
+            <CalendarDays size={18} className="text-slate-400" />
+            <span className="text-[13px] font-black text-slate-700 tracking-tight">{pendingCount} Pending</span>
+          </div>
         </div>
       </div>
+
+      <div className="flex-1 overflow-y-auto p-10 space-y-10">
 
       {error ? <div className="errorBox">{error}</div> : null}
 
@@ -177,6 +193,7 @@ export function LeavesPage() {
           <div className="muted">No leave requests.</div>
         )}
       </Card>
+      </div>
     </div>
   )
 }

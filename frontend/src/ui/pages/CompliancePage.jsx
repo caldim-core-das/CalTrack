@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { Button, Card, Pill } from "../components/kit.jsx"
 import {
   ShieldAlert, ShieldCheck, ShieldOff, AlertTriangle, Download,
   FileText, Users, Clock, CalendarDays, CheckCircle, XCircle,
-  RefreshCw, BadgeAlert, BadgeCheck, FileClock, Send,
+  RefreshCw, BadgeAlert, BadgeCheck, FileClock, Send, ScrollText,
 } from "lucide-react"
 
 // ---------------------------------------------------------------------------
@@ -18,8 +18,66 @@ function SectionHeader({ icon, title, sub }) {
         {icon}
       </div>
       <div>
-        <div style={{ fontWeight: 700, fontSize: 15 }}>{title}</div>
-        {sub && <div style={{ fontSize: 12, color: "var(--muted)" }}>{sub}</div>}
+        <div className="professional-title text-[15px]">{title}</div>
+        {sub && <div className="professional-subtitle text-[11px] text-slate-500 mt-0.5">{sub}</div>}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Stat 3D Card
+// ---------------------------------------------------------------------------
+function Stat3DCard({ label, value, colorClass }) {
+  const cardRef = useRef(null)
+  const [rotation, setRotation] = useState({ x: 0, y: 0 })
+  const [isHovered, setIsHovered] = useState(false)
+
+  const handleMouseMove = (e) => {
+    if (!cardRef.current) return
+    const rect = cardRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+    
+    // Calculate rotation (-15 to 15 degrees)
+    const rotateX = ((y - centerY) / centerY) * -15
+    const rotateY = ((x - centerX) / centerX) * 15
+    
+    setRotation({ x: rotateX, y: rotateY })
+  }
+
+  return (
+    <div
+      ref={cardRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => { setIsHovered(false); setRotation({ x: 0, y: 0 }) }}
+      onMouseEnter={() => setIsHovered(true)}
+      style={{ perspective: "800px" }}
+      className="relative group cursor-default flex-1 min-w-[140px] max-w-[200px]"
+    >
+      <div
+        className="relative h-[110px] rounded-2xl p-4 bg-white border border-slate-100/50 shadow-lg overflow-hidden transition-all duration-200 ease-out"
+        style={{
+          transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
+          transformStyle: "preserve-3d",
+          boxShadow: isHovered ? "0 20px 40px -10px rgba(0,0,0,0.15)" : "0 10px 20px -10px rgba(0,0,0,0.05)"
+        }}
+      >
+        <div 
+          className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/80 to-white/0 opacity-0 transition-opacity duration-300 pointer-events-none"
+          style={{ opacity: isHovered ? 1 : 0 }}
+        />
+        <div className={`absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-gradient-to-br ${colorClass} opacity-10 blur-2xl group-hover:opacity-30 transition-opacity duration-500`} />
+        <div className="flex flex-col items-center justify-center h-full relative z-10" style={{ transform: "translateZ(20px)" }}>
+          <div className={`text-4xl professional-title drop-shadow-sm mb-1 bg-clip-text text-transparent bg-gradient-to-br ${colorClass}`}>
+            {value}
+          </div>
+          <div className="text-[10px] professional-subtitle text-slate-500 text-center leading-tight mt-1">
+            {label}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -51,17 +109,14 @@ function OTRiskPanel() {
       />
       {loading ? <div className="muted">Loading…</div> : (
         <>
-          <div style={{ display: "flex", gap: 16, marginBottom: 16, flexWrap: "wrap" }}>
+          <div className="flex gap-4 mb-6 flex-wrap">
             {[
-              { label: "Approaching OT", value: summary.approaching_ot ?? 0, color: "#d97706" },
-              { label: "In Overtime", value: summary.in_ot ?? 0, color: "#dc2626" },
-              { label: "CA Daily OT", value: summary.daily_ot ?? 0, color: "#ea580c" },
-              { label: "Double Time", value: summary.double_time ?? 0, color: "#991b1b" },
+              { label: "Approaching OT", value: summary.approaching_ot ?? 0, color: "from-amber-400 to-orange-500" },
+              { label: "In Overtime", value: summary.in_ot ?? 0, color: "from-red-500 to-rose-600" },
+              { label: "CA Daily OT", value: summary.daily_ot ?? 0, color: "from-orange-500 to-red-600" },
+              { label: "Double Time", value: summary.double_time ?? 0, color: "from-rose-600 to-pink-700" },
             ].map(s => (
-              <div key={s.label} style={{ background: "var(--surface)", borderRadius: 10, padding: "10px 18px", minWidth: 110, textAlign: "center" }}>
-                <div style={{ fontSize: 24, fontWeight: 800, color: s.color }}>{s.value}</div>
-                <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{s.label}</div>
-              </div>
+              <Stat3DCard key={s.label} label={s.label} value={s.value} colorClass={s.color} />
             ))}
           </div>
 
@@ -120,15 +175,9 @@ function UK48HrPanel() {
       />
       {loading ? <div className="muted">Loading…</div> : (
         <>
-          <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
-            <div style={{ background: "#f0fdf4", borderRadius: 10, padding: "10px 18px", textAlign: "center", minWidth: 100 }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "#059669" }}>{compliant}</div>
-              <div style={{ fontSize: 11, color: "var(--muted)" }}>Compliant</div>
-            </div>
-            <div style={{ background: "#fef2f2", borderRadius: 10, padding: "10px 18px", textAlign: "center", minWidth: 100 }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: "#dc2626" }}>{breaching}</div>
-              <div style={{ fontSize: 11, color: "var(--muted)" }}>Breaching</div>
-            </div>
+          <div className="flex gap-4 mb-6">
+            <Stat3DCard label="Compliant" value={compliant} colorClass="from-emerald-400 to-teal-500" />
+            <Stat3DCard label="Breaching" value={breaching} colorClass="from-red-500 to-rose-600" />
           </div>
           {employees.length > 0 ? (
             <div style={{ overflowX: "auto" }}>
@@ -192,7 +241,11 @@ function RTWPanel() {
         apiRequest("/compliance/rtw/expiry-check/"),
       ])
       setDocs(unwrapResults(docsRes))
-      setExpiring(expiryRes.data?.expiring || [])
+      const expiringDocs = [
+        ...(expiryRes.data?.expiring_within_60_days || []),
+        ...(expiryRes.data?.expired || []),
+      ]
+      setExpiring(expiringDocs)
     } catch {
       setDocs([])
     } finally {
@@ -329,9 +382,8 @@ function WTROptOutPanel() {
         title="WTR 48-Hour Opt-Out Agreements"
         sub="Employees who have signed the WTR Reg 5 opt-out"
       />
-      <div style={{ marginBottom: 12, fontSize: 13 }}>
-        <span style={{ fontWeight: 700, color: "#6366f1" }}>{active}</span>
-        <span style={{ color: "var(--muted)", marginLeft: 4 }}>active opt-out{active !== 1 ? "s" : ""}</span>
+      <div className="flex gap-4 mb-6">
+        <Stat3DCard label="Active Opt-outs" value={active} colorClass="from-blue-500 to-indigo-600" />
       </div>
       {loading ? <div className="muted">Loading…</div> : optOuts.length > 0 ? (
         <div style={{ overflowX: "auto" }}>
@@ -389,11 +441,9 @@ function WageFloorPanel() {
         title="Minimum Wage Floor (US + UK)"
         sub="All 50 US states + UK NMW/NLW by age band"
       />
-      <div style={{ marginBottom: 12, fontSize: 13 }}>
-        <span style={{ fontWeight: 700, color: violations.length > 0 ? "#dc2626" : "#059669" }}>{violations.length}</span>
-        <span style={{ color: "var(--muted)", marginLeft: 4 }}>
-          violation{violations.length !== 1 ? "s" : ""} out of {total} employees checked
-        </span>
+      <div className="flex gap-4 mb-6">
+        <Stat3DCard label="Violations" value={violations.length} colorClass={violations.length > 0 ? "from-red-500 to-rose-600" : "from-emerald-400 to-teal-500"} />
+        <Stat3DCard label="Employees Checked" value={total} colorClass="from-slate-400 to-slate-500" />
       </div>
       {loading ? <div className="muted">Loading…</div> : violations.length > 0 ? (
         <div style={{ overflowX: "auto" }}>
@@ -479,11 +529,9 @@ function BreakCompliancePanel() {
       </div>
       {data && (
         <>
-          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>
-            Break violations: <span style={{ color: breakViolations.length ? "#dc2626" : "#059669" }}>{breakViolations.length}</span>
-            <span style={{ marginLeft: 16 }}>
-              Rest violations (UK 11hr): <span style={{ color: restViolations.length ? "#dc2626" : "#059669" }}>{restViolations.length}</span>
-            </span>
+          <div className="flex gap-4 mb-8">
+            <Stat3DCard label="Break Violations" value={breakViolations.length} colorClass={breakViolations.length ? "from-red-500 to-rose-600" : "from-emerald-400 to-teal-500"} />
+            <Stat3DCard label="Rest Violations (11hr)" value={restViolations.length} colorClass={restViolations.length ? "from-red-500 to-rose-600" : "from-emerald-400 to-teal-500"} />
           </div>
           {breakViolations.length > 0 && (
             <div style={{ overflowX: "auto", marginBottom: 12 }}>
@@ -784,19 +832,16 @@ function RTIFPSPanel() {
 
       {data && (
         <div>
-          <div style={{ display: "flex", gap: 14, marginBottom: 12, flexWrap: "wrap" }}>
+          <div className="flex gap-4 mb-6 flex-wrap">
             {[
-              { label: "Tax Year", value: data.submission?.tax_year },
-              { label: "Employees", value: data.totals?.total_employees },
-              { label: "Total Gross", value: `£${data.totals?.total_gross_pay?.toFixed(2)}` },
-              { label: "Total Tax", value: `£${data.totals?.total_income_tax?.toFixed(2)}` },
-              { label: "Emp NI", value: `£${data.totals?.total_employee_ni?.toFixed(2)}` },
-              { label: "Employer NI", value: `£${data.totals?.total_employer_ni?.toFixed(2)}` },
+              { label: "Tax Year", value: data.submission?.tax_year, color: "from-slate-400 to-slate-500" },
+              { label: "Employees", value: data.totals?.total_employees, color: "from-blue-400 to-indigo-500" },
+              { label: "Total Gross", value: `£${data.totals?.total_gross_pay?.toFixed(2)}`, color: "from-emerald-400 to-teal-500" },
+              { label: "Total Tax", value: `£${data.totals?.total_income_tax?.toFixed(2)}`, color: "from-rose-400 to-red-500" },
+              { label: "Emp NI", value: `£${data.totals?.total_employee_ni?.toFixed(2)}`, color: "from-purple-400 to-fuchsia-500" },
+              { label: "Employer NI", value: `£${data.totals?.total_employer_ni?.toFixed(2)}`, color: "from-amber-400 to-orange-500" },
             ].map(s => (
-              <div key={s.label} style={{ background: "var(--surface)", borderRadius: 8, padding: "8px 14px", minWidth: 90, textAlign: "center" }}>
-                <div style={{ fontWeight: 800, fontSize: 15, color: "#6366f1" }}>{s.value}</div>
-                <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 2 }}>{s.label}</div>
-              </div>
+              <Stat3DCard key={s.label} label={s.label} value={s.value} colorClass={s.color} />
             ))}
           </div>
           <div style={{ fontSize: 11, color: "var(--muted)", borderTop: "1px solid var(--stroke)", paddingTop: 8 }}>
@@ -827,26 +872,51 @@ export function CompliancePage() {
 
   if (user?.role !== "admin") {
     return (
-      <div className="stackLg">
-        <div style={{ padding: 40, textAlign: "center", color: "var(--muted)" }}>
-          <ShieldAlert size={40} style={{ marginBottom: 12, color: "#E94560" }} />
-          <div style={{ fontWeight: 700, fontSize: 16 }}>Admin Access Required</div>
-          <div style={{ fontSize: 13, marginTop: 4 }}>Compliance tools are only available to administrators.</div>
+      <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 overflow-hidden">
+        <div className="h-24 bg-white border-b border-slate-100 px-10 flex items-center justify-between shrink-0 relative overflow-hidden">
+          <div className="flex items-center gap-6">
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight font-[Manrope] flex items-center gap-3">
+                <ShieldAlert className="text-indigo-600" size={24} />
+                Compliance Centre
+              </h1>
+              <div className="flex items-center gap-3 mt-2">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                  Admin Access Required
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-10 space-y-10">
+          <Card>
+            <div className="text-slate-400 italic">Compliance tools are only available to administrators.</div>
+          </Card>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="stackLg" style={{ animation: "fadeUp 0.4s ease both" }}>
-      <div className="pageHeader">
-        <div>
-          <h1 className="pageTitle" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <ShieldAlert size={22} color="#E94560" /> Compliance Centre
-          </h1>
-          <div className="pageSub">US FLSA · UK WTR · PAYE/NI · Right to Work · Audit Trail</div>
+    <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 overflow-hidden">
+      {/* ── HEADER ── */}
+      <div className="h-24 bg-white border-b border-slate-100 px-10 flex items-center justify-between shrink-0 relative overflow-hidden">
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-2xl professional-title text-slate-900 flex items-center gap-3">
+              <ShieldAlert className="text-indigo-600" size={24} />
+              Compliance Centre
+            </h1>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-[10px] professional-subtitle text-slate-500">
+                US FLSA · UK WTR · PAYE/NI · Right to Work · Audit Trail
+              </span>
+            </div>
+          </div>
         </div>
       </div>
+
+      <div className="flex-1 overflow-y-auto p-10 space-y-10" style={{ animation: "fadeUp 0.4s ease both" }}>
 
       {/* Tab bar */}
       <div style={{ display: "flex", gap: 4, borderBottom: "2px solid var(--stroke)", paddingBottom: 0 }}>
@@ -898,6 +968,7 @@ export function CompliancePage() {
 
       {/* RTI tab */}
       {tab === "rti" && <RTIFPSPanel />}
+      </div>
     </div>
   )
 }

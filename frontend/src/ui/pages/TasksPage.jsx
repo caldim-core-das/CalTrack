@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, memo } from "react"
+import { createPortal } from "react-dom"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { Pill, Button, Card, Input, Select, TextArea } from "../components/kit.jsx"
@@ -496,33 +497,34 @@ function AdminTasksTable({ tasks, employees, jobSites, onRefresh }) {
   function getEmp(id) { return employees.find((x) => x.user?.id === id) }
 
   return (
-    <Card className="overflow-x-auto">
-      <table className="w-full text-left border-collapse">
-        <thead>
-          <tr className="border-b border-slate-100">
-            <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Task Details</th>
-            <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Assigned To</th>
-            <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Due Date</th>
-            <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Status</th>
-            <th className="px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-50">
-          {tasks.length === 0 && (
-            <tr>
-              <td colSpan={5} className="px-4 py-16 text-center text-slate-400 italic">
-                <div className="flex flex-col items-center gap-3">
-                  <ClipboardList size={40} className="opacity-20" />
-                  No tasks actively assigned.
-                </div>
-              </td>
+    <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-50/50 border-b border-slate-100">
+              <th className="p-6 professional-subtitle text-slate-400">Task Details</th>
+              <th className="p-6 professional-subtitle text-slate-400">Assigned To</th>
+              <th className="p-6 professional-subtitle text-slate-400">Due Date</th>
+              <th className="p-6 professional-subtitle text-slate-400">Status</th>
+              <th className="p-6 professional-subtitle text-slate-400 text-right">Actions</th>
             </tr>
-          )}
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {tasks.length === 0 && (
+              <tr>
+                <td colSpan={5} className="p-24 text-center text-slate-400">
+                  <div className="flex flex-col items-center gap-3 text-[10px] font-black uppercase tracking-widest">
+                    <ClipboardList size={32} className="opacity-20" />
+                    No tasks actively assigned.
+                  </div>
+                </td>
+              </tr>
+            )}
           {tasks.map(t => {
             const emp = getEmp(t.assigned_to)
             return (
               <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
-                <td className="px-4 py-4">
+                <td className="px-6 py-4">
                   <div className="font-bold text-slate-900 text-sm">{t.title}</div>
                   <div className="flex items-center gap-2 mt-1.5 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                     <span className="flex items-center gap-1">
@@ -544,7 +546,7 @@ function AdminTasksTable({ tasks, employees, jobSites, onRefresh }) {
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-4">
+                <td className="px-6 py-4">
                   {emp && emp.user ? (
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold">
@@ -556,11 +558,11 @@ function AdminTasksTable({ tasks, employees, jobSites, onRefresh }) {
                     </div>
                   ) : <span className="text-slate-300 italic text-sm">Unassigned</span>}
                 </td>
-                <td className="px-4 py-4 text-sm font-semibold text-slate-600">{t.due_date}</td>
-                <td className="px-4 py-4">
+                <td className="px-6 py-4 text-sm font-semibold text-slate-600">{t.due_date}</td>
+                <td className="px-6 py-4">
                   <Pill tone={statusTone(t.status)}>{statusLabel(t.status)}</Pill>
                 </td>
-                <td className="px-4 py-4 text-right">
+                <td className="px-6 py-4 text-right">
                   <button className="p-2 rounded-lg text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-all" onClick={() => deleteTask(t.id)} disabled={busy} title="Delete">
                     <Trash2 size={18} />
                   </button>
@@ -568,9 +570,10 @@ function AdminTasksTable({ tasks, employees, jobSites, onRefresh }) {
               </tr>
             )
           })}
-        </tbody>
-      </table>
-    </Card>
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 
@@ -578,8 +581,6 @@ function AdminTasksTable({ tasks, employees, jobSites, onRefresh }) {
 function AdminTasksPage({ tasks, employees, jobSites, loadTasks }) {
   const [open, setOpen] = useState(false)
   const modalRef = useRef(null)
-  const [pos, setPos] = useState({ x: 24, y: 88 })
-  const dragRef = useRef({ dragging: false, dx: 0, dy: 0 })
 
   useEffect(() => {
     if (!open) return
@@ -590,64 +591,16 @@ function AdminTasksPage({ tasks, employees, jobSites, loadTasks }) {
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [open])
 
-  useEffect(() => {
-    if (!open) return
-    const w = window.innerWidth || 0
-    const h = window.innerHeight || 0
-    const rect = modalRef.current?.getBoundingClientRect()
-    const mw = rect?.width || 880
-    const mh = rect?.height || 520
-    setPos({
-      x: Math.max(16, Math.round((w - mw) / 2)),
-      y: Math.max(16, Math.round((h - mh) / 6)),
-    })
-  }, [open])
-
-  function startDrag(e) {
-    if (!open) return
-    dragRef.current.dragging = true
-    dragRef.current.dx = e.clientX - pos.x
-    dragRef.current.dy = e.clientY - pos.y
-    e.currentTarget.setPointerCapture?.(e.pointerId)
-  }
-
-  function moveDrag(e) {
-    if (!dragRef.current.dragging) return
-    const rect = modalRef.current?.getBoundingClientRect()
-    const mw = rect?.width || 880
-    const mh = rect?.height || 520
-    const w = window.innerWidth || 0
-    const h = window.innerHeight || 0
-    const x = e.clientX - dragRef.current.dx
-    const y = e.clientY - dragRef.current.dy
-    setPos({
-      x: Math.min(Math.max(16, x), Math.max(16, w - mw - 16)),
-      y: Math.min(Math.max(16, y), Math.max(16, h - mh - 16)),
-    })
-  }
-
-  function endDrag() {
-    dragRef.current.dragging = false
-  }
-
   return (
     <>
-      {open && (
-        <div className="fixed inset-0 z-[9999] pointer-events-none">
+      {open && createPortal(
+        <div className="modal-overlay">
           <div
-            ref={modalRef}
-            className="absolute w-[min(880px,calc(100vw-32px))] max-h-[calc(100vh-32px)] overflow-auto bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-slate-200 pointer-events-auto animate-in zoom-in-95 duration-200"
-            style={{ left: pos.x, top: pos.y }}
+            className="modal-sheet w-[min(880px,100%)] max-h-[calc(100vh-32px)] flex flex-col pointer-events-auto"
           >
-            <div className="flex justify-between items-center px-6 py-5 border-b border-slate-100">
-              <div
-                onPointerDown={startDrag}
-                onPointerMove={moveDrag}
-                onPointerUp={endDrag}
-                onPointerCancel={endDrag}
-                className="flex flex-col flex-1 cursor-grab active:cursor-grabbing user-select-none"
-              >
-                <div className="text-xl font-extrabold text-slate-900 tracking-tight">Create Work Order</div>
+            <div className="flex justify-between items-center px-6 py-5 border-b border-slate-100 shrink-0">
+              <div className="flex flex-col flex-1 user-select-none">
+                <div className="text-xl professional-title text-slate-900">Create Work Order</div>
                 <div className="text-sm text-slate-400 font-medium mt-0.5">Define tasks, assign personnel, and set location constraints.</div>
               </div>
               <button type="button" className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition-colors" onClick={() => setOpen(false)}>
@@ -655,18 +608,19 @@ function AdminTasksPage({ tasks, employees, jobSites, loadTasks }) {
               </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto">
               <AssignTaskPanel employees={employees} jobSites={jobSites} onAssigned={loadTasks} onClose={() => setOpen(false)} />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <div className="flex flex-col gap-6">
         <div className="flex justify-between items-center">
           <div className="flex items-baseline gap-3">
-            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Task Queue</h2>
-            <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">{tasks.length} Total</span>
+            <h2 className="text-xl professional-title text-slate-900">Task Queue</h2>
+            <span className="text-[10px] professional-subtitle text-slate-400">{tasks.length} Total</span>
           </div>
 
           <Button onClick={() => setOpen(true)} className="shadow-indigo-100 shadow-xl gap-2">
@@ -788,18 +742,25 @@ export function TasksPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3">
-            <ClipboardList className="text-indigo-600" size={32} />
-            Tasks & Orders
-          </h1>
-          <p className="text-slate-500 mt-2 text-lg">
-            {isAdmin ? "Dispatch and monitor work activity across all employees." : "Your personal task feed and execution queue."}
-          </p>
+    <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 overflow-hidden">
+      {/* ── HEADER ── */}
+      <div className="h-24 bg-white border-b border-slate-100 px-10 flex items-center justify-between shrink-0 relative overflow-hidden">
+        <div className="flex items-center gap-6">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight font-[Manrope] flex items-center gap-3">
+              <ClipboardList className="text-indigo-600" size={24} />
+              Tasks & Orders
+            </h1>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                {isAdmin ? "Dispatch and monitor work activity across all employees." : "Your personal task feed and execution queue."}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
+
+      <div className="flex-1 overflow-y-auto p-10 space-y-10">
 
       {error && (
         <div className="p-4 bg-rose-50 text-rose-700 border border-rose-200 rounded-2xl font-bold flex items-center gap-3 animate-in shake duration-500">
@@ -817,6 +778,7 @@ export function TasksPage() {
       ) : (
         <EmployeeTasksPage tasks={tasks} handleAction={handleAction} busy={busy} />
       )}
+      </div>
     </div>
   )
 }

@@ -76,6 +76,8 @@ class DashboardAnalyticsView(APIView):
             return Response(cached_data)
 
         today = timezone.localdate()
+        seven_days_ago = today - timedelta(days=7)
+        thirty_days_ago = today - timedelta(days=30)
 
         # ── KPI Cards ──
         employees_total = Employee.objects.filter(company=company).count()

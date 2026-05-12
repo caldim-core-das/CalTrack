@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
+import { motion, AnimatePresence } from "framer-motion"
 
 import { isOffline } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
@@ -12,95 +13,64 @@ import { apiRequest, unwrapResults } from "../../api/client.js"
 import { NotificationService } from "../../utils/notifications.js"
 
 import {
-  Home,
-  Clock,
-  CheckSquare,
-  CalendarDays,
-  Banknote,
-  CalendarRange,
-  Users,
-  BarChart3,
-  MapPin,
-  Settings,
-  Search,
-  LogOut,
-  User,
-  SlidersHorizontal,
-  MoreHorizontal,
-  CreditCard,
-  X,
-  ChevronDown,
-  ChevronUp,
-  ChevronLeft,
-  ChevronRight,
-  History,
-  Sun,
-  Briefcase,
-  Tag,
-  Plug,
-  Timer,
-  Rocket,
-  Bell,
-  ShieldCheck,
-  ScrollText,
-  Workflow,
-  Shield,
-  Smartphone,
-  Palette,
-  Terminal,
-  Database,
+  Home, Clock, CheckSquare, CalendarDays, Banknote, CalendarRange,
+  Users, BarChart3, MapPin, Settings, Search, LogOut, User,
+  SlidersHorizontal, MoreHorizontal, CreditCard, X, ChevronDown,
+  ChevronUp, ChevronLeft, ChevronRight, History, Sun, Briefcase,
+  Tag, Plug, Timer, Rocket, Bell, ShieldCheck, ScrollText,
+  Workflow, Shield, Smartphone, Palette, Terminal, Database,
   ShieldAlert,
 } from "lucide-react"
 
 const NAV = [
-  { label: "Get Started", to: routes.get_started, icon: <Rocket size={18} strokeWidth={2.5} color="#8B5CF6" /> },
-  { label: "Dashboard", to: routes.dashboard, icon: <Home size={18} strokeWidth={2.5} color="#2563EB" /> },
-  { label: "Locations", to: routes.locations, icon: <MapPin size={18} strokeWidth={2.5} color="#6366F1" /> },
-  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={18} strokeWidth={3} color="#F97316" />, adminOnly: true },
-  { label: "Time", to: routes.time, icon: <Clock size={18} strokeWidth={2.5} color="#06B6D4" /> },
-  { label: "Tasks", to: routes.tasks, icon: <CheckSquare size={18} strokeWidth={2.5} color="#10B981" /> },
-  { label: "Leaves", to: routes.leaves, icon: <CalendarDays size={18} strokeWidth={2.5} color="#F43F5E" /> },
-  { label: "Payroll", to: routes.payroll, icon: <Banknote size={18} strokeWidth={2.5} color="#EAB308" /> },
-  { label: "Scheduling", to: routes.scheduling, icon: <CalendarRange size={18} strokeWidth={2.5} color="#EC4899" /> },
-  { label: "Employees", to: routes.employees, icon: <Users size={18} strokeWidth={2.5} color="#A855F7" />, adminOnly: true },
-  { label: "Reports", to: routes.reports, icon: <BarChart3 size={18} strokeWidth={2.5} color="#F59E0B" />, adminOnly: true },
-  { label: "Compliance", to: routes.compliance, icon: <ShieldAlert size={18} strokeWidth={2.5} color="#E94560" />, adminOnly: true },
+  { label: "Get Started", to: routes.get_started, icon: <Rocket size={20} />, color: "#0EA5E9" },
+  { label: "Dashboard", to: routes.dashboard, icon: <Home size={20} />, color: "#10B981" },
+  { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6" },
+  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, adminOnly: true, color: "#EF4444" },
+  { label: "Time", to: routes.time, icon: <Clock size={20} />, color: "#F59E0B" },
+  { label: "Tasks", to: routes.tasks, icon: <CheckSquare size={20} />, color: "#14B8A6" },
+  { label: "Leaves", to: routes.leaves, icon: <CalendarDays size={20} />, color: "#EC4899" },
+  { label: "Payroll", to: routes.payroll, icon: <Banknote size={20} />, color: "#6366F1" },
+  { label: "Scheduling", to: routes.scheduling, icon: <CalendarRange size={20} />, color: "#38BDF8" },
+  { label: "Employees", to: routes.employees, icon: <Users size={20} />, adminOnly: true, color: "#D946EF" },
+  { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, adminOnly: true, color: "#FACC15" },
+  { label: "Compliance", to: routes.compliance, icon: <ShieldAlert size={20} />, adminOnly: true, color: "#2563EB" },
   {
     label: "Settings",
     to: routes.settings,
-    icon: <Settings size={18} strokeWidth={2.5} color="#64748B" />,
+    icon: <Settings size={20} />,
+    color: "#64748B",
     children: [
-      { label: "My Profile", to: routes.settings_profile, icon: <User size={17} strokeWidth={2.2} color="#64748B" /> },
-      { label: "Preferences", to: routes.settings_preferences, icon: <SlidersHorizontal size={17} strokeWidth={2.2} color="#64748B" /> },
-      { label: "People", to: routes.settings_people, icon: <Users size={17} strokeWidth={2.2} color="#A855F7" />, adminOnly: true },
-      { label: "Time Tracking", to: routes.settings_timetracking, icon: <Clock size={17} strokeWidth={2.2} color="#06B6D4" /> },
-      { label: "Attendance Policies", to: routes.settings_attendance, icon: <SlidersHorizontal size={17} strokeWidth={2.2} color="#10B981" /> },
-      { label: "Work Schedules", to: routes.settings_schedules, icon: <Sun size={17} strokeWidth={2.2} color="#F59E0B" /> },
-      { label: "Shift Planning", to: routes.settings_shiftplanner, icon: <CalendarRange size={17} strokeWidth={2.2} color="#EC4899" />, adminOnly: true },
-      { label: "Time Off & Holidays", to: routes.settings_holidays, icon: <Briefcase size={17} strokeWidth={2.2} color="#F43F5E" /> },
-      { label: "Payroll", to: routes.settings_payroll, icon: <Banknote size={17} strokeWidth={2.2} color="#EAB308" />, adminOnly: true },
-      { label: "Expenses", to: routes.settings_expenses, icon: <CreditCard size={17} strokeWidth={2.2} color="#F97316" />, adminOnly: true },
-      { label: "Approval Workflows", to: routes.settings_workflows, icon: <Workflow size={17} strokeWidth={2.2} color="#2563EB" />, adminOnly: true },
-      { label: "Productivity", to: routes.settings_productivity, icon: <Timer size={17} strokeWidth={2.2} color="#06B6D4" />, adminOnly: true },
-      { label: "Reports & Analytics", to: routes.settings_reports, icon: <BarChart3 size={17} strokeWidth={2.2} color="#F59E0B" />, adminOnly: true },
-      { label: "Notifications", to: routes.settings_notifications, icon: <Bell size={17} strokeWidth={2.2} color="#6366F1" /> },
-      { label: "Security", to: routes.settings_security, icon: <Shield size={17} strokeWidth={2.2} color="#10B981" /> },
-      { label: "Permissions / RBAC", to: routes.settings_rbac, icon: <ShieldCheck size={17} strokeWidth={2.2} color="#10B981" />, adminOnly: true },
-      { label: "Audit Log", to: routes.settings_audit, icon: <ScrollText size={17} strokeWidth={2.2} color="#64748B" />, adminOnly: true },
-      { label: "Devices", to: routes.settings_devices, icon: <Smartphone size={17} strokeWidth={2.2} color="#64748B" />, adminOnly: true },
-      { label: "Location Tracking", to: routes.settings_location, icon: <MapPin size={17} strokeWidth={2.2} color="#F97316" />, adminOnly: true },
-      { label: "Branding", to: routes.settings_branding, icon: <Palette size={17} strokeWidth={2.2} color="#EC4899" />, adminOnly: true },
-      { label: "Organization", to: routes.settings_organization, icon: <Settings size={17} strokeWidth={2.2} color="#64748B" />, adminOnly: true },
-      { label: "Integrations", to: routes.settings_integrations, icon: <Plug size={17} strokeWidth={2.2} color="#2563EB" /> },
-      { label: "Developer / API", to: routes.settings_developer, icon: <Terminal size={17} strokeWidth={2.2} color="#64748B" />, adminOnly: true },
-      { label: "Billing", to: routes.settings_billing, icon: <CreditCard size={17} strokeWidth={2.2} color="#EAB308" />, adminOnly: true },
-      { label: "Data & Backups", to: routes.settings_data, icon: <Database size={17} strokeWidth={2.2} color="#6366F1" />, adminOnly: true },
+      { label: "My Profile", to: routes.settings_profile, icon: <User size={16} />, color: "#6366F1" },
+      { label: "Preferences", to: routes.settings_preferences, icon: <SlidersHorizontal size={16} />, color: "#8B5CF6" },
+      { label: "People", to: routes.settings_people, icon: <Users size={16} />, adminOnly: true, color: "#10B981" },
+      { label: "Time Tracking", to: routes.settings_timetracking, icon: <Clock size={16} />, color: "#F59E0B" },
+      { label: "Attendance Policies", to: routes.settings_attendance, icon: <SlidersHorizontal size={16} />, color: "#EF4444" },
+      { label: "Work Schedules", to: routes.settings_schedules, icon: <Sun size={16} />, color: "#FACC15" },
+      { label: "Shift Planning", to: routes.settings_shiftplanner, icon: <CalendarRange size={16} />, adminOnly: true, color: "#0EA5E9" },
+      { label: "Time Off & Holidays", to: routes.settings_holidays, icon: <Briefcase size={16} />, color: "#EC4899" },
+      { label: "Payroll", to: routes.settings_payroll, icon: <Banknote size={16} />, adminOnly: true, color: "#6366F1" },
+      { label: "Expenses", to: routes.settings_expenses, icon: <CreditCard size={16} />, adminOnly: true, color: "#14B8A6" },
+      { label: "Approval Workflows", to: routes.settings_workflows, icon: <Workflow size={16} />, adminOnly: true, color: "#38BDF8" },
+      { label: "Productivity", to: routes.settings_productivity, icon: <Timer size={16} />, adminOnly: true, color: "#10B981" },
+      { label: "Reports & Analytics", to: routes.settings_reports, icon: <BarChart3 size={16} />, adminOnly: true, color: "#FACC15" },
+      { label: "Notifications", to: routes.settings_notifications, icon: <Bell size={16} />, color: "#EF4444" },
+      { label: "Security", to: routes.settings_security, icon: <Shield size={16} />, color: "#64748B" },
+      { label: "Permissions / RBAC", to: routes.settings_rbac, icon: <ShieldCheck size={16} />, adminOnly: true, color: "#2563EB" },
+      { label: "Audit Log", to: routes.settings_audit, icon: <ScrollText size={16} />, adminOnly: true, color: "#64748B" },
+      { label: "Devices", to: routes.settings_devices, icon: <Smartphone size={16} />, adminOnly: true, color: "#0EA5E9" },
+      { label: "Location Tracking", to: routes.settings_location, icon: <MapPin size={16} />, adminOnly: true, color: "#8B5CF6" },
+      { label: "Branding", to: routes.settings_branding, icon: <Palette size={16} />, adminOnly: true, color: "#EC4899" },
+      { label: "Organization", to: routes.settings_organization, icon: <Settings size={16} />, adminOnly: true, color: "#64748B" },
+      { label: "Integrations", to: routes.settings_integrations, icon: <Plug size={16} />, color: "#14B8A6" },
+      { label: "Developer / API", to: routes.settings_developer, icon: <Terminal size={16} />, adminOnly: true, color: "#64748B" },
+      { label: "Billing", to: routes.settings_billing, icon: <CreditCard size={16} />, adminOnly: true, color: "#38BDF8" },
+      { label: "Data & Backups", to: routes.settings_data, icon: <Database size={16} />, adminOnly: true, color: "#10B981" },
     ],
   },
 ]
 
 const THEME_STORAGE_KEY = "quicktims.theme"
-
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme
@@ -131,12 +101,11 @@ function displayName(username) {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-/* ── Sidebar Tooltip (JS portal, never clipped) ──────────────── */
 function SidebarTooltip({ tooltip }) {
   if (!tooltip) return null
   return (
-    <div 
-      className="fixed z-[999999] bg-slate-900/95 backdrop-blur-md text-white px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shadow-xl border border-white/10 pointer-events-none transition-all"
+    <div
+      className="fixed z-[999999] bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap shadow-xl border border-white/10 dark:border-black/10 pointer-events-none transition-all animate-in fade-in zoom-in duration-200"
       style={{ top: tooltip.y, left: tooltip.x + 12, transform: "translateY(-50%)" }}
     >
       {tooltip.label}
@@ -144,7 +113,6 @@ function SidebarTooltip({ tooltip }) {
   )
 }
 
-/* ── Submenu Flyout ────────────────────────────────────────── */
 function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user, onClose }) {
   if (!flyout) return null
   const isBottom = flyout.bottom !== null
@@ -159,8 +127,8 @@ function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user, onClose }) {
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <div className="bg-white text-slate-900 p-2 rounded-xl min-w-[200px] shadow-[0_20px_25px_-5px_rgba(0,0,0,0.1),0_8px_10px_-6px_rgba(0,0,0,0.1)] border border-slate-200/60 flex flex-col gap-0.5">
-        <div className="px-3 py-2 text-[11px] font-extrabold text-slate-500 uppercase tracking-widest">
+      <div className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white p-2 rounded-2xl min-w-[220px] shadow-xl border border-slate-200 dark:border-slate-800 flex flex-col gap-1 backdrop-blur-xl animate-in slide-in-from-left-2 duration-200">
+        <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-1">
           {flyout.label}
         </div>
         {flyout.children
@@ -169,17 +137,17 @@ function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user, onClose }) {
             <NavLink
               key={child.to}
               to={child.to}
-              className={({ isActive }) => `flex items-center px-3 py-2.5 rounded-lg text-[13.5px] font-semibold transition-all ${isActive ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+              className={({ isActive }) => `flex items-center px-3 py-2.5 rounded-xl text-[13px] font-bold transition-all ${isActive ? 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'}`}
               onClick={onClose}
             >
+              <span className="mr-3 opacity-70">{child.icon}</span>
               {child.label}
             </NavLink>
-        ))}
+          ))}
       </div>
     </div>
   )
 }
-
 
 export function AppShell() {
   const { user, logout } = useAuth()
@@ -187,16 +155,29 @@ export function AppShell() {
   const navigate = useNavigate()
   const [offline, setOffline] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [prefTab, setPrefTab] = useState("general")
-  const [theme, setTheme] = useState(() => getInitialTheme())
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const [orgName, setOrgName] = useState(() => localStorage.getItem("quicktims.orgName") || "")
   const [settingsExpanded, setSettingsExpanded] = useState(true)
-  const [tooltip, setTooltip] = useState(null) // { label, x, y }
-  const [flyout, setFlyout] = useState(null) // { label, children, x, y }
+  const [tooltip, setTooltip] = useState(null)
+  const [flyout, setFlyout] = useState(null)
+  const [drillDownParent, setDrillDownParent] = useState(null)
   const flyoutTimerRef = useRef(null)
+
+  const items = useMemo(() => {
+    if (!user) return []
+    return NAV.filter((i) => !i.adminOnly || user.role === "admin")
+  }, [user])
+
+  useEffect(() => {
+    localStorage.setItem("caltrack.sidebarCollapsed", sidebarCollapsed)
+  }, [sidebarCollapsed])
+
+  useEffect(() => {
+    const parent = items.find(item => item.children && location.pathname.startsWith(item.to))
+    if (parent) setDrillDownParent(parent)
+  }, [location.pathname, items])
 
   const showTooltip = (label, e) => {
     if (!sidebarCollapsed) return
@@ -223,115 +204,18 @@ export function AppShell() {
   const hideFlyout = () => {
     flyoutTimerRef.current = setTimeout(() => {
       setFlyout(null)
-    }, 1200)
+    }, 800)
   }
 
   const cancelHideFlyout = () => {
     if (flyoutTimerRef.current) clearTimeout(flyoutTimerRef.current)
   }
 
-  // NOTE: orgName redirect removed — App.jsx routing already guards AppShell
-  // with user && user.companyId. Redirecting to /onboarding here caused an
-  // infinite loop because /onboarding immediately redirects back to /login.
-
-  const [prefs, setPrefs] = useState(() => {
-    try {
-      const raw = localStorage.getItem("quicktims.prefs")
-      const obj = raw ? JSON.parse(raw) : {}
-      return {
-        language: obj.language || "English",
-        groupTimeEntries: obj.groupTimeEntries ?? true,
-        compactProjectList: obj.compactProjectList || "Collapse if too many projects",
-        compactProjectLimit: obj.compactProjectLimit || 50,
-        taskFilter: obj.taskFilter ?? false,
-        dateFormat: obj.dateFormat || "DD/MM/YYYY",
-        timeFormat: obj.timeFormat || "24-hour",
-        dayStart: obj.dayStart || "09:00",
-      }
-    } catch {
-      return {
-        language: "English",
-        groupTimeEntries: true,
-        compactProjectList: "Collapse if too many projects",
-        compactProjectLimit: 50,
-        taskFilter: false,
-        dateFormat: "DD/MM/YYYY",
-        timeFormat: "24-hour",
-        dayStart: "09:00",
-      }
-    }
-  })
-
-  const [emailPrefs, setEmailPrefs] = useState(() => {
-    try {
-      const raw = localStorage.getItem("quicktims.emailPrefs")
-      const obj = raw ? JSON.parse(raw) : {}
-      return {
-        newsletter: !!obj.newsletter,
-        onboarding: obj.onboarding ?? true,
-        weeklyReport: !!obj.weeklyReport,
-        longRunningTimer: !!obj.longRunningTimer,
-        scheduledReports: obj.scheduledReports ?? true,
-        approval: obj.approval ?? true,
-        timeOff: obj.timeOff ?? true,
-        alerts: obj.alerts ?? true,
-        reminders: obj.reminders ?? true,
-        schedule: obj.schedule ?? true,
-        invoices: !!obj.invoices,
-      }
-    } catch {
-      return {
-        newsletter: false,
-        onboarding: true,
-        weeklyReport: false,
-        longRunningTimer: false,
-        scheduledReports: true,
-        approval: true,
-        timeOff: true,
-        alerts: true,
-        reminders: true,
-        schedule: true,
-        invoices: false,
-      }
-    }
-  })
-
-  const [apiKeys, setApiKeys] = useState(() => {
-    try {
-      const raw = localStorage.getItem("quicktims.apiKeys")
-      const xs = raw ? JSON.parse(raw) : []
-      return Array.isArray(xs) ? xs : []
-    } catch {
-      return []
-    }
-  })
-  const [webhooks, setWebhooks] = useState(() => {
-    try {
-      const raw = localStorage.getItem("quicktims.webhooks")
-      const xs = raw ? JSON.parse(raw) : []
-      return Array.isArray(xs) ? xs : []
-    } catch {
-      return []
-    }
-  })
-  const [workspace, setWorkspace] = useState(() => localStorage.getItem("quicktims.orgName") || "ok")
-
-  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false)
-  const [apiKeyName, setApiKeyName] = useState("")
-  const [apiKeyNameErr, setApiKeyNameErr] = useState("")
-
-  const [webhookModalOpen, setWebhookModalOpen] = useState(false)
-  const [webhookName, setWebhookName] = useState("")
-  const [webhookUrl, setWebhookUrl] = useState("")
-  const [webhookEvent, setWebhookEvent] = useState("")
-  const [webhookErr, setWebhookErr] = useState("")
-
   useEffect(() => {
     const t = setInterval(() => setOffline(isOffline()), 1500)
     return () => clearInterval(t)
   }, [])
 
-  // Auto-logout when JWT expires and refresh fails
   useEffect(() => {
     function handleSessionExpired() {
       logout()
@@ -345,7 +229,6 @@ export function AppShell() {
     function syncOrg() {
       const name = localStorage.getItem("quicktims.orgName") || ""
       setOrgName(name)
-      setWorkspace(name || "ok")
     }
     window.addEventListener("storage", syncOrg)
     window.addEventListener("quicktims:orgName", syncOrg)
@@ -355,7 +238,6 @@ export function AppShell() {
     }
   }, [])
 
-  // --- GPS Auto Clock-in/out & Reminders ---
   useEffect(() => {
     if (location.pathname.startsWith("/settings")) {
       setSettingsExpanded(true)
@@ -364,130 +246,8 @@ export function AppShell() {
 
   useEffect(() => {
     if (!user) return
-
     NotificationService.requestPermission()
-
-    const calculateDistance = (lat1, lon1, lat2, lon2) => {
-      const R = 6371e3; // metres
-      const p1 = lat1 * Math.PI / 180;
-      const p2 = lat2 * Math.PI / 180;
-      const dp = (lat2 - lat1) * Math.PI / 180;
-      const dl = (lon2 - lon1) * Math.PI / 180;
-
-      const a = Math.sin(dp / 2) * Math.sin(dp / 2) + Math.cos(p1) * Math.cos(p2) * Math.sin(dl / 2) * Math.sin(dl / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return Math.round(R * c);
-    }
-
-    let lastReminderDate = null
-    let autoClockedInToday = false
-    let autoClockedOutToday = false
-
-    const checkGeofence = async () => {
-      try {
-        const now = new Date()
-        const currentHour = now.getHours()
-        const todayStr = now.toDateString()
-
-        // 1. Get current session
-        const sessionRes = await apiRequest("/time/current-session/")
-        const isActive = sessionRes && sessionRes.active
-
-        // 2. Get locations
-        let locationsFetch = []
-        try {
-          locationsFetch = unwrapResults(await apiRequest("/time/locations/"))
-        } catch (e) { }
-
-        // Filter valid auto-locations (radius >= 300)
-        const validLocations = (Array.isArray(locationsFetch) ? locationsFetch : []).filter(l => l.geofence_radius >= 300)
-
-        // Reset daily flags
-        if (lastReminderDate !== todayStr) {
-          lastReminderDate = todayStr
-          autoClockedInToday = false
-          autoClockedOutToday = false
-        }
-
-        // 3. Time-based evening reminder (fallback)
-        if (currentHour >= 18 && isActive && !autoClockedOutToday) {
-          NotificationService.sendClockOutReminder()
-          autoClockedOutToday = true
-        }
-
-        // 4. GPS Auto Clock / Reminders
-        if (navigator.geolocation && validLocations.length > 0) {
-          navigator.geolocation.getCurrentPosition(
-            async (pos) => {
-              const { latitude, longitude } = pos.coords
-
-              let insideAny = false
-              for (const loc of validLocations) {
-                const dist = calculateDistance(latitude, longitude, parseFloat(loc.lat), parseFloat(loc.lng))
-                if (dist <= loc.geofence_radius) {
-                  insideAny = true
-                  break
-                }
-              }
-
-              if (insideAny && !isActive && !autoClockedInToday) {
-                // Entered Geofence - Auto Clock In
-                try {
-                  await apiRequest("/time/clock-in/", { method: "POST", json: { notes: "Auto clock-in via Geofence" } })
-                  NotificationService.send("Auto Clock-in", "You entered the workplace geofence. Clocked in successfully.")
-                  autoClockedInToday = true
-                } catch (e) {
-                  NotificationService.send("GPS Reminder", "You are at work. Remember to clock in!")
-                }
-              } else if (!insideAny && isActive && !autoClockedOutToday) {
-                // Exited Geofence - Auto Clock Out
-                try {
-                  await apiRequest("/time/clock-out/", { method: "POST" })
-                  NotificationService.send("Auto Clock-out", "You left the workplace geofence. Clocked out successfully.")
-                  autoClockedOutToday = true
-                  // Reset autoClockedInToday so they can auto clock back in later if they return
-                  autoClockedInToday = false
-                } catch (e) {
-                  NotificationService.send("GPS Reminder", "You left work. Remember to clock out!")
-                }
-              }
-            },
-            (err) => console.debug("GPS Check failed", err),
-            { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
-          )
-        }
-      } catch (err) {
-        console.error("Geofence check failed", err)
-      }
-    }
-
-    // Check every 5 minutes for geofence entry/exit (reduces DB connection pressure)
-    const timer = setInterval(checkGeofence, 300000)
-    checkGeofence() // Initial check
-
-    return () => clearInterval(timer)
   }, [user])
-
-
-  useEffect(() => {
-    applyTheme(theme)
-  }, [theme])
-
-  useEffect(() => {
-    localStorage.setItem("quicktims.prefs", JSON.stringify(prefs))
-  }, [prefs])
-
-  useEffect(() => {
-    localStorage.setItem("quicktims.emailPrefs", JSON.stringify(emailPrefs))
-  }, [emailPrefs])
-
-  useEffect(() => {
-    localStorage.setItem("quicktims.apiKeys", JSON.stringify(apiKeys))
-  }, [apiKeys])
-
-  useEffect(() => {
-    localStorage.setItem("quicktims.webhooks", JSON.stringify(webhooks))
-  }, [webhooks])
 
   useEffect(() => {
     setWorkspaceMenuOpen(false)
@@ -495,20 +255,10 @@ export function AppShell() {
 
   useEffect(() => {
     if (!workspaceMenuOpen) return
-
-    function onKeyDown(e) {
-      if (e.key === "Escape") {
-        setWorkspaceMenuOpen(false)
-      }
-    }
-
+    function onKeyDown(e) { if (e.key === "Escape") setWorkspaceMenuOpen(false) }
     function onPointerDown(e) {
-      const t = e.target
-      if (!(t instanceof Element)) return
-      if (t.closest(".workspaceMenuWrap")) return
-      setWorkspaceMenuOpen(false)
+      if (!e.target.closest(".workspaceMenuWrap")) setWorkspaceMenuOpen(false)
     }
-
     window.addEventListener("keydown", onKeyDown)
     window.addEventListener("pointerdown", onPointerDown)
     return () => {
@@ -519,160 +269,81 @@ export function AppShell() {
 
   if (!user) return null
 
-  const items = NAV.filter((i) => !i.adminOnly || user.role === "admin")
-  const email = `${user.email}`
-
-  function randKey(len = 32) {
-    const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-    const arr = new Uint8Array(len)
-    if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(arr)
-    else {
-      for (let i = 0; i < len; i++) arr[i] = Math.floor(Math.random() * 256)
-    }
-    let out = ""
-    for (let i = 0; i < len; i++) out += alphabet[arr[i] % alphabet.length]
-    return out
-  }
-
-  function openApiKeyModal() {
-    setApiKeyName("")
-    setApiKeyNameErr("")
-    setApiKeyModalOpen(true)
-  }
-
-  function generateApiKey() {
-    const name = apiKeyName.trim()
-    if (!name) {
-      setApiKeyNameErr("Name is mandatory")
-      return
-    }
-    const createdAt = new Date().toISOString()
-    const item = { id: `${Date.now()}`, name, createdAt, key: randKey(36) }
-    setApiKeys((xs) => [item, ...xs])
-    setApiKeyModalOpen(false)
-  }
-
-  function openWebhookModal() {
-    setWebhookName("")
-    setWebhookUrl("")
-    setWebhookEvent("")
-    setWebhookErr("")
-    setWebhookModalOpen(true)
-  }
-
-  function createWebhook() {
-    const name = webhookName.trim()
-    const url = webhookUrl.trim()
-    const event = webhookEvent.trim()
-    if (!name) return setWebhookErr("Name is mandatory")
-    if (!url) return setWebhookErr("Endpoint URL is mandatory")
-    if (!event) return setWebhookErr("Event is mandatory")
-    const createdAt = new Date().toISOString()
-    const item = { id: `${Date.now()}`, workspace, name, url, event, createdAt }
-    setWebhooks((xs) => [item, ...xs])
-    setWebhookModalOpen(false)
-  }
+  const email = user.email
 
   return (
-    <div className="flex flex-col h-screen w-full overflow-hidden bg-slate-50 text-slate-900 font-sans">
+    <div className="flex flex-col h-screen w-full overflow-hidden bg-bg text-fg font-body">
       <CommandPalette open={cmdOpen} setOpen={setCmdOpen} />
+
       {/* ── Topbar ───────────────────────────── */}
-      <header className="flex items-center justify-between h-[64px] px-6 bg-white border-b border-slate-200 z-50 shrink-0">
-        {/* Left: Brand */}
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3">
-            <CalTrackLogo size="sm" />
-            <span className="font-extrabold text-slate-900 text-lg truncate max-w-[150px] sm:max-w-[300px] tracking-tight" title={orgName || workspace}>
-              {orgName || workspace}
-            </span>
-            <div className="relative workspaceMenuWrap">
-              <button
-                type="button"
-                className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors focus:outline-none"
-                aria-label="Workspace menu"
-                title="Workspace menu"
-                onClick={() => setWorkspaceMenuOpen((v) => !v)}
-              >
-                <MoreHorizontal size={18} strokeWidth={2.5} />
-              </button>
-              {workspaceMenuOpen && (
-                <div className="absolute top-full left-0 mt-2 w-60 bg-white rounded-xl shadow-xl border border-slate-200/60 py-2 z-[99999]">
-                  <div className="px-3 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">Workspace</div>
-                  <div className="px-4 py-2 text-[13px] text-slate-500 font-medium">
-                    {orgName || workspace}
-                  </div>
-                </div>
-              )}
+      <header className="flex items-center justify-between h-[var(--header-height)] px-8 bg-surface/80 dark:bg-slate-950/80 backdrop-blur-xl border-b border-stroke dark:border-slate-800 z-50 shrink-0 shadow-sm">
+        <div className="flex items-center gap-8">
+          <div className="flex items-center gap-4">
+            <CalTrackLogo size="sm" className="hover:scale-105 transition-transform" />
+            <div className="flex flex-col">
+              <span className="font-bold text-slate-900 dark:text-white text-base tracking-tight truncate max-w-[200px]" title={orgName || "CalTrack"}>
+                {orgName || "CalTrack"}
+              </span>
+              <span className="text-[10px] professional-subtitle text-blue-500 leading-none">Enterprise</span>
             </div>
           </div>
         </div>
 
-        {/* Right: Actions & Profile */}
-        <div className="flex items-center gap-4">
-          {offline && (
-            <span className="flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold rounded-full" title="Backend unreachable — showing demo data">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Demo Mode
-            </span>
-          )}
-
+        <div className="flex items-center gap-6">
           <button
             type="button"
-            className="hidden md:flex items-center gap-3 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-500 transition-colors"
+            className="hidden md:flex items-center gap-3 px-4 py-2 bg-slate-100/50 dark:bg-slate-800/50 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 border border-slate-200 dark:border-slate-700 rounded-xl text-sm text-slate-500 transition-all duration-300 w-64 group"
             onClick={() => setCmdOpen(true)}
-            title="Search command palette (⌘K)"
           >
-            <Search size={15} />
-            <span className="hidden lg:inline-block font-medium">Search everywhere...</span>
-            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-white border border-slate-200 rounded text-slate-400">⌘K</span>
+            <Search size={16} className="group-hover:text-blue-500 transition-colors" />
+            <span className="flex-1 text-left font-medium opacity-70">Search...</span>
+            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">⌘K</span>
           </button>
 
-          <div className="w-px h-6 bg-slate-200 mx-1"></div>
-
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
             <NotificationCenter />
             <ThemeToggle />
           </div>
 
-          <div className="w-px h-6 bg-slate-200 mx-1"></div>
+          <div className="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
 
           <div
             className="relative profileMenuWrap"
             onMouseEnter={() => setProfileOpen(true)}
             onMouseLeave={() => setProfileOpen(false)}
           >
-            <button className="flex items-center justify-center w-9 h-9 rounded-full bg-indigo-100 border-2 border-white shadow-sm hover:ring-2 hover:ring-indigo-500/30 transition-all focus:outline-none" type="button" aria-label="Account menu" title="Account">
-              <div className="relative w-full h-full flex items-center justify-center rounded-full">
-                <span className="text-indigo-700 font-bold text-sm">{user.username.charAt(0).toUpperCase()}</span>
-                <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></div>
+            <button className="flex items-center gap-3 p-1 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-300 group" type="button">
+              <div className="relative w-10 h-10 flex items-center justify-center rounded-xl bg-blue-600 dark:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                {initials(user.username)}
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-4 border-white dark:border-slate-950 rounded-full shadow-sm"></div>
               </div>
+              {!sidebarCollapsed && (
+                <div className="hidden lg:flex flex-col text-left mr-2">
+                  <span className="text-sm font-bold leading-none">{displayName(user.username)}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">{user.role}</span>
+                </div>
+              )}
             </button>
 
             {profileOpen && (
-              <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200/60 z-[99999] overflow-hidden">
-                <div className="p-5 bg-slate-50 border-b border-slate-200/60">
+              <div className="absolute top-full right-0 mt-3 w-80 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-[99999] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="p-6 bg-slate-50/80 dark:bg-slate-800/50 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-700/60">
                   <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-12 h-12 rounded-full bg-indigo-600 text-white text-lg font-bold shadow-sm">{initials(user.username)}</div>
+                    <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 dark:bg-blue-500 text-white text-xl font-bold shadow-xl shadow-blue-500/20">{initials(user.username)}</div>
                     <div>
-                      <div className="font-bold text-slate-900">{displayName(user.username)}</div>
-                      <div className="text-xs text-slate-500 truncate max-w-[160px]">{email}</div>
+                      <div className="font-bold text-slate-900 dark:text-white text-lg">{displayName(user.username)}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[180px] font-medium">{email}</div>
                     </div>
-                  </div>
-                  <div className={`inline-flex items-center gap-1.5 mt-4 px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${user.role === 'admin' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${user.role === 'admin' ? 'bg-violet-500' : 'bg-blue-500'}`}></span>
-                    {user.role === "admin" ? "Administrator" : "Employee"}
                   </div>
                 </div>
 
-                <div className="p-2 flex flex-col gap-1">
+                <div className="p-3">
                   <button
                     type="button"
-                    className="flex items-center w-full px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
-                    onClick={() => {
-                      setProfileOpen(false)
-                      logout()
-                    }}
+                    className="flex items-center w-full px-4 py-3 text-sm font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all duration-300 group"
+                    onClick={() => { setProfileOpen(false); logout(); }}
                   >
-                    <LogOut size={16} className="mr-3" /> Log out
+                    <LogOut size={18} className="mr-3 group-hover:-translate-x-1 transition-transform" /> Log out
                   </button>
                 </div>
               </div>
@@ -681,92 +352,131 @@ export function AppShell() {
         </div>
       </header>
 
-      {/* Modals removed for sidebar-only settings access */}
-
       {/* ── Body ─────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <aside className={`flex flex-col bg-white border-r border-slate-200 transition-all duration-300 z-40 ${sidebarCollapsed ? 'w-[72px]' : 'w-[260px]'}`} onMouseLeave={() => { hideTooltip(); hideFlyout(); }}>
-          <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1.5 scrollbar-hide">
-            {items.map((item) => (
-              <div key={item.label} className="flex flex-col gap-1">
-                {item.children ? (
-                  <>
-                    <button
-                      type="button"
-                      className={`flex items-center px-3 py-2.5 rounded-lg transition-all group ${location.pathname.startsWith(item.to) ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
-                      onClick={(e) => {
-                        if (sidebarCollapsed) {
-                          navigate(item.to)
-                          if (flyout) setFlyout(null)
-                          else showFlyout(item, e)
-                        } else {
-                          navigate(item.to)
-                          setSettingsExpanded(true)
-                        }
-                      }}
-                      onMouseEnter={(e) => { showTooltip(item.label, e); showFlyout(item, e); }}
-                      onMouseLeave={() => { hideTooltip(); hideFlyout(); }}
-                    >
-                      <span className={`flex items-center justify-center transition-transform group-hover:scale-110 ${sidebarCollapsed ? 'mx-auto' : 'mr-3'}`}>
-                        {item.icon}
-                        {sidebarCollapsed && <span className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-indigo-400"></span>}
-                      </span>
-                      {!sidebarCollapsed && <span className="flex-1 text-left text-sm">{item.label}</span>}
-                      {!sidebarCollapsed && (
-                        <span className="text-slate-400">
-                          {settingsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                        </span>
-                      )}
-                    </button>
-                    {!sidebarCollapsed && settingsExpanded && (
-                      <div className="flex flex-col gap-0.5 pl-9 mt-1 mb-2 border-l-2 border-slate-100 ml-4">
-                        {item.children
-                          .filter(child => !child.adminOnly || user?.role === 'admin')
-                          .map((child) => (
-                            <NavLink
-                              key={child.to}
-                              to={child.to}
-                              className={({ isActive }) => `flex items-center px-3 py-2 rounded-lg text-[13px] font-medium transition-all ${isActive ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
-                            >
-                              <span className="mr-2 opacity-70">{child.icon}</span>
-                              {child.label}
-                            </NavLink>
-                          ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <NavLink
-                    to={item.to}
-                    className={({ isActive }) => `flex items-center px-3 py-2.5 rounded-lg transition-all group ${isActive || (item.to !== "/" && location.pathname.startsWith(item.to)) ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 font-medium'}`}
-                    end={item.to === "/"}
+        {/* ── Main Primary Sidebar ─────────────────────────────── */}
+        <aside
+          className="flex flex-col bg-white dark:bg-slate-950 border-r border-stroke dark:border-slate-900 z-50 w-[100px] shrink-0"
+        >
+          <nav className="flex-1 overflow-y-auto py-6 flex flex-col items-center gap-4 scrollbar-hide">
+            {items.map((item) => {
+              const active = (item.to === "/" && location.pathname === "/") || (item.to !== "/" && location.pathname.startsWith(item.to));
+              const color = item.color || "#3b82f6";
+              const hasChildren = !!item.children;
+
+              return (
+                <div key={item.label} className="relative group">
+                  <button
+                    onClick={() => {
+                      if (hasChildren) setDrillDownParent(item);
+                      navigate(item.to);
+                    }}
+                    className={`flex flex-col items-center justify-center w-20 h-20 rounded-2xl transition-all duration-500 relative gap-1.5 ${active ? 'shadow-lg shadow-sm' : 'text-slate-400 hover:bg-slate-50'}`}
+                    style={{
+                      backgroundColor: active ? `${color}15` : 'transparent',
+                      color: active ? color : undefined
+                    }}
                     onMouseEnter={(e) => showTooltip(item.label, e)}
                     onMouseLeave={hideTooltip}
                   >
-                    <span className={`flex items-center justify-center transition-transform group-hover:scale-110 ${sidebarCollapsed ? 'mx-auto' : 'mr-3'}`}>
+                    <motion.span 
+                      animate={active ? { scale: [1, 1.1, 1] } : {}}
+                      transition={{ repeat: Infinity, duration: 4 }}
+                      className={`transition-all duration-300 ${active ? '' : 'group-hover:scale-110'}`}
+                    >
                       {item.icon}
+                    </motion.span>
+                    <span 
+                      className={`text-[9px] font-black text-center px-1 leading-tight uppercase tracking-tighter transition-all ${active ? 'text-black dark:text-white opacity-100' : 'text-black/60 dark:text-white/60 group-hover:text-black dark:group-hover:text-white group-hover:opacity-100'}`}
+                    >
+                      {item.label}
                     </span>
-                    {!sidebarCollapsed && <span className="text-sm">{item.label}</span>}
-                  </NavLink>
-                )}
-              </div>
-            ))}
+                    
+                    {active && (
+                      <motion.div 
+                        layoutId="active-indicator-main"
+                        className="absolute -right-0 w-1 h-10 rounded-full"
+                        style={{ backgroundColor: color }}
+                      />
+                    )}
+
+                    {/* Hover Glow */}
+                    <div 
+                      className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                      style={{ background: `radial-gradient(circle at center, ${color}10 0%, transparent 70%)` }}
+                    />
+                  </button>
+                </div>
+              );
+            })}
           </nav>
-          <div className="p-3 border-t border-slate-200 bg-slate-50/50">
-            <button
-              className="flex items-center justify-center w-full py-2.5 rounded-lg text-slate-500 hover:bg-slate-200/50 hover:text-slate-800 transition-colors"
-              onClick={() => { setSidebarCollapsed(!sidebarCollapsed); hideTooltip() }}
-              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            >
-              {sidebarCollapsed ? <ChevronRight size={18} /> : <><ChevronLeft size={18} /> <span className="ml-2 text-sm font-semibold">Collapse</span></>}
-            </button>
-          </div>
         </aside>
 
+        {/* ── Secondary Sub-Sidebar Panel ─────────────────────────────── */}
+        <AnimatePresence mode="wait">
+          {drillDownParent && (
+            <motion.aside
+              initial={{ x: -140, opacity: 0, width: 0 }}
+              animate={{ x: 0, opacity: 1, width: 'var(--sub-sidebar-width)' }}
+              exit={{ x: -140, opacity: 0, width: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="flex flex-col bg-slate-50/50 dark:bg-slate-900/20 backdrop-blur-xl border-r border-stroke dark:border-slate-800 z-40 overflow-hidden shrink-0"
+            >
+              <div className="p-4 flex flex-col gap-1 h-full">
+                <div className="mb-4 px-2">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{drillDownParent.label}</h4>
+                  <div className="h-0.5 w-8 bg-slate-200 dark:bg-slate-700 rounded-full" />
+                </div>
+
+                <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col gap-1">
+                  {drillDownParent.children
+                    .filter(child => !child.adminOnly || user?.role === 'admin')
+                    .map((child) => {
+                      const active = location.pathname === child.to || (child.to !== '/settings' && location.pathname.startsWith(child.to));
+                      const color = child.color || drillDownParent.color || "#3b82f6";
+                      return (
+                        <NavLink
+                          key={child.label}
+                          to={child.to}
+                          className={`flex flex-col items-center justify-center w-full py-4 rounded-xl transition-all duration-300 relative group gap-1.5 ${active ? 'bg-white dark:bg-slate-800 shadow-lg border border-slate-200 dark:border-slate-700' : 'text-slate-400 hover:bg-white/50'}`}
+                          onMouseEnter={(e) => showTooltip(child.label, e)}
+                          onMouseLeave={hideTooltip}
+                        >
+                          <span className={`transition-all duration-300 ${active ? 'scale-110' : 'opacity-40 group-hover:opacity-100 group-hover:scale-105'}`} style={{ color }}>
+                            {child.icon}
+                          </span>
+                          <span className={`text-[10px] font-black text-center px-1 uppercase tracking-tighter transition-colors ${active ? 'text-black dark:text-white' : 'text-slate-500 group-hover:text-black dark:group-hover:text-white'}`}>
+                            {child.label}
+                          </span>
+                          {active && (
+                            <motion.div 
+                              layoutId="active-indicator-sub"
+                              className="absolute right-2 w-1 h-6 rounded-full"
+                              style={{ backgroundColor: color }}
+                            />
+                          )}
+                        </NavLink>
+                      );
+                    })}
+                </div>
+
+                <button
+                  onClick={() => setDrillDownParent(null)}
+                  className="mt-auto w-full py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <ChevronLeft size={14} /> Close
+                </button>
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
+
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-slate-50 relative">
-          <Outlet />
+        <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-bg relative scroll-smooth">
+          <div className="absolute inset-0 bg-grid-slate-900/[0.02] dark:bg-grid-white/[0.02] pointer-events-none"></div>
+          <div className="relative z-10 min-h-full">
+            <Outlet />
+          </div>
         </main>
       </div>
 
