@@ -19,21 +19,29 @@ import {
   ChevronLeft, ChevronRight, Rocket, ShieldAlert,
 } from "lucide-react"
 
-const NAV = [
-  { label: "Get Started", to: routes.get_started, icon: <Rocket size={20} />, color: "#0EA5E9" },
-  { label: "Dashboard", to: routes.dashboard, icon: <Home size={20} />, color: "#10B981" },
-  { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6" },
-  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, adminOnly: true, color: "#EF4444" },
-  { label: "Time", to: routes.time, icon: <Clock size={20} />, color: "#F59E0B" },
-  { label: "Tasks", to: routes.tasks, icon: <CheckSquare size={20} />, color: "#14B8A6" },
-  { label: "Leaves", to: routes.leaves, icon: <CalendarDays size={20} />, color: "#EC4899" },
-  { label: "Payroll", to: routes.payroll, icon: <Banknote size={20} />, color: "#6366F1" },
-  { label: "Scheduling", to: routes.scheduling, icon: <CalendarRange size={20} />, color: "#38BDF8" },
-  { label: "Employees", to: routes.employees, icon: <Users size={20} />, adminOnly: true, color: "#D946EF" },
-  { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, adminOnly: true, color: "#FACC15" },
-  { label: "Compliance", to: routes.compliance, icon: <ShieldAlert size={20} />, adminOnly: true, color: "#2563EB" },
-  { label: "Settings", to: routes.settings, icon: <Settings size={20} />, color: "#64748B" },
+// Items visible to all authenticated users (employees + admins)
+const NAV_SHARED = [
+  { label: "Dashboard",  to: routes.dashboard, icon: <Home size={20} />,        color: "#10B981" },
+  { label: "Time",       to: routes.time,       icon: <Clock size={20} />,       color: "#F59E0B" },
+  { label: "Tasks",      to: routes.tasks,      icon: <CheckSquare size={20} />, color: "#14B8A6" },
+  { label: "Leaves",     to: routes.leaves,     icon: <CalendarDays size={20} />,color: "#EC4899" },
+  { label: "Settings",   to: routes.settings,   icon: <Settings size={20} />,    color: "#64748B" },
 ]
+
+// Items visible only to admins/managers
+const NAV_ADMIN = [
+  { label: "Get Started",   to: routes.get_started,    icon: <Rocket size={20} />,      color: "#0EA5E9" },
+  { label: "Locations",     to: routes.locations,      icon: <MapPin size={20} />,      color: "#8B5CF6" },
+  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />,      color: "#EF4444" },
+  { label: "Payroll",       to: routes.payroll,        icon: <Banknote size={20} />,    color: "#6366F1" },
+  { label: "Scheduling",    to: routes.scheduling,     icon: <CalendarRange size={20} />,color: "#38BDF8" },
+  { label: "Employees",     to: routes.employees,      icon: <Users size={20} />,       color: "#D946EF" },
+  { label: "Reports",       to: routes.reports,        icon: <BarChart3 size={20} />,   color: "#FACC15" },
+  { label: "Compliance",    to: routes.compliance,     icon: <ShieldAlert size={20} />, color: "#2563EB" },
+]
+
+// Full combined NAV — built per role at render time (see `items` memo below)
+const NAV = [...NAV_SHARED, ...NAV_ADMIN]
 
 const THEME_STORAGE_KEY = "quicktims.theme"
 
@@ -97,7 +105,7 @@ function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user, onClose }) {
           {flyout.label}
         </div>
         {flyout.children
-          .filter(child => !child.adminOnly || user?.role === 'admin')
+          .filter(child => !child.adminOnly || isAdmin)
           .map((child) => (
             <NavLink
               key={child.to}
@@ -130,9 +138,15 @@ export function AppShell() {
   const [drillDownParent, setDrillDownParent] = useState(null)
   const flyoutTimerRef = useRef(null)
 
+  const isAdmin = user?.role === "admin" || user?.role === "manager"
+
   const items = useMemo(() => {
     if (!user) return []
-    return NAV.filter((i) => !i.adminOnly || user.role === "admin")
+    const isAdminUser = user.role === "admin" || user.role === "manager"
+    // Employees only see shared nav; admins see shared + admin items (admin items interleaved naturally)
+    return isAdminUser
+      ? [...NAV_SHARED.slice(0, 1), ...NAV_ADMIN, ...NAV_SHARED.slice(1)] // dashboard first, then admin, then shared rest
+      : NAV_SHARED
   }, [user])
 
   useEffect(() => {
@@ -292,7 +306,15 @@ export function AppShell() {
               {!sidebarCollapsed && (
                 <div className="hidden lg:flex flex-col text-left mr-2">
                   <span className="text-sm font-bold leading-none">{displayName(user.username)}</span>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">{user.role}</span>
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-wider mt-1 px-1.5 py-0.5 rounded-md"
+                    style={{
+                      color: isAdmin ? "#4f46e5" : "#059669",
+                      background: isAdmin ? "#ede9fe" : "#d1fae5",
+                    }}
+                  >
+                    {user.role}
+                  </span>
                 </div>
               )}
             </button>
@@ -305,6 +327,16 @@ export function AppShell() {
                     <div>
                       <div className="font-bold text-slate-900 dark:text-white text-lg">{displayName(user.username)}</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[180px] font-medium">{email}</div>
+                      <span
+                        className="inline-block mt-1.5 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
+                        style={{
+                          color: isAdmin ? "#4f46e5" : "#059669",
+                          background: isAdmin ? "#ede9fe" : "#d1fae5",
+                          border: `1px solid ${isAdmin ? "#c4b5fd" : "#a7f3d0"}`,
+                        }}
+                      >
+                        {isAdmin ? "Administrator" : "Employee"}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -399,7 +431,7 @@ export function AppShell() {
 
                 <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col gap-1">
                   {drillDownParent.children
-                    .filter(child => !child.adminOnly || user?.role === 'admin')
+                    .filter(child => !child.adminOnly || isAdmin)
                     .map((child) => {
                       const active = location.pathname === child.to || (child.to !== '/settings' && location.pathname.startsWith(child.to));
                       const color = child.color || drillDownParent.color || "#3b82f6";

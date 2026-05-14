@@ -15,7 +15,7 @@ from rest_framework import permissions, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdminRole
+from accounts.permissions import IsAdminRole, is_admin_role
 from employees.models import Employee
 from leaves.models import LeaveRequest
 from time_tracking.models import TimeLog
@@ -182,7 +182,7 @@ class PayrollRecordViewSet(viewsets.ReadOnlyModelViewSet):
             .select_related("employee", "employee__user", "period")
             .order_by("-generated_at")
         )
-        if self.request.user.role == "admin":
+        if is_admin_role(self.request.user):
             return qs
         employee = Employee.objects.filter(
             user=self.request.user, company=self.request.company

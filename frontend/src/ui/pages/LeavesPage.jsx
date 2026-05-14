@@ -28,6 +28,7 @@ function formatEmployeeId(value) {
 
 export function LeavesPage() {
   const { user } = useAuth()
+  const isAdmin = isAdmin || user?.role === "manager"
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState(null)
@@ -127,7 +128,7 @@ export function LeavesPage() {
 
       {error ? <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-600 dark:text-rose-400 text-sm font-bold">{error}</div> : null}
 
-      {user?.role === "employee" ? (
+      {!isAdmin ? (
         <Card title="New Leave Request">
           <form className="grid gap-6 md:grid-cols-2" onSubmit={submit}>
             <Select label="Type" value={leaveType} onChange={(e) => setLeaveType(e.target.value)} options={LEAVE_TYPES} />
@@ -147,7 +148,7 @@ export function LeavesPage() {
         </Card>
       ) : null}
 
-      <Card title={user?.role === "admin" ? "All Requests" : "My Requests"}>
+      <Card title={isAdmin ? "All Requests" : "My Requests"}>
         {loading ? (
           <div className="text-slate-400 dark:text-slate-600 italic">Loading requests…</div>
         ) : items.length ? (
@@ -167,7 +168,7 @@ export function LeavesPage() {
                     <div className="text-sm font-black text-slate-900 dark:text-white tracking-tight">
                       {i.employee ? formatEmployeeId(i.employee) : "—"}
                     </div>
-                    {user?.role === "admin" && i.employee_name ? <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide mt-1">{i.employee_name}</div> : null}
+                    {isAdmin && i.employee_name ? <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide mt-1">{i.employee_name}</div> : null}
                   </div>
                   <div className="w-32 text-sm font-bold text-slate-600 dark:text-slate-400 capitalize">{i.leave_type}</div>
                   <div className="w-40 text-sm font-medium text-slate-500 dark:text-slate-400">{i.start_date}</div>
@@ -176,7 +177,7 @@ export function LeavesPage() {
                     <Pill tone={toneForStatus(i.status)}>{i.status}</Pill>
                   </div>
                   <div className="w-48 flex justify-end gap-2">
-                    {user?.role === "admin" && i.status === "pending" ? (
+                    {isAdmin && i.status === "pending" ? (
                       <div className="flex gap-2">
                         <Button variant="ghost" disabled={busyId === i.id} onClick={() => decide(i.id, "approve")} type="button" className="h-9 px-4 text-[10px] font-black uppercase tracking-widest">
                           Approve

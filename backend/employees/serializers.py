@@ -27,6 +27,9 @@ class EmployeeSerializer(serializers.ModelSerializer):
         read_only=True,
         slug_field='name'
     )
+    # ── Live availability (computed, never stored) ────────────────────────
+    # Values: "available" | "busy" | "on_break" | "on_leave" | "offline"
+    current_availability = serializers.SerializerMethodField()
 
     class Meta:
         model = Employee
@@ -46,10 +49,54 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "job_site_name",
             "allow_all_locations",  # Phase 1 — bypass EmployeeLocation filter
             "is_active",
+            "current_availability",
             "created_at",
             "updated_at",
         )
         read_only_fields = ("id", "created_at", "updated_at")
+
+    def get_current_availability(self, employee):
+        """
+        Compute live availability by checking:
+          1. Employee is inactive        → offline
+          2. Has an open Break today     → on_break
+          3. Has an open TimeLog today   → busy
+          4. Has approved leave today    → on_leave
+          5. Otherwise                   → available
+        """
+        from django.utils import timezone
+        from time_tracking.models import TimeLog, Break
+        from leaves.models import LeaveRequest
+
+        if not employee.is_active:
+            return "offline"
+
+        today = timezone.localdate()
+
+        # Check for an open time log (clocked in, not yet clocked out)
+        open_log = TimeLog.objects.filter(
+            employee=employee,
+            work_date=today,
+            clock_out__isnull=True,
+        ).first()
+
+        if open_log:
+            # Check if currently on a break within that log
+            on_break = Break.objects.filter(
+                time_log=open_log,
+                break_end__isnull=True,
+            ).exists()
+            return "on_break" if on_break else "busy"
+
+        # Check for approved leave covering today
+        on_leave = LeaveRequest.objects.filter(
+            employee=employee,
+            status=LeaveRequest.Status.APPROVED,
+            start_date__lte=today,
+            end_date__gte=today,
+        ).exists()
+
+        return "on_leave" if on_leave else "available"
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user', {})

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
+import { useRole } from "../../state/auth/useRole.js"
 import { Button, Card, Pill } from "../components/kit.jsx"
 import {
   ShieldAlert, ShieldCheck, ShieldOff, AlertTriangle, Download,
@@ -879,9 +880,10 @@ const TABS = [
 
 export function CompliancePage() {
   const { user } = useAuth()
+  const { isAdmin } = useRole()
   const [tab, setTab] = useState("overview")
 
-  if (user?.role !== "admin") {
+  if (!isAdmin) {
     return (
       <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 overflow-hidden">
       <div className="h-24 bg-surface dark:bg-slate-900/60 border-b border-stroke dark:border-slate-800 px-10 flex items-center justify-between shrink-0 relative overflow-hidden">

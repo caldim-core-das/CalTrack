@@ -1,10 +1,284 @@
 import React, { useEffect, useMemo, useState, useRef, lazy, Suspense } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, useMotionValue, useTransform, useSpring, AnimatePresence } from "framer-motion"
-import { Clock, Users, Briefcase, CalendarDays, DollarSign, Loader2, AlertCircle, Timer, Activity, MapPin, ShieldAlert, TrendingUp, FileWarning, BadgeCheck, XCircle } from "lucide-react"
+import { Clock, Users, Briefcase, CalendarDays, DollarSign, Loader2, AlertCircle, Timer, Activity, MapPin, ShieldAlert, TrendingUp, FileWarning, BadgeCheck, XCircle, CheckCircle2, ClipboardList, UserCheck, ArrowRight } from "lucide-react"
 
-import { apiRequest } from "../../api/client.js"
+import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
+import { useRole } from "../../state/auth/useRole.js"
+import { routes } from "../routes.js"
+
+// ─── Employee Personal Dashboard ────────────────────────────
+function StatCard({ icon, label, value, sub, color, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: "#fff",
+        border: "1.5px solid #e2e8f0",
+        borderRadius: 20,
+        padding: "24px 28px",
+        display: "flex",
+        alignItems: "center",
+        gap: 20,
+        cursor: onClick ? "pointer" : "default",
+        transition: "box-shadow 0.2s, transform 0.2s",
+        boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
+      }}
+      onMouseEnter={e => { if (onClick) { e.currentTarget.style.boxShadow = "0 8px 28px rgba(0,0,0,0.10)"; e.currentTarget.style.transform = "translateY(-2px)" } }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.04)"; e.currentTarget.style.transform = "none" }}
+    >
+      <div style={{
+        width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+        background: `${color}18`, border: `1.5px solid ${color}30`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color,
+      }}>
+        {icon}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>
+          {label}
+        </div>
+        <div style={{ fontSize: 26, fontWeight: 900, color: "#0f172a", lineHeight: 1 }}>
+          {value}
+        </div>
+        {sub && <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, marginTop: 4 }}>{sub}</div>}
+      </div>
+      {onClick && <ArrowRight size={18} style={{ color: "#cbd5e1", flexShrink: 0 }} />}
+    </div>
+  )
+}
+
+function TaskStatusRow({ label, count, color }) {
+  if (!count) return null
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #f1f5f9" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
+        <span style={{ fontSize: 13, fontWeight: 700, color: "#475569" }}>{label}</span>
+      </div>
+      <span style={{ fontSize: 13, fontWeight: 900, color }}>{count}</span>
+    </div>
+  )
+}
+
+function EmployeeDashboard() {
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [tasks, setTasks]   = useState([])
+  const [leaves, setLeaves] = useState([])
+  const [loading, setLoading] = useState(true)
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true)
+      try {
+        const [t, l] = await Promise.all([
+          apiRequest("/tasks/my/").catch(() => []),
+          apiRequest("/leaves/").catch(() => []),
+        ])
+        setTasks(Array.isArray(t) ? t : unwrapResults(t))
+        setLeaves(Array.isArray(l) ? l : unwrapResults(l))
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const pendingAcceptance = tasks.filter(t => t.acceptance_status === "pending_acceptance").length
+  const inProgress        = tasks.filter(t => t.status === "in_progress").length
+  const completedToday    = tasks.filter(t => {
+    if (t.status !== "completed" || !t.completed_at) return false
+    return new Date(t.completed_at).toDateString() === new Date().toDateString()
+  }).length
+  const activeTasks       = tasks.filter(t => t.status !== "completed" && t.status !== "cancelled").length
+
+  const pendingLeaves  = leaves.filter(l => l.status === "pending").length
+  const approvedLeaves = leaves.filter(l => l.status === "approved").length
+  const totalLeaves    = leaves.length
+
+  const firstName = user?.firstName || user?.username || "there"
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#f8fafc", overflow: "auto" }}>
+      {/* Header */}
+      <div style={{
+        background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+        padding: "36px 48px 48px",
+        position: "relative",
+        overflow: "hidden",
+      }}>
+        <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 80% 50%, rgba(255,255,255,0.06) 0%, transparent 60%)", pointerEvents: "none" }} />
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: "rgba(255,255,255,0.6)", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>
+            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+          </div>
+          <h1 style={{ fontSize: 28, fontWeight: 900, color: "#fff", margin: 0, letterSpacing: "-0.02em" }}>
+            {greeting}, {firstName} 👋
+          </h1>
+          <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 14, fontWeight: 500, marginTop: 8 }}>
+            Here's your personal overview for today.
+          </p>
+        </div>
+
+        {/* Floating alert for pending tasks */}
+        {pendingAcceptance > 0 && (
+          <div
+            onClick={() => navigate(routes.tasks)}
+            style={{
+              position: "absolute", bottom: -20, right: 48,
+              background: "#fff", borderRadius: 16, padding: "12px 20px",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+              display: "flex", alignItems: "center", gap: 12, cursor: "pointer",
+              border: "1.5px solid #fde68a",
+              zIndex: 10,
+            }}
+          >
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: "#fef9c3", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ClipboardList size={18} style={{ color: "#ca8a04" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 900, color: "#92400e" }}>
+                {pendingAcceptance} task{pendingAcceptance > 1 ? "s" : ""} need{pendingAcceptance === 1 ? "s" : ""} your response
+              </div>
+              <div style={{ fontSize: 10, color: "#d97706", fontWeight: 600 }}>Tap to accept or decline</div>
+            </div>
+            <ArrowRight size={16} style={{ color: "#d97706" }} />
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div style={{ padding: "48px 48px 40px", display: "flex", flexDirection: "column", gap: 32, flex: 1 }}>
+
+        {loading ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "48px 0", color: "#94a3b8", gap: 12 }}>
+            <Loader2 className="animate-spin" size={24} />
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Loading your dashboard…</span>
+          </div>
+        ) : (
+          <>
+            {/* KPI Row */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 20 }}>
+              <StatCard
+                icon={<ClipboardList size={22} />}
+                label="Active Tasks"
+                value={activeTasks}
+                sub={completedToday > 0 ? `${completedToday} completed today` : "No completions today"}
+                color="#4f46e5"
+                onClick={() => navigate(routes.tasks)}
+              />
+              <StatCard
+                icon={<UserCheck size={22} />}
+                label="Awaiting Response"
+                value={pendingAcceptance}
+                sub={pendingAcceptance > 0 ? "Action required" : "All caught up"}
+                color={pendingAcceptance > 0 ? "#d97706" : "#059669"}
+                onClick={pendingAcceptance > 0 ? () => navigate(routes.tasks) : null}
+              />
+              <StatCard
+                icon={<CalendarDays size={22} />}
+                label="My Leaves"
+                value={totalLeaves}
+                sub={`${pendingLeaves} pending · ${approvedLeaves} approved`}
+                color="#ec4899"
+                onClick={() => navigate(routes.leaves)}
+              />
+              <StatCard
+                icon={<Clock size={22} />}
+                label="Clock In/Out"
+                value="Time"
+                sub="Tap to open attendance"
+                color="#f59e0b"
+                onClick={() => navigate(routes.time)}
+              />
+            </div>
+
+            {/* Tasks breakdown */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+              {/* Tasks breakdown card */}
+              <div style={{ background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 20, padding: "24px 28px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>My Task Breakdown</div>
+                  <button
+                    onClick={() => navigate(routes.tasks)}
+                    style={{ fontSize: 11, fontWeight: 800, color: "#4f46e5", background: "#ede9fe", border: "none", borderRadius: 8, padding: "4px 10px", cursor: "pointer" }}
+                  >
+                    View All
+                  </button>
+                </div>
+                <TaskStatusRow label="Awaiting Acceptance" count={pendingAcceptance} color="#d97706" />
+                <TaskStatusRow label="In Progress"         count={inProgress}         color="#2563eb" />
+                <TaskStatusRow label="Completed Today"     count={completedToday}     color="#059669" />
+                {tasks.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "24px 0", color: "#cbd5e1", fontSize: 13, fontWeight: 600 }}>
+                    No tasks assigned yet
+                  </div>
+                )}
+              </div>
+
+              {/* Leave summary card */}
+              <div style={{ background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 20, padding: "24px 28px", boxShadow: "0 2px 12px rgba(0,0,0,0.04)" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: "#0f172a" }}>My Leave Requests</div>
+                  <button
+                    onClick={() => navigate(routes.leaves)}
+                    style={{ fontSize: 11, fontWeight: 800, color: "#ec4899", background: "#fdf2f8", border: "none", borderRadius: 8, padding: "4px 10px", cursor: "pointer" }}
+                  >
+                    View All
+                  </button>
+                </div>
+                <TaskStatusRow label="Pending Approval" count={pendingLeaves}  color="#d97706" />
+                <TaskStatusRow label="Approved"         count={approvedLeaves} color="#059669" />
+                <TaskStatusRow label="Rejected"         count={leaves.filter(l => l.status === "rejected").length} color="#dc2626" />
+                {leaves.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "24px 0", color: "#cbd5e1", fontSize: 13, fontWeight: 600 }}>
+                    No leave requests yet
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Quick actions */}
+            <div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 16 }}>
+                Quick Actions
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                {[
+                  { label: "Clock In / Out",    to: routes.time,   color: "#f59e0b", icon: <Clock size={15} /> },
+                  { label: "My Tasks",          to: routes.tasks,  color: "#4f46e5", icon: <ClipboardList size={15} /> },
+                  { label: "Request Leave",     to: routes.leaves, color: "#ec4899", icon: <CalendarDays size={15} /> },
+                  { label: "My Profile",        to: routes.settings_profile, color: "#64748b", icon: <UserCheck size={15} /> },
+                ].map(({ label, to, color, icon }) => (
+                  <button
+                    key={to}
+                    onClick={() => navigate(to)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      padding: "10px 20px", borderRadius: 12,
+                      background: `${color}12`, border: `1.5px solid ${color}30`,
+                      color, fontSize: 12, fontWeight: 800, cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = `${color}22`; e.currentTarget.style.transform = "translateY(-1px)" }}
+                    onMouseLeave={e => { e.currentTarget.style.background = `${color}12`; e.currentTarget.style.transform = "none" }}
+                  >
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // Lazy-loaded sub-modules
 const DashboardMap = lazy(() => import("./DashboardMap.jsx"))
@@ -77,7 +351,11 @@ function ChartPlaceholder() {
 
 export function DashboardPage() {
   const { user } = useAuth()
+  const { isAdmin } = useRole()
   const navigate = useNavigate()
+
+  // Employees get their own personal dashboard — not the admin analytics view
+  if (!isAdmin) return <EmployeeDashboard />
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [analytics, setAnalytics] = useState(null)
@@ -131,7 +409,7 @@ export function DashboardPage() {
 
     if (user) {
       load()
-      if (user.role === "admin") loadCompliance()
+      if (isAdmin) loadCompliance()
     }
     return () => { cancelled = true }
   }, [user])
@@ -804,7 +1082,7 @@ export function DashboardPage() {
       )}
 
       {/* ── Compliance Risk Banner (admin only) ── */}
-      {user?.role === "admin" && !complianceDismissed && (otAlerts.length > 0 || wageViolations.length > 0 || rtwExpiring.length > 0) && (
+      {isAdmin && !complianceDismissed && (otAlerts.length > 0 || wageViolations.length > 0 || rtwExpiring.length > 0) && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-500/50 dark:border-amber-500/30 rounded-2xl p-5 flex flex-col gap-3 relative shadow-sm mb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">

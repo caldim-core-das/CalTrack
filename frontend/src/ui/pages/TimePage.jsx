@@ -6,6 +6,7 @@ import { getTokens } from "../../state/auth/tokens.js"
 import { getAddress } from "../../api/geocoding.js"
 import { formatDateTime, Card, Button, Pill, Input, Select, TextArea } from "../components/kit.jsx"
 import { useAuth } from "../../state/auth/useAuth.js"
+import { useRole } from "../../state/auth/useRole.js"
 import { verifyFaces, loadFaceModels, hasFace } from "../../utils/faceVerify.js"
 import { NotificationService } from "../../utils/notifications.js"
 
@@ -2032,6 +2033,6 @@ function EmployeeTimePage() {
 //  ROUTER: admin vs employee
 // ═══════════════════════════════════════════════════════════════
 export function TimePage() {
-  const { user } = useAuth()
-  return user?.role === "admin" ? <AdminTimePage /> : <EmployeeTimePage />
+  const { isAdmin } = useRole()
+  return isAdmin ? <AdminTimePage /> : <EmployeeTimePage />
 }

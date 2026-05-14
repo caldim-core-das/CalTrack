@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 
-from accounts.permissions import IsAdminRole
+from accounts.permissions import IsAdminRole, is_admin_role
 from employees.models import Employee
 
 from .models import LeaveRequest
@@ -19,7 +19,7 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         if not hasattr(self.request, 'company'):
             return LeaveRequest.objects.none()
         qs = LeaveRequest.objects.filter(company=self.request.company).select_related("employee", "employee__user", "approved_by").order_by("-created_at")
-        if self.request.user.role == "admin":
+        if is_admin_role(self.request.user):
             return qs
         employee = Employee.objects.filter(user=self.request.user, company=self.request.company).first()
         if not employee:

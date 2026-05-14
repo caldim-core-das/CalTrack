@@ -16,7 +16,7 @@ from rest_framework import permissions, viewsets
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from accounts.permissions import IsAdminRole
+from accounts.permissions import IsAdminRole, is_admin_role
 from employees.models import Employee
 
 from .models import Shift
@@ -119,7 +119,7 @@ class ShiftViewSet(viewsets.ModelViewSet):
             .select_related("employee", "employee__user")
             .order_by("-shift_start")
         )
-        if self.request.user.role == "admin":
+        if is_admin_role(self.request.user):
             return qs
         employee = Employee.objects.filter(
             user=self.request.user, company=self.request.company
@@ -197,6 +197,6 @@ class ShiftViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         shift = self.get_object()
-        if request.user.role != "admin" and shift.employee.user_id != request.user.id:
+        if not is_admin_role(request.user) and shift.employee.user_id != request.user.id:
             return Response({"detail": "Not found."}, status=404)
         return super().retrieve(request, *args, **kwargs)

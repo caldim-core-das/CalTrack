@@ -145,7 +145,7 @@ const TABS = [
 /* ── Page ────────────────────────────────────────────────────── */
 export function SettingsPage({ section: sectionProp }) {
   const { user } = useAuth()
-  const isAdmin = user?.role === "admin"
+  const isAdmin = user?.role === "admin" || user?.role === "manager"
   const location = useLocation()
 
   const [activeSection, setActiveSection] = useState("profile")
@@ -187,7 +187,7 @@ export function SettingsPage({ section: sectionProp }) {
       {/* ── Sidebar ──────────────────────────────────────────────── */}
       <aside className="w-[280px] shrink-0 border-r border-stroke dark:border-slate-800 bg-surface dark:bg-slate-900/40 py-10 sticky top-0 h-screen overflow-y-auto">
         <div className="px-8 pb-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em]">
-          User Settings
+          {isAdmin ? "Settings" : "My Settings"}
         </div>
         <nav className="flex flex-col gap-1 px-4">
           {filteredTabs.map(tab => {

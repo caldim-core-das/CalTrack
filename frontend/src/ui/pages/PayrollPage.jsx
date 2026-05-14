@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
+import { useRole } from "../../state/auth/useRole.js"
 import { Button, Card, Input, Pill } from "../components/kit.jsx"
 import { Banknote } from "lucide-react"
 
@@ -25,7 +26,7 @@ export function PayrollPage() {
   const [start, setStart] = useState("")
   const [end, setEnd] = useState("")
 
-  const isAdmin = user?.role === "admin"
+  const { isAdmin } = useRole()
 
   const employeeOptions = useMemo(() => {
     return employees.map((e) => ({ id: e.id, label: `${e.employee_id} (${e.user?.username ?? "user"})` }))

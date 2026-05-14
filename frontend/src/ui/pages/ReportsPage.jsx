@@ -2,6 +2,7 @@ import { useRef, useEffect, useMemo, useState } from "react"
 
 import { apiRequest } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
+import { useRole } from "../../state/auth/useRole.js"
 import { Button, Card, Input, Pill } from "../components/kit.jsx"
 import { BarChart3, Users, UserCheck, Clock, CalendarCheck, Activity, Banknote } from "lucide-react"
 
@@ -102,7 +103,7 @@ function isoDate(d) {
 
 export function ReportsPage() {
   const { user } = useAuth()
-  const isAdmin = user?.role === "admin"
+  const { isAdmin } = useRole()
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState(() => {

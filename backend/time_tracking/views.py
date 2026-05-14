@@ -5,7 +5,7 @@ from rest_framework import permissions, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdminRole
+from accounts.permissions import IsAdminRole, is_admin_role, ADMIN_ROLES
 from employees.models import Employee
 
 from .models import Break, TimeLog, JobSite, TimeLogPhoto, Location, LocationZone, EmployeeLocation
@@ -55,7 +55,7 @@ def _parse_date(value: str | None) -> date | None:
 
 def _get_employee_for_request(request, employee_id: str | None) -> Employee | None:
     company = getattr(request, 'company', None)
-    if request.user.role == "admin" and employee_id:
+    if is_admin_role(request.user) and employee_id:
         return Employee.objects.filter(id=employee_id, company=company).first()
     return Employee.objects.filter(user=request.user, company=company).first()
 
@@ -88,7 +88,7 @@ class TimeLogViewSet(viewsets.ReadOnlyModelViewSet):
         if date_to:
             qs = qs.filter(work_date__lte=date_to)
 
-        if self.request.user.role == "admin":
+        if is_admin_role(self.request.user):
             return qs.order_by("-clock_in")
             
         employee = Employee.objects.filter(user=self.request.user, company=self.request.company).first()
@@ -146,10 +146,10 @@ class ClockInView(APIView):
                 lat=float(lat) if lat not in (None, "") else None,
                 lng=float(lon) if lon not in (None, "") else None,
                 shift=active_shift,
-                is_admin=(getattr(request.user, "role", None) == "admin"),
+                is_admin=is_admin_role(request.user),
                 # Legacy behaviour granted admin override automatically when
                 # the requesting user was an admin. Preserve that.
-                request_admin_override=(getattr(request.user, "role", None) == "admin"),
+                request_admin_override=is_admin_role(request.user),
             )
         except TenantMismatch:
             return Response({"detail": "Employee/company mismatch."}, status=403)
@@ -515,7 +515,7 @@ class JobSitePhotosView(APIView):
 
     def get(self, request):
         # Admins see all, employees see their own (or all if needed, but let's stick to related logs)
-        if request.user.role == "admin":
+        if is_admin_role(request.user):
             company = getattr(request, 'company', None)
             qs = TimeLogPhoto.objects.filter(time_log__employee__company=company).select_related("time_log", "time_log__employee", "time_log__employee__user").order_by("-uploaded_at")
         else:
@@ -910,7 +910,7 @@ class GeofenceValidatePointView(APIView):
                 lat=lat,
                 lng=lng,
                 shift=shift,
-                is_admin=(getattr(request.user, "role", None) == "admin"),
+                is_admin=is_admin_role(request.user),
                 # Dry-run: NEVER auto-apply admin override. The caller can
                 # opt in explicitly via request_admin_override=true.
                 request_admin_override=bool(request.data.get("request_admin_override")),

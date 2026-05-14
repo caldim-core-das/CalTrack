@@ -4,6 +4,7 @@ import { Bell, CheckSquare, Clock, ArrowRight, CalendarDays, Banknote, AlertCirc
 
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
+import { useRole } from "../../state/auth/useRole.js"
 import { routes } from "../routes.js"
 
 function timeAgo(ts) {
@@ -167,6 +168,7 @@ function buildNotifications({ tasks, leaves, shifts, payroll, timesheet, isAdmin
 
 export function NotificationCenter() {
   const { user } = useAuth()
+  const { isAdmin } = useRole()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -222,7 +224,7 @@ export function NotificationCenter() {
     setLoading(true)
     setError("")
     try {
-      const tasksUrl = role === "admin" ? "/tasks/admin/" : "/tasks/my/"
+      const tasksUrl = isAdmin ? "/tasks/admin/" : "/tasks/my/"
       
       // Sequential fetches to avoid connection pool exhaustion (EMAXCONNSESSION)
       let tasks = []; try { tasks = await apiRequest(tasksUrl) } catch(e) {}
@@ -231,7 +233,7 @@ export function NotificationCenter() {
       let payroll = []; try { payroll = await apiRequest("/payroll/records/") } catch(e) {}
       let timesheet = null; try { timesheet = await apiRequest("/time/timesheets/") } catch(e) {}
 
-      const next = buildNotifications({ tasks, leaves, shifts, payroll, timesheet, isAdmin: role === "admin" })
+      const next = buildNotifications({ tasks, leaves, shifts, payroll, timesheet, isAdmin })
       setItems(next)
     } catch {
       setError("Failed to load notifications.")

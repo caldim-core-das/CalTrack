@@ -33,7 +33,7 @@ function Toggle({ checked, onChange, disabled }) {
 
 export default function PrivacyDataSection({ showToast, SectionHeader }) {
   const { user } = useAuth()
-  const isAdmin = user?.role === "admin"
+  const isAdmin = user?.role === "admin" || user?.role === "manager"
 
   const [exporting, setExporting] = useState(false)
   const [exportRequested, setExportRequested] = useState(false)

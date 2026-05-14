@@ -20,7 +20,7 @@ function DangerCard({ icon, title, desc, children, borderColor = "rgba(220,38,38
 
 export default function DangerZoneSection({ showToast, SectionHeader }) {
   const { user } = useAuth()
-  const isAdmin = user?.role === "admin"
+  const isAdmin = user?.role === "admin" || user?.role === "manager"
 
   // Transfer ownership
   const [transferEmail, setTransferEmail] = useState("")

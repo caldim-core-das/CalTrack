@@ -31,8 +31,9 @@ class TaskSerializer(serializers.ModelSerializer):
         read_only=True,
         slug_field='name'
     )
-    actual_hours = serializers.ReadOnlyField()
-    attachments = serializers.SerializerMethodField()
+    actual_hours  = serializers.ReadOnlyField()
+    billed_hours  = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True, allow_null=True)
+    attachments   = serializers.SerializerMethodField()
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -53,6 +54,10 @@ class TaskSerializer(serializers.ModelSerializer):
             "category",
             "priority",
             "status",
+            # Accept / Decline
+            "acceptance_status",
+            "decline_reason",
+            "declined_at",
             "attachments",
             "assigned_to",
             "assigned_to_detail",
@@ -61,6 +66,7 @@ class TaskSerializer(serializers.ModelSerializer):
             "due_date",
             "estimated_hours",
             "actual_hours",
+            "billed_hours",
             "job_site",
             "job_site_name",
             "job_address",
@@ -79,7 +85,12 @@ class TaskSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "assigned_by", "started_at", "completed_at", "created_at", "updated_at")
+        read_only_fields = (
+            "id", "assigned_by",
+            "acceptance_status", "decline_reason", "declined_at",
+            "billed_hours",
+            "started_at", "completed_at", "created_at", "updated_at",
+        )
 
     def get_assigned_by_name(self, obj):
         if obj.assigned_by:

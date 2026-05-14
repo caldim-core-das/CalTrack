@@ -49,7 +49,7 @@ function RoleMenu({ value, onChange, exclude = [] }) {
 
 export default function TeamMembersSection({ showToast, SectionHeader }) {
   const { user } = useAuth()
-  const isAdmin = user?.role === "admin"
+  const isAdmin = user?.role === "admin" || user?.role === "manager"
 
   const [members, setMembers] = useState([])
   const [invites, setInvites] = useState([])

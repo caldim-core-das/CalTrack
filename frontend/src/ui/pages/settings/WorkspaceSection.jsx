@@ -32,7 +32,7 @@ const INDUSTRIES = [
 
 export default function WorkspaceSection({ showToast, SectionHeader }) {
   const { user } = useAuth()
-  const isAdmin = user?.role === "admin"
+  const isAdmin = user?.role === "admin" || user?.role === "manager"
   const logoRef = useRef(null)
 
   const [loading, setLoading] = useState(true)

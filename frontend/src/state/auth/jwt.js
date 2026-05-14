@@ -22,7 +22,8 @@ export function decodeJwtPayload(token) {
 export function getJwtRole(token) {
   const payload = decodeJwtPayload(token)
   const role = payload?.role
-  if (role === "admin" || role === "employee") return role
+  const VALID_ROLES = ["admin", "manager", "employee", "kiosk"]
+  if (VALID_ROLES.includes(role)) return role
   return null
 }
 

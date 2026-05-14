@@ -4,6 +4,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from accounts.permissions import is_admin_role
+
 from .models import (
     NotificationPreference, LoginSession, LoginHistory,
     APIKey, Webhook, TeamInvite,
@@ -17,7 +19,7 @@ from .serializers import (
 
 
 def _is_admin(user):
-    return getattr(user, "role", None) == "admin"
+    return is_admin_role(user)
 
 
 # ─── Notification Preferences ────────────────────────────────────────────────

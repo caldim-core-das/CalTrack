@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
+import { useRole } from "../../state/auth/useRole.js"
 import { Button, Card, Input, Pill, Select, TextArea, formatDateTime } from "../components/kit.jsx"
 import { CalendarRange } from "lucide-react"
 import { fireSparkleFromEl } from "../sparkle.js"
@@ -13,7 +14,7 @@ function toIsoLocal(datetimeLocal) {
 
 export function SchedulingPage() {
   const { user } = useAuth()
-  const isAdmin = user?.role === "admin"
+  const { isAdmin } = useRole()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")

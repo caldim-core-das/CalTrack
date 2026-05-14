@@ -2,7 +2,7 @@ from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from accounts.permissions import IsAdminRole
+from accounts.permissions import IsAdminRole, is_admin_role
 
 from .models import Employee
 from .serializers import EmployeeCreateSerializer, EmployeeSerializer
@@ -26,7 +26,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         employee = self.get_object()
-        if request.user.role != "admin" and employee.user_id != request.user.id:
+        if not is_admin_role(request.user) and employee.user_id != request.user.id:
             return Response({"detail": "Not found."}, status=404)
         return super().retrieve(request, *args, **kwargs)
 

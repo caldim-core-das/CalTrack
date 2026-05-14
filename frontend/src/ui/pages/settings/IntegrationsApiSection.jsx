@@ -260,7 +260,7 @@ function NewWebhookForm({ onCreated, onCancel, showToast }) {
 
 export default function IntegrationsApiSection({ showToast, SectionHeader }) {
   const { user } = useAuth()
-  const isAdmin = user?.role === "admin"
+  const isAdmin = user?.role === "admin" || user?.role === "manager"
 
   const [apiKeys, setApiKeys] = useState([])
   const [keysLoading, setKeysLoading] = useState(true)

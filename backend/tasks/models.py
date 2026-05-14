@@ -23,6 +23,11 @@ class Task(models.Model):
         COMPLETED   = "completed",   "Completed"
         CANCELLED   = "cancelled",   "Cancelled"
 
+    class AcceptanceStatus(models.TextChoices):
+        PENDING_ACCEPTANCE = "pending_acceptance", "Pending Acceptance"
+        ACCEPTED           = "accepted",           "Accepted"
+        DECLINED           = "declined",           "Declined"
+
     class Category(models.TextChoices):
         ELECTRICIAN  = "electrician",  "Electrician"
         PLUMBER      = "plumber",      "Plumber"
@@ -94,6 +99,33 @@ class Task(models.Model):
     employee_notes   = models.TextField(blank=True)
     admin_notes      = models.TextField(blank=True)
 
+    # ── Accept / Decline workflow ─────────────────────────────────────────
+    # Every newly-created task starts as pending_acceptance.
+    # The assigned employee must explicitly accept before they can start it.
+    # On decline the admin is alerted and can immediately reassign, which
+    # resets acceptance_status back to pending_acceptance for the new assignee.
+    acceptance_status = models.CharField(
+        max_length=20,
+        choices=AcceptanceStatus.choices,
+        default=AcceptanceStatus.PENDING_ACCEPTANCE,
+    )
+    decline_reason = models.TextField(blank=True)
+    declined_at    = models.DateTimeField(null=True, blank=True)
+    declined_by    = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="declined_tasks",
+    )
+
+    # ── Billed hours (stored on completion for payroll) ───────────────────
+    # Populated by the complete action using the sub-1-hour rounding rules:
+    #   actual ≤ 15 min  → billed 0.5 h
+    #   actual ≤ 45 min  → billed 1.0 h
+    #   actual  > 45 min → billed = actual_hours (normal)
+    # Only applied when estimated_hours < 1. Otherwise billed = actual_hours.
+    billed_hours = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+
     # Timestamps
     started_at       = models.DateTimeField(null=True, blank=True)
     completed_at     = models.DateTimeField(null=True, blank=True)
@@ -114,6 +146,34 @@ class Task(models.Model):
         end = self.completed_at or timezone.now()
         delta = end - self.started_at
         return round(delta.total_seconds() / 3600, 2)
+
+    @staticmethod
+    def compute_billed_hours(estimated_hours, actual_seconds):
+        """
+        Sub-1-hour rounding rule:
+          If estimated_hours < 1:
+            actual ≤ 15 min  → bill 0.5 h
+            actual ≤ 45 min  → bill 1.0 h
+            actual  > 45 min → bill actual_hours (normal rounding, ceil to 0.5)
+          If estimated_hours ≥ 1:
+            bill = actual_hours (standard, no special rounding)
+        Returns a Decimal-compatible float rounded to 2 dp.
+        """
+        from decimal import Decimal
+        actual_minutes = actual_seconds / 60
+        if float(estimated_hours) < 1.0:
+            if actual_minutes <= 15:
+                return Decimal("0.50")
+            elif actual_minutes <= 45:
+                return Decimal("1.00")
+            else:
+                # Still round up to nearest 0.5 for fairness
+                raw = actual_seconds / 3600
+                import math
+                return Decimal(str(round(math.ceil(raw * 2) / 2, 2)))
+        else:
+            raw = actual_seconds / 3600
+            return Decimal(str(round(raw, 2)))
 
 
 class TaskAttachment(models.Model):

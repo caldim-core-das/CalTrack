@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
+import { useRole } from "../../state/auth/useRole.js"
 import { Button, Card, Input, Pill } from "../components/kit.jsx"
 import { Loader2, ShieldCheck, ShieldOff, AlertTriangle, ChevronDown, ChevronUp, Users } from "lucide-react"
 import { fireSparkleFromEl } from "../sparkle.js"
@@ -27,7 +28,7 @@ function ExemptBadge({ status }) {
 
 export function EmployeesPage() {
   const { user } = useAuth()
-  const isAdmin = user?.role === "admin"
+  const { isAdmin } = useRole()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
