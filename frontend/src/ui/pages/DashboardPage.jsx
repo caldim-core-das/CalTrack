@@ -407,12 +407,12 @@ export function DashboardPage() {
       } catch (_) { }
     }
 
-    if (user) {
+    if (user && isAdmin) {
       load()
-      if (isAdmin) loadCompliance()
+      loadCompliance()
     }
     return () => { cancelled = true }
-  }, [user])
+  }, [user, isAdmin])
 
   const kpi = analytics?.kpi || {}
 
