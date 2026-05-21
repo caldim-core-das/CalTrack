@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     LoginView, MeView, RefreshView, GoogleLoginView, RegisterView,
     ProfileUpdateView, PasswordChangeView, EmailChangeView, TwoFactorSetupView,
+    AcceptInviteView
 )
 
 urlpatterns = [
@@ -15,4 +16,5 @@ urlpatterns = [
     path("password/change/", PasswordChangeView.as_view(), name="password-change"),
     path("email/change/", EmailChangeView.as_view(), name="email-change"),
     path("2fa/", TwoFactorSetupView.as_view(), name="2fa-setup"),
+    path("accept-invite/", AcceptInviteView.as_view(), name="accept-invite"),
 ]

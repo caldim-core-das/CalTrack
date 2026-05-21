@@ -7,7 +7,7 @@ import { useAuth } from "../../state/auth/useAuth.js"
 import {
   User, Shield, Palette, Bell, CreditCard, Users2, Plug,
   Building2, Database, AlertTriangle, ShieldCheck, RefreshCcw,
-  CheckCircle2, X, Save, ChevronRight,
+  CheckCircle2, X, Save, ChevronRight, FileText,
 } from "lucide-react"
 
 /* ── Lazy section imports ─────────────────────────────────────── */
@@ -17,6 +17,7 @@ const AppearanceSection     = lazy(() => import("./settings/AppearanceSection.js
 const NotificationsSection  = lazy(() => import("./settings/NotificationsSection.jsx"))
 const BillingSection        = lazy(() => import("./settings/BillingSection.jsx"))
 const TeamMembersSection    = lazy(() => import("./settings/TeamMembersSection.jsx"))
+const InvoicesSection       = lazy(() => import("./settings/InvoicesSection.jsx"))
 const IntegrationsApiSection = lazy(() => import("./settings/IntegrationsApiSection.jsx"))
 const WorkspaceSection      = lazy(() => import("./settings/WorkspaceSection.jsx"))
 const PrivacyDataSection    = lazy(() => import("./settings/PrivacyDataSection.jsx"))
@@ -100,6 +101,14 @@ const TABS = [
     icon: <Users2 size={15} />,
     adminOnly: true,
     to: routes.settings_team,
+  },
+  {
+    id: "invoices",
+    label: "Invoices",
+    subtitle: "View, generate, and download your past billing invoices.",
+    icon: <FileText size={15} />,
+    adminOnly: true,
+    to: routes.settings_invoices,
   },
   {
     id: "integrations",
@@ -238,6 +247,7 @@ export function SettingsPage({ section: sectionProp }) {
               {activeSection === "notifications" && <NotificationsSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "billing"       && <BillingSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "team"          && <TeamMembersSection showToast={showToast} SectionHeader={SectionHeader} />}
+              {activeSection === "invoices"      && <InvoicesSection />}
               {activeSection === "integrations"  && <IntegrationsApiSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "organization"  && <WorkspaceSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "data"          && <PrivacyDataSection showToast={showToast} SectionHeader={SectionHeader} />}
