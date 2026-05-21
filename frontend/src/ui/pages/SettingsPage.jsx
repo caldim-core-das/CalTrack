@@ -16,6 +16,9 @@ const AccountSecuritySection = lazy(() => import("./settings/AccountSecuritySect
 const AppearanceSection     = lazy(() => import("./settings/AppearanceSection.jsx"))
 const NotificationsSection  = lazy(() => import("./settings/NotificationsSection.jsx"))
 const BillingSection        = lazy(() => import("./settings/BillingSection.jsx"))
+const MembersSettingsSection = lazy(() =>
+  import("./PeopleSettingsPage.jsx").then(m => ({ default: m.PeopleSettingsPage }))
+)
 const TeamMembersSection    = lazy(() => import("./settings/TeamMembersSection.jsx"))
 const IntegrationsApiSection = lazy(() => import("./settings/IntegrationsApiSection.jsx"))
 const WorkspaceSection      = lazy(() => import("./settings/WorkspaceSection.jsx"))
@@ -92,6 +95,14 @@ const TABS = [
     icon: <CreditCard size={15} />,
     adminOnly: true,
     to: routes.settings_billing,
+  },
+  {
+    id: "people",
+    label: "Members",
+    subtitle: "Add members, manage roles, and view the invite/creation queue.",
+    icon: <Users2 size={15} />,
+    adminOnly: true,
+    to: routes.settings_people,
   },
   {
     id: "team",
@@ -237,6 +248,7 @@ export function SettingsPage({ section: sectionProp }) {
               {activeSection === "appearance"    && <AppearanceSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "notifications" && <NotificationsSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "billing"       && <BillingSection showToast={showToast} SectionHeader={SectionHeader} />}
+              {activeSection === "people"        && <MembersSettingsSection />}
               {activeSection === "team"          && <TeamMembersSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "integrations"  && <IntegrationsApiSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "organization"  && <WorkspaceSection showToast={showToast} SectionHeader={SectionHeader} />}
