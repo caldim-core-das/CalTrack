@@ -11,6 +11,7 @@ import { ZonesPanel } from "./locations/ZonesPanel.jsx"
 import { AssignmentsPanel } from "./locations/AssignmentsPanel.jsx"
 import { MapOverview } from "./locations/MapOverview.jsx"
 import { GeofenceEditorModal } from "./locations/GeofenceEditorModal.jsx"
+import { getPosition } from "./TimePage.jsx"
 
 /* ── Fix default Leaflet icons ────────────────────────────────── */
 delete L.Icon.Default.prototype._getIconUrl
@@ -144,32 +145,72 @@ export function LocationsPage() {
   }
 
   /* ── User Geolocation ──────────────────────────────────────── */
-  useEffect(() => {
-    if ("geolocation" in navigator) {
+  const [locating, setLocating] = useState(false)
+
+  const getBasicLocationFallback = () => {
+    return new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude
-          const lng = position.coords.longitude
-          setMapCenter([lat, lng])
-          setMapZoom(16) // Zoom in closer once we have accurate location
-          
-          // Reverse geocode to show as text
-          const address = await getAddress(lat, lng)
+        (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+        (err) => reject(err),
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+      )
+    })
+  }
+
+  const handleLocateMe = async () => {
+    setLocating(true)
+    try {
+      // 1. Try to get high-accuracy GPS (ideal for mobile/field clients)
+      let pos
+      try {
+        pos = await getPosition()
+      } catch (gpsError) {
+        // 2. Fallback to basic IP-based location (ideal for desktop development)
+        console.warn("High-accuracy GPS failed, falling back to basic location:", gpsError)
+        pos = await getBasicLocationFallback()
+      }
+
+      if (pos) {
+        setMapCenter([pos.lat, pos.lon])
+        setMapZoom(16)
+        const address = await getAddress(pos.lat, pos.lon)
+        if (address) {
+          setSearchQuery(address)
+        }
+      }
+    } catch (error) {
+      console.error("All location methods failed:", error)
+      alert("Unable to retrieve your location. Please check your browser or Windows location settings.")
+    } finally {
+      setLocating(false)
+    }
+  }
+
+  useEffect(() => {
+    const initLocation = async () => {
+      try {
+        let pos
+        try {
+          pos = await getPosition()
+        } catch (err) {
+          pos = await getBasicLocationFallback()
+        }
+        
+        if (pos) {
+          setMapCenter([pos.lat, pos.lon])
+          setMapZoom(16)
+          const address = await getAddress(pos.lat, pos.lon)
           if (address) {
             setSearchQuery(address)
           }
-        },
-        (error) => {
-          console.warn("Could not get user location:", error)
-          setMapCenter([0, 0])
-          setMapZoom(2)
-        },
-        { enableHighAccuracy: true, timeout: 10000 }
-      )
-    } else {
-      setMapCenter([0, 0])
-      setMapZoom(2)
+        }
+      } catch (error) {
+        console.warn("Could not get initial user location:", error)
+        setMapCenter([0, 0])
+        setMapZoom(2)
+      }
     }
+    initLocation()
   }, [])
 
   /* ── Radius ────────────────────────────────────────────────── */
@@ -666,6 +707,14 @@ export function LocationsPage() {
               </div>
 
               <div className="flex bg-surface dark:bg-slate-900 rounded-[1.5rem] border border-stroke dark:border-slate-800 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.3)] overflow-hidden">
+                <button
+                  onClick={handleLocateMe}
+                  disabled={locating}
+                  className={`px-4 py-4 text-sm font-bold flex items-center justify-center transition-colors border-r border-slate-100 ${locating ? "text-slate-400 bg-slate-50 dark:bg-slate-800/50" : "text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/30"}`}
+                  title="Locate Me"
+                >
+                  {locating ? <Loader2 size={18} className="animate-spin" /> : <Navigation2 size={18} />}
+                </button>
                 <button
                   onClick={() => setViewMode("map")}
                   className={`px-5 py-4 text-sm font-bold flex items-center gap-2 transition-colors ${viewMode === "map" ? "bg-indigo-50/50 text-indigo-600" : "text-slate-500 hover:bg-slate-50"} border-r border-slate-100`}
