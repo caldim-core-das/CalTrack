@@ -302,6 +302,7 @@ function useWsLocationTracker(isClockedIn) {
 // ─── UI Components ──────────────────────────────────────────────
 // (Local Card/Pill removed - now using kit.jsx)
 
+
 function Skeleton({ w = "100%", h = "16px", r = "8px", className = "" }) {
   return (
     <div
