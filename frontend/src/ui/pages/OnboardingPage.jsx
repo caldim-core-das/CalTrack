@@ -231,8 +231,8 @@ export function OnboardingPage() {
               <button className="btn btnGhost" style={{ fontSize: 13, fontWeight: 800, color: "#5d5fef", marginBottom: 32 }}>+ ADD MORE</button>
 
               <div style={{ display: "flex", gap: 16 }}>
-                <button 
-                  className="btn btnGhost" 
+                <button
+                  className="btn btnGhost"
                   onClick={async () => {
                     // Treat skip as "Create with what we have"
                     setLoading(true)
@@ -249,12 +249,12 @@ export function OnboardingPage() {
                       window.location.href = routes.dashboard
                     } catch (err) {
                       setLoading(false)
-                      const msg = err?.body?.detail || 
-                                 (err?.body && typeof err.body === 'object' ? Object.values(err.body).flat()[0] : null) || 
-                                 err?.message || "Failed to create organization."
+                      const msg = err?.body?.detail ||
+                        (err?.body && typeof err.body === 'object' ? Object.values(err.body).flat()[0] : null) ||
+                        err?.message || "Failed to create organization."
                       setError(msg)
                     }
-                  }} 
+                  }}
                   style={{ padding: 16, borderRadius: 12, fontSize: 14, fontWeight: 800 }}
                   disabled={loading}
                 >
@@ -275,14 +275,14 @@ export function OnboardingPage() {
                           default_state: "NY"
                         }
                       })
-                      
+
                       // 3. Finish - redirect to dashboard with a full reload to refresh all context/tokens
                       window.location.href = routes.dashboard
                     } catch (err) {
                       setLoading(false)
-                      const msg = err?.body?.detail || 
-                                 (err?.body && typeof err.body === 'object' ? Object.values(err.body).flat()[0] : null) || 
-                                 err?.message || "Failed to create organization."
+                      const msg = err?.body?.detail ||
+                        (err?.body && typeof err.body === 'object' ? Object.values(err.body).flat()[0] : null) ||
+                        err?.message || "Failed to create organization."
                       setError(msg)
                       console.error("Setup failed:", err)
                     }

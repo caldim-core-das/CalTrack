@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from accounts.models import User
-from .models import Task, TaskAttachment
+from tasks.models import Task, TaskAttachment, TaskActivityLog
 
 
 class AssignedToSerializer(serializers.ModelSerializer):
@@ -34,6 +34,8 @@ class TaskSerializer(serializers.ModelSerializer):
     actual_hours  = serializers.ReadOnlyField()
     billed_hours  = serializers.DecimalField(max_digits=5, decimal_places=2, read_only=True, allow_null=True)
     attachments   = serializers.SerializerMethodField()
+    sla_status            = serializers.SerializerMethodField()
+    sla_minutes_remaining = serializers.SerializerMethodField()
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -52,8 +54,17 @@ class TaskSerializer(serializers.ModelSerializer):
             "title",
             "description",
             "category",
+            "subcategory",
+            "service_type",
+            "required_tools",
+            "required_spare_parts",
             "priority",
             "status",
+            # SLA & Smart Workflow
+            "sla_deadline",
+            "completion_percentage",
+            "sla_status",
+            "sla_minutes_remaining",
             # Accept / Decline
             "acceptance_status",
             "decline_reason",
@@ -70,11 +81,20 @@ class TaskSerializer(serializers.ModelSerializer):
             "job_site",
             "job_site_name",
             "job_address",
+            "landmark",
+            "area",
+            "city",
+            "state",
+            "pincode",
             "location",
             "location_lat",
             "location_lon",
             "geofence_radius",
             "client_name",
+            "client_company_name",
+            "client_contact_number",
+            "client_alternate_number",
+            "client_email",
             "require_selfie",
             "require_before_after_photos",
             "time_log",
@@ -84,12 +104,27 @@ class TaskSerializer(serializers.ModelSerializer):
             "completed_at",
             "created_at",
             "updated_at",
+            # Suspended / Gap job fields
+            "suspended_at",
+            "resume_deadline",
+            "total_active_seconds",
+            "suspend_reason",
+            "gap_job",
+            "is_pushed_gap_job",
+            # Travel / Journey Workflow
+            "travel_status",
+            "reached_site_at",
+            "work_started_at",
         )
         read_only_fields = (
             "id", "assigned_by",
             "acceptance_status", "decline_reason", "declined_at",
             "billed_hours",
             "started_at", "completed_at", "created_at", "updated_at",
+            "suspended_at", "resume_deadline", "total_active_seconds", "suspend_reason", "gap_job",
+            "is_pushed_gap_job",
+            "sla_status", "sla_minutes_remaining",
+            "travel_status", "reached_site_at", "work_started_at",
         )
 
     def get_assigned_by_name(self, obj):
@@ -102,6 +137,16 @@ class TaskSerializer(serializers.ModelSerializer):
         if qs is None:
             return []
         return TaskAttachmentSerializer(qs.all(), many=True, context=self.context).data
+
+    def get_sla_status(self, obj):
+        from tasks.services.gap_job_service import get_sla_status
+        status, _ = get_sla_status(obj)
+        return status
+
+    def get_sla_minutes_remaining(self, obj):
+        from tasks.services.gap_job_service import get_sla_status
+        _, mins = get_sla_status(obj)
+        return mins
 
 
 class TaskAttachmentSerializer(serializers.ModelSerializer):

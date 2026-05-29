@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion"
 const ACTIONS = [
   { id: "dashboard", label: "Go to Dashboard", shortcut: ["G", "D"], icon: <Home size={18} />, to: routes.dashboard, color: "text-emerald-500" },
   { id: "time", label: "Track Time", shortcut: ["G", "T"], icon: <Clock size={18} />, to: routes.time, color: "text-amber-500" },
-  { id: "tasks", label: "Manage Tasks", shortcut: ["G", "K"], icon: <CheckSquare size={18} />, to: routes.tasks, color: "text-teal-500" },
+  { id: "tasks", label: "Manage Jobs", shortcut: ["G", "K"], icon: <CheckSquare size={18} />, to: routes.tasks, color: "text-teal-500" },
   { id: "leaves", label: "Request Leave", shortcut: ["G", "L"], icon: <CalendarDays size={18} />, to: routes.leaves, color: "text-rose-500" },
   { id: "payroll", label: "View Payroll", shortcut: ["G", "P"], icon: <Banknote size={18} />, to: routes.payroll, color: "text-indigo-500" },
   { id: "scheduling", label: "Team Schedule", shortcut: ["G", "S"], icon: <CalendarRange size={18} />, to: routes.scheduling, color: "text-sky-500" },

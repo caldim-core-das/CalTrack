@@ -190,142 +190,142 @@ export function LeavesPage() {
 
       <div className="flex-1 overflow-y-auto p-10 space-y-10" style={{ animation: "fadeUp 0.4s ease both" }}>
 
-      {error ? <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-600 dark:text-rose-400 text-sm font-bold">{error}</div> : null}
+        {error ? <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-600 dark:text-rose-400 text-sm font-bold">{error}</div> : null}
 
-      {!isAdmin ? (
-        <Card title="New Leave Request">
-          <form className="grid gap-6 md:grid-cols-2" onSubmit={submit}>
-            <Select label="Type" value={leaveType} onChange={(e) => setLeaveType(e.target.value)} options={LEAVE_TYPES} />
-            <div className="flex flex-col md:flex-row gap-4">
-              <Input label="Start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
-              <Input label="End" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
-            </div>
-            <div className="md:col-span-2">
-              <TextArea label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
-            </div>
-            <div className="md:col-span-2 flex justify-end">
-              <Button type="submit" disabled={submitting} ref={submitBtnRef} className="px-10 h-14 rounded-2xl text-base font-black shadow-xl shadow-indigo-500/20">
-                {submitting ? "Submitting…" : "Submit request"}
-              </Button>
-            </div>
-          </form>
-        </Card>
-      ) : null}
+        {!isAdmin ? (
+          <Card title="New Leave Request">
+            <form className="grid gap-6 md:grid-cols-2" onSubmit={submit}>
+              <Select label="Type" value={leaveType} onChange={(e) => setLeaveType(e.target.value)} options={LEAVE_TYPES} />
+              <div className="flex flex-col md:flex-row gap-4">
+                <Input label="Start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+                <Input label="End" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
+              </div>
+              <div className="md:col-span-2">
+                <TextArea label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} rows={3} />
+              </div>
+              <div className="md:col-span-2 flex justify-end">
+                <Button type="submit" disabled={submitting} ref={submitBtnRef} className="px-10 h-14 rounded-2xl text-base font-black shadow-xl shadow-indigo-500/20">
+                  {submitting ? "Submitting…" : "Submit request"}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        ) : null}
 
-      <Card title={isAdmin ? "All Requests" : "My Requests"}>
-        {loading ? (
-          <div className="text-slate-400 dark:text-slate-600 italic">Loading requests…</div>
-        ) : items.length ? (
-          <div className="w-full border-separate border-spacing-y-2">
-            <div className="flex items-center px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-stroke dark:border-slate-800/50 mb-2">
-              <div className="flex-1">Employee ID</div>
-              <div className="w-32 shrink-0">Type</div>
-              <div className="w-40 shrink-0">Start</div>
-              <div className="w-40 shrink-0">End</div>
-              <div className="w-32 shrink-0">Status</div>
-              <div className="w-80 shrink-0 text-right">Actions</div>
-            </div>
-            <div className="space-y-3">
-              {items.map((i) => (
-                <div key={i.id} className="flex items-center px-6 py-5 bg-bg dark:bg-slate-950/40 rounded-2xl border border-stroke dark:border-slate-800 hover:border-indigo-500/30 transition-all group">
-                  <div className="flex-1">
-                    <div className="text-sm font-black text-slate-900 dark:text-white tracking-tight">
-                      {i.employee ? formatEmployeeId(i.employee) : "—"}
+        <Card title={isAdmin ? "All Requests" : "My Requests"}>
+          {loading ? (
+            <div className="text-slate-400 dark:text-slate-600 italic">Loading requests…</div>
+          ) : items.length ? (
+            <div className="w-full border-separate border-spacing-y-2">
+              <div className="flex items-center px-6 py-4 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-stroke dark:border-slate-800/50 mb-2">
+                <div className="flex-1">Employee ID</div>
+                <div className="w-32 shrink-0">Type</div>
+                <div className="w-40 shrink-0">Start</div>
+                <div className="w-40 shrink-0">End</div>
+                <div className="w-32 shrink-0">Status</div>
+                <div className="w-80 shrink-0 text-right">Actions</div>
+              </div>
+              <div className="space-y-3">
+                {items.map((i) => (
+                  <div key={i.id} className="flex items-center px-6 py-5 bg-bg dark:bg-slate-950/40 rounded-2xl border border-stroke dark:border-slate-800 hover:border-indigo-500/30 transition-all group">
+                    <div className="flex-1">
+                      <div className="text-sm font-black text-slate-900 dark:text-white tracking-tight">
+                        {i.employee ? formatEmployeeId(i.employee) : "—"}
+                      </div>
+                      {isAdmin && i.employee_name ? <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide mt-1">{i.employee_name}</div> : null}
                     </div>
-                    {isAdmin && i.employee_name ? <div className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wide mt-1">{i.employee_name}</div> : null}
+                    <div className="w-32 shrink-0 text-sm font-bold text-slate-600 dark:text-slate-400 capitalize">{i.leave_type}</div>
+                    <div className="w-40 shrink-0 text-sm font-medium text-slate-500 dark:text-slate-400">{i.start_date}</div>
+                    <div className="w-40 shrink-0 text-sm font-medium text-slate-500 dark:text-slate-400">{i.end_date}</div>
+                    <div className="w-32 shrink-0">
+                      <Pill tone={toneForStatus(i.status)}>{i.status}</Pill>
+                    </div>
+                    <div className="w-80 shrink-0 flex justify-end gap-2">
+                      {isAdmin ? (
+                        <div className="flex gap-2">
+                          {i.status === "pending" && (
+                            <>
+                              <Button variant="ghost" disabled={busyId === i.id} onClick={() => decide(i.id, "approve")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 hover:bg-emerald-500/10">
+                                Approve
+                              </Button>
+                              <Button variant="ghost" disabled={busyId === i.id} onClick={() => decide(i.id, "rework")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-500 hover:bg-amber-500/10">
+                                Rework
+                              </Button>
+                              <Button variant="danger" disabled={busyId === i.id} onClick={() => decide(i.id, "reject")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest">
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          {i.status === "pending_cancel" && (
+                            <>
+                              <Button variant="ghost" disabled={busyId === i.id} onClick={() => decide(i.id, "approve")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 hover:bg-emerald-500/10">
+                                Reject Cancel
+                              </Button>
+                              <Button variant="ghost" disabled={busyId === i.id} onClick={() => decide(i.id, "rework")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-500 hover:bg-amber-500/10">
+                                Rework
+                              </Button>
+                              <Button variant="danger" disabled={busyId === i.id} onClick={() => decide(i.id, "cancel")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest">
+                                Approve Cancel
+                              </Button>
+                            </>
+                          )}
+                          {i.status === "approved" && (
+                            <Button variant="danger" disabled={busyId === i.id} onClick={() => decide(i.id, "cancel")} type="button" className="h-9 px-4 text-[10px] font-black uppercase tracking-widest">
+                              Cancel Leave
+                            </Button>
+                          )}
+                          {i.status === "cancelled" && (
+                            <span className="text-slate-400 dark:text-slate-700 text-[10px] font-black uppercase tracking-widest self-center py-1">Cancelled</span>
+                          )}
+                          {i.status === "rejected" && (
+                            <span className="text-slate-400 dark:text-slate-700 text-[10px] font-black uppercase tracking-widest self-center py-1">Rejected</span>
+                          )}
+                          {i.status === "rework" && (
+                            <span className="text-amber-500 dark:text-amber-400 text-[10px] font-black uppercase tracking-widest self-center py-1">Awaiting Rework</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          {(i.status === "pending" || i.status === "approved") ? (
+                            <Button
+                              variant="danger"
+                              disabled={busyId === i.id}
+                              onClick={() => {
+                                if (i.status === "approved") {
+                                  // Show confirmation modal for active approved leave
+                                  setCancelTarget(i)
+                                } else {
+                                  decide(i.id, "cancel")
+                                }
+                              }}
+                              type="button"
+                              className="h-9 px-4 text-[10px] font-black uppercase tracking-widest"
+                            >
+                              {i.status === "approved" ? "Cancel Remaining Leave" : "Cancel Leave"}
+                            </Button>
+                          ) : i.status === "pending_cancel" ? (
+                            <span className="text-amber-500 dark:text-amber-400 text-[10px] font-black uppercase tracking-widest self-center py-1">Cancellation Requested</span>
+                          ) : (i.status === "rework" || i.status === "cancelled" || i.status === "rejected") ? (
+                            <Button variant="primary" disabled={busyId === i.id} onClick={() => startEdit(i)} type="button" className="h-9 px-4 text-[10px] font-black uppercase tracking-widest">
+                              Edit & Reassign
+                            </Button>
+                          ) : (
+                            <span className="text-slate-400 dark:text-slate-700 text-xs">—</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="w-32 shrink-0 text-sm font-bold text-slate-600 dark:text-slate-400 capitalize">{i.leave_type}</div>
-                  <div className="w-40 shrink-0 text-sm font-medium text-slate-500 dark:text-slate-400">{i.start_date}</div>
-                  <div className="w-40 shrink-0 text-sm font-medium text-slate-500 dark:text-slate-400">{i.end_date}</div>
-                  <div className="w-32 shrink-0">
-                    <Pill tone={toneForStatus(i.status)}>{i.status}</Pill>
-                  </div>
-                  <div className="w-80 shrink-0 flex justify-end gap-2">
-                    {isAdmin ? (
-                      <div className="flex gap-2">
-                        {i.status === "pending" && (
-                          <>
-                            <Button variant="ghost" disabled={busyId === i.id} onClick={() => decide(i.id, "approve")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 hover:bg-emerald-500/10">
-                              Approve
-                            </Button>
-                            <Button variant="ghost" disabled={busyId === i.id} onClick={() => decide(i.id, "rework")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-500 hover:bg-amber-500/10">
-                              Rework
-                            </Button>
-                            <Button variant="danger" disabled={busyId === i.id} onClick={() => decide(i.id, "reject")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest">
-                              Reject
-                            </Button>
-                          </>
-                        )}
-                        {i.status === "pending_cancel" && (
-                          <>
-                            <Button variant="ghost" disabled={busyId === i.id} onClick={() => decide(i.id, "approve")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 hover:bg-emerald-500/10">
-                              Reject Cancel
-                            </Button>
-                            <Button variant="ghost" disabled={busyId === i.id} onClick={() => decide(i.id, "rework")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest text-amber-600 dark:text-amber-500 hover:bg-amber-500/10">
-                              Rework
-                            </Button>
-                            <Button variant="danger" disabled={busyId === i.id} onClick={() => decide(i.id, "cancel")} type="button" className="h-9 px-3 text-[10px] font-black uppercase tracking-widest">
-                              Approve Cancel
-                            </Button>
-                          </>
-                        )}
-                        {i.status === "approved" && (
-                          <Button variant="danger" disabled={busyId === i.id} onClick={() => decide(i.id, "cancel")} type="button" className="h-9 px-4 text-[10px] font-black uppercase tracking-widest">
-                            Cancel Leave
-                          </Button>
-                        )}
-                        {i.status === "cancelled" && (
-                          <span className="text-slate-400 dark:text-slate-700 text-[10px] font-black uppercase tracking-widest self-center py-1">Cancelled</span>
-                        )}
-                        {i.status === "rejected" && (
-                          <span className="text-slate-400 dark:text-slate-700 text-[10px] font-black uppercase tracking-widest self-center py-1">Rejected</span>
-                        )}
-                        {i.status === "rework" && (
-                          <span className="text-amber-500 dark:text-amber-400 text-[10px] font-black uppercase tracking-widest self-center py-1">Awaiting Rework</span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex gap-2">
-                        {(i.status === "pending" || i.status === "approved") ? (
-                          <Button
-                            variant="danger"
-                            disabled={busyId === i.id}
-                            onClick={() => {
-                              if (i.status === "approved") {
-                                // Show confirmation modal for active approved leave
-                                setCancelTarget(i)
-                              } else {
-                                decide(i.id, "cancel")
-                              }
-                            }}
-                            type="button"
-                            className="h-9 px-4 text-[10px] font-black uppercase tracking-widest"
-                          >
-                            {i.status === "approved" ? "Cancel Remaining Leave" : "Cancel Leave"}
-                          </Button>
-                        ) : i.status === "pending_cancel" ? (
-                          <span className="text-amber-500 dark:text-amber-400 text-[10px] font-black uppercase tracking-widest self-center py-1">Cancellation Requested</span>
-                        ) : (i.status === "rework" || i.status === "cancelled" || i.status === "rejected") ? (
-                          <Button variant="primary" disabled={busyId === i.id} onClick={() => startEdit(i)} type="button" className="h-9 px-4 text-[10px] font-black uppercase tracking-widest">
-                            Edit & Reassign
-                          </Button>
-                        ) : (
-                          <span className="text-slate-400 dark:text-slate-700 text-xs">—</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="text-center py-20 bg-bg dark:bg-slate-950/20 rounded-3xl border border-dashed border-stroke dark:border-slate-800">
-            <CalendarDays size={48} className="mx-auto text-slate-200 dark:text-slate-800 mb-4" />
-            <div className="text-slate-400 dark:text-slate-600 font-bold uppercase tracking-widest text-sm">No leave requests found</div>
-          </div>
-        )}
-      </Card>
+          ) : (
+            <div className="text-center py-20 bg-bg dark:bg-slate-950/20 rounded-3xl border border-dashed border-stroke dark:border-slate-800">
+              <CalendarDays size={48} className="mx-auto text-slate-200 dark:text-slate-800 mb-4" />
+              <div className="text-slate-400 dark:text-slate-600 font-bold uppercase tracking-widest text-sm">No leave requests found</div>
+            </div>
+          )}
+        </Card>
       </div>
 
       {/* ── EDIT/REASSIGN MODAL ── */}
@@ -333,7 +333,7 @@ export function LeavesPage() {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-x-hidden overflow-y-auto">
           {/* Backdrop */}
           <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity" onClick={() => setEditingItem(null)} />
-          
+
           {/* Modal Container */}
           <div className="relative w-full max-w-2xl bg-surface dark:bg-slate-900 border border-stroke dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden transform transition-all animate-in fade-in zoom-in-95 duration-200 z-[10000]">
             {/* Modal Header */}
@@ -347,12 +347,12 @@ export function LeavesPage() {
                   Status: <span className="text-indigo-600 dark:text-indigo-400 capitalize">{editingItem.status}</span> · Will reset to pending on submit
                 </p>
               </div>
-              <button 
+              <button
                 onClick={() => setEditingItem(null)}
                 className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 transition-colors"
               >
                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M13.5 4.5L4.5 13.5M4.5 4.5L13.5 13.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M13.5 4.5L4.5 13.5M4.5 4.5L13.5 13.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
             </div>
@@ -360,48 +360,48 @@ export function LeavesPage() {
             {/* Modal Form */}
             <form onSubmit={handleEditSubmit} className="p-8 space-y-6">
               <div className="grid gap-6 sm:grid-cols-3">
-                <Select 
-                  label="Leave Type" 
-                  value={editLeaveType} 
-                  onChange={(e) => setEditLeaveType(e.target.value)} 
-                  options={LEAVE_TYPES} 
+                <Select
+                  label="Leave Type"
+                  value={editLeaveType}
+                  onChange={(e) => setEditLeaveType(e.target.value)}
+                  options={LEAVE_TYPES}
                 />
-                <Input 
-                  label="Start Date" 
-                  type="date" 
-                  value={editStartDate} 
-                  onChange={(e) => setEditStartDate(e.target.value)} 
-                  required 
+                <Input
+                  label="Start Date"
+                  type="date"
+                  value={editStartDate}
+                  onChange={(e) => setEditStartDate(e.target.value)}
+                  required
                 />
-                <Input 
-                  label="End Date" 
-                  type="date" 
-                  value={editEndDate} 
-                  onChange={(e) => setEditEndDate(e.target.value)} 
-                  required 
+                <Input
+                  label="End Date"
+                  type="date"
+                  value={editEndDate}
+                  onChange={(e) => setEditEndDate(e.target.value)}
+                  required
                 />
               </div>
-              
-              <TextArea 
-                label="Reason / Notes" 
-                value={editReason} 
-                onChange={(e) => setEditReason(e.target.value)} 
-                rows={4} 
+
+              <TextArea
+                label="Reason / Notes"
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                rows={4}
                 placeholder="Explain the updates or reassignment details here..."
               />
 
               <div className="flex justify-end gap-3 pt-4 border-t border-stroke dark:border-slate-800/80">
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  onClick={() => setEditingItem(null)} 
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setEditingItem(null)}
                   className="px-6 h-12 rounded-2xl"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={editSubmitting} 
+                <Button
+                  type="submit"
+                  disabled={editSubmitting}
                   className="px-8 h-12 rounded-2xl font-black shadow-lg shadow-indigo-500/20"
                 >
                   {editSubmitting ? "Saving Updates…" : "Save & Re-submit"}

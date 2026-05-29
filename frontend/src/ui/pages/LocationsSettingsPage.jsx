@@ -125,7 +125,7 @@ export function LocationsSettingsPage() {
           const lng = position.coords.longitude
           setMapCenter([lat, lng])
           setMapZoom(16) // Zoom in closer once we have accurate location
-          
+
           // Reverse geocode to show as text
           const address = await getAddress(lat, lng)
           if (address) {

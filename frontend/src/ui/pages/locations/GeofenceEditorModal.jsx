@@ -57,7 +57,7 @@ export function GeofenceEditorModal({ location, onClose, onSaved }) {
     } catch (err) {
       // Server-side validators return {geofence_polygon: "..."} on bad shapes.
       const polyErr = err?.body?.geofence_polygon
-      const detail  = err?.body?.detail
+      const detail = err?.body?.detail
       const msg = polyErr || detail || "Failed to save geofence."
       setError(typeof msg === "string" ? msg : JSON.stringify(msg))
     } finally {

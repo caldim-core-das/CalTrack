@@ -188,6 +188,26 @@ class ClockInView(APIView):
             except Exception as e:
                 print(f"Error linking task: {e}")
 
+        # Broadcast real-time online status alert to admins
+        try:
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+            channel_layer = get_channel_layer()
+            if channel_layer and company:
+                emp_name = employee.user.get_full_name() or employee.user.username
+                async_to_sync(channel_layer.group_send)(
+                    f"live_admin_{company.id}",
+                    {
+                        "type": "employee_status_change",
+                        "employee_id": str(employee.id),
+                        "employee_name": emp_name,
+                        "status": "online",
+                        "message": f"🟢 {emp_name} is now ONLINE (Clocked In)",
+                    }
+                )
+        except Exception as ws_err:
+            print(f"Failed to broadcast clock-in to WS: {ws_err}")
+
         return Response(TimeLogSerializer(time_log).data, status=201)
 
 
@@ -283,6 +303,26 @@ class ClockOutView(APIView):
             send_shift_summary_email(time_log)
         except Exception:
             pass
+
+        # Broadcast real-time offline status alert to admins
+        try:
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+            channel_layer = get_channel_layer()
+            if channel_layer and company:
+                emp_name = employee.user.get_full_name() or employee.user.username
+                async_to_sync(channel_layer.group_send)(
+                    f"live_admin_{company.id}",
+                    {
+                        "type": "employee_status_change",
+                        "employee_id": str(employee.id),
+                        "employee_name": emp_name,
+                        "status": "offline",
+                        "message": f"🔴 {emp_name} is now OFFLINE (Clocked Out)",
+                    }
+                )
+        except Exception as ws_err:
+            print(f"Failed to broadcast clock-out to WS: {ws_err}")
         
         return Response(TimeLogSerializer(time_log).data)
 

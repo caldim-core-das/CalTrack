@@ -195,7 +195,7 @@ export function LocationsPage() {
         } catch (err) {
           pos = await getBasicLocationFallback()
         }
-        
+
         if (pos) {
           setMapCenter([pos.lat, pos.lon])
           setMapZoom(16)
@@ -341,7 +341,7 @@ export function LocationsPage() {
       placesService.current = new window.google.maps.places.PlacesService(dummyDiv.current)
     }
     document.head.appendChild(script)
-    return () => {}
+    return () => { }
   }, [GOOGLE_API_KEY])
 
   /* ── Google Places Autocomplete search (debounced) ─────────── */
@@ -609,18 +609,18 @@ export function LocationsPage() {
                   <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
                     <Search size={22} className="text-slate-400" />
                   </div>
-                    <input
-                      id="location-search-input"
-                      type="text"
-                      placeholder="Search for an address, business, or landmark..."
-                      value={searchQuery}
-                      onChange={(e) => {
-                        setSearchQuery(e.target.value)
-                        if (e.target.value.length >= 2) setShowDropdown(true)
-                      }}
-                      onFocus={() => { if (searchResults.length > 0) setShowDropdown(true) }}
-                      className="w-full pl-16 pr-14 py-5 bg-surface dark:bg-slate-900 border border-stroke dark:border-slate-800 rounded-[1.5rem] text-base font-bold text-slate-700 dark:text-white placeholder-slate-400 outline-none focus:ring-[6px] focus:ring-indigo-500/20 transition-all shadow-inner"
-                    />
+                  <input
+                    id="location-search-input"
+                    type="text"
+                    placeholder="Search for an address, business, or landmark..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value)
+                      if (e.target.value.length >= 2) setShowDropdown(true)
+                    }}
+                    onFocus={() => { if (searchResults.length > 0) setShowDropdown(true) }}
+                    className="w-full pl-16 pr-14 py-5 bg-surface dark:bg-slate-900 border border-stroke dark:border-slate-800 rounded-[1.5rem] text-base font-bold text-slate-700 dark:text-white placeholder-slate-400 outline-none focus:ring-[6px] focus:ring-indigo-500/20 transition-all shadow-inner"
+                  />
                   {searching && (
                     <div className="absolute inset-y-0 right-14 flex items-center">
                       <Loader2 size={20} className="animate-spin text-indigo-500" />

@@ -96,11 +96,10 @@ function EditEmployeeModal({ employee, onClose, onSave, saving }) {
               <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em] ml-1">Status</label>
               <button
                 type="button"
-                className={`h-11 px-4 rounded-xl border border-stroke dark:border-slate-800 text-sm font-black uppercase tracking-widest transition-all ${
-                  isActive
+                className={`h-11 px-4 rounded-xl border border-stroke dark:border-slate-800 text-sm font-black uppercase tracking-widest transition-all ${isActive
                     ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
                     : "bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300"
-                }`}
+                  }`}
                 onClick={() => setIsActive(v => !v)}
                 disabled={saving}
               >
@@ -232,7 +231,7 @@ function StarRating({ value }) {
   if (!value) return <span className="text-slate-400 dark:text-slate-600 text-xs italic">Not rated</span>
   return (
     <span className="flex items-center gap-0.5">
-      {[1,2,3,4,5].map(i => (
+      {[1, 2, 3, 4, 5].map(i => (
         <Star key={i} size={12} className={i <= value ? "text-amber-400 fill-amber-400" : "text-slate-200 dark:text-slate-700"} />
       ))}
       <span className="ml-1 text-xs font-black text-slate-700 dark:text-slate-300">{value}/5</span>
@@ -322,11 +321,10 @@ function EmployeeHistoryDrawer({ employee, onClose }) {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-5 py-3.5 text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition-all border-b-2 ${
-                tab === t.id
+              className={`px-5 py-3.5 text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition-all border-b-2 ${tab === t.id
                   ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
                   : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white"
-              }`}
+                }`}
             >{t.label}</button>
           ))}
         </div>
@@ -403,7 +401,7 @@ function EmployeeHistoryDrawer({ employee, onClose }) {
 
                   {/* Performance quick view */}
                   <div className="rounded-2xl border border-stroke dark:border-slate-800 p-5 bg-surface dark:bg-slate-900/40">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><TrendingUp size={12}/> Performance</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2"><TrendingUp size={12} /> Performance</div>
                     <div className="grid grid-cols-2 gap-3">
                       {[
                         { label: "Feedback Rate", val: perf.feedback_rate },
@@ -481,15 +479,15 @@ function EmployeeHistoryDrawer({ employee, onClose }) {
                       const borderColor = isApproved
                         ? tookLess ? "border-emerald-400 dark:border-emerald-700" : "border-indigo-300 dark:border-indigo-800"
                         : isRejected ? "border-rose-300 dark:border-rose-800"
-                        : isCancelled ? "border-slate-300 dark:border-slate-700"
-                        : "border-amber-300 dark:border-amber-800"
+                          : isCancelled ? "border-slate-300 dark:border-slate-700"
+                            : "border-amber-300 dark:border-amber-800"
 
                       const headerBg = isApproved
                         ? tookLess ? "bg-gradient-to-r from-indigo-50 to-emerald-50 dark:from-indigo-900/20 dark:to-emerald-900/20"
                           : "bg-indigo-50 dark:bg-indigo-900/20"
                         : isRejected ? "bg-rose-50 dark:bg-rose-900/20"
-                        : isCancelled ? "bg-slate-50 dark:bg-slate-800/40"
-                        : "bg-amber-50 dark:bg-amber-900/20"
+                          : isCancelled ? "bg-slate-50 dark:bg-slate-800/40"
+                            : "bg-amber-50 dark:bg-amber-900/20"
 
                       return (
                         <div key={lv.id} className={`rounded-2xl border-2 ${borderColor} overflow-hidden`}>

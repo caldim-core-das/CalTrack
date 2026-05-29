@@ -48,7 +48,7 @@ export function AcceptInvitePage() {
   const org = searchParams.get("org")
   const navigate = useNavigate()
   const { refreshMe, loginWithGoogle } = useAuth()
-  
+
   const [formData, setFormData] = useState({ first_name: "", last_name: "", password: "" })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -85,7 +85,7 @@ export function AcceptInvitePage() {
         method: "POST",
         json: { ...formData, token, org }
       })
-      
+
       setTokens({ access: res.access, refresh: res.refresh })
       const u = await refreshMe()
       const role = u?.role
@@ -101,11 +101,11 @@ export function AcceptInvitePage() {
 
   return (
     <div className="flex min-h-screen bg-white font-sans overflow-hidden">
-      
+
       {/* ═══════════════════ LEFT PANEL ═══════════════════ */}
       <div className="hidden lg:flex flex-col w-[60%] bg-[#FDFDFF] relative border-r border-[#F1F5F9] overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "radial-gradient(125% 125% at 50% 10%, #ffffff 40%, #fbbf24 100%)" }} />
-        
+
         <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="relative z-50 flex justify-center pt-14">
           <CalTrackLogo size="lg" showTagline={false} />
         </motion.div>
@@ -120,7 +120,7 @@ export function AcceptInvitePage() {
       {/* ═══════════════════ RIGHT PANEL ═══════════════════ */}
       <div className="flex-1 flex flex-col justify-center items-center p-8 lg:p-12 bg-white overflow-y-auto">
         <div className="w-full max-w-[440px]">
-          
+
           <div className="text-center mb-12">
             <h1 className="text-[32px] font-black text-[#0F172A] leading-tight tracking-tight">Join Your Team</h1>
             <p className="text-[#64748B] font-medium mt-3">Setup your account to start tracking time</p>
@@ -128,7 +128,7 @@ export function AcceptInvitePage() {
 
           {/* Social Join */}
           <div className="space-y-4 mb-8">
-            <button 
+            <button
               onClick={() => googleLogin()}
               disabled={loading}
               className="flex items-center justify-center gap-3 w-full px-6 py-4 bg-white border border-[#E2E8F0] rounded-2xl text-[14px] font-bold text-[#334155] hover:bg-[#F8FAFF] transition-all shadow-sm"
@@ -157,14 +157,14 @@ export function AcceptInvitePage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="grid grid-cols-2 gap-4">
-              <input 
+              <input
                 className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 transition-all outline-none"
                 placeholder="First Name"
                 value={formData.first_name}
                 onChange={e => setFormData(p => ({ ...p, first_name: e.target.value }))}
                 required
               />
-              <input 
+              <input
                 className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 transition-all outline-none"
                 placeholder="Last Name"
                 value={formData.last_name}
@@ -175,7 +175,7 @@ export function AcceptInvitePage() {
 
             <div className="relative group">
               <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={18} />
-              <input 
+              <input
                 className="w-full pl-14 pr-5 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 transition-all outline-none"
                 type="password"
                 placeholder="Set Password"
@@ -185,7 +185,7 @@ export function AcceptInvitePage() {
               />
             </div>
 
-            <button 
+            <button
               type="submit"
               disabled={loading}
               className="w-full py-5 bg-indigo-600 text-white text-[13px] font-black uppercase tracking-widest rounded-2xl shadow-xl hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"

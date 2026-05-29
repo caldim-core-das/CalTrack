@@ -37,3 +37,6 @@ __pycache__/
 *.pyc
 
 .claude/
+backend/.env.bak
+*.bak
+frontend/parse_check.cjs

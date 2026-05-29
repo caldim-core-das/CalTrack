@@ -36,6 +36,21 @@ def _set_tenant(company):
         connection.set_tenant(company)
 
 
+def _get_active_task_travel_status(user, company):
+    """Return travel_status of the employee's active/accepted task, or None."""
+    try:
+        from tasks.models import Task
+        task = Task.objects.filter(
+            assigned_to=user,
+            company=company,
+            acceptance_status=Task.AcceptanceStatus.ACCEPTED,
+            status__in=(Task.Status.PENDING, Task.Status.IN_PROGRESS),
+        ).order_by("-updated_at").first()
+        return task.travel_status if task else None
+    except Exception:
+        return None
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # Employee consumer
 # ──────────────────────────────────────────────────────────────────────────
@@ -184,7 +199,14 @@ class EmployeeLocationConsumer(AsyncWebsocketConsumer):
 
             # ── Presence status ───────────────────────────────────────────
             if not time_log:
-                status = "offline"
+                from tasks.models import Task
+                has_traveling_task = Task.objects.filter(
+                    assigned_to=self.employee.user,
+                    company=self.company,
+                    acceptance_status=Task.AcceptanceStatus.ACCEPTED,
+                    status__in=(Task.Status.PENDING, Task.Status.IN_PROGRESS)
+                ).exists()
+                status = "active" if has_traveling_task else "offline"
             elif Break.objects.filter(time_log=time_log, break_end__isnull=True).exists():
                 status = "on_break"
             else:
@@ -251,6 +273,8 @@ class EmployeeLocationConsumer(AsyncWebsocketConsumer):
                 "clock_in_photo": clock_in_photo,
                 "job_site_name": job_site_name,
                 "clock_in": time_log.clock_in.isoformat() if time_log else None,
+                # Travel status for the active task
+                "task_travel_status": _get_active_task_travel_status(self.employee.user, self.company),
             }
 
             return ping_data, breach
@@ -428,6 +452,28 @@ class AdminMapConsumer(AsyncWebsocketConsumer):
         await self.send(json.dumps({
             "type": "task_assigned",
             "task": event.get("task"),
+        }))
+
+    async def employee_status_change(self, event):
+        await self.send(json.dumps({
+            "type": "employee_status_change",
+            "employee_id": event.get("employee_id"),
+            "employee_name": event.get("employee_name"),
+            "status": event.get("status"),
+            "message": event.get("message"),
+        }))
+
+    async def travel_status_update(self, event):
+        """Relay employee travel phase changes (on_the_way / reached_site / working / done) to admin UI."""
+        await self.send(json.dumps({
+            "type": "travel_status_update",
+            "employee_id": event.get("employee_id"),
+            "employee_name": event.get("employee_name"),
+            "task_id": event.get("task_id"),
+            "task_title": event.get("task_title"),
+            "travel_event": event.get("travel_event"),
+            "travel_status": event.get("travel_status"),
+            "task_status": event.get("task_status"),
         }))
 
     # ── DB helpers ─────────────────────────────────────────────────────────

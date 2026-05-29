@@ -57,8 +57,17 @@ export default function AuditLedger({ logs, loading, elapsed, downloadLogPdf, su
                               <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatDateTime(l.clock_out).split(",")[1]}</span>
                             </div>
                           )}
+                          {l.breaks && l.breaks.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2 max-w-[200px]">
+                              {l.breaks.map((b, idx) => (
+                                <span key={idx} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                                  {b.break_type === "tea" ? "☕ Tea" : b.break_type === "lunch" ? "🍱 Lunch" : "💤 Break"}: {b.duration_minutes ? `${b.duration_minutes}m` : "Active"}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        {isRowActive && <div className="px-2 py-0.5 bg-indigo-600 dark:bg-indigo-500 text-white text-[9px] font-black rounded-full animate-pulse">LIVE</div>}
+                        {isRowActive && <div className="px-2 py-0.5 bg-indigo-600 dark:bg-indigo-50 text-white text-[9px] font-black rounded-full animate-pulse">LIVE</div>}
                       </div>
                     </td>
                     <td className="p-6">

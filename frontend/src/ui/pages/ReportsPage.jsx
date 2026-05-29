@@ -61,8 +61,8 @@ function Report3DCard({ label, value }) {
         style={{
           transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
           transformStyle: "preserve-3d",
-          boxShadow: isHovered 
-            ? "0 40px 80px -12px rgba(0,0,0,0.3)" 
+          boxShadow: isHovered
+            ? "0 40px 80px -12px rgba(0,0,0,0.3)"
             : "0 20px 40px -12px rgba(0,0,0,0.1)"
         }}
       >

@@ -3,8 +3,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 import os
+import sys
 
-load_dotenv(override=True)
+# Prevent loading remote Supabase dotenv when running pytest / django tests
+if "test" not in "".join(sys.argv) and not os.getenv("DJANGO_TESTING"):
+    load_dotenv(override=True)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -14,6 +17,7 @@ DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 
 SHARED_APPS = [
+    "daphne",
     "django_tenants",
     "companies",
     "django.contrib.contenttypes",
@@ -40,7 +44,15 @@ TENANT_APPS = [
     "settings_hub",
 ]
 
-INSTALLED_APPS = list(set(SHARED_APPS + TENANT_APPS))
+# Preserve order and ensure daphne is at the very beginning for ASGI/WebSocket support
+_installed = []
+for app in SHARED_APPS + TENANT_APPS:
+    if app not in _installed:
+        _installed.append(app)
+if "daphne" in _installed:
+    _installed.remove("daphne")
+    _installed.insert(0, "daphne")
+INSTALLED_APPS = _installed
 
 TENANT_MODEL = "companies.Company"
 TENANT_DOMAIN_MODEL = "companies.Domain"
@@ -204,25 +216,43 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
 ]
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
+]
 
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # ── Django Channels ──────────────────────────────────────────────────────────
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [(os.getenv("REDIS_HOST", "127.0.0.1"), int(os.getenv("REDIS_PORT", "6379")))],
-            "capacity": 1500,
-            "expiry": 10,
+if DEBUG:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
         },
-    },
-}
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [(os.getenv("REDIS_HOST", "127.0.0.1"), int(os.getenv("REDIS_PORT", "6379")))],
+                "capacity": 1500,
+                "expiry": 10,
+            },
+        },
+    }
 
 # ── Email Settings for Password Reset ──────────────────────────────────────────
 if os.getenv("EMAIL_HOST_USER") and os.getenv("EMAIL_HOST_PASSWORD"):

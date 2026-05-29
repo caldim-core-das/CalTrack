@@ -70,10 +70,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
         """
         Compute live availability by checking:
           1. Employee is inactive        → offline
-          2. Has an open Break today     → on_break
-          3. Has an open TimeLog today   → busy
-          4. Has approved leave today    → on_leave
-          5. Otherwise                   → available
+          2. Has approved leave today    → on_leave
+          3. Has an open Break today     → on_break
+          4. Has an open TimeLog today   → busy (if active task) or available (if standby)
+          5. Otherwise (not clocked in)  → offline
         """
         from django.utils import timezone
         from time_tracking.models import TimeLog, Break
@@ -83,6 +83,16 @@ class EmployeeSerializer(serializers.ModelSerializer):
             return "offline"
 
         today = timezone.localdate()
+
+        # Check for approved leave covering today
+        on_leave = LeaveRequest.objects.filter(
+            employee=employee,
+            status=LeaveRequest.Status.APPROVED,
+            start_date__lte=today,
+            end_date__gte=today,
+        ).exists()
+        if on_leave:
+            return "on_leave"
 
         # Check for an open time log (clocked in, not yet clocked out)
         open_log = TimeLog.objects.filter(
@@ -97,17 +107,19 @@ class EmployeeSerializer(serializers.ModelSerializer):
                 time_log=open_log,
                 break_end__isnull=True,
             ).exists()
-            return "on_break" if on_break else "busy"
+            if on_break:
+                return "on_break"
+            
+            # Check if there is an active (in progress) task associated with this time log
+            has_active_task = False
+            if hasattr(open_log, 'task') and open_log.task:
+                if open_log.task.status == 'in_progress':
+                    has_active_task = True
+            
+            return "busy" if has_active_task else "available"
 
-        # Check for approved leave covering today
-        on_leave = LeaveRequest.objects.filter(
-            employee=employee,
-            status=LeaveRequest.Status.APPROVED,
-            start_date__lte=today,
-            end_date__gte=today,
-        ).exists()
-
-        return "on_leave" if on_leave else "available"
+        # If not clocked in, employee is offline
+        return "offline"
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user', {})

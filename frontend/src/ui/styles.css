@@ -18,6 +18,37 @@
   }
 }
 
+@keyframes route-dash-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.animated-route-line {
+  animation: route-dash-flow 1.2s linear infinite !important;
+}
+
+/* ── Travel Journey Status Animations ─────────────────────── */
+@keyframes travelPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.25), 0 2px 12px rgba(59, 130, 246, 0.15); }
+  50%       { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.06), 0 4px 20px rgba(59, 130, 246, 0.25); }
+}
+
+@keyframes arrivedGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.2); }
+  50%       { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0.05); }
+}
+
+@keyframes workingBounce {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-2px); }
+}
+
+.travel-on-way    { animation: travelPulse 2s ease-in-out infinite; }
+.travel-reached   { animation: arrivedGlow 2s ease-in-out infinite; }
+.travel-working   { animation: workingBounce 1.8s ease-in-out infinite; }
+
+
 /* â”€â”€â”€ Design Tokens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root {
   /* Backgrounds */
@@ -84,8 +115,8 @@
   --radius-xl: 20px;
 
   /* Typography */
-  --font: "Manrope", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Syne", "Manrope", sans-serif;
+  --font: "Inter", "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", "Manrope", sans-serif;
 
   /* Sidebar width */
   --sidebar-width: 280px;
@@ -102,7 +133,7 @@
   --bg2: #070B14;
   --surface: #131B2B;
   --surface2: #1A2436;
-  
+
   --fg: #F1F5F9;
   --fg2: #CBD5E1;
   --muted: #94A3B8;
@@ -149,7 +180,10 @@ a {
   text-decoration: none;
 }
 
-button {
+button,
+input,
+select,
+textarea {
   font-family: var(--font);
 }
 
@@ -159,31 +193,57 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: "Manrope", "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  font-family: var(--font-display) !important;
 }
 
 /* ─── Semantic Utilities ─── */
-.bg-bg { background-color: var(--bg) !important; }
-.bg-bg2 { background-color: var(--bg2) !important; }
-.bg-surface { background-color: var(--surface) !important; }
-.bg-surface2 { background-color: var(--surface2) !important; }
-.text-fg { color: var(--fg) !important; }
-.text-fg2 { color: var(--fg2) !important; }
-.text-muted { color: var(--muted) !important; }
-.border-stroke { border-color: var(--stroke) !important; }
-.border-stroke2 { border-color: var(--stroke2) !important; }
+.bg-bg {
+  background-color: var(--bg) !important;
+}
+
+.bg-bg2 {
+  background-color: var(--bg2) !important;
+}
+
+.bg-surface {
+  background-color: var(--surface) !important;
+}
+
+.bg-surface2 {
+  background-color: var(--surface2) !important;
+}
+
+.text-fg {
+  color: var(--fg) !important;
+}
+
+.text-fg2 {
+  color: var(--fg2) !important;
+}
+
+.text-muted {
+  color: var(--muted) !important;
+}
+
+.border-stroke {
+  border-color: var(--stroke) !important;
+}
+
+.border-stroke2 {
+  border-color: var(--stroke2) !important;
+}
 
 .professional-title {
-  font-family: "Manrope", sans-serif !important;
+  font-family: var(--font-display) !important;
   font-weight: 900 !important;
-  letter-spacing: -0.035em !important;
+  letter-spacing: -0.03em !important;
 }
 
 .professional-subtitle {
-  font-family: "Manrope", sans-serif !important;
+  font-family: var(--font-display) !important;
   font-weight: 800 !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.1em !important;
+  letter-spacing: 0.08em !important;
 }
 
 /* ─── Enterprise Modals & Overlays ─── */
@@ -11471,7 +11531,7 @@ h6 {
 
 /* --- Leaves Module Font Style (Reference Image) -------------------- */
 .leaves-module .pageTitle {
-  font-family: 'Inter', system-ui, sans-serif !important;
+  font-family: var(--font-display) !important;
   font-size: 28px !important;
   font-weight: 700 !important;
   letter-spacing: -0.5px !important;
@@ -11479,7 +11539,7 @@ h6 {
 }
 
 .leaves-module .cardTitle {
-  font-family: 'Inter', system-ui, sans-serif !important;
+  font-family: var(--font-display) !important;
   font-size: 18px !important;
   font-weight: 600 !important;
   letter-spacing: -0.3px !important;
@@ -11896,7 +11956,7 @@ h6 {
 /* â”€â”€â”€ TYPOGRAPHY: PLAYFAIR DISPLAY INTEGRATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* 1. Reset everything structurally back to Inter (Defense) */
+/* 1. Reset everything structurally back to var(--font) */
 body,
 button,
 input,
@@ -11915,10 +11975,10 @@ td,
 .tp-break-timer,
 .tp-btn-massive,
 .tp-clock-in-massive {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  font-family: var(--font) !important;
 }
 
-/* 2. Apply Playfair Display ONLY to Major Headings & Titles */
+/* 2. Apply var(--font-display) ONLY to Major Headings & Titles */
 h1,
 h2,
 h3,
@@ -11937,7 +11997,7 @@ h4,
 .dash-panel-title,
 .tsk-panel-title,
 .qt-form-title {
-  font-family: 'Playfair Display', serif !important;
+  font-family: var(--font-display) !important;
   font-weight: 700 !important;
   letter-spacing: 0.2px !important;
 }

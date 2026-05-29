@@ -182,7 +182,7 @@ export function App() {
               )
             }
           />
-          
+
           <Route
             path={routes.reset_password}
             element={
@@ -217,54 +217,54 @@ export function App() {
           >
             {/* ── Routes accessible by ALL authenticated roles ── */}
             <Route path={routes.dashboard} element={<DashboardPage />} />
-            <Route path={routes.time}      element={<TimePage />} />
-            <Route path={routes.tasks}     element={<TasksPage />} />
-            <Route path={routes.leaves}    element={<LeavesPage />} />
+            <Route path={routes.time} element={<TimePage />} />
+            <Route path={routes.tasks} element={<TasksPage />} />
+            <Route path={routes.leaves} element={<LeavesPage />} />
 
             {/* Employee profile settings — accessible to everyone */}
-            <Route path={routes.settings}         element={<SettingsPage />} />
+            <Route path={routes.settings} element={<SettingsPage />} />
             <Route path={routes.settings_profile} element={<SettingsPage section="profile" />} />
             <Route path={routes.settings_notifications} element={<SettingsPage section="notifications" />} />
-            <Route path={routes.settings_preferences}   element={<SettingsPage section="preferences" />} />
+            <Route path={routes.settings_preferences} element={<SettingsPage section="preferences" />} />
 
             {/* ── Admin-only routes ── */}
             <Route element={<RequireAdmin />}>
-              <Route path={routes.get_started}     element={<GetStartedPage />} />
-              <Route path={routes.locations}        element={<LocationsPage />} />
-              <Route path={routes.live_locations}   element={<LiveLocationsPage />} />
-              <Route path={routes.payroll}          element={<PayrollPage />} />
-              <Route path={routes.scheduling}       element={<SchedulingPage />} />
-              <Route path={routes.employees}        element={<EmployeesPage />} />
-              <Route path={routes.reports}          element={<ReportsPage />} />
-              <Route path={routes.compliance}       element={<CompliancePage />} />
+              <Route path={routes.get_started} element={<GetStartedPage />} />
+              <Route path={routes.locations} element={<LocationsPage />} />
+              <Route path={routes.live_locations} element={<LiveLocationsPage />} />
+              <Route path={routes.payroll} element={<PayrollPage />} />
+              <Route path={routes.scheduling} element={<SchedulingPage />} />
+              <Route path={routes.employees} element={<EmployeesPage />} />
+              <Route path={routes.reports} element={<ReportsPage />} />
+              <Route path={routes.compliance} element={<CompliancePage />} />
             </Route>
 
             {/* ── Admin-only settings (employees redirected to /settings/profile) ── */}
             <Route element={<RequireAdminSettings />}>
-              <Route path={routes.settings_people}        element={<SettingsPage section="people" />} />
-              <Route path={routes.settings_team}          element={<SettingsPage section="team" />} />
-              <Route path={routes.settings_timetracking}  element={<SettingsPage section="time-tracking" />} />
-              <Route path={routes.settings_attendance}    element={<SettingsPage section="attendance" />} />
-              <Route path={routes.settings_schedules}     element={<SettingsPage section="schedules" />} />
-              <Route path={routes.settings_shiftplanner}  element={<SettingsPage section="shift-planner" />} />
-              <Route path={routes.settings_holidays}      element={<SettingsPage section="holidays" />} />
-              <Route path={routes.settings_payroll}       element={<SettingsPage section="payroll" />} />
-              <Route path={routes.settings_expenses}      element={<SettingsPage section="expenses" />} />
-              <Route path={routes.settings_workflows}     element={<SettingsPage section="workflows" />} />
-              <Route path={routes.settings_productivity}  element={<SettingsPage section="productivity" />} />
-              <Route path={routes.settings_reports}       element={<SettingsPage section="reports" />} />
-              <Route path={routes.settings_security}      element={<SettingsPage section="security" />} />
-              <Route path={routes.settings_rbac}          element={<SettingsPage section="rbac" />} />
-              <Route path={routes.settings_audit}         element={<SettingsPage section="audit" />} />
-              <Route path={routes.settings_devices}       element={<SettingsPage section="devices" />} />
-              <Route path={routes.settings_location}      element={<SettingsPage section="location" />} />
-              <Route path={routes.settings_branding}      element={<SettingsPage section="branding" />} />
-              <Route path={routes.settings_organization}  element={<SettingsPage section="organization" />} />
-              <Route path={routes.settings_integrations}  element={<SettingsPage section="integrations" />} />
-              <Route path={routes.settings_developer}     element={<SettingsPage section="developer" />} />
-              <Route path={routes.settings_billing}       element={<SettingsPage section="billing" />} />
-              <Route path={routes.settings_invoices}      element={<SettingsPage section="invoices" />} />
-              <Route path={routes.settings_data}          element={<SettingsPage section="data" />} />
+              <Route path={routes.settings_people} element={<SettingsPage section="people" />} />
+              <Route path={routes.settings_team} element={<SettingsPage section="team" />} />
+              <Route path={routes.settings_timetracking} element={<SettingsPage section="time-tracking" />} />
+              <Route path={routes.settings_attendance} element={<SettingsPage section="attendance" />} />
+              <Route path={routes.settings_schedules} element={<SettingsPage section="schedules" />} />
+              <Route path={routes.settings_shiftplanner} element={<SettingsPage section="shift-planner" />} />
+              <Route path={routes.settings_holidays} element={<SettingsPage section="holidays" />} />
+              <Route path={routes.settings_payroll} element={<SettingsPage section="payroll" />} />
+              <Route path={routes.settings_expenses} element={<SettingsPage section="expenses" />} />
+              <Route path={routes.settings_workflows} element={<SettingsPage section="workflows" />} />
+              <Route path={routes.settings_productivity} element={<SettingsPage section="productivity" />} />
+              <Route path={routes.settings_reports} element={<SettingsPage section="reports" />} />
+              <Route path={routes.settings_security} element={<SettingsPage section="security" />} />
+              <Route path={routes.settings_rbac} element={<SettingsPage section="rbac" />} />
+              <Route path={routes.settings_audit} element={<SettingsPage section="audit" />} />
+              <Route path={routes.settings_devices} element={<SettingsPage section="devices" />} />
+              <Route path={routes.settings_location} element={<SettingsPage section="location" />} />
+              <Route path={routes.settings_branding} element={<SettingsPage section="branding" />} />
+              <Route path={routes.settings_organization} element={<SettingsPage section="organization" />} />
+              <Route path={routes.settings_integrations} element={<SettingsPage section="integrations" />} />
+              <Route path={routes.settings_developer} element={<SettingsPage section="developer" />} />
+              <Route path={routes.settings_billing} element={<SettingsPage section="billing" />} />
+              <Route path={routes.settings_invoices} element={<SettingsPage section="invoices" />} />
+              <Route path={routes.settings_data} element={<SettingsPage section="data" />} />
             </Route>
           </Route>
 

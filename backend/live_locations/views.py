@@ -43,7 +43,7 @@ def _haversine_meters(lat1, lon1, lat2, lon2):
 def build_live_snapshot(company):
     """
     Return a JSON-serialisable dict with:
-      employees  – one entry per clocked-in employee with latest ping/position
+      employees  – one entry per clocked-in employee or employee with accepted travel task with latest ping/position
       sos_alerts – active SOS alerts
     """
     now = timezone.now()
@@ -130,6 +130,77 @@ def build_live_snapshot(company):
             "clock_in": log.clock_in.isoformat(),
         })
 
+    # ── Add Employees who have an ACCEPTED task but are NOT clocked in ──
+    from tasks.models import Task
+    accepted_tasks = Task.objects.filter(
+        company=company,
+        acceptance_status=Task.AcceptanceStatus.ACCEPTED,
+        status__in=(Task.Status.PENDING, Task.Status.IN_PROGRESS),
+        assigned_to__isnull=False
+    ).select_related("assigned_to", "assigned_to__employee_profile")
+
+    for task in accepted_tasks:
+        user = task.assigned_to
+        if not hasattr(user, "employee_profile"):
+            continue
+        emp = user.employee_profile
+        if emp.id in seen:
+            continue
+        seen.add(emp.id)
+
+        latest_ping = (
+            EmployeeLocation.objects.filter(employee=emp)
+            .order_by("-timestamp")
+            .first()
+        )
+
+        status_val = "active"
+        if latest_ping:
+            age_min = (now - latest_ping.timestamp).total_seconds() / 60
+            if age_min > 30:
+                status_val = "offline"
+            elif age_min > 15:
+                status_val = "idle"
+            else:
+                status_val = "active"
+        else:
+            status_val = "active"
+
+        # Check geofence against task location
+        if task.location_lat and task.location_lon and latest_ping and status_val == "active":
+            radius = task.geofence_radius or 200
+            dist = _haversine_meters(
+                float(latest_ping.lat), float(latest_ping.lng),
+                float(task.location_lat), float(task.location_lon)
+            )
+            if dist > radius:
+                status_val = "outside_geofence"
+
+        if latest_ping:
+            lat = str(latest_ping.lat)
+            lng = str(latest_ping.lng)
+            last_seen = latest_ping.timestamp.isoformat()
+        else:
+            lat = "0"
+            lng = "0"
+            last_seen = None
+
+        job_site_name = task.client_name or task.title or "Traveling to Client"
+
+        employees.append({
+            "employee_id": str(emp.id),
+            "employee_name": emp.user.get_full_name() or emp.user.username,
+            "lat": lat,
+            "lng": lng,
+            "timestamp": last_seen,
+            "status": status_val,
+            "worked_seconds": 0,
+            "time_log_id": None,
+            "clock_in_photo": None,
+            "job_site_name": job_site_name,
+            "clock_in": None,
+        })
+
     # Active SOS alerts
     sos_list = []
     for sos in SOSAlert.objects.filter(status="active").select_related("employee", "employee__user"):
@@ -165,10 +236,18 @@ class LiveLocationUpdateView(APIView):
                 .first()
             )
             if not time_log:
-                return Response(
-                    {"detail": "You must be clocked in to report live location."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                from tasks.models import Task
+                has_accepted_task = Task.objects.filter(
+                    assigned_to=request.user,
+                    company=company,
+                    acceptance_status=Task.AcceptanceStatus.ACCEPTED,
+                    status__in=(Task.Status.PENDING, Task.Status.IN_PROGRESS),
+                ).exists()
+                if not has_accepted_task:
+                    return Response(
+                        {"detail": "You must be clocked in or have an accepted task to report live location."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
             lat = request.data.get("lat")
             lng = request.data.get("lng")

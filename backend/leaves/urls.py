@@ -6,6 +6,6 @@ from .views import LeaveRequestViewSet, NotificationsView
 router = DefaultRouter()
 router.register(r"", LeaveRequestViewSet, basename="leave")
 
-urlpatterns = router.urls + [
+urlpatterns = [
     path("notifications/", NotificationsView.as_view(), name="leave-notifications"),
-]
+] + router.urls

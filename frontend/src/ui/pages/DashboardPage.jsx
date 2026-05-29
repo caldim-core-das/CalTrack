@@ -537,7 +537,7 @@ function AdminDashboard() {
         }}
         onMouseMove={handleMouse}
         onMouseLeave={handleMouseLeave}
-        className="relative cursor-pointer"
+        className="relative cursor-pointer w-full"
         initial={{ opacity: 0, x: side === 'left' ? -30 : 30 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.8, delay: 0.2, type: "spring" }}
@@ -559,11 +559,11 @@ function AdminDashboard() {
 
   function KpiDiagramSide({ card, side }) {
     const desc = (
-      <div className={`flex flex-col ${side === 'left' ? 'items-end text-right' : 'items-start text-left'} min-w-[140px]`}>
-        <div className="professional-title text-[1.4rem] leading-none" style={{ color: card.color }}>
+      <div className={`flex flex-col ${side === 'left' ? 'items-end text-right' : 'items-start text-left'} min-w-[70px] lg:min-w-[85px]`}>
+        <div className="professional-title text-[1.4rem] leading-[1.2]" style={{ color: card.color }}>
           {card.value}
         </div>
-        <div className="professional-subtitle text-slate-400 text-[0.7rem] mt-1.5 opacity-60 whitespace-nowrap">
+        <div className="professional-subtitle text-slate-400 text-[0.65rem] mt-1 opacity-70 whitespace-nowrap">
           {card.sub}
         </div>
       </div>
@@ -572,31 +572,31 @@ function AdminDashboard() {
     const pill = (
       <motion.div
         whileHover={{ scale: 1.05, y: -2 }}
-        className={`flex items-center rounded-2xl min-h-[58px] shadow-[0_20px_40px_rgba(0,0,0,0.12)] px-4 py-2 gap-4 border border-white/20 relative overflow-hidden group`}
+        className={`flex items-center rounded-2xl min-h-[58px] shadow-[0_20px_40px_rgba(0,0,0,0.12)] px-3.5 py-1.5 gap-3 border border-white/20 relative overflow-hidden group`}
         style={{
           background: `linear-gradient(135deg, ${card.color} 0%, ${card.color}dd 100%)`,
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-        <div className="text-white professional-subtitle text-[0.9rem] whitespace-nowrap">{card.title}</div>
-        <div className="w-[40px] h-[40px] rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center flex-none border border-white/20 shadow-inner">
+        <div className="text-white professional-subtitle text-[0.8rem] whitespace-nowrap">{card.title}</div>
+        <div className="w-[36px] h-[36px] rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center flex-none border border-white/20 shadow-inner">
           <span style={{ color: "white", display: "flex" }}>{card.icon}</span>
         </div>
       </motion.div>
     )
 
     const connector = (
-      <div className={`flex items-center ${side === 'left' ? 'justify-end' : 'justify-start'} w-[60px]`}>
+      <div className={`flex items-center ${side === 'left' ? 'justify-end' : 'justify-start'} flex-1`} style={{ minWidth: 32 }}>
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: "100%" }}
-          className="h-[2px] relative"
+          className="h-[2px] relative w-full"
           style={{
             background: `linear-gradient(${side === 'left' ? 'to right' : 'to left'}, transparent, ${card.color}44)`
           }}
         >
           <motion.div
-            animate={{ x: side === 'left' ? [0, 60, 0] : [0, -60, 0], opacity: [0, 1, 0] }}
+            animate={{ x: side === 'left' ? [0, 80, 0] : [0, -80, 0], opacity: [0, 1, 0] }}
             transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
             className="absolute top-1/2 -translate-y-1/2 w-1 h-1 rounded-full"
             style={{ backgroundColor: card.color }}
@@ -607,10 +607,20 @@ function AdminDashboard() {
 
     return (
       <ThreeDKpiCard color={card.color} side={side}>
-        <div className={`flex items-center gap-6 ${side === 'left' ? 'flex-row' : 'flex-row-reverse'}`}>
-          {desc}
-          {pill}
-          {connector}
+        <div className={`flex items-center gap-2 lg:gap-3 ${side === 'left' ? 'flex-row justify-end' : 'flex-row justify-start'}`}>
+          {side === 'left' ? (
+            <>
+              {desc}
+              {pill}
+              {connector}
+            </>
+          ) : (
+            <>
+              {connector}
+              {pill}
+              {desc}
+            </>
+          )}
         </div>
       </ThreeDKpiCard>
     )
@@ -1206,7 +1216,7 @@ function AdminDashboard() {
           <div className="text-[0.9rem] text-slate-400 dark:text-slate-500 font-medium mt-1">Strategic overview</div>
         </div>
 
-        <div className="p-8 pb-12 grid grid-cols-1 lg:grid-cols-[1fr_260px_1fr] lg:grid-rows-[repeat(3,minmax(110px,auto))] gap-x-24 gap-y-12 items-center">
+        <div className="p-8 pb-12 grid grid-cols-1 lg:grid-cols-[1fr_260px_1fr] lg:grid-rows-[repeat(3,minmax(110px,auto))] gap-x-6 gap-y-10 items-center">
           <div className="flex justify-center items-center max-lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:row-span-3">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}

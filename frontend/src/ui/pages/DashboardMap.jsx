@@ -68,7 +68,7 @@ function createLocationDotIcon(loc) {
 export default function DashboardMap({ locationSummary }) {
   const mapCenter = useMemo(() => {
     const locs = locationSummary.filter((l) => l.lat && l.lng)
-    if (locs.length === 0) return [20.5937, 78.9629]
+    if (locs.length === 0) return [12.7419, 77.8238] // Samathuvapuram Bus Stand, Hosur
     const avgLat = locs.reduce((s, l) => s + l.lat, 0) / locs.length
     const avgLng = locs.reduce((s, l) => s + l.lng, 0) / locs.length
     return [avgLat, avgLng]

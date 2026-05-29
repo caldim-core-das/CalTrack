@@ -24,23 +24,23 @@ import {
 
 // Items visible to all authenticated users (employees + admins)
 const NAV_SHARED = [
-  { label: "Dashboard",  to: routes.dashboard, icon: <Home size={20} />,        color: "#10B981" },
-  { label: "Time",       to: routes.time,       icon: <Clock size={20} />,       color: "#F59E0B" },
-  { label: "Tasks",      to: routes.tasks,      icon: <CheckSquare size={20} />, color: "#14B8A6" },
-  { label: "Leaves",     to: routes.leaves,     icon: <CalendarDays size={20} />,color: "#EC4899" },
-  { label: "Settings",   to: routes.settings,   icon: <Settings size={20} />,    color: "#64748B" },
+  { label: "Dashboard", to: routes.dashboard, icon: <Home size={20} />, color: "#10B981" },
+  { label: "Time", to: routes.time, icon: <Clock size={20} />, color: "#F59E0B" },
+  { label: "Jobs", to: routes.tasks, icon: <CheckSquare size={20} />, color: "#14B8A6" },
+  { label: "Leaves", to: routes.leaves, icon: <CalendarDays size={20} />, color: "#EC4899" },
+  { label: "Settings", to: routes.settings, icon: <Settings size={20} />, color: "#64748B" },
 ]
 
 // Items visible only to admins/managers
 const NAV_ADMIN = [
-  { label: "Get Started",   to: routes.get_started,    icon: <Rocket size={20} />,      color: "#0EA5E9" },
-  { label: "Locations",     to: routes.locations,      icon: <MapPin size={20} />,      color: "#8B5CF6" },
-  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />,      color: "#EF4444" },
-  { label: "Payroll",       to: routes.payroll,        icon: <Banknote size={20} />,    color: "#6366F1" },
-  { label: "Scheduling",    to: routes.scheduling,     icon: <CalendarRange size={20} />,color: "#38BDF8" },
-  { label: "Employees",     to: routes.employees,      icon: <Users size={20} />,       color: "#D946EF" },
-  { label: "Reports",       to: routes.reports,        icon: <BarChart3 size={20} />,   color: "#FACC15" },
-  { label: "Compliance",    to: routes.compliance,     icon: <ShieldAlert size={20} />, color: "#2563EB" },
+  { label: "Get Started", to: routes.get_started, icon: <Rocket size={20} />, color: "#0EA5E9" },
+  { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6" },
+  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444" },
+  { label: "Payroll", to: routes.payroll, icon: <Banknote size={20} />, color: "#6366F1" },
+  { label: "Scheduling", to: routes.scheduling, icon: <CalendarRange size={20} />, color: "#38BDF8" },
+  { label: "Employees", to: routes.employees, icon: <Users size={20} />, color: "#D946EF" },
+  { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, color: "#FACC15" },
+  { label: "Compliance", to: routes.compliance, icon: <ShieldAlert size={20} />, color: "#2563EB" },
 ]
 
 // Full combined NAV — built per role at render time (see `items` memo below)
@@ -93,6 +93,23 @@ function playCriticalAlert() {
     osc.stop(ctx.currentTime + 0.5)
   } catch (e) {
     console.warn("Audio alert failed", e)
+  }
+}
+
+function playStatusBeep(isOnline) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = "sine"
+    osc.frequency.setValueAtTime(isOnline ? 660 : 440, ctx.currentTime)
+    gain.gain.setValueAtTime(0.05, ctx.currentTime)
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.15)
+  } catch (e) {
+    console.warn("Status beep failed", e)
   }
 }
 
@@ -281,6 +298,10 @@ export function AppShell() {
       NotificationService.send("🆘 SOS ALERT", `${msg.data.employee_name} needs assistance!`)
     } else if (msg.type === "geofence_breach") {
       dispatch(addGeofenceBreach(msg.data))
+    } else if (msg.type === "employee_status_change") {
+      playStatusBeep(msg.status === "online")
+      NotificationService.send("Workforce Status Alert", msg.message)
+      window.dispatchEvent(new CustomEvent("quicktims:employeeStatusChange", { detail: msg }))
     }
   }, [dispatch])
 
@@ -365,40 +386,40 @@ export function AppShell() {
                 <div className="absolute top-full right-0 mt-3 w-80 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-[99999] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
                   <div className="p-6 bg-slate-50/80 dark:bg-slate-800/50 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-700/60">
                     <div className="flex items-center gap-4">
-                    <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 dark:bg-blue-500 text-white text-xl font-bold shadow-xl shadow-blue-500/20">{initials(user.username)}</div>
-                    <div>
-                      <div className="font-bold text-slate-900 dark:text-white text-lg">{displayName(user.username)}</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[180px] font-medium">{email}</div>
-                      <span
-                        className="inline-block mt-1.5 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
-                        style={{
-                          color: isAdmin ? "#4f46e5" : "#059669",
-                          background: isAdmin ? "#ede9fe" : "#d1fae5",
-                          border: `1px solid ${isAdmin ? "#c4b5fd" : "#a7f3d0"}`,
-                        }}
-                      >
-                        {isAdmin ? "Administrator" : "Employee"}
-                      </span>
+                      <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 dark:bg-blue-500 text-white text-xl font-bold shadow-xl shadow-blue-500/20">{initials(user.username)}</div>
+                      <div>
+                        <div className="font-bold text-slate-900 dark:text-white text-lg">{displayName(user.username)}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[180px] font-medium">{email}</div>
+                        <span
+                          className="inline-block mt-1.5 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
+                          style={{
+                            color: isAdmin ? "#4f46e5" : "#059669",
+                            background: isAdmin ? "#ede9fe" : "#d1fae5",
+                            border: `1px solid ${isAdmin ? "#c4b5fd" : "#a7f3d0"}`,
+                          }}
+                        >
+                          {isAdmin ? "Administrator" : "Employee"}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="p-3">
-                  <button
-                    type="button"
-                    className="flex items-center w-full px-4 py-3 text-sm font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all duration-300 group"
-                    onClick={async () => {
-                      setProfileOpen(false);
-                      await logout();
-                      navigate("/login", { replace: true });
-                    }}
-                  >
-                    <LogOut size={18} className="mr-3 group-hover:-translate-x-1 transition-transform" /> Log out
-                  </button>
+                  <div className="p-3">
+                    <button
+                      type="button"
+                      className="flex items-center w-full px-4 py-3 text-sm font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all duration-300 group"
+                      onClick={async () => {
+                        setProfileOpen(false);
+                        await logout();
+                        navigate("/login", { replace: true });
+                      }}
+                    >
+                      <LogOut size={18} className="mr-3 group-hover:-translate-x-1 transition-transform" /> Log out
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+              </>
+            )}
           </div>
         </div>
       </header>

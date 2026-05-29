@@ -39,7 +39,7 @@ async function _silentRefresh() {
 }
 
 export async function apiRequest(path, init = {}, attemptRefresh = true) {
-  const method   = (init.method || "GET").toUpperCase()
+  const method = (init.method || "GET").toUpperCase()
   const cacheKey = method === "GET" ? path + JSON.stringify(init.params || "") : null
 
   if (cacheKey && _pendingRequests.has(cacheKey)) {

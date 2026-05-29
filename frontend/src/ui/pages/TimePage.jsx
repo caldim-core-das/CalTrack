@@ -50,9 +50,22 @@ import {
   ChevronRight,
   Upload,
   Eye,
-  X,
-  User
+  User,
+  Navigation,
+  X
 } from "lucide-react"
+
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, Polyline } from "react-leaflet"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
+
+/* ── Fix default Leaflet icons ────────────────────────────────── */
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+})
 
 const AuditLedger = lazy(() => import("./AuditLedger.jsx"))
 
@@ -221,14 +234,42 @@ function useLocationTracker(isClockedIn) {
  * Falls back to REST if WebSocket is not open.
  * Returns { sendSOS } so the SOS button can push alerts.
  */
-function useWsLocationTracker(isClockedIn) {
+function useWsLocationTracker(isClockedIn, simActive = false, simCoords = null) {
   const wsRef = useRef(null)
   const pingRef = useRef(null)
   const reconnectRef = useRef(null)
   const mountedRef = useRef(true)
 
+  const simActiveRef = useRef(simActive)
+  const simCoordsRef = useRef(simCoords)
+
+  useEffect(() => {
+    simActiveRef.current = simActive
+    simCoordsRef.current = simCoords
+  }, [simActive, simCoords])
+
   const sendGpsPing = useCallback(() => {
     if (!isClockedIn) return
+
+    if (simActiveRef.current && simCoordsRef.current) {
+      const payload = {
+        type: "location_ping",
+        lat: simCoordsRef.current.lat,
+        lng: simCoordsRef.current.lng,
+        accuracy: 5,
+      }
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify(payload))
+      } else {
+        // REST fallback
+        apiRequest("/live-locations/update/", {
+          method: "POST",
+          json: { lat: payload.lat, lng: payload.lng },
+        }).catch(() => { })
+      }
+      return
+    }
+
     navigator.geolocation?.getCurrentPosition(
       (pos) => {
         const payload = {
@@ -278,7 +319,7 @@ function useWsLocationTracker(isClockedIn) {
 
     connect()
     sendGpsPing()
-    pingRef.current = setInterval(sendGpsPing, 30000)
+    pingRef.current = setInterval(sendGpsPing, simActive ? 3000 : 30000)
 
     return () => {
       mountedRef.current = false
@@ -289,7 +330,7 @@ function useWsLocationTracker(isClockedIn) {
         wsRef.current.close(1000)
       }
     }
-  }, [isClockedIn, sendGpsPing])
+  }, [isClockedIn, sendGpsPing, simActive])
 
   const sendSOS = useCallback((lat, lng) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -953,15 +994,17 @@ function AdminTimePage() {
               const isApproved = log.status === "approved";
               const clockInTime = log.clock_in ? new Date(log.clock_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—";
               const clockOutTime = log.clock_out ? new Date(log.clock_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "In Progress";
-              
+
               // Allocate time
               const allocateTime = "09:00 AM - 05:00 PM (8.00h Shift)";
 
               // Breaks mapping
               const teaBreaks = log.breaks?.filter(b => b.break_type === "tea") || [];
               const lunchBreaks = log.breaks?.filter(b => b.break_type === "lunch") || [];
+              const otherBreaks = log.breaks?.filter(b => b.break_type === "other") || [];
               const totalTeaMin = teaBreaks.reduce((acc, curr) => acc + (curr.duration_minutes || 0), 0);
               const totalLunchMin = lunchBreaks.reduce((acc, curr) => acc + (curr.duration_minutes || 0), 0);
+              const totalOtherMin = otherBreaks.reduce((acc, curr) => acc + (curr.duration_minutes || 0), 0);
 
               // Admin
               const adminName = isApproved ? log.approved_by_name || "Jane Doe (Finance Director)" : "System Verified";
@@ -978,11 +1021,11 @@ function AdminTimePage() {
                   boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
                   backdropFilter: "blur(8px)"
                 }} className="hover:border-indigo-500/45 transition-all">
-                  
+
                   {/* 1. PHOTO VERIFICATION PORTRAIT VIEW */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                     <span style={{ fontSize: 10, fontWeight: 900, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.1em" }}>Verification Photos</span>
-                    
+
                     {/* Clock In Portrait */}
                     <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "1.5px solid rgba(255,255,255,0.12)", background: "#090d16", height: 120 }}>
                       {log.clock_in_photo ? (
@@ -1036,7 +1079,7 @@ function AdminTimePage() {
 
                     {/* Timeline steps */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 16, position: "relative" }}>
-                      
+
                       {/* Step 1: Allocated Time */}
                       <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
                         <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#60a5fa", marginTop: 4, boxShadow: "0 0 8px #60a5fa" }} />
@@ -1075,9 +1118,10 @@ function AdminTimePage() {
                         <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#f59e0b", marginTop: 4, boxShadow: "0 0 8px #f59e0b" }} />
                         <div>
                           <span style={{ fontSize: 11, fontWeight: 900, color: "#f59e0b", textTransform: "uppercase", letterSpacing: "0.08em" }}>Shift Health Breaks</span>
-                          <div style={{ fontSize: 13, color: "#cbd5e1", marginTop: 3, display: "flex", gap: 20 }}>
-                            <span>Tea Break Duration: <strong style={{ color: "#fff" }}>{totalTeaMin || 15} mins</strong></span>
-                            <span>Lunch Break Duration: <strong style={{ color: "#fff" }}>{totalLunchMin || 30} mins</strong></span>
+                          <div style={{ fontSize: 13, color: "#cbd5e1", marginTop: 3, display: "flex", flexWrap: "wrap", gap: 20 }}>
+                            <span>Tea Break: <strong style={{ color: "#fff" }}>{totalTeaMin || 15} mins</strong></span>
+                            <span>Lunch Break: <strong style={{ color: "#fff" }}>{totalLunchMin || 30} mins</strong></span>
+                            {totalOtherMin > 0 && <span>Other Break: <strong style={{ color: "#fff" }}>{totalOtherMin} mins</strong></span>}
                           </div>
                         </div>
                       </div>
@@ -1105,7 +1149,7 @@ function AdminTimePage() {
                   {/* 3. METADATA STATS TABLE COLUMN */}
                   <div style={{ borderLeft: "1.5px solid rgba(255,255,255,0.08)", paddingLeft: 28, display: "flex", flexDirection: "column", gap: 14 }}>
                     <span style={{ fontSize: 10, fontWeight: 900, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.1em" }}>Ledger details</span>
-                    
+
                     <div>
                       <div style={{ fontSize: 10, color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.05em" }}>Admin Assignor</div>
                       <div style={{ fontSize: 13, fontWeight: 800, color: "#e2e8f0", marginTop: 3 }}>{adminName}</div>
@@ -1188,6 +1232,15 @@ function AdminLogRow({ log, onAction, onView }) {
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">Out</span>
                 <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatDateTime(log.clock_out).split(",")[1]}</span>
+              </div>
+            )}
+            {log.breaks && log.breaks.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1.5 max-w-[180px]">
+                {log.breaks.map((b, idx) => (
+                  <span key={idx} className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded text-[8px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    {b.break_type === "tea" ? "☕ Tea" : b.break_type === "lunch" ? "🍱 Lunch" : "💤 Break"}: {b.duration_minutes ? `${b.duration_minutes}m` : "Active"}
+                  </span>
+                ))}
               </div>
             )}
           </div>
@@ -1287,6 +1340,17 @@ function AdminLogRow({ log, onAction, onView }) {
   )
 }
 
+// ── Map controller for pan-to-follow ──
+function MapController({ center, zoom }) {
+  const map = useMap()
+  useEffect(() => {
+    if (center && center[0] && center[1]) {
+      map.flyTo(center, zoom || 14, { duration: 0.5 })
+    }
+  }, [center, zoom, map])
+  return null
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  EMPLOYEE VIEW (same as before)
 // ═══════════════════════════════════════════════════════════════
@@ -1348,6 +1412,8 @@ function EmployeeTimePage() {
   const openBreak = useMemo(() => findOpenBreak(openLog), [openLog])
   const elapsed = useElapsed(openLog?.clock_in)
   const breakElapsed = useBreakTimer(openBreak)
+
+
 
   // Layer 4: WS-based GPS tracking + SOS
   const { sendSOS } = useWsLocationTracker(!!openLog)
@@ -1769,9 +1835,9 @@ function EmployeeTimePage() {
             <div>
               <h1 className="text-xl professional-title text-slate-900 dark:text-white">Personal Timesheets</h1>
               <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${openLog ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}></div>
+                <div className={`w-2 h-2 rounded-full ${openLog ? (openLog.task ? 'bg-emerald-500' : (openBreak ? 'bg-amber-500' : 'bg-blue-500')) : 'bg-slate-300 dark:bg-slate-700'}`}></div>
                 <span className="text-[10px] professional-subtitle text-slate-400 dark:text-slate-500">
-                  {openLog ? (openLog.task ? `Working on: ${openLog.task.title}` : (openBreak ? 'Currently on Break' : 'On Active Duty')) : 'System Standby'}
+                  {openLog ? (openLog.task ? `Working on: ${openLog.task.title}` : (openBreak ? 'Currently on Break' : 'Standby (Idle - No Active Job)')) : 'System Standby'}
                 </span>
               </div>
             </div>
@@ -1781,12 +1847,28 @@ function EmployeeTimePage() {
             {openLog && (
               <div className="flex items-center bg-slate-900 dark:bg-slate-800 text-white rounded-2xl px-1.5 py-1.5 shadow-xl shadow-slate-200 dark:shadow-none border border-slate-800 dark:border-slate-700">
                 <div className="px-4 py-1">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block leading-none">Session</span>
-                  <span className="text-lg font-black tabular-nums">{formatDuration(elapsed)}</span>
+                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block leading-none">
+                    {openBreak ? `On Break (${openBreak.break_type.toUpperCase()})` : (openLog.task ? "Working Time" : "Active Session")}
+                  </span>
+                  <span className="text-lg font-black tabular-nums">
+                    {openBreak ? formatDuration(breakElapsed) : formatDuration(elapsed)}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1 ml-2">
                   {!openBreak ? (
                     <>
+                      <div className="flex items-center gap-1 bg-slate-800/80 dark:bg-slate-900/60 rounded-xl px-2 border border-slate-700/50">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider ml-1">Type:</span>
+                        <select
+                          value={breakType}
+                          onChange={(e) => setBreakType(e.target.value)}
+                          className="bg-transparent text-slate-200 text-xs font-bold py-2 focus:outline-none cursor-pointer outline-none border-none"
+                        >
+                          <option value="tea" className="bg-slate-800">☕ Tea</option>
+                          <option value="lunch" className="bg-slate-800">🍱 Lunch</option>
+                          <option value="other" className="bg-slate-800">💤 Other</option>
+                        </select>
+                      </div>
                       <button onClick={() => action("/time/break/start/")} className="p-2.5 bg-slate-800 dark:bg-slate-700 hover:bg-amber-500 text-white rounded-xl transition-all" title="Start Break"><Coffee size={16} /></button>
                       <button onClick={() => setPanelOpen(true)} className="p-2.5 bg-slate-800 dark:bg-slate-700 hover:bg-emerald-500 text-white rounded-xl transition-all" title="Job Photo"><Camera size={16} /></button>
                       <button onClick={handleClockOut} className="p-2.5 bg-slate-800 dark:bg-slate-700 hover:bg-red-500 text-white rounded-xl transition-all" title="Clock Out"><Square size={14} fill="currentColor" /></button>
@@ -1898,15 +1980,17 @@ function EmployeeTimePage() {
               {openLog && (
                 <StatCard
                   icon={<Clock />}
-                  label="Live Session"
-                  value={formatDuration(elapsed)}
-                  sub={openLog.task ? `Task: ${openLog.task.title}` : (geofenceStatus?.job_site?.name || "Corporate Site")}
-                  color="#EF4444"
-                  pulse
+                  label={openLog.task ? "Live Session" : "Standby Session"}
+                  value={openLog.task ? formatDuration(elapsed) : "STANDBY"}
+                  sub={openLog.task ? `Task: ${openLog.task.title}` : "Standby - Waiting for Job Assignment"}
+                  color={openLog.task ? "#EF4444" : "#3B82F6"}
+                  pulse={!!openLog.task}
                 />
               )}
             </div>
           )}
+
+
 
           {/* Audit Ledger Section */}
           <div className="space-y-6">
@@ -1951,7 +2035,9 @@ function EmployeeTimePage() {
             {/* Header */}
             <div className="p-8 border-b border-stroke dark:border-slate-800 flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">{openLog ? 'Complete Shift' : 'Initiate Session'}</h3>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                  {openLog ? (selectedTaskId && !openLog.task ? 'Start Task' : 'Complete Shift') : 'Initiate Session'}
+                </h3>
                 {openLog && <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Started {formatDateTime(openLog.clock_in).split(",")[1]}</div>}
               </div>
               <button onClick={() => setPanelOpen(false)} className="w-10 h-10 rounded-xl bg-bg dark:bg-slate-950 text-slate-400 hover:text-slate-900 dark:hover:text-white flex items-center justify-center transition-all border border-stroke dark:border-slate-800">✕</button>
@@ -1979,8 +2065,8 @@ function EmployeeTimePage() {
                 </div>
               )}
 
-              {/* Task Selection (Clock-in only) */}
-              {!openLog && (
+              {/* Task Selection (Clock-in or general shift start) */}
+              {(!openLog || (openLog && !openLog.task)) && (
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Select Assigned Task (Optional)</label>
                   <div className="relative group">
@@ -2004,11 +2090,198 @@ function EmployeeTimePage() {
                       <ChevronDown size={16} />
                     </div>
                   </div>
-                  {selectedTaskId && (
-                    <div className="p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-[10px] font-bold text-indigo-700 animate-in fade-in slide-in-from-top-1">
-                      Target task identified. Session will be linked to this work order.
-                    </div>
-                  )}
+                  {selectedTaskId && (() => {
+                    const selTask = assignedTasks.find(t => String(t.id) === String(selectedTaskId))
+                    const hasLoc = selTask?.location_lat && selTask?.location_lon
+                    const lat = hasLoc ? parseFloat(selTask.location_lat) : null
+                    const lon = hasLoc ? parseFloat(selTask.location_lon) : null
+
+                    // Calc distance from employee current position
+                    let distStr = ""
+                    if (hasLoc && currentGPS) {
+                      const R = 6371000
+                      const dLat = (lat - currentGPS.lat) * Math.PI / 180
+                      const dLon = (lon - currentGPS.lon) * Math.PI / 180
+                      const a = Math.sin(dLat/2)**2 + Math.cos(currentGPS.lat*Math.PI/180)*Math.cos(lat*Math.PI/180)*Math.sin(dLon/2)**2
+                      const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+                      const eta = Math.round(dist / 25000 * 60) // 25 km/h avg
+                      distStr = dist < 1000 ? `${Math.round(dist)}m away` : `${(dist/1000).toFixed(1)}km away · ETA ~${eta}min`
+                    }
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }} className="animate-in fade-in slide-in-from-top-1">
+                        {/* Client info header */}
+                        <div style={{
+                          background: "linear-gradient(135deg,#eff6ff,#f5f3ff)",
+                          border: "1.5px solid #c7d2fe",
+                          borderRadius: 16, padding: "12px 14px",
+                          display: "flex", alignItems: "flex-start", gap: 10,
+                        }}>
+                          <div style={{
+                            width: 38, height: 38, borderRadius: 12,
+                            background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            flexShrink: 0,
+                          }}>
+                            <MapPin size={18} style={{ color: "white" }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 900, color: "#1e293b", marginBottom: 2 }}>
+                              {selTask?.title}
+                            </div>
+                            {selTask?.client_name && (
+                              <div style={{ fontSize: 11, fontWeight: 700, color: "#6366f1" }}>
+                                👤 {selTask.client_name}
+                                {selTask.client_company_name && ` · ${selTask.client_company_name}`}
+                              </div>
+                            )}
+                            <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, marginTop: 2 }}>
+                              {selTask?.job_address || selTask?.area || ""}
+                              {selTask?.city && `, ${selTask.city}`}
+                            </div>
+                            {distStr && (
+                              <div style={{ fontSize: 10, fontWeight: 900, color: "#059669", marginTop: 3, display: "flex", alignItems: "center", gap: 4 }}>
+                                🚗 {distStr}
+                              </div>
+                            )}
+                            {selTask?.client_contact_number && (
+                              <a
+                                href={`tel:${selTask.client_contact_number}`}
+                                style={{ fontSize: 10, fontWeight: 800, color: "#6366f1", marginTop: 3, display: "flex", alignItems: "center", gap: 4, textDecoration: "none" }}
+                              >
+                                📞 {selTask.client_contact_number}
+                              </a>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Mini Leaflet Map */}
+                        {hasLoc && (
+                          <div style={{
+                            position: "relative",
+                            height: 200, borderRadius: 16, overflow: "hidden",
+                            border: "2px solid #6366f1",
+                            boxShadow: "0 4px 20px rgba(99,102,241,0.15)",
+                          }}>
+                            <MapContainer
+                              center={[lat, lon]}
+                              zoom={15}
+                              style={{ width: "100%", height: "100%" }}
+                              zoomControl={false}
+                              scrollWheelZoom={false}
+                            >
+                              <TileLayer
+                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                attribution="© OpenStreetMap"
+                              />
+
+                              {/* Red client pin */}
+                              <Marker
+                                position={[lat, lon]}
+                                icon={L.divIcon({
+                                  className: "",
+                                  html: `<div style="
+                                    display:flex;flex-direction:column;align-items:center;
+                                  ">
+                                    <div style="
+                                      width:42px;height:42px;
+                                      border-radius:50% 50% 50% 0;
+                                      transform:rotate(-45deg);
+                                      background:linear-gradient(135deg,#e94560,#ff6b6b);
+                                      border:3px solid white;
+                                      box-shadow:0 4px 16px rgba(233,69,96,0.5);
+                                      display:flex;align-items:center;justify-content:center;
+                                    ">
+                                      <div style="transform:rotate(45deg);font-size:18px">🏢</div>
+                                    </div>
+                                    <div style="
+                                      margin-top:3px;
+                                      background:rgba(233,69,96,0.9);color:white;
+                                      padding:2px 8px;border-radius:12px;
+                                      font-size:9px;font-weight:900;
+                                      white-space:nowrap;
+                                      box-shadow:0 2px 6px rgba(0,0,0,0.15);
+                                    ">WORK SITE</div>
+                                  </div>`,
+                                  iconSize: [60, 65],
+                                  iconAnchor: [30, 58],
+                                })}
+                              >
+                                <Popup>
+                                  <div style={{ fontSize: 12, fontWeight: 800, padding: 4 }}>
+                                    📍 {selTask?.title}
+                                    {selTask?.job_address && <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{selTask.job_address}</div>}
+                                  </div>
+                                </Popup>
+                              </Marker>
+
+                              {/* Green geofence circle */}
+                              <Circle
+                                center={[lat, lon]}
+                                radius={parseInt(selTask?.geofence_radius) || 200}
+                                pathOptions={{ color: "#059669", fillColor: "#059669", fillOpacity: 0.10, weight: 2, dashArray: "6 4" }}
+                              />
+
+                              {/* Employee current position (blue) */}
+                              {currentGPS && (
+                                <Marker
+                                  position={[currentGPS.lat, currentGPS.lon]}
+                                  icon={L.divIcon({
+                                    className: "",
+                                    html: `<div style="
+                                      width:20px;height:20px;border-radius:50%;
+                                      background:#3b82f6;border:3px solid white;
+                                      box-shadow:0 2px 8px rgba(59,130,246,0.5);
+                                    "></div>`,
+                                    iconSize: [20, 20],
+                                    iconAnchor: [10, 10],
+                                  })}
+                                />
+                              )}
+                            </MapContainer>
+
+                            {/* Get Directions overlay button */}
+                            <a
+                              href={`https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                position: "absolute", bottom: 10, right: 10,
+                                background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
+                                color: "white", padding: "6px 14px",
+                                borderRadius: 20, fontSize: 10, fontWeight: 900,
+                                textDecoration: "none", zIndex: 600,
+                                boxShadow: "0 4px 12px rgba(99,102,241,0.4)",
+                                display: "flex", alignItems: "center", gap: 5,
+                                letterSpacing: "0.04em",
+                              }}
+                            >
+                              📍 Get Directions
+                            </a>
+
+                            {/* Location confirmed badge */}
+                            <div style={{
+                              position: "absolute", top: 8, left: 8,
+                              background: "rgba(99,102,241,0.9)",
+                              color: "white", padding: "3px 10px",
+                              borderRadius: 20, fontSize: 9, fontWeight: 900,
+                              zIndex: 600, letterSpacing: "0.05em",
+                              textTransform: "uppercase",
+                            }}>
+                              Work Location
+                            </div>
+                          </div>
+                        )}
+
+                        {/* No GPS — plain confirmation */}
+                        {!hasLoc && (
+                          <div style={{ padding: "10px 14px", borderRadius: 12, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 11, fontWeight: 700, color: "#3b82f6" }}>
+                            ✅ Task linked. No GPS coordinates set for this work order.
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
 
@@ -2049,8 +2322,8 @@ function EmployeeTimePage() {
                 />
               </div>
 
-              {/* Job Site Intelligence (Clocked-in only) */}
-              {openLog && (
+              {/* Job Site Intelligence (Clocked-in with active task) */}
+              {openLog && openLog.task && (
                 <div className="p-6 bg-slate-900 rounded-3xl space-y-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -2255,14 +2528,34 @@ function EmployeeTimePage() {
                 Cancel
               </button>
               {openLog ? (
-                <button
-                  onClick={handleClockOut}
-                  disabled={busy}
-                  className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-red-500 hover:bg-red-600 shadow-xl shadow-red-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                >
-                  {busy ? <Loader2 size={18} className="animate-spin" /> : <Square size={14} fill="currentColor" />}
-                  {openLog.task ? "COMPLETE & EXIT" : "CLOCK OUT"}
-                </button>
+                openLog.task ? (
+                  <button
+                    onClick={handleClockOut}
+                    disabled={busy}
+                    className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-red-500 hover:bg-red-600 shadow-xl shadow-red-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {busy ? <Loader2 size={18} className="animate-spin" /> : <Square size={14} fill="currentColor" />}
+                    COMPLETE & EXIT
+                  </button>
+                ) : selectedTaskId ? (
+                  <button
+                    onClick={() => { setPanelOpen(false); action(`/tasks/my/${selectedTaskId}/start/`) }}
+                    disabled={busy}
+                    className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {busy ? <Loader2 size={18} className="animate-spin" /> : <Play size={14} />}
+                    START TASK
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleClockOut}
+                    disabled={busy}
+                    className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-red-500 hover:bg-red-600 shadow-xl shadow-red-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                  >
+                    {busy ? <Loader2 size={18} className="animate-spin" /> : <Square size={14} fill="currentColor" />}
+                    CLOCK OUT
+                  </button>
+                )
               ) : (
                 <button
                   onClick={() => { setPanelOpen(false); action("/time/clock-in/") }}
@@ -2286,7 +2579,12 @@ function EmployeeTimePage() {
           </div>
         </div>
       )}
-      <style>{`@keyframes sosPulse{0%,100%{box-shadow:0 0 0 3px rgba(233,69,96,.35)}50%{box-shadow:0 0 0 6px rgba(233,69,96,.1)}}`}</style>
+      <style>{`
+        @keyframes sosPulse{0%,100%{box-shadow:0 0 0 3px rgba(233,69,96,.35)}50%{box-shadow:0 0 0 6px rgba(233,69,96,.1)}}
+        .smooth-marker {
+          transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+        }
+      `}</style>
     </>
   )
 }
