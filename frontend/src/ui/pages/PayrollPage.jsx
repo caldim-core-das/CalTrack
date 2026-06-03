@@ -1881,8 +1881,18 @@ export function PayrollPage() {
                 </thead>
                 <tbody>
                   {filtered.map(r => {
-                    const isUK = r.region?.includes("UK")
-                    const curr = isUK ? "£" : "$"
+                    let curr = "$"
+                    if (r.employee_currency) {
+                      const cMap = { INR: "₹", GBP: "£", EUR: "€", SGD: "S$", AED: "د.إ", USD: "$" }
+                      curr = cMap[r.employee_currency] || r.employee_currency + " "
+                    } else if (r.employee_country) {
+                      const cMap = { IN: "₹", UK: "£", DE: "€", SG: "S$", AE: "د.إ", US: "$" }
+                      curr = cMap[r.employee_country] || "$"
+                    } else if (r.region?.includes("UK")) {
+                      curr = "£"
+                    }
+                    const isUK = r.region?.includes("UK") || r.employee_country === "UK"
+                    
                     return (
                       <tr key={r.id} onClick={() => setSelected(r)}
                         style={{ borderBottom: "1px solid #f1f5f9", cursor: "pointer", transition: "background 0.15s" }}
@@ -1903,7 +1913,7 @@ export function PayrollPage() {
                           <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b" }}>{r.period?.end_date}</div>
                         </td>
                         <td style={{ padding: "14px 14px" }}>
-                          <span style={{ fontSize: 10, fontWeight: 800, color: "#4f46e5", textTransform: "uppercase", letterSpacing: "0.06em" }}>{r.region || "—"}</span>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: "#4f46e5", textTransform: "uppercase", letterSpacing: "0.06em" }}>{r.employee_country || r.region || "—"}</span>
                           {r.is_exempt && <div style={{ fontSize: 9, fontWeight: 800, color: "#059669", textTransform: "uppercase", marginTop: 2 }}>FLSA EXEMPT</div>}
                         </td>
                         <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: "#64748b" }}>{fmt(r.hourly_rate, curr)}</td>

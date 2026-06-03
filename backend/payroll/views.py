@@ -447,3 +447,126 @@ class PayrollGenerateView(APIView):
             },
         )
         return Response(PayrollRecordSerializer(record).data, status=201)
+
+from .models import CurrencyMaster, PayrollRule, PayrollGeneration
+from .serializers import CurrencyMasterSerializer, PayrollRuleSerializer, PayrollGenerationSerializer
+
+class CurrencyMasterViewSet(viewsets.ModelViewSet):
+    serializer_class = CurrencyMasterSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get_queryset(self):
+        if not hasattr(self.request, "company"):
+            return CurrencyMaster.objects.none()
+        return CurrencyMaster.objects.filter(company=self.request.company)
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.company)
+
+class PayrollRuleViewSet(viewsets.ModelViewSet):
+    serializer_class = PayrollRuleSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get_queryset(self):
+        if not hasattr(self.request, "company"):
+            return PayrollRule.objects.none()
+        return PayrollRule.objects.filter(company=self.request.company)
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.company)
+
+class DynamicPayrollGenerateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get(self, request):
+        month = request.query_params.get("month")
+        year = request.query_params.get("year")
+        country = request.query_params.get("country")
+        
+        qs = PayrollGeneration.objects.filter(company=request.company).select_related("employee", "employee__user").order_by("-created_at")
+        if month:
+            qs = qs.filter(month=month)
+        if year:
+            qs = qs.filter(year=year)
+        if country and country != "all":
+            qs = qs.filter(country__iexact=country)
+            
+        serializer = PayrollGenerationSerializer(qs, many=True)
+        return Response(serializer.data, status=200)
+
+    @transaction.atomic
+    def post(self, request):
+        month = request.data.get("month")
+        year = request.data.get("year")
+        
+        if not month or not year:
+            return Response({"detail": "Month and year are required."}, status=400)
+
+        employees = Employee.objects.filter(company=request.company, is_active=True)
+        generated_records = []
+
+        for employee in employees:
+            country = employee.country
+            if not country:
+                continue
+
+            rule = PayrollRule.objects.filter(country__iexact=country, company=request.company, status=True).first()
+            if not rule:
+                continue
+
+            base_salary = employee.weekly_salary or Decimal("5000.00")
+            basic = (base_salary * rule.basic_percentage) / 100
+            hra = (base_salary * rule.hra_percentage) / 100
+            pf = (base_salary * rule.pf_percentage) / 100
+            esi = (base_salary * rule.esi_percentage) / 100
+
+            gross_salary = basic + hra
+            deductions = pf + esi
+            net_salary = gross_salary - deductions
+
+            currency_code = rule.currency.currency_code if rule.currency else "USD"
+
+            breakdown = {
+                "basic": float(basic),
+                "hra": float(hra),
+                "pf": float(pf),
+                "esi": float(esi),
+                "gross": float(gross_salary),
+                "deductions": float(deductions),
+                "net": float(net_salary)
+            }
+
+            record, _ = PayrollGeneration.objects.update_or_create(
+                employee=employee,
+                month=month,
+                year=year,
+                company=request.company,
+                defaults={
+                    "gross_salary": gross_salary,
+                    "deductions": deductions,
+                    "net_salary": net_salary,
+                    "currency": currency_code,
+                    "country": rule.country,
+                    "breakdown": breakdown
+                }
+            )
+            generated_records.append(record)
+
+        serializer = PayrollGenerationSerializer(generated_records, many=True)
+        return Response(serializer.data, status=201)
+
+
+class PayslipView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, employee_id):
+        employee = Employee.objects.filter(employee_id=employee_id, company=request.company).first()
+        if not employee:
+            return Response({"detail": "Employee not found."}, status=404)
+
+        if not is_admin_role(request.user) and request.user != employee.user:
+            return Response({"detail": "Not authorized."}, status=403)
+
+        records = PayrollGeneration.objects.filter(employee=employee, company=request.company).order_by("-year", "-month")
+        serializer = PayrollGenerationSerializer(records, many=True)
+        return Response(serializer.data)

@@ -16,6 +16,8 @@ class PayrollRecordSerializer(serializers.ModelSerializer):
     employee = serializers.CharField(source="employee.employee_id", read_only=True)
     employee_pk = serializers.IntegerField(source="employee.id", read_only=True)
     employee_name = serializers.SerializerMethodField()
+    employee_country = serializers.CharField(source="employee.country", read_only=True)
+    employee_currency = serializers.CharField(source="employee.currency", read_only=True)
     generated_by = serializers.CharField(source="generated_by.id", read_only=True)
     period = PayrollPeriodSerializer(read_only=True)
 
@@ -31,6 +33,7 @@ class PayrollRecordSerializer(serializers.ModelSerializer):
         model = PayrollRecord
         fields = (
             "id", "period", "employee", "employee_pk", "employee_name",
+            "employee_country", "employee_currency",
             "hourly_rate", "regular_hours", "overtime_hours",
             "daily_ot_hours", "double_time_hours",
             "paid_leave_hours", "unpaid_leave_hours",
@@ -47,3 +50,26 @@ class PayrollGenerateSerializer(serializers.Serializer):
     employee = serializers.CharField()
     start = serializers.DateField()
     end = serializers.DateField()
+
+from .models import CurrencyMaster, PayrollRule, PayrollGeneration
+
+class CurrencyMasterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CurrencyMaster
+        fields = '__all__'
+        read_only_fields = ['company']
+
+class PayrollRuleSerializer(serializers.ModelSerializer):
+    currency_details = CurrencyMasterSerializer(source='currency', read_only=True)
+    class Meta:
+        model = PayrollRule
+        fields = '__all__'
+        read_only_fields = ['company']
+
+class PayrollGenerationSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source='employee.user.get_full_name', read_only=True)
+    employee_id_code = serializers.CharField(source='employee.employee_id', read_only=True)
+    class Meta:
+        model = PayrollGeneration
+        fields = '__all__'
+        read_only_fields = ['company']

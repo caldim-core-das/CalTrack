@@ -192,19 +192,16 @@ class GoogleLoginView(APIView):
             
         User = get_user_model()
         user = User.objects.filter(email=email).first()
-        
-        # Check for pending invitations for this email
-        from settings_hub.models import TeamInvite
-        invite = TeamInvite.objects.filter(email__iexact=email, status="pending").first()
 
         if not user:
+            # Auto-create the user if they don't exist yet
             username = email.split("@")[0]
             base_username = username
             counter = 1
             while User.objects.filter(username=username).exists():
                 username = f"{base_username}{counter}"
                 counter += 1
-            
+
             user = User.objects.create(
                 username=username,
                 email=email,
@@ -212,54 +209,12 @@ class GoogleLoginView(APIView):
                 last_name=user_info.get("family_name", ""),
             )
             user.set_unusable_password()
-            
-            # If they have an invite, link them to the company immediately
-            if invite:
-                user.company = invite.company
-                user.role = invite.role
-                
             user.save()
-
-        # If user exists but wasn't linked to a company, and now has an invite
-        elif invite and not user.company:
-            user.company = invite.company
-            user.role = invite.role
-            user.save(update_fields=["company", "role"])
-
-        # Handle invitation acceptance logic
-        if invite:
-            with transaction.atomic():
-                invite.status = "accepted"
-                from django.utils import timezone
-                invite.accepted_at = timezone.now()
-                invite.save(update_fields=["status", "accepted_at"])
-
-                # Ensure Employee profile exists in tenant schema
-                if hasattr(connection, 'set_tenant'):
-                    connection.set_tenant(invite.company)
-                
-                from employees.models import Employee
-                Employee.objects.get_or_create(
-                    user=user,
-                    company=invite.company,
-                    defaults={
-                        "employee_id": generate_next_employee_id(invite.company),
-                        "title": invite.role.title(),
-                        "hourly_rate": 0,
-                    }
-                )
-                if hasattr(connection, 'set_schema_to_public'):
-                    connection.set_schema_to_public()
 
         refresh = CustomTokenObtainPairSerializer.get_token(user)
         response = Response({"success": True, "message": "Google login successful."})
         _set_auth_cookies(response, str(refresh.access_token), str(refresh))
         return response
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-            "user": UserSerializer(user).data
-        })
 
 
 class RegisterView(APIView):

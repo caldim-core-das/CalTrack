@@ -16,6 +16,11 @@ class Employee(models.Model):
     company = models.ForeignKey('companies.Company', on_delete=models.CASCADE, related_name="employees")
     country = models.CharField(max_length=2, blank=True, null=True)
     state = models.CharField(max_length=100, blank=True, null=True)
+    department = models.CharField(max_length=100, blank=True, null=True)
+    currency = models.CharField(max_length=10, blank=True, null=True)
+    payroll_group = models.CharField(max_length=100, blank=True, null=True)
+    tax_category = models.CharField(max_length=100, blank=True, null=True)
+    bank_details = models.JSONField(default=dict, blank=True)
 
     # ── Geofence override (Phase 1, Layer 3) ─────────────────────────────
     allow_all_locations = models.BooleanField(default=False)

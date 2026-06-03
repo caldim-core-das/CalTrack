@@ -87,3 +87,53 @@ class PayrollRecord(models.Model):
 
     def __str__(self):
         return f"{self.employee.employee_id} ({self.period})"
+
+
+class CurrencyMaster(models.Model):
+    company = models.ForeignKey('companies.Company', on_delete=models.CASCADE, related_name="currencies", null=True, blank=True)
+    currency_code = models.CharField(max_length=10)
+    currency_symbol = models.CharField(max_length=10)
+    exchange_rate = models.DecimalField(max_digits=10, decimal_places=4, default=1.0)
+    country = models.CharField(max_length=100)
+    status = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.currency_code} - {self.country}"
+
+
+class PayrollRule(models.Model):
+    company = models.ForeignKey('companies.Company', on_delete=models.CASCADE, related_name="payroll_rules", null=True, blank=True)
+    rule_id = models.CharField(max_length=50, blank=True, null=True)
+    country = models.CharField(max_length=100)
+    currency = models.ForeignKey(CurrencyMaster, on_delete=models.SET_NULL, null=True, blank=True)
+    basic_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=40)
+    hra_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=20)
+    pf_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=12)
+    esi_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.75)
+    tax_formula = models.TextField(blank=True, null=True)
+    pension_formula = models.TextField(blank=True, null=True)
+    overtime_formula = models.TextField(blank=True, null=True)
+    allowances = models.JSONField(default=dict, blank=True)
+    effective_date = models.DateField(null=True, blank=True)
+    status = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.country} - {self.rule_id}"
+
+
+class PayrollGeneration(models.Model):
+    company = models.ForeignKey('companies.Company', on_delete=models.CASCADE, related_name="payroll_generations", null=True, blank=True)
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="payroll_generations")
+    month = models.IntegerField()
+    year = models.IntegerField()
+    gross_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    deductions = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    net_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    currency = models.CharField(max_length=10, blank=True, null=True)
+    country = models.CharField(max_length=100, blank=True, null=True)
+    generated_date = models.DateTimeField(auto_now_add=True)
+    breakdown = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=50, default="Generated")
+
+    def __str__(self):
+        return f"{self.employee.employee_id} - {self.month}/{self.year}"

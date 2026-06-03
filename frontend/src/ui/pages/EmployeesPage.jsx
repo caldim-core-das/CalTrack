@@ -768,6 +768,10 @@ export function EmployeesPage() {
   const [lastName, setLastName] = useState("")
   const [title, setTitle] = useState("")
   const [hourlyRate, setHourlyRate] = useState("")
+  const [department, setDepartment] = useState("")
+  const [currency, setCurrency] = useState("USD")
+  const [payrollGroup, setPayrollGroup] = useState("")
+  const [taxCategory, setTaxCategory] = useState("")
 
   // Compliance fields
   const [country, setCountry] = useState("US")
@@ -827,6 +831,10 @@ export function EmployeesPage() {
         uk_tax_code: data.country === "UK" ? (data.uk_tax_code || null) : null,
         uk_ni_category: data.country === "UK" ? (data.uk_ni_category || null) : null,
         rolled_up_holiday_pay: data.country === "UK" ? !!data.rolled_up_holiday_pay : false,
+        department: data.department || null,
+        currency: data.currency || null,
+        payroll_group: data.payroll_group || null,
+        tax_category: data.tax_category || null,
         is_active: !!data.is_active,
       }
 
@@ -863,6 +871,10 @@ export function EmployeesPage() {
             uk_tax_code: payload.uk_tax_code,
             uk_ni_category: payload.uk_ni_category,
             rolled_up_holiday_pay: payload.rolled_up_holiday_pay,
+            department: payload.department,
+            currency: payload.currency,
+            payroll_group: payload.payroll_group,
+            tax_category: payload.tax_category,
             is_active: payload.is_active,
           }
           const putRes = await apiRequest(`/employees/${data.id}/`, { method: "PUT", json: putPayload })
@@ -932,6 +944,10 @@ export function EmployeesPage() {
         uk_tax_code: country === "UK" ? ukTaxCode : null,
         uk_ni_category: country === "UK" ? ukNiCategory : null,
         rolled_up_holiday_pay: country === "UK" ? rolledUpHolidayPay : false,
+        department: department || null,
+        currency: currency || null,
+        payroll_group: payrollGroup || null,
+        tax_category: taxCategory || null,
       }
       await apiRequest("/employees/", { method: "POST", json: payload })
 
@@ -940,6 +956,7 @@ export function EmployeesPage() {
       setFirstName(""); setLastName(""); setTitle(""); setHourlyRate("")
       setCountry("US"); setState(""); setDateOfBirth(""); setExemptStatus("non_exempt")
       setWeeklySalary(""); setUkTaxCode("1257L"); setUkNiCategory("A"); setRolledUpHolidayPay(false)
+      setDepartment(""); setCurrency("USD"); setPayrollGroup(""); setTaxCategory("")
 
       fireSparkleFromEl(submitBtnRef.current)
       setSuccessMsg(`Employee "${username}" created. They can log in at ${window.location.origin} with their username and password.`)
@@ -1050,6 +1067,10 @@ export function EmployeesPage() {
                       >
                         <option value="US">🇺🇸 United States</option>
                         <option value="UK">🇬🇧 United Kingdom</option>
+                        <option value="IN">🇮🇳 India</option>
+                        <option value="SG">🇸🇬 Singapore</option>
+                        <option value="DE">🇩🇪 Germany</option>
+                        <option value="AE">🇦🇪 UAE</option>
                       </select>
                     </div>
                     {country === "US" && (
@@ -1072,6 +1093,22 @@ export function EmployeesPage() {
                         value={dateOfBirth}
                         onChange={e => setDateOfBirth(e.target.value)}
                       />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="fieldLabel">Department</label>
+                      <input className="input" value={department} onChange={e => setDepartment(e.target.value)} placeholder="e.g. Engineering" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="fieldLabel">Currency Code</label>
+                      <input className="input" value={currency} onChange={e => setCurrency(e.target.value)} placeholder="e.g. USD, INR" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="fieldLabel">Payroll Group</label>
+                      <input className="input" value={payrollGroup} onChange={e => setPayrollGroup(e.target.value)} placeholder="e.g. US Salaried" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="fieldLabel">Tax Category</label>
+                      <input className="input" value={taxCategory} onChange={e => setTaxCategory(e.target.value)} placeholder="e.g. Regular" />
                     </div>
                   </div>
 

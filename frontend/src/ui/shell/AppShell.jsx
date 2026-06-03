@@ -20,7 +20,7 @@ import {
   Home, Clock, CheckSquare, CalendarDays, Banknote, CalendarRange,
   Users, BarChart3, MapPin, Settings, Search, LogOut,
   ChevronLeft, ChevronRight, Rocket, ShieldAlert, Award,
-  FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle
+  FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Globe
 } from "lucide-react"
 
 // Items visible to all authenticated users (employees + admins)
