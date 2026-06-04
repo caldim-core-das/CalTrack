@@ -66,7 +66,7 @@ function TaskStatusRow({ label, count, color }) {
 function EmployeeDashboard() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [tasks, setTasks]   = useState([])
+  const [tasks, setTasks] = useState([])
   const [leaves, setLeaves] = useState([])
   const [loading, setLoading] = useState(true)
   const hour = new Date().getHours()
@@ -90,16 +90,16 @@ function EmployeeDashboard() {
   }, [])
 
   const pendingAcceptance = tasks.filter(t => t.acceptance_status === "pending_acceptance").length
-  const inProgress        = tasks.filter(t => t.status === "in_progress").length
-  const completedToday    = tasks.filter(t => {
+  const inProgress = tasks.filter(t => t.status === "in_progress").length
+  const completedToday = tasks.filter(t => {
     if (t.status !== "completed" || !t.completed_at) return false
     return new Date(t.completed_at).toDateString() === new Date().toDateString()
   }).length
-  const activeTasks       = tasks.filter(t => t.status !== "completed" && t.status !== "cancelled").length
+  const activeTasks = tasks.filter(t => t.status !== "completed" && t.status !== "cancelled").length
 
-  const pendingLeaves  = leaves.filter(l => l.status === "pending").length
+  const pendingLeaves = leaves.filter(l => l.status === "pending").length
   const approvedLeaves = leaves.filter(l => l.status === "approved").length
-  const totalLeaves    = leaves.length
+  const totalLeaves = leaves.length
 
   const firstName = user?.firstName || user?.username || "there"
 
@@ -237,8 +237,8 @@ function EmployeeDashboard() {
                   </button>
                 </div>
                 <TaskStatusRow label="Awaiting Acceptance" count={pendingAcceptance} color="#d97706" />
-                <TaskStatusRow label="In Progress"         count={inProgress}         color="#2563eb" />
-                <TaskStatusRow label="Completed Today"     count={completedToday}     color="#059669" />
+                <TaskStatusRow label="In Progress" count={inProgress} color="#2563eb" />
+                <TaskStatusRow label="Completed Today" count={completedToday} color="#059669" />
                 {tasks.length === 0 && (
                   <div style={{ textAlign: "center", padding: "24px 0", color: "#cbd5e1", fontSize: 13, fontWeight: 600 }}>
                     No tasks assigned yet
@@ -257,9 +257,9 @@ function EmployeeDashboard() {
                     View All
                   </button>
                 </div>
-                <TaskStatusRow label="Pending Approval" count={pendingLeaves}  color="#d97706" />
-                <TaskStatusRow label="Approved"         count={approvedLeaves} color="#059669" />
-                <TaskStatusRow label="Rejected"         count={leaves.filter(l => l.status === "rejected").length} color="#dc2626" />
+                <TaskStatusRow label="Pending Approval" count={pendingLeaves} color="#d97706" />
+                <TaskStatusRow label="Approved" count={approvedLeaves} color="#059669" />
+                <TaskStatusRow label="Rejected" count={leaves.filter(l => l.status === "rejected").length} color="#dc2626" />
                 {leaves.length === 0 && (
                   <div style={{ textAlign: "center", padding: "24px 0", color: "#cbd5e1", fontSize: 13, fontWeight: 600 }}>
                     No leave requests yet
@@ -275,10 +275,10 @@ function EmployeeDashboard() {
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                 {[
-                  { label: "Clock In / Out",    to: routes.time,   color: "#f59e0b", icon: <Clock size={15} /> },
-                  { label: "My Tasks",          to: routes.tasks,  color: "#4f46e5", icon: <ClipboardList size={15} /> },
-                  { label: "Request Leave",     to: routes.leaves, color: "#ec4899", icon: <CalendarDays size={15} /> },
-                  { label: "My Profile",        to: routes.settings_profile, color: "#64748b", icon: <UserCheck size={15} /> },
+                  { label: "Clock In / Out", to: routes.time, color: "#f59e0b", icon: <Clock size={15} /> },
+                  { label: "My Tasks", to: routes.tasks, color: "#4f46e5", icon: <ClipboardList size={15} /> },
+                  { label: "Request Leave", to: routes.leaves, color: "#ec4899", icon: <CalendarDays size={15} /> },
+                  { label: "My Profile", to: routes.settings_profile, color: "#64748b", icon: <UserCheck size={15} /> },
                 ].map(({ label, to, color, icon }) => (
                   <button
                     key={to}
@@ -502,18 +502,18 @@ function AdminDashboard() {
   useEffect(() => {
     function handlePresenceChange(event) {
       const presenceData = event.detail
-      
+
       setEmployees((prev) =>
         prev.map((emp) =>
           emp.id === presenceData.employee_id
             ? {
-                ...emp,
-                is_online: presenceData.is_online,
-                last_login_at: presenceData.last_login_at,
-                last_logout_at: presenceData.last_logout_at,
-                last_activity_at: presenceData.last_activity_at,
-                current_availability: presenceData.current_availability,
-              }
+              ...emp,
+              is_online: presenceData.is_online,
+              last_login_at: presenceData.last_login_at,
+              last_logout_at: presenceData.last_logout_at,
+              last_activity_at: presenceData.last_activity_at,
+              current_availability: presenceData.current_availability,
+            }
             : emp
         )
       )
@@ -1414,7 +1414,7 @@ function AdminDashboard() {
               <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
               Online Employees ({employees.filter(e => e.is_online).length})
             </div>
-            
+
             <div className="flex flex-col gap-3 max-h-[350px] overflow-y-auto pr-1 scrollbar-thin">
               {employees.filter(e => e.is_online).length > 0 ? (
                 employees.filter(e => e.is_online).map((emp) => (
@@ -1430,7 +1430,7 @@ function AdminDashboard() {
                         </div>
                         <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-950 rounded-full shadow-[0_0_4px_rgba(16,185,129,0.6)]" />
                       </div>
-                      
+
                       <div className="flex flex-col">
                         <div className="font-extrabold text-slate-800 dark:text-white group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
                           {emp.first_name || emp.user?.username ? `${emp.first_name} ${emp.last_name || ""}`.trim() : "Employee"}

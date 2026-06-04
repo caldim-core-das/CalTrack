@@ -200,7 +200,7 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.getenv("JWT_ACCESS_MINUTES", "60"))),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.getenv("JWT_ACCESS_MINUTES", "480"))),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.getenv("JWT_REFRESH_DAYS", "7"))),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
@@ -209,7 +209,9 @@ SIMPLE_JWT = {
 AUTH_COOKIE          = "qt_access"         # access token cookie name
 AUTH_COOKIE_REFRESH  = "qt_refresh"        # refresh token cookie name
 AUTH_COOKIE_SECURE   = not DEBUG           # HTTPS-only in production; False in dev
-AUTH_COOKIE_SAMESITE = "Strict"            # blocks CSRF entirely
+# "Lax" is required for cross-origin dev (frontend:5173 → backend:8000).
+# In production with same domain, change back to "Strict" via env var.
+AUTH_COOKIE_SAMESITE = os.getenv("AUTH_COOKIE_SAMESITE", "Lax" if DEBUG else "Strict")
 
 # ── CORS — must name origins explicitly when credentials=True ────────────────
 # CORS_ALLOW_ALL_ORIGINS + CORS_ALLOW_CREDENTIALS together are rejected by browsers.
@@ -222,6 +224,10 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5175",
     "http://127.0.0.1:5175",
 ]
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://.*\.localhost:517[3-5]$",
+    r"^http://.*\.127\.0\.0\.1:517[3-5]$",
+]
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
@@ -230,6 +236,12 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:5174",
     "http://localhost:5175",
     "http://127.0.0.1:5175",
+    "http://*.localhost:5173",
+    "http://*.localhost:5174",
+    "http://*.localhost:5175",
+    "http://*.127.0.0.1:5173",
+    "http://*.127.0.0.1:5174",
+    "http://*.127.0.0.1:5175",
 ]
 
 

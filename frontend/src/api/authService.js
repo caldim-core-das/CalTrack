@@ -145,3 +145,43 @@ export function extractAuthError(err, fallback = "Something went wrong. Please t
 
   return fallback
 }
+
+/**
+ * Fetch registration dossier from backend
+ */
+export async function apiFetchRegistrationDossier() {
+  try {
+    return await fetchJSON("/auth/registration-dossier/")
+  } catch (err) {
+    console.error("Fetch dossier API error", err)
+    return null
+  }
+}
+
+/**
+ * Save/update registration dossier to backend
+ */
+export async function apiSaveRegistrationDossier(dossier) {
+  try {
+    return await fetchJSON("/auth/registration-dossier/", {
+      method: "POST",
+      body: JSON.stringify(dossier)
+    })
+  } catch (err) {
+    console.error("Save dossier API error", err)
+  }
+}
+
+/**
+ * Delete registration dossier from backend
+ */
+export async function apiDeleteRegistrationDossier() {
+  try {
+    return await fetchJSON("/auth/registration-dossier/", {
+      method: "DELETE"
+    })
+  } catch (err) {
+    console.error("Delete dossier API error", err)
+  }
+}
+

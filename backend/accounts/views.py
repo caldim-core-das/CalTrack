@@ -582,3 +582,41 @@ class PasswordResetConfirmView(APIView):
             user.save()
             return Response({"detail": "Password has been reset successfully."})
         return Response({"detail": "Invalid or expired token"}, status=400)
+
+
+import json
+import os
+
+class RegistrationDossierView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+        if os.path.exists(file_path):
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return Response(data)
+            except Exception as e:
+                return Response({"error": str(e)}, status=500)
+        return Response({})
+
+    def post(self, request):
+        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(request.data, f, indent=4, ensure_ascii=False)
+            return Response({"success": True})
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+    def delete(self, request):
+        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                return Response({"success": True})
+            except Exception as e:
+                return Response({"error": str(e)}, status=500)
+        return Response({"success": True})
+

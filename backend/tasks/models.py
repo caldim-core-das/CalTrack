@@ -119,22 +119,6 @@ class Task(models.Model):
     require_selfie   = models.BooleanField(default=False)
     require_before_after_photos = models.BooleanField(default=False)
 
-    # Task Verification Photos & Score
-    start_photo      = models.ImageField(upload_to="tasks/start_photos/", null=True, blank=True)
-    end_photo        = models.ImageField(upload_to="tasks/end_photos/", null=True, blank=True)
-    face_match_percentage = models.FloatField(null=True, blank=True)
-    face_match_status = models.CharField(
-        max_length=20,
-        default="pending",
-        choices=[
-            ("pending", "Pending"),
-            ("verified", "Verified"),
-            ("failed", "Failed"),
-            ("skipped", "Skipped")
-        ]
-    )
-    submission_time  = models.DateTimeField(null=True, blank=True)
-
     # Time tracking link
     time_log = models.OneToOneField(
         'time_tracking.TimeLog',
@@ -224,6 +208,22 @@ class Task(models.Model):
         null=True, blank=True,
         help_text="When the employee tapped 'Start Work' — distinct from task.started_at which is set by /start/."
     )
+
+    # Face Verification Fields
+    start_photo = models.ImageField(blank=True, null=True, upload_to='tasks/start_photos/')
+    end_photo = models.ImageField(blank=True, null=True, upload_to='tasks/end_photos/')
+    face_match_percentage = models.FloatField(blank=True, null=True)
+    face_match_status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('verified', 'Verified'),
+            ('failed', 'Failed'),
+            ('skipped', 'Skipped')
+        ],
+        default='pending'
+    )
+    submission_time = models.DateTimeField(blank=True, null=True)
 
     # Timestamps
     started_at       = models.DateTimeField(null=True, blank=True)

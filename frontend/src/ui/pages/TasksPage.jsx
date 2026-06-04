@@ -18,7 +18,6 @@ import { useRole } from "../../state/auth/useRole.js"
 import { Pill, Button, Card, Input, Select, TextArea } from "../components/kit.jsx"
 import { ClipboardList, Clock, CheckCircle2, AlertCircle, MapPin, Calendar as CalIcon, Play, Save, Trash2, Tag, Loader2, Paperclip, User, Flag, ListChecks, Plus, X, Building2, Camera, ThumbsUp, ThumbsDown, RefreshCw, UserCheck, AlertTriangle, DollarSign, Battery, Wifi, ShieldAlert, Sparkles, Navigation, Upload, Activity, Search, ChevronRight, ChevronDown, Phone, Car, Wrench, MessageSquare, Compass, MoreHorizontal, Hammer, ChevronLeft } from "lucide-react"
 import { SelfieCapture, getPosition } from "./TimePage.jsx"
-import { verifyFaces } from "../../utils/faceVerify.js"
 
 // ─── Constants & Helpers ─────────────────────────────────────
 const CATEGORIES = [
@@ -981,73 +980,16 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
 
   // Complete flow state
   const [afterPhoto, setAfterPhoto] = useState(null)
-  const [afterPhotoPreview, setAfterPhotoPreview] = useState(null)
-  const [faceVerifyScore, setFaceVerifyScore] = useState(null)
-  const [faceVerifyStatus, setFaceVerifyStatus] = useState(null) // 'verifying', 'matched', 'mismatch', 'no_face', 'skipped'
-  const [faceVerifyError, setFaceVerifyError] = useState("")
-  const [showEndSelfieCamera, setShowEndSelfieCamera] = useState(false)
-
-  async function performFaceMatching(endingPhotoPreview) {
-    setFaceVerifyStatus("verifying")
-    setFaceVerifyError("")
-    
-    let startPhotoUrl = task.start_photo
-    if (startPhotoUrl && startPhotoUrl.startsWith('/')) {
-      const host = "http://localhost:8000"
-      startPhotoUrl = `${host}${startPhotoUrl}`;
-    }
-
-    if (!startPhotoUrl) {
-      setFaceVerifyStatus("skipped")
-      setFaceVerifyScore(100)
-      return
-    }
-
-    try {
-      const result = await verifyFaces(startPhotoUrl, endingPhotoPreview)
-      setFaceVerifyScore(result.score)
-      if (result.status === 'mismatch') {
-        setFaceVerifyStatus('mismatch')
-        setFaceVerifyError('Face verification failed. Please retake the photo.')
-      } else if (result.status === 'no_face') {
-        setFaceVerifyStatus('no_face')
-        setFaceVerifyError('No face detected in the photos! Please retake.')
-      } else {
-        setFaceVerifyStatus('matched')
-      }
-    } catch (err) {
-      console.error("Face verification error:", err)
-      setFaceVerifyStatus("skipped")
-      setFaceVerifyScore(100)
-    }
-  }
-
-  function handleAfterPhotoCapture(file, previewUrl) {
-    setAfterPhoto(file)
-    setAfterPhotoPreview(previewUrl)
-    setShowEndSelfieCamera(false)
-    performFaceMatching(previewUrl)
-  }
-
-  function handleAfterPhotoFileChange(e) {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0]
-      setAfterPhoto(file)
-
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setAfterPhotoPreview(reader.result)
-        performFaceMatching(reader.result)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
 
   const elapsed = useElapsed(task.started_at)
   const liveHours = task.status === "in_progress" && elapsed > 0 ? formatDuration(elapsed) : null
 
   // Sync completion % from prop
   useEffect(() => { setCompletionPct(task.completion_percentage || 0) }, [task.completion_percentage])
+
+  function handleAfterPhotoChange(e) {
+    if (e.target.files && e.target.files[0]) setAfterPhoto(e.target.files[0])
+  }
 
   function handleStartWork() { navigate(`/time?task_id=${task.id}`) }
 
@@ -1097,7 +1039,6 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     alert(`[SMS GATEWAY SIMULATOR] Customer SMS sent. Verification Code: ${code}`)
   }
 
-  // OTP verify
   function verifyOtp() {
     if (otpInput === otpCode && otpCode !== "") {
       setOtpVerified(true)
@@ -1111,24 +1052,10 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     if (task.require_before_after_photos && !afterPhoto) {
       alert("An after photo is required to complete this task."); return;
     }
-    if (faceVerifyStatus === "mismatch" || faceVerifyStatus === "no_face") {
-      alert("Face verification failed. Please retake the photo."); return;
-    }
-    if (faceVerifyStatus === "verifying") {
-      alert("Please wait for face verification to complete."); return;
-    }
-    if (!faceVerifyStatus && task.start_photo) {
-      alert("Please capture or upload an ending photo to verify identity."); return;
-    }
     if (!otpVerified) {
       alert("Please generate and verify the Customer OTP code to proceed."); return;
     }
-    const payload = { 
-      notes: note, 
-      require_fd: true,
-      face_match_percentage: faceVerifyScore ?? 0,
-      face_match_status: faceVerifyStatus === 'matched' ? 'verified' : (faceVerifyStatus === 'skipped' ? 'skipped' : 'failed')
-    }
+    const payload = { notes: note, require_fd: true }
     if (afterPhoto) payload.photo = afterPhoto
     onAction(task.id, "complete", payload)
   }
@@ -2448,8 +2375,8 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                       </>
                     )}
 
-                    {/* ── START WORK — Visible for non-reached, non-working states ── */}
-                    {task.travel_status !== "reached_site" && task.travel_status !== "working" && (
+                    {/* ── START WORK — Always visible at bottom of modal ── */}
+                    {task.travel_status !== "reached_site" && (
                       <div className="mt-3 p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/10 border border-emerald-100 dark:border-emerald-900/30 flex flex-col gap-3.5 shadow-sm">
                         <div className="text-[10px] font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-2">
                           <Hammer size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
@@ -2524,253 +2451,6 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                         )}
                       </div>
                     )}
-
-                    {/* ── COMPLETE WORK — Visible for working state ── */}
-                    {task.travel_status === "working" && (
-                      <div className="mt-3 p-5 rounded-3xl bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 flex flex-col gap-5 shadow-sm">
-                        <div className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                          <CheckCircle2 size={16} className="text-indigo-600" />
-                          <span>Complete Work Action</span>
-                        </div>
-
-                        {/* End Photo Requirement */}
-                        <div className="flex flex-col gap-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
-                            <span>Ending Photo (After Photo) *</span>
-                            {afterPhoto && <span className="text-emerald-600 font-extrabold uppercase">Captured ✓</span>}
-                          </label>
-
-                          {afterPhotoPreview ? (
-                            <div className="relative rounded-2xl overflow-hidden border-2 border-indigo-650/40 h-44 group shadow-sm bg-slate-900">
-                              <img src={afterPhotoPreview} className="w-full h-full object-cover" />
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-205">
-                                <button
-                                  type="button"
-                                  onClick={() => { setAfterPhoto(null); setAfterPhotoPreview(null); setFaceVerifyStatus(null); setFaceVerifyScore(null); }}
-                                  className="px-4 py-2 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-705 transition-colors shadow-lg"
-                                >
-                                  Remove Photo
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-2 gap-3">
-                              <button
-                                type="button"
-                                onClick={() => setShowEndSelfieCamera(true)}
-                                className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-slate-700 hover:bg-indigo-50/20 bg-white dark:bg-slate-950 transition-all shadow-sm"
-                              >
-                                <Camera size={24} className="text-indigo-600" />
-                                <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Take Selfie / Photo</span>
-                              </button>
-                              <label className="flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-slate-700 hover:bg-indigo-50/20 bg-white dark:bg-slate-950 transition-all shadow-sm cursor-pointer">
-                                <Upload size={24} className="text-indigo-600" />
-                                <span className="text-[9px] font-black uppercase text-slate-500 tracking-wider">Upload File</span>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={handleAfterPhotoFileChange}
-                                  className="hidden"
-                                />
-                              </label>
-                            </div>
-                          )}
-                        </div>
-
-                        {showEndSelfieCamera && (
-                          <SelfieCapture
-                            onCapture={handleAfterPhotoCapture}
-                            onCancel={() => setShowEndSelfieCamera(false)}
-                          />
-                        )}
-
-                        {/* Face Verification Preview Section */}
-                        <div className="flex flex-col gap-3 p-4 rounded-2xl border border-stroke bg-white dark:bg-slate-950 shadow-sm">
-                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Identity Verification Section</div>
-                          <div className="grid grid-cols-2 gap-4 items-center">
-                            {/* Start Photo Preview */}
-                            <div className="flex flex-col gap-1 items-center">
-                              <span className="text-[9px] font-black text-slate-400 uppercase">Start Photo</span>
-                              <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
-                                {task.start_photo ? (
-                                  <img src={`http://localhost:8000${task.start_photo}`} className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-400 font-bold uppercase">No Start Photo</div>
-                                )}
-                              </div>
-                            </div>
-                            
-                            {/* End Photo Preview */}
-                            <div className="flex flex-col gap-1 items-center">
-                              <span className="text-[9px] font-black text-slate-400 uppercase">End Photo</span>
-                              <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
-                                {afterPhotoPreview ? (
-                                  <img src={afterPhotoPreview} className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-400 font-bold uppercase">Awaiting Photo</div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Verification Badge */}
-                          <div className="mt-2 flex justify-center">
-                            {faceVerifyStatus === "verifying" && (
-                              <span className="px-4 py-2 rounded-full text-xs font-black bg-indigo-50 border border-indigo-200 text-indigo-700 animate-pulse flex items-center gap-1.5">
-                                <Loader2 size={12} className="animate-spin" /> Verifying Facial Models...
-                              </span>
-                            )}
-                            {faceVerifyStatus === "matched" && (
-                              <span className="px-4 py-2 rounded-full text-xs font-black bg-emerald-50 border border-emerald-200 text-emerald-805 flex items-center gap-1.5">
-                                🟢 Identity Verified ({faceVerifyScore}% Match)
-                              </span>
-                            )}
-                            {faceVerifyStatus === "mismatch" && (
-                              <span className="px-4 py-2 rounded-full text-xs font-black bg-red-50 border border-red-200 text-red-800 flex items-center gap-1.5">
-                                🔴 Verification Failed ({faceVerifyScore}% Match)
-                              </span>
-                            )}
-                            {faceVerifyStatus === "no_face" && (
-                              <span className="px-4 py-2 rounded-full text-xs font-black bg-red-50 border border-red-200 text-red-800 flex items-center gap-1.5">
-                                🔴 Verification Failed (No face detected)
-                              </span>
-                            )}
-                            {faceVerifyStatus === "skipped" && (
-                              <span className="px-4 py-2 rounded-full text-xs font-black bg-amber-50 border border-amber-200 text-amber-800 flex items-center gap-1.5">
-                                🟡 Identity Verification Skipped
-                              </span>
-                            )}
-                            {!faceVerifyStatus && (
-                              <span className="px-4 py-2 rounded-full text-xs font-black bg-slate-100 border border-slate-200 text-slate-500">
-                                ⚪ Verification Pending Ending Photo
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Work Summary Notes */}
-                        <div className="flex flex-col gap-2">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Work Summary Notes</label>
-                          <textarea
-                            value={note}
-                            onChange={e => setNote(e.target.value)}
-                            placeholder="Add brief description of task completion..."
-                            className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 text-sm font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all shadow-sm resize-none"
-                            rows={2}
-                          />
-                        </div>
-
-                        {/* Customer Digital Signature */}
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Digital Signature *</label>
-                            <button
-                              type="button"
-                              onClick={clearCanvas}
-                              className="text-[9px] font-black uppercase text-indigo-600 tracking-wider hover:text-indigo-800"
-                            >
-                              Clear Pad
-                            </button>
-                          </div>
-                          <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-900 h-32 relative">
-                            <canvas
-                              ref={canvasRef}
-                              width={480}
-                              height={128}
-                              onMouseDown={startDrawing}
-                              onMouseMove={draw}
-                              onMouseUp={stopDrawing}
-                              onMouseLeave={stopDrawing}
-                              onTouchStart={startDrawing}
-                              onTouchMove={draw}
-                              onTouchEnd={stopDrawing}
-                              className="w-full h-full cursor-crosshair touch-none"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Customer OTP Verification */}
-                        <div className="flex flex-col gap-2.5 p-4 rounded-2xl border border-stroke bg-white dark:bg-slate-950 shadow-sm">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer OTP Verification *</label>
-                          
-                          {otpVerified ? (
-                            <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-black flex items-center gap-1.5">
-                              <span>✓ Customer OTP Verification Successful</span>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-2">
-                              <button
-                                type="button"
-                                onClick={generateOtp}
-                                className="py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-black rounded-xl uppercase tracking-wider transition-colors border border-indigo-200"
-                              >
-                                Send OTP Code to Customer
-                              </button>
-                              {otpCode && (
-                                <div className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    maxLength={4}
-                                    placeholder="Enter 4-digit code"
-                                    value={otpInput}
-                                    onChange={e => setOtpInput(e.target.value)}
-                                    className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-center font-black text-sm tracking-widest outline-none focus:border-indigo-500"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={verifyOtp}
-                                    className="px-6 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black rounded-xl uppercase tracking-wider transition-colors"
-                                  >
-                                    Verify
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Complete Button */}
-                        <button
-                          type="button"
-                          onClick={handleComplete}
-                          disabled={
-                            localBusy || 
-                            busy || 
-                            faceVerifyStatus === "verifying" || 
-                            (task.start_photo && faceVerifyStatus !== "matched" && faceVerifyStatus !== "skipped") || 
-                            !otpVerified
-                          }
-                          style={{
-                            width: "100%",
-                            padding: "15px 0",
-                            borderRadius: 14,
-                            border: "none",
-                            background: (otpVerified && (!task.start_photo || faceVerifyStatus === "matched" || faceVerifyStatus === "skipped"))
-                              ? "linear-gradient(135deg, #059669 0%, #047857 100%)"
-                              : "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)",
-                            color: "#fff",
-                            fontSize: 13,
-                            fontWeight: 900,
-                            cursor: (localBusy || busy) ? "not-allowed" : "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: 10,
-                            letterSpacing: "0.06em",
-                            textTransform: "uppercase",
-                            boxShadow: (otpVerified && (!task.start_photo || faceVerifyStatus === "matched" || faceVerifyStatus === "skipped"))
-                              ? "0 6px 20px rgba(5,150,105,0.4)"
-                              : "0 4px 12px rgba(100,116,139,0.2)",
-                            transition: "all 0.25s ease",
-                            opacity: (localBusy || busy) ? 0.6 : 1,
-                          }}
-                        >
-                          <CheckCircle2 size={16} />
-                          <span>{localBusy ? "Submitting…" : "Submit & Finish"}</span>
-                          {!localBusy && <ChevronRight size={16} />}
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>,
                 document.body
@@ -2778,36 +2458,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
             </div>
           )}
 
-          {/* ── COMPLETED STATE ── */}
-          {task.status === "completed" && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0", gap: 14, textAlign: "center" }}>
-              <div style={{ position: "relative", width: 76, height: 76, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "#d1fae5", opacity: 0.5 }} />
-                <div style={{ width: 62, height: 62, borderRadius: "50%", background: "#059669", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 24px rgba(5,150,105,0.35)" }}>
-                  <CheckCircle2 size={32} style={{ color: "#fff" }} />
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 900, color: "#065f46", textTransform: "uppercase", letterSpacing: "0.06em" }}>Work Completed</div>
-                <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginTop: 3 }}>All objectives and requirements met</div>
-              </div>
-              {task.billed_hours && <BillingBadge billedHours={task.billed_hours} actualHours={task.actual_hours} estimatedHours={task.estimated_hours} />}
-              <div style={{ width: "100%", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, textAlign: "left" }}>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 900, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em" }}>Started At</div>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#1e293b", marginTop: 3 }}>{task.started_at ? new Date(task.started_at).toLocaleString() : "—"}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 900, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em" }}>Completed At</div>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#1e293b", marginTop: 3 }}>{task.completed_at ? new Date(task.completed_at).toLocaleString() : "—"}</div>
-                </div>
-                <div style={{ gridColumn: "span 2", borderTop: "1px solid #f1f5f9", paddingTop: 10 }}>
-                  <div style={{ fontSize: 9, fontWeight: 900, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em" }}>Work Notes</div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#475569", marginTop: 3, fontStyle: "italic" }}>"{task.employee_notes || "No notes submitted"}"</div>
-                </div>
-              </div>
-            </div>
-          )}
+
 
           {/* ── SHOW ACTIVITY LOG ── */}
           <button onClick={toggleTimeline} 
@@ -4099,8 +3750,6 @@ function AdminTasksTable({ tasks, employees, availableEmployees, jobSites, onRef
               <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Assigned To</th>
               <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Due Date</th>
               <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Acceptance</th>
-              <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Face Match %</th>
-              <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Verification Status</th>
               <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Status</th>
               <th className="p-6 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest text-right">Actions</th>
             </tr>
@@ -4108,7 +3757,7 @@ function AdminTasksTable({ tasks, employees, availableEmployees, jobSites, onRef
           <tbody className="divide-y divide-stroke dark:divide-slate-800">
             {tasks.length === 0 && (
               <tr>
-                <td colSpan={8} className="p-24 text-center text-slate-400">
+                <td colSpan={6} className="p-24 text-center text-slate-400">
                   <div className="flex flex-col items-center gap-3 text-[10px] font-black uppercase tracking-widest">
                     <ClipboardList size={32} className="opacity-20" />
                     No jobs in this view.
@@ -4203,28 +3852,6 @@ function AdminTasksTable({ tasks, employees, availableEmployees, jobSites, onRef
                       <div style={{ marginTop: 4, fontSize: 10, color: "#f87171", fontStyle: "italic", maxWidth: 160 }}>
                         "{t.decline_reason.slice(0, 60)}{t.decline_reason.length > 60 ? "…" : ""}"
                       </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-xs font-bold text-slate-700 dark:text-slate-300">
-                    {t.face_match_percentage !== null && t.face_match_percentage !== undefined ? (
-                      <span className={t.face_match_percentage >= 90 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
-                        {t.face_match_percentage.toFixed(1)}%
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 dark:text-slate-600">—</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    {t.face_match_status === "verified" ? (
-                      <Pill tone="good">🟢 Verified</Pill>
-                    ) : t.face_match_status === "failed" ? (
-                      <Pill tone="bad">🔴 Failed</Pill>
-                    ) : t.face_match_status === "skipped" ? (
-                      <Pill tone="neutral">⚪ Skipped</Pill>
-                    ) : t.face_match_status === "pending" ? (
-                      <Pill tone="warn">🟡 Pending</Pill>
-                    ) : (
-                      <span className="text-slate-400 dark:text-slate-600 text-xs">—</span>
                     )}
                   </td>
                   <td className="px-6 py-4">
@@ -4567,95 +4194,6 @@ function AdminTaskDetailPanel({ task, employees, availableEmployees, jobSites, o
                   </div>
                 )
               })()}
-            </div>
-          )}
-
-          {/* Identity Verification Section */}
-          {(task.start_photo || task.end_photo || task.face_match_percentage !== null || task.face_match_status) && (
-            <div style={{ padding: "14px 16px", borderRadius: 14, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-              <div style={{ fontSize: 9, fontWeight: 900, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Identity Verification</div>
-              
-              {/* Status Badge & Match Percentage */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {task.face_match_status === "verified" ? (
-                    <span style={{
-                      padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 900,
-                      background: "#dcfce7", color: "#166534", border: "1px solid #86efac",
-                      display: "inline-flex", alignItems: "center", gap: 4
-                    }}>
-                      🟢 Identity Verified
-                    </span>
-                  ) : task.face_match_status === "failed" ? (
-                    <span style={{
-                      padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 900,
-                      background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5",
-                      display: "inline-flex", alignItems: "center", gap: 4
-                    }}>
-                      🔴 Verification Failed
-                    </span>
-                  ) : task.face_match_status === "skipped" ? (
-                    <span style={{
-                      padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 900,
-                      background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1",
-                      display: "inline-flex", alignItems: "center", gap: 4
-                    }}>
-                      ⚪ Verification Skipped
-                    </span>
-                  ) : (
-                    <span style={{
-                      padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 900,
-                      background: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa",
-                      display: "inline-flex", alignItems: "center", gap: 4
-                    }}>
-                      🟡 Pending Verification
-                    </span>
-                  )}
-                </div>
-                {task.face_match_percentage !== null && task.face_match_percentage !== undefined && (
-                  <div style={{ fontSize: 12, fontWeight: 900, color: task.face_match_percentage >= 90 ? "#16a34a" : "#dc2626" }}>
-                    Match Score: {task.face_match_percentage.toFixed(1)}%
-                  </div>
-                )}
-              </div>
-
-              {/* Photos comparison */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 8, fontWeight: 900, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>Start Photo</div>
-                  <div style={{
-                    width: "100%", height: 120, borderRadius: 10, border: "1.5px solid #cbd5e1",
-                    overflow: "hidden", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center"
-                  }}>
-                    {task.start_photo ? (
-                      <img src={task.start_photo} alt="Start Photo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : (
-                      <span style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8" }}>No Start Photo</span>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 8, fontWeight: 900, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>End Photo</div>
-                  <div style={{
-                    width: "100%", height: 120, borderRadius: 10, border: "1.5px solid #cbd5e1",
-                    overflow: "hidden", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center"
-                  }}>
-                    {task.end_photo ? (
-                      <img src={task.end_photo} alt="End Photo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : (
-                      <span style={{ fontSize: 9, fontWeight: 700, color: "#94a3b8" }}>No End Photo</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Submission Time */}
-              {task.submission_time && (
-                <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}>
-                  <span>🕒 Submitted:</span>
-                  <span>{new Date(task.submission_time).toLocaleString()}</span>
-                </div>
-              )}
             </div>
           )}
 

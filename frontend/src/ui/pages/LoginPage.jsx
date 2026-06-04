@@ -2,7 +2,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { useAuth } from "../../state/auth/useAuth.js"
-import { extractAuthError } from "../../api/authService.js"
+import { extractAuthError, apiFetchRegistrationDossier, apiDeleteRegistrationDossier } from "../../api/authService.js"
 import { validateLoginForm } from "../../utils/validate.js"
 import { routes } from "../routes.js"
 import { useGoogleLogin } from "@react-oauth/google"
@@ -151,6 +151,8 @@ export function LoginPage() {
   const [selected, setSelected] = useState(null)
   const [agreedUpdates, setAgreedUpdates] = useState(true)
   const [agreedTerms, setAgreedTerms] = useState(false)
+  const [employeeStatus, setEmployeeStatus] = useState(null)
+  const [dossierInfo, setDossierInfo] = useState(null)
 
   const postLoginRoute = (usr) => {
     const role = usr?.role
@@ -179,8 +181,63 @@ export function LoginPage() {
       const ve = validateLoginForm({ identifier: username, password })
       if (ve) return setError(ve)
       setLoading(true)
+      
+      // Sync dossier from backend first
+      let savedDossier = localStorage.getItem("caltrack_activation_dossier")
+      try {
+        const backendDossier = await apiFetchRegistrationDossier()
+        if (backendDossier && backendDossier.regForm?.fullName) {
+          savedDossier = JSON.stringify(backendDossier)
+          localStorage.setItem("caltrack_activation_dossier", savedDossier)
+        }
+      } catch (err) {
+        console.error("Fetch registration dossier pre-login intercept error", err)
+      }
+      if (savedDossier) {
+        try {
+          const parsed = JSON.parse(savedDossier)
+          const dossierEmail = (parsed.regForm?.email || "").trim().toLowerCase()
+          const dossierName = (parsed.regForm?.fullName || "").trim().toLowerCase()
+          const inputUser = username.trim().toLowerCase()
+          const isMatch = inputUser === dossierEmail || 
+                          (dossierEmail && inputUser.includes(dossierEmail.split("@")[0])) || 
+                          dossierName.includes(inputUser)
+
+          if (isMatch) {
+            const status = parsed.adminClearance?.status
+            if (status === "pending") {
+              setLoading(false)
+              navigate(routes.activation_journey)
+              return
+            } else if (status === "rejected") {
+              setEmployeeStatus("rejected")
+              setDossierInfo(parsed)
+              setLoading(false)
+              return
+            }
+          }
+        } catch (err) {
+          console.error("Dossier pre-login intercept check error", err)
+        }
+      }
+
       try { 
         const u = await login(username.trim(), password)
+        const savedDossier = localStorage.getItem("caltrack_activation_dossier")
+        if (savedDossier && u.role === "employee") {
+          try {
+            const parsed = JSON.parse(savedDossier)
+            const status = parsed.adminClearance?.status
+            if (status === "approved" || status === "rejected") {
+              setEmployeeStatus(status)
+              setDossierInfo(parsed)
+              setLoading(false)
+              return
+            }
+          } catch (e) {
+            console.error("Dossier parse error", e)
+          }
+        }
         navigate(postLoginRoute(u), { replace: true }) 
       }
       catch (err) { setError(extractAuthError(err, "Login failed.")) }
@@ -412,222 +469,322 @@ export function LoginPage() {
       <div className="flex-1 flex flex-col justify-center items-center p-8 lg:p-12 bg-white overflow-y-auto">
         <div className="w-full max-w-[440px]">
 
-          {/* Toggle Sign In / Create Account */}
-          <div className="flex bg-[#F8FAFC] p-1.5 rounded-2xl mb-12 border border-[#F1F5F9] shadow-sm max-w-[320px] mx-auto">
-            <button
-              onClick={() => { setMode("signin"); setError(""); setRegStep(1) }}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${mode === "signin" ? "bg-white text-indigo-600 shadow-md shadow-indigo-100/50 border border-indigo-50/50" : "text-[#94A3B8]"}`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => { setMode("register"); setError(""); setRegStep(1) }}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${mode === "register" ? "bg-white text-indigo-600 shadow-md shadow-indigo-100/50 border border-indigo-50/50" : "text-[#94A3B8]"}`}
-            >
-              Create Account
-            </button>
-          </div>
-
-          <div className="text-center mb-10">
-            <h1 className="text-[32px] font-black text-[#0F172A] leading-tight tracking-tight">
-              {mode === "signin" ? "Welcome Back" : "Create a new account"}
-            </h1>
-          </div>
-
-          {/* Connect With Buttons */}
-          <div className="mb-8">
-            <p className="text-center text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.2em] mb-4">Connect With</p>
-            <button type="button" onClick={() => googleLoginHandler()} className="flex items-center justify-center w-full py-4 px-2 border border-[#F1F5F9] rounded-2xl hover:bg-[#F8FAFC] transition-all group">
-              <svg width="20" height="20" viewBox="0 0 48 48">
-                <path fill="#EA4335" d="M24 9.5c3.5 0 6.5 1.2 8.9 3.2l6.7-6.7C35.4 2.2 30.1 0 24 0 14.8 0 6.9 5.4 3.1 13.3l7.8 6.1C13 13.1 18 9.5 24 9.5z" />
-                <path fill="#4285F4" d="M46.6 24.5c0-1.6-.1-3.2-.4-4.7H24v9h12.7c-.6 3.1-2.4 5.7-5 7.4l7.7 6c4.5-4.1 7.2-10.2 7.2-17.7z" />
-                <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6L2.5 13.3A24 24 0 0 0 0 24c0 3.8.9 7.4 2.5 10.7l8.4-6.1z" />
-                <path fill="#34A853" d="M24 48c6.1 0 11.2-2 14.9-5.5l-7.7-6c-2 1.4-4.6 2.2-7.2 2.2-5.9 0-11-4-12.8-9.4l-8 6.1C6.9 42.6 14.8 48 24 48z" />
-              </svg>
-              <span className="ml-3 text-[13px] font-black uppercase text-[#475569]">Google</span>
-            </button>
-          </div>
-
-          <div className="relative flex items-center mb-8">
-            <div className="flex-grow border-t border-[#F1F5F9]" />
-            <span className="mx-4 text-[10px] font-black text-[#CBD5E1] tracking-[0.3em]">OR</span>
-            <div className="flex-grow border-t border-[#F1F5F9]" />
-          </div>
-
-          {mode === "register" && (
-            <div className="mb-10 flex items-center justify-between relative px-2">
-              <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[#F1F5F9] -translate-y-1/2 z-0 mx-8" />
-              <div
-                className="absolute top-1/2 left-0 h-0.5 bg-[#10B981] -translate-y-1/2 z-0 transition-all duration-500 mx-8"
-                style={{ width: `calc(${(regStep - 1) / 3 * 100}%)` }}
-              />
-              {[1, 2, 3, 4].map((s) => (
-                <div key={s} className="relative z-10 flex flex-col items-center">
-                  <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-black transition-all duration-300 border-4 ${regStep > s ? "bg-[#10B981] border-[#D1FAE5] text-white" :
-                        regStep === s ? "bg-indigo-600 border-[#EEF2FF] text-white" :
-                          "bg-[#F8FAFC] border-[#F1F5F9] text-[#94A3B8]"
-                      }`}
-                  >
-                    {regStep > s ? <Check size={18} strokeWidth={3} /> : s}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <form onSubmit={onSubmit} className="space-y-6">
-            {mode === "signin" ? (
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <div className="relative group">
-                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8] group-focus-within:text-indigo-600 transition-colors" size={18} />
-                    <input
-                      className="w-full pl-14 pr-5 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]"
-                      placeholder="Work Email"
-                      value={username}
-                      onChange={e => setUsername(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="relative group">
-                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8] group-focus-within:text-indigo-600 transition-colors" size={18} />
-                    <input
-                      className="w-full pl-14 pr-14 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]"
-                      type={showPass ? "text" : "password"}
-                      placeholder="Password"
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                    />
-                    <button type="button" className="absolute right-5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#334155]" onClick={() => setShowPass(p => !p)}>
-                      {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
-                <div className="flex justify-end mt-1 pr-1">
-                  <button type="button" onClick={() => setMode("forgot_password")} className="text-[12px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
-                    Forgot Password?
-                  </button>
-                </div>
+          {employeeStatus === "approved" ? (
+            <div className="text-center py-6 space-y-6">
+              <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-600 shadow-md">
+                <Check size={40} strokeWidth={3} />
               </div>
-            ) : mode === "forgot_password" ? (
-              <div className="space-y-5 min-h-[240px]">
-                <h2 className="text-xl font-black text-[#0F172A] mb-2">Reset Password</h2>
-                <p className="text-[13px] font-medium text-[#64748B] mb-6">Enter your email address and we'll send you a link to reset your password.</p>
-                <div className="relative group">
-                  <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8] group-focus-within:text-indigo-600 transition-colors" size={18} />
-                  <input
-                    className="w-full pl-14 pr-5 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]"
-                    placeholder="Work Email"
-                    value={username}
-                    onChange={e => setUsername(e.target.value)}
-                    required
-                  />
-                </div>
+              
+              <div className="space-y-2">
+                <span className="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800">
+                  Status : APPROVED
+                </span>
+                <h1 className="text-[32px] font-black text-[#0F172A] leading-tight tracking-tight">
+                  Congratulations
+                </h1>
+                <p className="text-sm font-medium text-[#64748B] leading-relaxed max-w-sm mx-auto">
+                  Your account has been activated. <br />
+                  You can now access tasks and start working.
+                </p>
               </div>
-            ) : (
-              <div className="min-h-[240px]">
-                {regStep === 1 && (
-                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
-                    <h2 className="text-xl font-black text-[#0F172A] mb-6">Personal Details</h2>
-                    <div className="relative">
-                      <input className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all" placeholder="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} />
-                    </div>
-                    <div className="relative">
-                      <input className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all" placeholder="Work Email" value={email} onChange={e => setEmail(e.target.value)} />
-                    </div>
-                  </motion.div>
-                )}
-                {regStep === 2 && (
-                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
-                    <h2 className="text-xl font-black text-[#0F172A] mb-6">Organization Info</h2>
-                    <input className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all" placeholder="Organization Name" value={orgName} onChange={e => setOrgName(e.target.value)} />
-                    <select className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all appearance-none" value={numEmployees} onChange={e => setNumEmployees(e.target.value)}>
-                      <option>1 - 10 employees</option>
-                      <option>11 - 50 employees</option>
-                      <option>51 - 200 employees</option>
-                      <option>201+ employees</option>
-                    </select>
-                  </motion.div>
-                )}
-                {regStep === 3 && (
-                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
-                    <h2 className="text-xl font-black text-[#0F172A] mb-6">Platform Credentials</h2>
-                    <input className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
-                    <input className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
-                  </motion.div>
-                )}
-                {regStep === 4 && (
-                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
-                    <div className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-widest mb-1">
-                      <ShieldCheck size={14} /> Finalize
-                    </div>
-                    <h2 className="text-[28px] font-black text-[#0F172A] leading-tight">Almost there!</h2>
 
-                    <div className="space-y-4 pt-2">
-                      <label className="flex items-start gap-3 cursor-pointer group">
-                        <div className={`mt-1 w-5 h-5 rounded-md flex items-center justify-center transition-all border ${agreedUpdates ? "bg-indigo-600 border-indigo-600 text-white" : "border-[#E2E8F0] bg-white group-hover:border-indigo-200"}`}>
-                          {agreedUpdates && <Check size={14} strokeWidth={4} />}
-                        </div>
-                        <input type="checkbox" className="hidden" checked={agreedUpdates} onChange={() => setAgreedUpdates(!agreedUpdates)} />
-                        <span className="text-[13px] font-medium text-[#64748B] leading-tight">Receive updates and tips from Caltrack.</span>
-                      </label>
-                      <label className="flex items-start gap-3 cursor-pointer group">
-                        <div className={`mt-1 w-5 h-5 rounded-md flex items-center justify-center transition-all border ${agreedTerms ? "bg-indigo-600 border-indigo-600 text-white" : "border-[#E2E8F0] bg-white group-hover:border-indigo-200"}`}>
-                          {agreedTerms && <Check size={14} strokeWidth={4} />}
-                        </div>
-                        <input type="checkbox" className="hidden" checked={agreedTerms} onChange={() => setAgreedTerms(!agreedTerms)} />
-                        <span className="text-[13px] font-medium text-[#64748B] leading-tight">Agree to <span className="text-indigo-600 font-bold">Terms</span> & <span className="text-indigo-600 font-bold">Privacy</span>.</span>
-                      </label>
-                    </div>
-
-                    <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-5 flex items-center justify-between">
-                      <span className="text-[15px] font-bold text-[#0F172A]">I'm not a robot</span>
-                      <div className="w-6 h-6 border-2 border-[#E2E8F0] rounded-md" />
-                    </div>
-                  </motion.div>
-                )}
-              </div>
-            )}
-
-            {error && (
-              <div className="p-4 bg-red-50 text-red-600 text-xs font-bold rounded-2xl border border-red-100 flex items-center gap-3">
-                <AlertCircle size={15} /> {error}
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              {mode === "register" && regStep > 1 && (
-                <button
-                  type="button"
-                  onClick={() => setRegStep(p => p - 1)}
-                  className="flex-1 py-5 bg-[#F8FAFC] text-[#64748B] text-[13px] font-black uppercase tracking-widest rounded-2xl border border-[#F1F5F9] hover:bg-white transition-all"
-                >
-                  Back
-                </button>
-              )}
               <button
-                type={mode === "register" && regStep < 4 ? "button" : "submit"}
-                disabled={loading || (mode === "register" && regStep === 4 && !agreedTerms)}
-                onClick={() => {
-                  if (mode === "register" && regStep < 4) setRegStep(p => p + 1)
+                type="button"
+                onClick={async () => {
+                  setEmployeeStatus(null)
+                  localStorage.removeItem("caltrack_activation_dossier")
+                  await apiDeleteRegistrationDossier()
+                  navigate(routes.dashboard, { replace: true })
                 }}
-                className={`flex-[2] py-5 bg-indigo-600 text-white text-[13px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-100/50 hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:shadow-none`}
+                className="w-full py-5 bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-100/50 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
               >
-                {loading ? <RefreshCcw className="animate-spin" size={18} /> :
-                  mode === "signin" ? "Sign In" :
-                  mode === "forgot_password" ? "Send Reset Link" :
-                    regStep === 4 ? (agreedTerms ? "Continue" : <RefreshCcw size={18} />) : "Continue"}
+                Confirm
               </button>
             </div>
-          </form>
+          ) : employeeStatus === "rejected" ? (
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-600 mb-4">
+                  <X size={32} strokeWidth={3} />
+                </div>
+                <h1 className="text-2xl font-black text-rose-600 tracking-tight uppercase">
+                  APPLICATION REJECTED
+                </h1>
+              </div>
 
-          <div className="mt-12 text-center">
-            <button className="text-[11px] font-black uppercase tracking-widest text-[#94A3B8] hover:text-indigo-600 transition-colors">
-              Need Help? <span className="text-indigo-600">Contact Support</span>
-            </button>
-          </div>
+              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+                <div>
+                  <div className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Reason Category</div>
+                  <div className="text-sm font-bold text-slate-800">
+                    {dossierInfo?.adminClearance?.reasonCategory || "Document Verification Failed"}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Admin Comments</div>
+                  <div className="text-xs font-semibold text-rose-600 leading-relaxed">
+                    {dossierInfo?.adminClearance?.remarks || "Please upload a clearer Aadhaar image."}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 border-t border-slate-200/60 pt-3 text-[11px] font-semibold text-slate-500">
+                  <div>
+                    <span className="block text-[8px] font-black uppercase text-slate-400">Rejected By</span>
+                    {dossierInfo?.adminClearance?.rejectedBy || "Admin Team"}
+                  </div>
+                  <div>
+                    <span className="block text-[8px] font-black uppercase text-slate-400">Rejected On</span>
+                    {dossierInfo?.adminClearance?.rejectedOn || "02 Jun 2026"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Resubmission Panel */}
+              <div className="p-5 rounded-2xl border border-dashed border-slate-300 bg-white space-y-4">
+                <div className="text-xs font-bold text-slate-700">Required Action</div>
+                <div className="space-y-2 text-xs font-semibold text-slate-600">
+                  {(dossierInfo?.adminClearance?.requiredActions || ["Re-upload Aadhaar", "Re-upload PAN"]).map((action, aIdx) => (
+                    <div key={aIdx} className="flex items-center gap-2">
+                      <Check className="text-emerald-500 w-4 h-4 shrink-0" strokeWidth={3} />
+                      <span>{action}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    localStorage.removeItem("caltrack_activation_dossier")
+                    await apiDeleteRegistrationDossier()
+                    setEmployeeStatus(null)
+                    navigate(routes.activation_journey)
+                  }}
+                  className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-[0.98]"
+                >
+                  Upload New Documents
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Toggle Sign In / Create Account */}
+              <div className="flex bg-[#F8FAFC] p-1.5 rounded-2xl mb-12 border border-[#F1F5F9] shadow-sm max-w-[320px] mx-auto">
+                <button
+                  onClick={() => { setMode("signin"); setError(""); setRegStep(1) }}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${mode === "signin" ? "bg-white text-indigo-600 shadow-md shadow-indigo-100/50 border border-indigo-50/50" : "text-[#94A3B8]"}`}
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => navigate(routes.activation_journey)}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all text-[#94A3B8]"
+                >
+                  Create Account
+                </button>
+              </div>
+
+              <div className="text-center mb-10">
+                <h1 className="text-[32px] font-black text-[#0F172A] leading-tight tracking-tight">
+                  {mode === "signin" ? "Welcome Back" : "Create a new account"}
+                </h1>
+              </div>
+
+              {/* Connect With Buttons */}
+              <div className="mb-8">
+                <p className="text-center text-[10px] font-black text-[#94A3B8] uppercase tracking-[0.2em] mb-4">Connect With</p>
+                <button type="button" onClick={() => googleLoginHandler()} className="flex items-center justify-center w-full py-4 px-2 border border-[#F1F5F9] rounded-2xl hover:bg-[#F8FAFC] transition-all group">
+                  <svg width="20" height="20" viewBox="0 0 48 48">
+                    <path fill="#EA4335" d="M24 9.5c3.5 0 6.5 1.2 8.9 3.2l6.7-6.7C35.4 2.2 30.1 0 24 0 14.8 0 6.9 5.4 3.1 13.3l7.8 6.1C13 13.1 18 9.5 24 9.5z" />
+                    <path fill="#4285F4" d="M46.6 24.5c0-1.6-.1-3.2-.4-4.7H24v9h12.7c-.6 3.1-2.4 5.7-5 7.4l7.7 6c4.5-4.1 7.2-10.2 7.2-17.7z" />
+                    <path fill="#FBBC05" d="M10.9 28.6A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.6L2.5 13.3A24 24 0 0 0 0 24c0 3.8.9 7.4 2.5 10.7l8.4-6.1z" />
+                    <path fill="#34A853" d="M24 48c6.1 0 11.2-2 14.9-5.5l-7.7-6c-2 1.4-4.6 2.2-7.2 2.2-5.9 0-11-4-12.8-9.4l-8 6.1C6.9 42.6 14.8 48 24 48z" />
+                  </svg>
+                  <span className="ml-3 text-[13px] font-black uppercase text-[#475569]">Google</span>
+                </button>
+              </div>
+
+              <div className="relative flex items-center mb-8">
+                <div className="flex-grow border-t border-[#F1F5F9]" />
+                <span className="mx-4 text-[10px] font-black text-[#CBD5E1] tracking-[0.3em]">OR</span>
+                <div className="flex-grow border-t border-[#F1F5F9]" />
+              </div>
+
+              {mode === "register" && (
+                <div className="mb-10 flex items-center justify-between relative px-2">
+                  <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-[#F1F5F9] -translate-y-1/2 z-0 mx-8" />
+                  <div
+                    className="absolute top-1/2 left-0 h-0.5 bg-[#10B981] -translate-y-1/2 z-0 transition-all duration-500 mx-8"
+                    style={{ width: `calc(${(regStep - 1) / 3 * 100}%)` }}
+                  />
+                  {[1, 2, 3, 4].map((s) => (
+                    <div key={s} className="relative z-10 flex flex-col items-center">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-black transition-all duration-300 border-4 ${regStep > s ? "bg-[#10B981] border-[#D1FAE5] text-white" :
+                            regStep === s ? "bg-indigo-600 border-[#EEF2FF] text-white" :
+                              "bg-[#F8FAFC] border-[#F1F5F9] text-[#94A3B8]"
+                          }`}
+                      >
+                        {regStep > s ? <Check size={18} strokeWidth={3} /> : s}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <form onSubmit={onSubmit} className="space-y-6">
+                {mode === "signin" ? (
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <div className="relative group">
+                        <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8] group-focus-within:text-indigo-600 transition-colors" size={18} />
+                        <input
+                          className="w-full pl-14 pr-5 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]"
+                          placeholder="Work Email"
+                          value={username}
+                          onChange={e => setUsername(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="relative group">
+                        <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8] group-focus-within:text-indigo-600 transition-colors" size={18} />
+                        <input
+                          className="w-full pl-14 pr-14 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]"
+                          type={showPass ? "text" : "password"}
+                          placeholder="Password"
+                          value={password}
+                          onChange={e => setPassword(e.target.value)}
+                        />
+                        <button type="button" className="absolute right-5 top-1/2 -translate-y-1/2 text-[#94A3B8] hover:text-[#334155]" onClick={() => setShowPass(p => !p)}>
+                          {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex justify-end mt-1 pr-1">
+                      <button type="button" onClick={() => setMode("forgot_password")} className="text-[12px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
+                        Forgot Password?
+                      </button>
+                    </div>
+                  </div>
+                ) : mode === "forgot_password" ? (
+                  <div className="space-y-5 min-h-[240px]">
+                    <h2 className="text-xl font-black text-[#0F172A] mb-2">Reset Password</h2>
+                    <p className="text-[13px] font-medium text-[#64748B] mb-6">Enter your email address and we'll send you a link to reset your password.</p>
+                    <div className="relative group">
+                      <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8] group-focus-within:text-indigo-600 transition-colors" size={18} />
+                      <input
+                        className="w-full pl-14 pr-5 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]"
+                        placeholder="Work Email"
+                        value={username}
+                        onChange={e => setUsername(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="min-h-[240px]">
+                    {regStep === 1 && (
+                      <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
+                        <h2 className="text-xl font-black text-[#0F172A] mb-6">Personal Details</h2>
+                        <div className="relative">
+                          <input className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all" placeholder="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} />
+                        </div>
+                        <div className="relative">
+                          <input className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all" placeholder="Work Email" value={email} onChange={e => setEmail(e.target.value)} />
+                        </div>
+                      </motion.div>
+                    )}
+                    {regStep === 2 && (
+                      <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
+                        <h2 className="text-xl font-black text-[#0F172A] mb-6">Organization Info</h2>
+                        <input className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all" placeholder="Organization Name" value={orgName} onChange={e => setOrgName(e.target.value)} />
+                        <select className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all appearance-none" value={numEmployees} onChange={e => setNumEmployees(e.target.value)}>
+                          <option>1 - 10 employees</option>
+                          <option>11 - 50 employees</option>
+                          <option>51 - 200 employees</option>
+                          <option>201+ employees</option>
+                        </select>
+                      </motion.div>
+                    )}
+                    {regStep === 3 && (
+                      <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
+                        <h2 className="text-xl font-black text-[#0F172A] mb-6">Platform Credentials</h2>
+                        <input className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all" placeholder="Username" value={username} onChange={e => setUsername(e.target.value)} />
+                        <input className="w-full px-6 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium outline-none focus:bg-white focus:border-indigo-500 transition-all" type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} />
+                      </motion.div>
+                    )}
+                    {regStep === 4 && (
+                      <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+                        <div className="flex items-center gap-2 text-indigo-600 font-black text-[10px] uppercase tracking-widest mb-1">
+                          <ShieldCheck size={14} /> Finalize
+                        </div>
+                        <h2 className="text-[28px] font-black text-[#0F172A] leading-tight">Almost there!</h2>
+
+                        <div className="space-y-4 pt-2">
+                          <label className="flex items-start gap-3 cursor-pointer group">
+                            <div className={`mt-1 w-5 h-5 rounded-md flex items-center justify-center transition-all border ${agreedUpdates ? "bg-indigo-600 border-indigo-600 text-white" : "border-[#E2E8F0] bg-white group-hover:border-indigo-200"}`}>
+                              {agreedUpdates && <Check size={14} strokeWidth={4} />}
+                            </div>
+                            <input type="checkbox" className="hidden" checked={agreedUpdates} onChange={() => setAgreedUpdates(!agreedUpdates)} />
+                            <span className="text-[13px] font-medium text-[#64748B] leading-tight">Receive updates and tips from Caltrack.</span>
+                          </label>
+                          <label className="flex items-start gap-3 cursor-pointer group">
+                            <div className={`mt-1 w-5 h-5 rounded-md flex items-center justify-center transition-all border ${agreedTerms ? "bg-indigo-600 border-indigo-600 text-white" : "border-[#E2E8F0] bg-white group-hover:border-indigo-200"}`}>
+                              {agreedTerms && <Check size={14} strokeWidth={4} />}
+                            </div>
+                            <input type="checkbox" className="hidden" checked={agreedTerms} onChange={() => setAgreedTerms(!agreedTerms)} />
+                            <span className="text-[13px] font-medium text-[#64748B] leading-tight">Agree to <span className="text-indigo-600 font-bold">Terms</span> & <span className="text-indigo-600 font-bold">Privacy</span>.</span>
+                          </label>
+                        </div>
+
+                        <div className="bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl p-5 flex items-center justify-between">
+                          <span className="text-[15px] font-bold text-[#0F172A]">I'm not a robot</span>
+                          <div className="w-6 h-6 border-2 border-[#E2E8F0] rounded-md" />
+                        </div>
+                      </motion.div>
+                    )}
+                  </div>
+                )}
+
+                {error && (
+                  <div className="p-4 bg-red-50 text-red-600 text-xs font-bold rounded-2xl border border-red-100 flex items-center gap-3">
+                    <AlertCircle size={15} /> {error}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  {mode === "register" && regStep > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setRegStep(p => p - 1)}
+                      className="flex-1 py-5 bg-[#F8FAFC] text-[#64748B] text-[13px] font-black uppercase tracking-widest rounded-2xl border border-[#F1F5F9] hover:bg-white transition-all"
+                    >
+                      Back
+                    </button>
+                  )}
+                  <button
+                    type={mode === "register" && regStep < 4 ? "button" : "submit"}
+                    disabled={loading || (mode === "register" && regStep === 4 && !agreedTerms)}
+                    onClick={() => {
+                      if (mode === "register" && regStep < 4) setRegStep(p => p + 1)
+                    }}
+                    className={`flex-[2] py-5 bg-indigo-600 text-white text-[13px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-100/50 hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:shadow-none`}
+                  >
+                    {loading ? <RefreshCcw className="animate-spin" size={18} /> :
+                      mode === "signin" ? "Sign In" :
+                      mode === "forgot_password" ? "Send Reset Link" :
+                        regStep === 4 ? (agreedTerms ? "Continue" : <RefreshCcw size={18} />) : "Continue"}
+                  </button>
+                </div>
+              </form>
+
+              <div className="mt-12 text-center">
+                <button className="text-[11px] font-black uppercase tracking-widest text-[#94A3B8] hover:text-indigo-600 transition-colors">
+                  Need Help? <span className="text-indigo-600">Contact Support</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

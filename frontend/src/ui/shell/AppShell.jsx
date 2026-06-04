@@ -19,7 +19,8 @@ import { addSosAlert, addGeofenceBreach } from "../../store/liveLocationSlice.js
 import {
   Home, Clock, CheckSquare, CalendarDays, Banknote, CalendarRange,
   Users, BarChart3, MapPin, Settings, Search, LogOut,
-  ChevronLeft, ChevronRight, Rocket, ShieldAlert, Globe, Package
+  ChevronLeft, ChevronRight, Rocket, ShieldAlert, Globe, Package, Award,
+  FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle
 } from "lucide-react"
 
 // Items visible to all authenticated users (employees + admins)
@@ -34,11 +35,26 @@ const NAV_SHARED = [
 // Items visible only to admins/managers
 const NAV_ADMIN = [
   { label: "Get Started", to: routes.get_started, icon: <Rocket size={20} />, color: "#0EA5E9" },
+  {
+    label: "Employees",
+    to: routes.employees,
+    icon: <Users size={20} />,
+    color: "#D946EF",
+    children: [
+      { label: "Dashboard", to: routes.employees_dashboard, icon: <Home size={16} />, color: "#10B981" },
+      { label: "Employee Directory", to: routes.employees, icon: <Users size={16} />, color: "#D946EF" },
+      { label: "Pending Approvals", to: routes.employees_pending, icon: <FileText size={16} />, color: "#F59E0B" },
+      { label: "Approved Employees", to: routes.employees_approved, icon: <CheckCircle size={16} />, color: "#10B981" },
+      { label: "Rejected Employees", to: routes.employees_rejected, icon: <XCircle size={16} />, color: "#EF4444" },
+      { label: "Document Vault", to: routes.employees_documents, icon: <FolderOpen size={16} />, color: "#3B82F6" },
+      { label: "Training Records", to: routes.employees_training, icon: <GraduationCap size={16} />, color: "#8B5CF6" },
+      { label: "Settings", to: routes.settings, icon: <Settings size={16} />, color: "#64748B" },
+    ]
+  },
   { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6" },
   { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444" },
   { label: "Payroll", to: routes.payroll, icon: <Banknote size={20} />, color: "#6366F1" },
   { label: "Scheduling", to: routes.scheduling, icon: <CalendarRange size={20} />, color: "#38BDF8" },
-  { label: "Employees", to: routes.employees, icon: <Users size={20} />, color: "#D946EF" },
   { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, color: "#FACC15" },
   { label: "Inventory", to: routes.inventory, icon: <Package size={20} />, color: "#10B981" },
   { label: "Compliance", to: routes.compliance, icon: <ShieldAlert size={20} />, color: "#2563EB" },
@@ -505,14 +521,16 @@ export function AppShell() {
             >
               <div className="p-4 flex flex-col gap-1 h-full">
                 <div className="mb-4 px-3">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-black dark:text-white mb-1">{drillDownParent.label}</h4>
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-black dark:text-white mb-1">
+                    {drillDownParent.label === "Employees" ? "Employee Management" : drillDownParent.label}
+                  </h4>
                 </div>
 
                 <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col gap-1">
                   {drillDownParent.children
                     .filter(child => !child.adminOnly || isAdmin)
                     .map((child) => {
-                      const active = location.pathname === child.to || (child.to !== '/settings' && location.pathname.startsWith(child.to));
+                      const active = location.pathname === child.to || (child.to !== '/settings' && child.to !== '/employees' && location.pathname.startsWith(child.to));
                       const color = child.color || drillDownParent.color || "#3b82f6";
                       return (
                         <NavLink

@@ -426,8 +426,6 @@ class EmployeeTaskActionView(APIView):
                 task.status     = Task.Status.IN_PROGRESS
                 task.started_at = timezone.now()
                 task.time_log   = timelog
-                if photo:
-                    task.start_photo = photo
                 if notes:
                     task.employee_notes = notes
                 task.save()
@@ -456,28 +454,14 @@ class EmployeeTaskActionView(APIView):
                 from time_tracking.models import TimeLogPhoto
                 photo = request.FILES.get("photo")
                 notes = request.data.get("notes", "")
-                face_match_percentage = request.data.get("face_match_percentage")
-                face_match_status = request.data.get("face_match_status")
 
                 task.status       = Task.Status.COMPLETED
                 task.travel_status = Task.TravelStatus.DONE
                 task.completed_at = timezone.now()
-                task.submission_time = timezone.now()
                 if notes:
                     task.employee_notes = notes
                 if not task.started_at:
                     task.started_at = task.completed_at
-
-                if face_match_percentage not in (None, ""):
-                    try:
-                        task.face_match_percentage = float(face_match_percentage)
-                    except ValueError:
-                        pass
-                if face_match_status:
-                    task.face_match_status = face_match_status
-
-                if photo:
-                    task.end_photo = photo
 
                 # ── Sub-1-hour billing round-up ───────────────────────────
                 actual_seconds = int(
@@ -498,18 +482,6 @@ class EmployeeTaskActionView(APIView):
                             photo_type="after",
                         )
                 task.save()
-
-                if task.start_photo and task.end_photo:
-                    try:
-                        from time_tracking.utils import verify_face_match
-                        is_match, score, status = verify_face_match(task.start_photo.path, task.end_photo.path)
-                        if status != 'skipped':
-                            task.face_match_percentage = score
-                            task.face_match_status = 'verified' if is_match else 'failed'
-                            task.save(update_fields=['face_match_percentage', 'face_match_status'])
-                    except Exception as e:
-                        print(f"Backend face verification exception: {e}")
-
                 _write_task_audit(request.user, "task_completed", task)
 
                 # Notify admin via WS group
@@ -636,8 +608,6 @@ class EmployeeTaskActionView(APIView):
                 task.work_started_at = timezone.now()
                 task.started_at   = task.work_started_at
                 task.time_log     = timelog
-                if photo:
-                    task.start_photo = photo
                 if request.data.get("notes"):
                     task.employee_notes = request.data.get("notes")
                 task.save()

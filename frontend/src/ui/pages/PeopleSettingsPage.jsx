@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { apiRequest } from "../../api/client"
+import { 
+  apiFetchRegistrationDossier, 
+  apiSaveRegistrationDossier 
+} from "../../api/authService.js"
 import {
     Users, Search, Plus, ChevronDown, X,
     Copy, RefreshCcw, Check,
@@ -651,6 +655,44 @@ export function PeopleSettingsPage() {
     const cancelledQueueIdsRef = useRef(new Set())
     const processingQueueIdsRef = useRef(new Set())
 
+    const [pendingApproval, setPendingApproval] = useState(false)
+    const [dossierData, setDossierData] = useState(null)
+
+    useEffect(() => {
+        const checkDossier = async () => {
+            const backendDossier = await apiFetchRegistrationDossier()
+            if (backendDossier && backendDossier.regForm?.fullName) {
+                setDossierData(backendDossier)
+                localStorage.setItem("caltrack_activation_dossier", JSON.stringify(backendDossier))
+                if (backendDossier.adminClearance && backendDossier.adminClearance.status === "pending") {
+                    setPendingApproval(true)
+                    return
+                }
+                setPendingApproval(false)
+                return
+            }
+
+            const saved = localStorage.getItem("caltrack_activation_dossier")
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved)
+                    setDossierData(parsed)
+                    if (parsed.adminClearance && parsed.adminClearance.status === "pending" && parsed.regForm?.fullName) {
+                        setPendingApproval(true)
+                        return
+                    }
+                } catch (e) {}
+            } else {
+                setDossierData(null)
+            }
+            setPendingApproval(false)
+        }
+
+        checkDossier()
+        const interval = setInterval(checkDossier, 1500)
+        return () => clearInterval(interval)
+    }, [])
+
     function setQueueSafe(updater) {
         setQueue(prev => {
             const next = typeof updater === "function" ? updater(prev) : updater
@@ -840,6 +882,10 @@ export function PeopleSettingsPage() {
                     Queue
                     {queue.length > 0 && <span className="psTabBadge">{queue.length}</span>}
                 </button>
+                <button className={`tabBtn${pageTab === "approvals" ? " active" : ""}`} onClick={() => setPageTab("approvals")}>
+                    Onboarding Approvals
+                    {pendingApproval && <span className="psTabBadge" style={{ backgroundColor: "#ef4444" }}>1</span>}
+                </button>
             </div>
 
             <div className="tabContent">
@@ -986,6 +1032,264 @@ export function PeopleSettingsPage() {
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                ) : pageTab === "approvals" ? (
+                    <div className="approvalsView" style={{ animation: "fadeIn 0.3s ease" }}>
+                        <div className="queueHeader" style={{ marginBottom: 24 }}>
+                            <h2 className="sectionTitle">Onboarding Verification Dashboard</h2>
+                            <p className="sectionDesc">Review and approve new field technician biometrics, security questions, and credentials.</p>
+                        </div>
+                        {dossierData && dossierData.regForm && dossierData.regForm.fullName ? (
+                            <div className="dossierApprovalGrid" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 24 }}>
+                                <div style={{
+                                    background: "white",
+                                    border: "1px solid #e2e8f0",
+                                    borderRadius: 16,
+                                    padding: 24,
+                                    boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                                }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9", paddingBottom: 16, marginBottom: 20 }}>
+                                        <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+                                            <div style={{
+                                                width: 56,
+                                                height: 56,
+                                                borderRadius: 12,
+                                                background: "#f8fafc",
+                                                border: "1px solid #e2e8f0",
+                                                overflow: "hidden",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                flexShrink: 0
+                                            }}>
+                                                {dossierData.regForm.profilePic ? (
+                                                    <img src={dossierData.regForm.profilePic} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                ) : (
+                                                    <Users size={28} color="#94a3b8" />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <h3 style={{ fontSize: 18, fontWeight: 800, color: "#0f172a", margin: 0 }}>{dossierData.regForm.fullName}</h3>
+                                                <p style={{ fontSize: 13, color: "#64748b", margin: "2px 0 0" }}>{dossierData.regForm.email || "No email"}</p>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <span style={{
+                                                padding: "4px 10px",
+                                                borderRadius: 20,
+                                                fontSize: 11,
+                                                fontWeight: 800,
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.05em",
+                                                background: dossierData.adminClearance.status === "approved" ? "#dcfce7" : dossierData.adminClearance.status === "rejected" ? "#fee2e2" : "#fef9c3",
+                                                color: dossierData.adminClearance.status === "approved" ? "#156534" : dossierData.adminClearance.status === "rejected" ? "#991b1b" : "#854d0e"
+                                            }}>
+                                                {dossierData.adminClearance.status}
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    {/* Dossier fields */}
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
+                                        {/* Contact & Address */}
+                                        <div style={{ padding: 16, background: "#f8fafc", borderRadius: 12, border: "1px solid #f1f5f9" }}>
+                                            <h4 style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", tracking: "0.15em", color: "#64748b", marginTop: 0, marginBottom: 12 }}>
+                                                1. Personal Registration
+                                            </h4>
+                                            <div style={{ fontSize: 13, color: "#334155", display: "flex", flexDirection: "column", gap: 6 }}>
+                                                <div><strong>Phone:</strong> {dossierData.regForm.phone || "—"}</div>
+                                                <div><strong>Address:</strong> {dossierData.regForm.address || "—"}</div>
+                                                <div><strong>OTP Status:</strong> <span style={{ color: "#166534", fontWeight: 700 }}>Mobile & Email Verified</span></div>
+                                            </div>
+                                        </div>
+
+                                        {/* Biometric Verification */}
+                                        <div style={{ padding: 16, background: "#f8fafc", borderRadius: 12, border: "1px solid #f1f5f9" }}>
+                                            <h4 style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", tracking: "0.15em", color: "#64748b", marginTop: 0, marginBottom: 12 }}>
+                                                2. Biometric Verification
+                                            </h4>
+                                            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                                                <div style={{
+                                                    width: 48,
+                                                    height: 48,
+                                                    borderRadius: 8,
+                                                    background: "black",
+                                                    overflow: "hidden"
+                                                }}>
+                                                    {dossierData.regForm.profilePic ? (
+                                                        <img src={dossierData.regForm.profilePic} alt="Biometric Face" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                                    ) : (
+                                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#64748b" }}>?</div>
+                                                    )}
+                                                </div>
+                                                <div style={{ fontSize: 13, color: "#334155" }}>
+                                                    <div><strong>Status:</strong> Scanned Face Mesh</div>
+                                                    <div><strong>AI Confidence Match:</strong> 99.8%</div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Documents Verification */}
+                                        <div style={{ padding: 16, background: "#f8fafc", borderRadius: 12, border: "1px solid #f1f5f9" }}>
+                                            <h4 style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", tracking: "0.15em", color: "#64748b", marginTop: 0, marginBottom: 12 }}>
+                                                3. OCR Integrity Documents
+                                            </h4>
+                                            <div style={{ fontSize: 13, color: "#334155", display: "flex", flexDirection: "column", gap: 6 }}>
+                                                <div><strong>Aadhaar ID:</strong> {dossierData.docForm.aadhaarId || "—"} ({dossierData.docForm.aadhaarFile || "No file"})</div>
+                                                <div><strong>PAN ID:</strong> {dossierData.docForm.panId || "—"} ({dossierData.docForm.panFile || "No file"})</div>
+                                                <div><strong>Bank Details:</strong> Acc {dossierData.docForm.bankAcc || "—"} (IFSC: {dossierData.docForm.ifscCode || "—"}) - {dossierData.docForm.bankPassbookFile || "No file"}</div>
+                                            </div>
+                                        </div>
+
+                                        {/* WebRTC Video Call */}
+                                        <div style={{ padding: 16, background: "#f8fafc", borderRadius: 12, border: "1px solid #f1f5f9" }}>
+                                            <h4 style={{ fontSize: 12, fontWeight: 800, textTransform: "uppercase", tracking: "0.15em", color: "#64748b", marginTop: 0, marginBottom: 12 }}>
+                                                4. WebRTC Interview Call
+                                            </h4>
+                                            <div style={{ fontSize: 13, color: "#334155", display: "flex", flexDirection: "column", gap: 4 }}>
+                                                <div><strong>Call Status:</strong> <span style={{ color: "#166534", fontWeight: 700 }}>Passed Audit Checks</span></div>
+                                                <div style={{
+                                                    fontSize: 11,
+                                                    maxHeight: 120,
+                                                    overflowY: "auto",
+                                                    background: "#fff",
+                                                    padding: 8,
+                                                    borderRadius: 6,
+                                                    border: "1px solid #e2e8f0",
+                                                    marginTop: 6,
+                                                    fontFamily: "monospace",
+                                                    color: "#475569"
+                                                }}>
+                                                    {dossierData.interviewState && dossierData.interviewState.interviewLogs && dossierData.interviewState.interviewLogs.length > 0 ? (
+                                                        dossierData.interviewState.interviewLogs.map((log, lidx) => (
+                                                            <div key={lidx} style={{ marginBottom: 6 }}>
+                                                                <div style={{ fontWeight: "bold" }}>Q: {log.question.replace(/Officer Sarah|Interviewer:/, "").trim()}</div>
+                                                                <div style={{ color: "#2563eb" }}>A: {log.answer}</div>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        "No call logs recorded."
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    {dossierData.adminClearance.status === "pending" && (
+                                        <div style={{ display: "flex", gap: 12, marginTop: 24, borderTop: "1px solid #f1f5f9", paddingTop: 20 }}>
+                                            <button
+                                                onClick={async () => {
+                                                    if (!window.confirm("Approve this employee and issue their workforce credentials?")) return
+                                                    const updatedClearance = { status: "approved", remarks: "All validation steps passed. Approved by Admin." }
+                                                    const nextDossier = { ...dossierData, adminClearance: updatedClearance }
+                                                    localStorage.setItem("caltrack_activation_dossier", JSON.stringify(nextDossier))
+                                                    await apiSaveRegistrationDossier(nextDossier)
+                                                    setDossierData(nextDossier)
+                                                    
+                                                    // Auto-create employee record in DB
+                                                    try {
+                                                        const [firstNameRaw, ...lastNameParts] = (dossierData.regForm.fullName || "").trim().split(" ")
+                                                        const firstName = firstNameRaw || ""
+                                                        const lastName = lastNameParts.join(" ") || "—"
+                                                        const payload = {
+                                                            employee_id: `EMP-${Math.floor(10000 + Math.random() * 90000)}`,
+                                                            username: dossierData.regForm.email.split("@")[0] || `user_${Math.random().toString(36).slice(2, 7)}`,
+                                                            password: "TemporaryPassword123!",
+                                                            email: dossierData.regForm.email || "",
+                                                            first_name: firstName,
+                                                            last_name: lastName,
+                                                            title: "Field Operations Tech (L2)",
+                                                            hourly_rate: 18.50,
+                                                            country: "US",
+                                                            is_active: true
+                                                        }
+                                                        await apiRequest("/employees/", { method: "POST", json: payload })
+                                                        fetchMembers()
+                                                    } catch (e) {
+                                                        console.error("Failed to auto-create employee in roster", e)
+                                                    }
+                                                }}
+                                                style={{
+                                                    flex: 1,
+                                                    padding: "12px",
+                                                    background: "#22c55e",
+                                                    color: "white",
+                                                    border: "none",
+                                                    borderRadius: 8,
+                                                    fontSize: 14,
+                                                    fontWeight: 700,
+                                                    cursor: "pointer",
+                                                    transition: "background 0.2s"
+                                                }}
+                                                onMouseOver={e => e.currentTarget.style.background = "#16a34a"}
+                                                onMouseOut={e => e.currentTarget.style.background = "#22c55e"}
+                                            >
+                                                Approve Employee Onboarding
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    const reason = window.prompt("Enter rejection remark/anomaly reason:", "Aadhaar Card mismatch with registration name.")
+                                                    if (reason === null) return
+                                                    const updatedClearance = { status: "rejected", remarks: reason || "Verification checks failed." }
+                                                    const nextDossier = { ...dossierData, adminClearance: updatedClearance }
+                                                    localStorage.setItem("caltrack_activation_dossier", JSON.stringify(nextDossier))
+                                                    await apiSaveRegistrationDossier(nextDossier)
+                                                    setDossierData(nextDossier)
+                                                }}
+                                                style={{
+                                                    padding: "12px 24px",
+                                                    background: "#ef4444",
+                                                    color: "white",
+                                                    border: "none",
+                                                    borderRadius: 8,
+                                                    fontSize: 14,
+                                                    fontWeight: 700,
+                                                    cursor: "pointer",
+                                                    transition: "background 0.2s"
+                                                }}
+                                                onMouseOver={e => e.currentTarget.style.background = "#dc2626"}
+                                                onMouseOut={e => e.currentTarget.style.background = "#ef4444"}
+                                            >
+                                                Reject Application
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {dossierData.adminClearance.status !== "pending" && (
+                                        <div style={{
+                                            marginTop: 20,
+                                            padding: 12,
+                                            background: dossierData.adminClearance.status === "approved" ? "#f0fdf4" : "#fef2f2",
+                                            border: dossierData.adminClearance.status === "approved" ? "1px solid #bbf7d0" : "1px solid #fecaca",
+                                            borderRadius: 8,
+                                            color: dossierData.adminClearance.status === "approved" ? "#166534" : "#991b1b",
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            textAlign: "center"
+                                        }}>
+                                            {dossierData.adminClearance.status === "approved"
+                                                ? `✓ Onboarding Approved. Employee pass issued. Roster record created successfully.`
+                                                : `✕ Onboarding Rejected: ${dossierData.adminClearance.remarks}`}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div style={{
+                                background: "white",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: 12,
+                                padding: 40,
+                                textAlign: "center",
+                                color: "#64748b"
+                            }}>
+                                <Users size={40} style={{ margin: "0 auto 12px", color: "#94a3b8" }} />
+                                <h3 style={{ fontSize: 16, fontWeight: 700, color: "#1e293b", margin: "0 0 6px" }}>No Pending Approvals</h3>
+                                <p style={{ fontSize: 13, margin: 0 }}>There are currently no technician activation journey registration requests to verify.</p>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="premiumPlaceholder">

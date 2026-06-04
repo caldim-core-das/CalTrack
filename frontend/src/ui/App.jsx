@@ -12,6 +12,11 @@ const AcceptInvitePage = lazy(() =>
   import("./pages/AcceptInvitePage.jsx").then(m => ({ default: m.AcceptInvitePage }))
 )
 
+const ActivationJourneyPage = lazy(() =>
+  import("./pages/ActivationJourneyPage.jsx").then(m => ({ default: m.ActivationJourneyPage }))
+)
+
+
 const DashboardPage = lazy(() =>
   import("./pages/DashboardPage.jsx").then(m => ({ default: m.DashboardPage }))
 )
@@ -94,6 +99,26 @@ const CompliancePage = lazy(() =>
 
 const InventoryPage = lazy(() =>
   import("./pages/InventoryPage.jsx").then(m => ({ default: m.InventoryPage }))
+)
+
+const ApprovalCenterPage = lazy(() =>
+  import("./pages/ApprovalCenterPage.jsx").then(m => ({ default: m.ApprovalCenterPage }))
+)
+
+const EmployeesDashboardPage = lazy(() =>
+  import("./pages/EmployeeSubPages.jsx").then(m => ({ default: m.EmployeesDashboardPage }))
+)
+const ApprovedEmployeesPage = lazy(() =>
+  import("./pages/EmployeeSubPages.jsx").then(m => ({ default: m.ApprovedEmployeesPage }))
+)
+const RejectedEmployeesPage = lazy(() =>
+  import("./pages/EmployeeSubPages.jsx").then(m => ({ default: m.RejectedEmployeesPage }))
+)
+const DocumentVaultPage = lazy(() =>
+  import("./pages/EmployeeSubPages.jsx").then(m => ({ default: m.DocumentVaultPage }))
+)
+const TrainingRecordsPage = lazy(() =>
+  import("./pages/EmployeeSubPages.jsx").then(m => ({ default: m.TrainingRecordsPage }))
 )
 
 // ─── Route Guards ────────────────────────────────────────────
@@ -188,6 +213,11 @@ export function App() {
           />
 
           <Route
+            path={routes.activation_journey}
+            element={<ActivationJourneyPage />}
+          />
+
+          <Route
             path={routes.reset_password}
             element={
               user ? <Navigate to={isAdmin ? routes.get_started : routes.dashboard} replace /> : <ResetPasswordPage />
@@ -242,6 +272,13 @@ export function App() {
               <Route path={routes.employees} element={<EmployeesPage />} />
               <Route path={routes.reports} element={<ReportsPage />} />
               <Route path={routes.compliance} element={<CompliancePage />} />
+              <Route path={routes.approvals} element={<ApprovalCenterPage />} />
+              <Route path={routes.employees_dashboard} element={<EmployeesDashboardPage />} />
+              <Route path={routes.employees_pending} element={<ApprovalCenterPage />} />
+              <Route path={routes.employees_approved} element={<ApprovedEmployeesPage />} />
+              <Route path={routes.employees_rejected} element={<RejectedEmployeesPage />} />
+              <Route path={routes.employees_documents} element={<DocumentVaultPage />} />
+              <Route path={routes.employees_training} element={<TrainingRecordsPage />} />
             </Route>
 
             {/* ── Admin-only settings (employees redirected to /settings/profile) ── */}
