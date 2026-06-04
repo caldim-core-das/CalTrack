@@ -14,6 +14,7 @@ urlpatterns = [
     path("api/tasks/", include("tasks.urls")),
     path("api/live-locations/", include("live_locations.urls")),
     path("api/compliance/", include("compliance.urls")),
+    path("api/inventory/", include("inventory.urls")),
     path("api/settings/", include("settings_hub.urls")),
 ]
 

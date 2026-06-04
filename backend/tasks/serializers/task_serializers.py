@@ -36,6 +36,7 @@ class TaskSerializer(serializers.ModelSerializer):
     attachments   = serializers.SerializerMethodField()
     sla_status            = serializers.SerializerMethodField()
     sla_minutes_remaining = serializers.SerializerMethodField()
+    required_items        = serializers.SerializerMethodField()
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -109,6 +110,9 @@ class TaskSerializer(serializers.ModelSerializer):
             "completed_at",
             "created_at",
             "updated_at",
+            "inventory_status",
+            "blocking_reason",
+            "required_items",
             # Suspended / Gap job fields
             "suspended_at",
             "resume_deadline",
@@ -131,6 +135,7 @@ class TaskSerializer(serializers.ModelSerializer):
             "sla_status", "sla_minutes_remaining",
             "travel_status", "reached_site_at", "work_started_at",
             "start_photo", "end_photo", "face_match_percentage", "face_match_status", "submission_time",
+            "inventory_status", "blocking_reason", "required_items",
         )
 
     def get_assigned_by_name(self, obj):
@@ -153,6 +158,19 @@ class TaskSerializer(serializers.ModelSerializer):
         from tasks.services.gap_job_service import get_sla_status
         _, mins = get_sla_status(obj)
         return mins
+
+    def get_required_items(self, obj):
+        reqs = getattr(obj, "taskrequireditem_set", None)
+        if reqs is None:
+            return []
+        return [
+            {
+                "item_id": str(r.inventory_item.id),
+                "name": r.inventory_item.name,
+                "quantity_needed": r.quantity_needed,
+            }
+            for r in reqs.all()
+        ]
 
 
 class TaskAttachmentSerializer(serializers.ModelSerializer):

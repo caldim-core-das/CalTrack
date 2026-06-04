@@ -958,6 +958,22 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
   const [otpInput, setOtpInput] = useState("")
   const [otpVerified, setOtpVerified] = useState(false)
 
+  // Nearest Stock Info
+  const [nearestStock, setNearestStock] = useState({})
+
+  useEffect(() => {
+    if (task.inventory_status && task.inventory_status !== "Fulfilled" && task.inventory_status !== "None" && precGPS && task.required_items?.length > 0) {
+      task.required_items.forEach(async (reqItem) => {
+        try {
+          const res = await apiRequest(`/inventory/nearest-stock/${reqItem.item_id}/?lat=${precGPS.lat}&lng=${precGPS.lon}`)
+          setNearestStock(prev => ({ ...prev, [reqItem.item_id]: res }))
+        } catch (e) {
+          console.error("Failed to fetch nearest stock", e)
+        }
+      })
+    }
+  }, [task.inventory_status, task.required_items, precGPS])
+
   // Activity timeline
   const [showTimeline, setShowTimeline] = useState(false)
   const [timeline, setTimeline] = useState([])
@@ -2097,6 +2113,36 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                               pathOptions={{ color: "#059669", fillColor: "#059669", fillOpacity: 0.10, weight: 2, dashArray: "6 4" }}
                             />
 
+                            {/* Nearest Stock Pins */}
+                            {Object.values(nearestStock).map(stockLocs => {
+                              if (!stockLocs || stockLocs.length === 0) return null;
+                              const closest = stockLocs[0];
+                              if (!closest.lat || !closest.lng) return null;
+                              return (
+                                <Marker
+                                  key={`stock-${closest.location_id}`}
+                                  position={[closest.lat, closest.lng]}
+                                  icon={L.divIcon({
+                                    className: "",
+                                    html: `<div style="display:flex;flex-direction:column;align-items:center;">
+                                      <div style="width:32px;height:32px;border-radius:50%;background:#f59e0b;border:2px solid white;box-shadow:0 4px 12px rgba(245,158,11,0.4);display:flex;align-items:center;justify-content:center;">
+                                        <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round' style='width:16px;height:16px;'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'></path><polyline points='3.27 6.96 12 12.01 20.73 6.96'></polyline><line x1='12' y1='22.08' x2='12' y2='12'></line></svg>
+                                      </div>
+                                    </div>`,
+                                    iconSize: [32, 32],
+                                    iconAnchor: [16, 16],
+                                  })}
+                                >
+                                  <Popup>
+                                    <div style={{ fontSize: 11, fontWeight: 800, padding: 4 }}>
+                                      📦 Nearest Stock: {closest.location_name}
+                                      <div style={{ fontSize: 9, color: "#64748b", marginTop: 2 }}>{closest.distance_km}km away</div>
+                                    </div>
+                                  </Popup>
+                                </Marker>
+                              );
+                            })}
+
                             {/* Employee current position (blue) */}
                             {precGPS && (
                               <Marker
@@ -2299,6 +2345,47 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                       )}
                     </div>
 
+                    {/* Required Inventory Check Panel */}
+                    <div className="flex flex-col gap-2 mt-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Required Inventory</label>
+                      {(!task.required_items || task.required_items.length === 0) ? (
+                        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-black flex items-center gap-1.5 shadow-sm">
+                          <CheckCircle2 size={14} /> No specific inventory required.
+                        </div>
+                      ) : task.inventory_status === "Fulfilled" ? (
+                        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-black flex items-center gap-1.5 shadow-sm">
+                          <CheckCircle2 size={14} /> All required inventory is available.
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex flex-col gap-3 shadow-sm">
+                          <div className="text-red-800 text-xs font-black flex items-center gap-1.5">
+                            <AlertTriangle size={14} /> Missing Required Inventory
+                          </div>
+                          <div className="text-[11px] font-bold text-red-700/90 leading-relaxed">
+                            {task.blocking_reason}
+                          </div>
+                          <div className="flex flex-col gap-2 mt-1">
+                            {task.required_items.map(item => {
+                              const stockLocs = nearestStock[item.item_id]
+                              if (!stockLocs || stockLocs.length === 0) return null
+                              const closest = stockLocs[0]
+                              return (
+                                <div key={item.item_id} className="p-2.5 bg-white border border-red-200 rounded-xl flex items-center justify-between text-[10px] shadow-sm">
+                                  <div>
+                                    <div className="font-black text-slate-800">{item.name}</div>
+                                    <div className="text-slate-500 font-bold mt-0.5">Nearest: {closest.location_name} ({closest.distance_km}km)</div>
+                                  </div>
+                                  <div className="font-extrabold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+                                    {closest.available_quantity} available
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Journey Action Buttons — context-sensitive based on travel_status */}
                     {!task.travel_status && (
                       <SwipeButton
@@ -2389,35 +2476,39 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                         <button
                           type="button"
                           onClick={async () => {
+                            if (task.inventory_status && task.inventory_status !== "Fulfilled" && task.inventory_status !== "None") {
+                              alert("Cannot start work until required inventory is fulfilled. Please visit the nearest stock location.");
+                              return;
+                            }
                             if (!beforePhoto) { alert("Please capture a Before Photo first."); return; }
                             if (!startNotes.trim()) { alert("Please enter Work Notes / Objectives first."); return; }
                             if (!precGPS) { alert("GPS is still locking. Please wait a moment and try again."); return; }
                             await handleStartWorkNew();
                           }}
-                          disabled={localBusy || busy}
+                          disabled={localBusy || busy || (task.inventory_status && task.inventory_status !== "Fulfilled" && task.inventory_status !== "None")}
                           style={{
                             width: "100%",
                             padding: "15px 0",
                             borderRadius: 14,
                             border: "none",
-                            background: (beforePhoto && startNotes.trim() && precGPS)
+                            background: (beforePhoto && startNotes.trim() && precGPS && (!task.inventory_status || task.inventory_status === "Fulfilled" || task.inventory_status === "None"))
                               ? "linear-gradient(135deg, #059669 0%, #047857 100%)"
                               : "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)",
                             color: "#fff",
                             fontSize: 13,
                             fontWeight: 900,
-                            cursor: (localBusy || busy) ? "not-allowed" : "pointer",
+                            cursor: (localBusy || busy || (task.inventory_status && task.inventory_status !== "Fulfilled" && task.inventory_status !== "None")) ? "not-allowed" : "pointer",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             gap: 10,
                             letterSpacing: "0.06em",
                             textTransform: "uppercase",
-                            boxShadow: (beforePhoto && startNotes.trim() && precGPS)
+                            boxShadow: (beforePhoto && startNotes.trim() && precGPS && (!task.inventory_status || task.inventory_status === "Fulfilled" || task.inventory_status === "None"))
                               ? "0 6px 20px rgba(5,150,105,0.4)"
                               : "0 4px 12px rgba(100,116,139,0.2)",
                             transition: "all 0.25s ease",
-                            opacity: (localBusy || busy) ? 0.6 : 1,
+                            opacity: (localBusy || busy || (task.inventory_status && task.inventory_status !== "Fulfilled" && task.inventory_status !== "None")) ? 0.6 : 1,
                           }}
                         >
                           <Hammer size={16} />

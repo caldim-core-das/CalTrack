@@ -57,6 +57,17 @@ class Task(models.Model):
     required_spare_parts = models.TextField(blank=True, help_text="Comma-separated or list of spare parts needed.")
     priority         = models.CharField(max_length=20, choices=Priority.choices, default=Priority.MEDIUM)
     status           = models.CharField(max_length=20, choices=Status.choices,   default=Status.PENDING)
+
+    # Inventory linking
+    class InventoryStatus(models.TextChoices):
+        FULFILLED = "fulfilled", "Fulfilled"
+        PARTIAL = "partial", "Partial"
+        MISSING = "missing", "Missing"
+        PENDING_TRANSFER = "pending_transfer", "Pending Transfer"
+        
+    required_items   = models.ManyToManyField('inventory.InventoryItem', through='TaskRequiredItem', blank=True, related_name='tasks_requiring')
+    inventory_status = models.CharField(max_length=30, choices=InventoryStatus.choices, default=InventoryStatus.FULFILLED)
+    blocking_reason  = models.TextField(blank=True)
     
     # Multi-tenant
     company          = models.ForeignKey('companies.Company', on_delete=models.CASCADE, related_name="tasks", null=True, blank=True)
@@ -319,4 +330,13 @@ class TaskActivityLog(models.Model):
 
     def __str__(self):
         return f"[{self.task_id}] {self.event_type} @ {self.timestamp}"
+
+class TaskRequiredItem(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    inventory_item = models.ForeignKey('inventory.InventoryItem', on_delete=models.CASCADE)
+    quantity_needed = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        unique_together = ('task', 'inventory_item')
+
 

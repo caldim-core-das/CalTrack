@@ -92,6 +92,10 @@ const CompliancePage = lazy(() =>
   import("./pages/CompliancePage.jsx").then(m => ({ default: m.CompliancePage }))
 )
 
+const InventoryPage = lazy(() =>
+  import("./pages/InventoryPage.jsx").then(m => ({ default: m.InventoryPage }))
+)
+
 // ─── Route Guards ────────────────────────────────────────────
 
 /**
@@ -220,6 +224,7 @@ export function App() {
             <Route path={routes.time} element={<TimePage />} />
             <Route path={routes.tasks} element={<TasksPage />} />
             <Route path={routes.leaves} element={<LeavesPage />} />
+            <Route path={routes.inventory} element={<InventoryPage />} />
 
             {/* Employee profile settings — accessible to everyone */}
             <Route path={routes.settings} element={<SettingsPage />} />
