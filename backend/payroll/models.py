@@ -57,6 +57,8 @@ class PayrollRecord(models.Model):
     holiday_hours_accrued = models.DecimalField(max_digits=6, decimal_places=2, default=0)
 
     net_pay = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    mileage_reimbursement = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    extras = models.JSONField(default=dict, blank=True)
 
     # Compliance flags
     region = models.CharField(max_length=50, blank=True, null=True)  # e.g. "US FLSA (CA)"

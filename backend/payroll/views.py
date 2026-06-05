@@ -420,6 +420,25 @@ class PayrollGenerateView(APIView):
         gross = gross.quantize(Decimal("0.01"))
         net = net.quantize(Decimal("0.01"))
 
+        # Fetch approved, unpaid mileage trips for this employee in the period
+        from mileage.models import MileageTrip
+        trips = MileageTrip.objects.filter(
+            employee=employee,
+            company=request.company,
+            approval_status=MileageTrip.ApprovalStatus.APPROVED,
+            trip_date__gte=start,
+            trip_date__lte=end,
+        )
+        mileage_reimbursement = sum(t.reimbursement_amount for t in trips)
+        trip_count = trips.count()
+
+        # Add mileage reimbursement to net pay
+        net_with_mileage = net + mileage_reimbursement
+        extras = {
+            "mileage_trip_count": trip_count,
+            "mileage_reimbursement": float(mileage_reimbursement),
+        }
+
         record, _ = PayrollRecord.objects.update_or_create(
             period=period,
             employee=employee,
@@ -439,13 +458,21 @@ class PayrollGenerateView(APIView):
                 "uk_tax_code": employee.uk_tax_code,
                 "uk_ni_category": employee.uk_ni_category,
                 "holiday_hours_accrued": holiday_hours_accrued,
-                "net_pay": net,
+                "net_pay": net_with_mileage.quantize(Decimal("0.01")),
+                "mileage_reimbursement": mileage_reimbursement.quantize(Decimal("0.01")),
+                "extras": extras,
                 "region": compliance_rules["name"],
                 "is_exempt": employee.is_flsa_exempt,
                 "wage_floor_compliant": wage_check["is_compliant"],
                 "generated_by": request.user,
             },
         )
+
+        trips.update(
+            linked_payroll_record=record,
+            approval_status=MileageTrip.ApprovalStatus.PAID,
+        )
+
         return Response(PayrollRecordSerializer(record).data, status=201)
 
 from .models import CurrencyMaster, PayrollRule, PayrollGeneration
@@ -524,6 +551,19 @@ class DynamicPayrollGenerateView(APIView):
             deductions = pf + esi
             net_salary = gross_salary - deductions
 
+            # Fetch approved, unpaid mileage trips for this employee in the month/year
+            from mileage.models import MileageTrip
+            trips = MileageTrip.objects.filter(
+                employee=employee,
+                company=request.company,
+                approval_status=MileageTrip.ApprovalStatus.APPROVED,
+                trip_date__month=month,
+                trip_date__year=year,
+            )
+            mileage_reimbursement = sum(t.reimbursement_amount for t in trips)
+            trip_count = trips.count()
+
+            net_salary_total = net_salary + mileage_reimbursement
             currency_code = rule.currency.currency_code if rule.currency else "USD"
 
             breakdown = {
@@ -533,7 +573,10 @@ class DynamicPayrollGenerateView(APIView):
                 "esi": float(esi),
                 "gross": float(gross_salary),
                 "deductions": float(deductions),
-                "net": float(net_salary)
+                "net_without_mileage": float(net_salary),
+                "mileage_reimbursement": float(mileage_reimbursement),
+                "mileage_trip_count": trip_count,
+                "net": float(net_salary_total)
             }
 
             record, _ = PayrollGeneration.objects.update_or_create(
@@ -544,11 +587,14 @@ class DynamicPayrollGenerateView(APIView):
                 defaults={
                     "gross_salary": gross_salary,
                     "deductions": deductions,
-                    "net_salary": net_salary,
+                    "net_salary": net_salary_total,
                     "currency": currency_code,
                     "country": rule.country,
                     "breakdown": breakdown
                 }
+            )
+            trips.update(
+                approval_status=MileageTrip.ApprovalStatus.PAID,
             )
             generated_records.append(record)
 

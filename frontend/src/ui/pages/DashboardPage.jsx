@@ -14,6 +14,7 @@ import { useAuth } from "../../state/auth/useAuth.js"
 import { useRole } from "../../state/auth/useRole.js"
 import { routes } from "../routes.js"
 import { BarChart, LineChart, DoughnutChart } from "../components/DashboardCharts.jsx"
+import { apiFetchRegistrationDossier, apiSaveRegistrationDossier } from "../../api/authService.js"
 
 // ─── Employee Personal Dashboard ────────────────────────────
 
@@ -751,139 +752,372 @@ function AdminDashboard() {
   }, [notifications])
 
   // --- Onboarding & Verification Center interactive states ---
-  const [verificationQueue, setVerificationQueue] = useState({
-    documents: 18,
-    training: 12,
-    interview: 8,
-    ready: 6
+  // --- Onboarding & Verification Center interactive states ---
+  const [dossier, setDossier] = useState(() => {
+    try {
+      const saved = localStorage.getItem("caltrack_activation_dossier")
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
   })
+
+  // Poll registration dossier from backend
+  useEffect(() => {
+    let active = true
+    async function loadDossier() {
+      const data = await apiFetchRegistrationDossier()
+      if (data && active) {
+        setDossier(data)
+        localStorage.setItem("caltrack_activation_dossier", JSON.stringify(data))
+      }
+    }
+    loadDossier()
+    const interval = setInterval(loadDossier, 3000)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [])
+
+  const verificationQueue = useMemo(() => {
+    const docsPending = (dossier && dossier.regForm?.fullName && !dossier.docForm?.isCompleted) ? 1 : 0
+    const trainPending = (dossier && dossier.docForm?.isCompleted && !dossier.academyState?.isCompleted) ? 1 : 0
+    const intPending = (dossier && dossier.academyState?.isCompleted && (dossier.interviewState?.status === "Scheduled" || dossier.interviewState?.status === "In Call")) ? 1 : 0
+    const rdyApproval = (dossier && dossier.interviewState?.status === "Passed" && dossier.adminClearance?.status === "pending") ? 1 : 0
+    return {
+      documents: docsPending,
+      training: trainPending,
+      interview: intPending,
+      ready: rdyApproval
+    }
+  }, [dossier])
   
-  const [interviewsToday, setInterviewsToday] = useState([
-    { id: 1, time: "09:00 AM", name: "Surya", role: "Electrician", status: "Scheduled" },
-    { id: 2, time: "10:30 AM", name: "Kalyani", role: "Tester", status: "Scheduled" },
-    { id: 3, time: "11:00 AM", name: "Madhan", role: "Electrician", status: "Scheduled" }
-  ])
+  const interviewsToday = useMemo(() => {
+    if (!dossier?.regForm?.fullName) return []
+    return [
+      { id: 1, time: "09:00 AM", name: dossier.regForm.fullName, role: "Field Operations Tech", status: dossier.interviewState?.status || "Scheduled" }
+    ]
+  }, [dossier])
 
-  const [verificationCenterCandidate, setVerificationCenterCandidate] = useState({
-    name: "Surya",
-    role: "Electrician",
-    registration: "Complete",
-    documents: "Verified",
-    training: "Completed",
-    interview: "Pending",
-  })
+  const verificationCenterCandidate = useMemo(() => {
+    return {
+      name: dossier?.regForm?.fullName || "Surya",
+      role: "Electrician",
+      registration: dossier?.regForm?.fullName ? "Complete" : "Pending",
+      documents: dossier?.docForm?.isCompleted ? "Verified" : "Pending",
+      training: dossier?.academyState?.isCompleted ? "Completed" : "Pending",
+      interview: dossier?.interviewState?.status === "Passed" ? "Passed" : (dossier?.interviewState?.status === "Rejected" ? "Rejected" : "Pending"),
+    }
+  }, [dossier])
 
-  const [approvalCenterReview, setApprovalCenterReview] = useState({
-    name: "Surya",
-    role: "Electrician",
-    identity: "Verified",
-    training: "Completed",
-    interview: "Passed",
-    trustScore: 98,
-    status: "Reviewing"
-  })
+  const approvalCenterReview = useMemo(() => {
+    return {
+      name: dossier?.regForm?.fullName || "Surya",
+      role: "Electrician",
+      identity: dossier?.regForm?.isBiometricCompleted ? "Verified" : (dossier?.regForm?.fullName ? "Verified" : "Pending"),
+      training: dossier?.academyState?.isCompleted ? "Completed" : "Pending",
+      interview: dossier?.interviewState?.status === "Passed" ? "Passed" : (dossier?.interviewState?.status === "Rejected" ? "Rejected" : "Pending"),
+      trustScore: dossier?.trustScore || 80,
+      status: dossier?.adminClearance?.status === "approved" ? "Approved" : (dossier?.adminClearance?.status === "rejected" ? "Rejected" : "Reviewing")
+    }
+  }, [dossier])
 
-  const [aiInsightsRecommendation, setAiInsightsRecommendation] = useState("Reduce interview waiting time.")
+  const funnelData = useMemo(() => {
+    const approvedCount = employees.length
+    const hasPassedInt = dossier?.interviewState?.status === "Passed" || dossier?.interviewState?.status === "Rejected"
+    const interviewCount = approvedCount + (dossier && hasPassedInt ? 1 : 0)
+    const trainingCount = interviewCount + (dossier?.academyState?.isCompleted ? 1 : 0)
+    const docsCount = trainingCount + (dossier?.docForm?.isCompleted ? 1 : 0)
+    const regCount = docsCount + (dossier?.regForm?.fullName ? 1 : 0)
 
-  const [recentActivities, setRecentActivities] = useState([
-    { id: 1, time: "11:10 AM", event: "Employee Activated", desc: "Surya pass activated" },
-    { id: 2, time: "11:00 AM", event: "Interview Passed", desc: "Surya L1 interview logged" },
-    { id: 3, time: "10:00 AM", event: "Training Completed", desc: "Surya video modules done" },
-    { id: 4, time: "09:25 AM", event: "Documents Approved", desc: "OCR verification green light" },
-    { id: 5, time: "09:15 AM", event: "Documents Uploaded", desc: "Aadhaar/PAN card uploaded" },
-    { id: 6, time: "09:10 AM", event: "New Registration", desc: "Surya registered on app" }
-  ])
+    return [
+      { stage: "Registered", count: regCount, percent: regCount > 0 ? 100 : 0, color: "#3b82f6" },
+      { stage: "Documents Verified", count: docsCount, percent: regCount > 0 ? Math.round((docsCount / regCount) * 100) : 0, color: "#6366f1" },
+      { stage: "Training Completed", count: trainingCount, percent: regCount > 0 ? Math.round((trainingCount / regCount) * 100) : 0, color: "#8b5cf6" },
+      { stage: "Interview Completed", count: interviewCount, percent: regCount > 0 ? Math.round((interviewCount / regCount) * 100) : 0, color: "#ec4899" },
+      { stage: "Approved", count: approvedCount, percent: regCount > 0 ? Math.round((approvedCount / regCount) * 100) : 0, color: "#10b981" }
+    ]
+  }, [employees, dossier])
+
+  const [insightsDismissed, setInsightsDismissed] = useState(false)
+
+  const approvalRate = useMemo(() => {
+    const approvedCount = employees.length
+    const rejectedCount = dossier?.adminClearance?.status === "rejected" ? 1 : 0
+    const total = approvedCount + rejectedCount
+    return total > 0 ? Math.round((approvedCount / total) * 100) : 100
+  }, [employees, dossier])
+
+  const interviewSuccess = useMemo(() => {
+    const approvedCount = employees.length
+    const rejectedCount = dossier?.interviewState?.status === "Rejected" ? 1 : 0
+    const total = approvedCount + rejectedCount
+    return total > 0 ? Math.round((approvedCount / total) * 100) : 100
+  }, [employees, dossier])
+
+  const trainingCompletion = useMemo(() => {
+    const candidateCompleted = dossier?.academyState?.modules?.filter(m => m.completed).length || 0
+    const totalCompleted = (employees.length * 5) + candidateCompleted
+    const totalModules = (employees.length + (dossier ? 1 : 0)) * 5
+    return totalModules > 0 ? Math.round((totalCompleted / totalModules) * 100) : 100
+  }, [employees, dossier])
+
+  const avgApprovalTime = useMemo(() => {
+    const validEmps = employees.filter(e => e.hire_date && e.created_at)
+    if (validEmps.length === 0) return "1.2 Days"
+    const totalDays = validEmps.reduce((acc, emp) => {
+      const hire = new Date(emp.hire_date)
+      const created = new Date(emp.created_at)
+      const diff = Math.abs(hire - created)
+      return acc + (diff / (1000 * 60 * 60 * 24))
+    }, 0)
+    return `${(totalDays / validEmps.length).toFixed(1)} Days`
+  }, [employees])
+
+  const aiInsightsRecommendation = useMemo(() => {
+    if (insightsDismissed) return ""
+    if (!dossier?.regForm?.fullName) {
+      return "Awaiting candidate registration on Caltrack app."
+    }
+    if (!dossier.docForm?.isCompleted) {
+      return "Verify candidate's uploaded identity documents (Aadhaar & PAN)."
+    }
+    if (!dossier.academyState?.isCompleted) {
+      return "Candidate is completing the 5 compliance training modules."
+    }
+    if (dossier.interviewState?.status === "Scheduled" || dossier.interviewState?.status === "In Call") {
+      return "Conduct scheduled L1 verification and biometric matching call."
+    }
+    if (dossier.interviewState?.status === "Passed" && dossier.adminClearance?.status === "pending") {
+      return "Approve candidate onboarding dossier to activate portal access."
+    }
+    return "All candidate pipelines are clear. Roster is fully up to date."
+  }, [dossier, insightsDismissed])
+
+  // Recent activities — derived from real dossier state
+  const [recentActivities, setRecentActivities] = useState([])
+
+  // Auto-derive timeline from real dossier steps
+  useEffect(() => {
+    if (!dossier) return
+    const items = []
+    const name = dossier.regForm?.fullName || "Candidate"
+    if (dossier.adminClearance?.status === "approved") {
+      items.push({ id: "act-approved", time: "—", event: "Employee Activated", desc: `${name} approved — portal access granted` })
+    }
+    if (dossier.adminClearance?.status === "rejected") {
+      items.push({ id: "act-rejected", time: "—", event: "Application Rejected", desc: `${name} application rejected` })
+    }
+    if (dossier.interviewState?.status === "Passed") {
+      items.push({ id: "act-interview", time: "—", event: "Interview Passed", desc: `${name} L1 verification passed` })
+    }
+    if (dossier.interviewState?.status === "Rejected") {
+      items.push({ id: "act-int-rej", time: "—", event: "Interview Failed", desc: `${name} did not pass interview` })
+    }
+    if (dossier.academyState?.isCompleted) {
+      items.push({ id: "act-training", time: "—", event: "Training Completed", desc: `${name} completed all ${dossier.academyState?.modules?.length || 5} training modules` })
+    }
+    if (dossier.docForm?.isCompleted) {
+      items.push({ id: "act-docs", time: "—", event: "Documents Verified", desc: `${name} identity documents approved` })
+    }
+    if (dossier.regForm?.fullName) {
+      items.push({ id: "act-reg", time: "—", event: "New Registration", desc: `${name} registered on Caltrack app` })
+    }
+    setRecentActivities(prev => {
+      // Preserve dynamically-added items (from approve/reject handlers) at the top
+      const dynamic = prev.filter(a => !String(a.id).startsWith("act-"))
+      return [...dynamic, ...items]
+    })
+  }, [dossier])
 
   const [auditTab, setAuditTab] = useState("login")
   const [hoveredLoc, setHoveredLoc] = useState(null)
 
+  // Audit logs — starts empty, populated by real admin actions only
   const [auditLogs, setAuditLogs] = useState({
-    login: [
-      { id: 1, time: "13:30 PM", user: "Admin (Jasmine)", action: "Logged in via Web", ip: "192.168.1.45" },
-      { id: 2, time: "11:15 AM", user: "Manager (Ramesh)", action: "Logged in via Android", ip: "192.168.1.12" },
-      { id: 3, time: "08:00 AM", user: "Admin (Jasmine)", action: "Logged in via Web", ip: "192.168.1.45" }
-    ],
-    approvals: [
-      { id: 1, time: "11:10 AM", candidate: "Surya", approvedBy: "Admin (Jasmine)", role: "Electrician" },
-      { id: 2, time: "Yesterday", candidate: "Anjali Devi", approvedBy: "Admin (Jasmine)", role: "Plumber" },
-      { id: 3, time: "2 days ago", candidate: "Vikram Singh", approvedBy: "Manager (Ramesh)", role: "Security Guard" }
-    ],
-    rejections: [
-      { id: 1, time: "10:45 AM", candidate: "Kunal Sharma", rejectedBy: "Admin (Jasmine)", reason: "Blurred document scan" },
-      { id: 2, time: "3 days ago", candidate: "Amit Patel", rejectedBy: "Manager (Ramesh)", reason: "Failed video mesh biometric check" }
-    ],
-    docs: [
-      { id: 1, time: "09:25 AM", candidate: "Surya", field: "OCR Document Check", status: "Approved" },
-      { id: 2, time: "09:15 AM", candidate: "Surya", field: "Aadhaar Front/Back", status: "Uploaded" },
-      { id: 3, time: "Yesterday", candidate: "Riya Verma", field: "Selfie Biometrics", status: "Failed (Mesh <90%)" }
-    ],
-    interviews: [
-      { id: 1, time: "11:00 AM", candidate: "Surya", interviewer: "Manager (Ramesh)", rating: "4.5/5 (Good)", notes: "Strong technical knowledge, recommended." },
-      { id: 2, time: "Yesterday", candidate: "Anjali Devi", interviewer: "Admin (Jasmine)", rating: "5/5 (Excellent)", notes: "Perfect communication, prompt answers." }
-    ]
+    login: [],
+    approvals: [],
+    rejections: [],
+    docs: [],
+    interviews: []
   })
 
   // Handlers
-  const handleApproveCandidate = (name) => {
-    setApprovalCenterReview(prev => ({ ...prev, status: "Approved", trustScore: 100 }))
-    setVerificationCenterCandidate(prev => ({ ...prev, interview: "Passed" }))
-    setVerificationQueue(prev => ({ ...prev, ready: Math.max(0, prev.ready - 1) }))
-    
-    // Add to recent activity
-    const nowStr = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-    setRecentActivities(prev => [
-      { id: Math.random(), time: nowStr, event: "Employee Activated", desc: `${name} approved and activated` },
-      ...prev
-    ])
-
-    // Add to audit approvals
-    setAuditLogs(prev => ({
-      ...prev,
-      approvals: [
-        { id: Math.random(), time: nowStr, candidate: name, approvedBy: "Admin (Jasmine)", role: "Electrician" },
-        ...prev.approvals
-      ]
-    }))
-  }
-
-  const handleRejectCandidate = (name, reason = "Failed interview criteria") => {
-    setApprovalCenterReview(prev => ({ ...prev, status: "Rejected" }))
-    setVerificationCenterCandidate(prev => ({ ...prev, interview: "Rejected" }))
-    setVerificationQueue(prev => ({ ...prev, ready: Math.max(0, prev.ready - 1) }))
-    
-    // Add to recent activity
-    const nowStr = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-    setRecentActivities(prev => [
-      { id: Math.random(), time: nowStr, event: "Application Rejected", desc: `${name} review rejected` },
-      ...prev
-    ])
-
-    // Add to audit rejections
-    setAuditLogs(prev => ({
-      ...prev,
-      rejections: [
-        { id: Math.random(), time: nowStr, candidate: name, rejectedBy: "Admin (Jasmine)", reason: reason },
-        ...prev.rejections
-      ]
-    }))
-  }
-
-  const handlePassInterview = (id, name) => {
-    setInterviewsToday(prev => prev.map(i => i.id === id ? { ...i, status: "Passed" } : i))
-    if (name === "Surya") {
-      setVerificationCenterCandidate(prev => ({ ...prev, interview: "Passed" }))
+  const handleApproveCandidate = async (name) => {
+    if (!dossier) return
+    try {
+      const updatedClearance = {
+        status: "approved",
+        remarks: "All validation steps passed. Approved by Admin on Dashboard."
+      }
+      const nextDossier = { ...dossier, adminClearance: updatedClearance }
+      setDossier(nextDossier)
+      localStorage.setItem("caltrack_activation_dossier", JSON.stringify(nextDossier))
+      await apiSaveRegistrationDossier(nextDossier)
+      
+      // Provision employee record in DB
+      const [firstNameRaw, ...lastNameParts] = (name || "").trim().split(" ")
+      const firstName = firstNameRaw || ""
+      const lastName = lastNameParts.join(" ") || "—"
+      const payload = {
+        employee_id: dossier.id || "EMP-2048",
+        username: dossier.regForm?.email?.split("@")[0] || `user_${Math.random().toString(36).slice(2, 7)}`,
+        password: "TemporaryPassword123!",
+        email: dossier.regForm?.email || "surya@example.com",
+        first_name: firstName,
+        last_name: lastName,
+        title: "Field Operations Tech (L2)",
+        hourly_rate: 18.50,
+        country: "IN",
+        is_active: true
+      }
+      await apiRequest("/employees/", { method: "POST", json: payload })
+      
+      const nowStr = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+      setRecentActivities(prev => [
+        { id: Math.random(), time: nowStr, event: "Employee Activated", desc: `${name} approved and activated` },
+        ...prev
+      ])
+      setAuditLogs(prev => ({
+        ...prev,
+        approvals: [
+          { id: Math.random(), time: nowStr, candidate: name, approvedBy: "Admin (Jasmine)", role: "Electrician" },
+          ...prev.approvals
+        ]
+      }))
+      alert(`${name} Approved Successfully\n\nPortal Access Enabled\nTask Assignment Enabled\nEmployee Activated`)
+    } catch (e) {
+      console.error("Failed to approve employee from dashboard", e)
+      alert("Error approving employee. Please check logs.")
     }
   }
 
-  const handleRejectInterview = (id, name) => {
-    setInterviewsToday(prev => prev.map(i => i.id === id ? { ...i, status: "Rejected" } : i))
-    if (name === "Surya") {
-      setVerificationCenterCandidate(prev => ({ ...prev, interview: "Rejected" }))
+  const handleRejectCandidate = async (name, reason = "Failed interview criteria") => {
+    if (!dossier) return
+    try {
+      const updatedClearance = {
+        status: "rejected",
+        remarks: reason
+      }
+      const nextDossier = { ...dossier, adminClearance: updatedClearance }
+      setDossier(nextDossier)
+      localStorage.setItem("caltrack_activation_dossier", JSON.stringify(nextDossier))
+      await apiSaveRegistrationDossier(nextDossier)
+      
+      const nowStr = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+      setRecentActivities(prev => [
+        { id: Math.random(), time: nowStr, event: "Application Rejected", desc: `${name} review rejected` },
+        ...prev
+      ])
+      setAuditLogs(prev => ({
+        ...prev,
+        rejections: [
+          { id: Math.random(), time: nowStr, candidate: name, rejectedBy: "Admin (Jasmine)", reason: reason },
+          ...prev.rejections
+        ]
+      }))
+      alert(`Employee ${name} Application Rejected`)
+    } catch (e) {
+      console.error("Failed to reject employee from dashboard", e)
     }
   }
 
-  const handleStartCall = (id, name) => {
-    setInterviewsToday(prev => prev.map(i => i.id === id ? { ...i, status: "In Call" } : i))
+  const handlePassInterview = async (id, name) => {
+    if (name === (dossier?.regForm?.fullName || "Surya") && dossier) {
+      try {
+        const nextDossier = {
+          ...dossier,
+          interviewState: {
+            ...dossier.interviewState,
+            status: "Passed",
+            isCompleted: true
+          }
+        }
+        setDossier(nextDossier)
+        localStorage.setItem("caltrack_activation_dossier", JSON.stringify(nextDossier))
+        await apiSaveRegistrationDossier(nextDossier)
+        const nowStr = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+        setAuditLogs(prev => ({
+          ...prev,
+          interviews: [
+            { id: Math.random(), time: nowStr, candidate: name, interviewer: user?.username || "Admin", rating: "Passed", notes: "Interview passed via dashboard action." },
+            ...prev.interviews
+          ]
+        }))
+      } catch (e) {
+        console.error("Failed to pass interview", e)
+      }
+    }
+  }
+
+  const handleRejectInterview = async (id, name) => {
+    if (name === (dossier?.regForm?.fullName || "Surya") && dossier) {
+      try {
+        const nextDossier = {
+          ...dossier,
+          interviewState: {
+            ...dossier.interviewState,
+            status: "Rejected",
+            isCompleted: true
+          }
+        }
+        setDossier(nextDossier)
+        localStorage.setItem("caltrack_activation_dossier", JSON.stringify(nextDossier))
+        await apiSaveRegistrationDossier(nextDossier)
+        const nowStr = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+        setAuditLogs(prev => ({
+          ...prev,
+          interviews: [
+            { id: Math.random(), time: nowStr, candidate: name, interviewer: user?.username || "Admin", rating: "Failed", notes: "Interview failed via dashboard action." },
+            ...prev.interviews
+          ]
+        }))
+      } catch (e) {
+        console.error("Failed to reject interview", e)
+      }
+    }
+  }
+
+  const handleStartCall = async (id, name) => {
+    if (name === (dossier?.regForm?.fullName || "Surya") && dossier) {
+      try {
+        const nextDossier = {
+          ...dossier,
+          interviewState: {
+            ...dossier.interviewState,
+            status: "In Call"
+          }
+        }
+        setDossier(nextDossier)
+        localStorage.setItem("caltrack_activation_dossier", JSON.stringify(nextDossier))
+        await apiSaveRegistrationDossier(nextDossier)
+      } catch (e) {
+        console.error("Failed to start call", e)
+      }
+    }
+  }
+
+  const handleRescheduleInterview = async (id, name) => {
+    if (name === (dossier?.regForm?.fullName || "Surya") && dossier) {
+      try {
+        const nextDossier = {
+          ...dossier,
+          interviewState: {
+            ...dossier.interviewState,
+            status: "Scheduled",
+            isCompleted: false
+          }
+        }
+        setDossier(nextDossier)
+        localStorage.setItem("caltrack_activation_dossier", JSON.stringify(nextDossier))
+        await apiSaveRegistrationDossier(nextDossier)
+      } catch (e) {
+        console.error("Failed to reschedule interview", e)
+      }
+    } else {
+      alert(`Rescheduling ${name}'s interview...`)
+    }
   }
 
   const kpi = analytics?.kpi || {}
@@ -1706,12 +1940,12 @@ function AdminDashboard() {
       {/* ── Section 1: Executive Overview ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         {[
-          { label: "Total Employees", value: "1,245", change: "+14", trend: "up", icon: <Users size={20} />, color: "#3b82f6", desc: "Approved roster + candidates" },
-          { label: "Active Employees", value: "1,080", change: "+8", trend: "up", icon: <UserCheck size={20} />, color: "#10b981", desc: "Currently clocked in / active" },
-          { label: "Pending Verification", value: `${verificationQueue.documents + verificationQueue.training + verificationQueue.interview + verificationQueue.ready}`, change: "-3", trend: "down", icon: <AlertCircle size={20} />, color: "#f59e0b", desc: "Dossiers awaiting admin review" },
-          { label: "Interviews Today", value: `${interviewsToday.filter(i => i.status === "Scheduled" || i.status === "In Call").length}`, change: "0", trend: "up", icon: <Phone size={20} />, color: "#8b5cf6", desc: "Scheduled calls logged" },
-          { label: "Approved This Month", value: "185", change: "+24", trend: "up", icon: <CheckCircle2 size={20} />, color: "#10b981", desc: "Onboarding success count" },
-          { label: "Rejected This Month", value: "24", change: "+2", trend: "up", icon: <XCircle size={20} />, color: "#ef4444", desc: "Applications flagged with anomalies" },
+          { label: "Total Employees", value: (kpi.employees_total ?? employees.length).toLocaleString(), change: `+${kpi.employees_total ?? employees.length}`, trend: "up", icon: <Users size={20} />, color: "#3b82f6", desc: "Registered + approved roster" },
+          { label: "Active Employees", value: (kpi.employees_active ?? employees.filter(e => e.is_online).length).toLocaleString(), change: "+0", trend: "up", icon: <UserCheck size={20} />, color: "#10b981", desc: "Active in system" },
+          { label: "Pending Verification", value: `${verificationQueue.documents + verificationQueue.training + verificationQueue.interview + verificationQueue.ready}`, change: "0", trend: "down", icon: <AlertCircle size={20} />, color: "#f59e0b", desc: "Dossiers awaiting admin review" },
+          { label: "Interviews Today", value: `${interviewsToday.filter(i => i.status === "Scheduled" || i.status === "In Call").length}`, change: "0", trend: "up", icon: <Phone size={20} />, color: "#8b5cf6", desc: "Scheduled calls today" },
+          { label: "Pending Leaves", value: (kpi.pending_leaves ?? 0).toLocaleString(), change: "0", trend: "down", icon: <CheckCircle2 size={20} />, color: "#10b981", desc: "Leave requests awaiting approval" },
+          { label: "Active Tasks", value: (kpi.active_tasks ?? 0).toLocaleString(), change: "0", trend: "up", icon: <XCircle size={20} />, color: "#ef4444", desc: "Tasks in pending / in-progress state" },
         ].map((item) => (
           <div
             key={item.label}
@@ -1774,13 +2008,7 @@ function AdminDashboard() {
             </div>
             {/* Custom Funnel visual rendering */}
             <div className="flex flex-col gap-4 mt-6">
-              {[
-                { stage: "Registered", count: 1250, percent: 100, color: "#3b82f6" },
-                { stage: "Documents Verified", count: 1180, percent: 94, color: "#6366f1" },
-                { stage: "Training Completed", count: 1120, percent: 90, color: "#8b5cf6" },
-                { stage: "Interview Completed", count: 1090, percent: 87, color: "#ec4899" },
-                { stage: "Approved", count: 1055, percent: 84, color: "#10b981" }
-              ].map((item, idx) => (
+              {funnelData.map((item, idx) => (
                 <div key={item.stage} className="flex items-center gap-4">
                   <div className="w-40 text-xs font-bold text-slate-600 dark:text-slate-450 uppercase tracking-wide truncate">{item.stage}</div>
                   <div className="flex-1 h-8 bg-slate-100 dark:bg-slate-850 rounded-lg overflow-hidden relative border border-stroke dark:border-slate-800/80">
@@ -1855,15 +2083,15 @@ function AdminDashboard() {
               Schedule Interview
             </button>
             <button
-              onClick={() => handleApproveCandidate("Surya")}
-              disabled={verificationQueue.ready === 0 || approvalCenterReview.status === "Approved"}
+              onClick={() => handleApproveCandidate(dossier?.regForm?.fullName || "Surya")}
+              disabled={!dossier || dossier.interviewState?.status !== "Passed" || dossier.adminClearance?.status !== "pending"}
               className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-98"
             >
               Approve Employee
             </button>
             <button
-              onClick={() => handleRejectCandidate("Surya")}
-              disabled={verificationQueue.ready === 0 || approvalCenterReview.status === "Rejected"}
+              onClick={() => handleRejectCandidate(dossier?.regForm?.fullName || "Surya")}
+              disabled={!dossier || dossier.adminClearance?.status !== "pending"}
               className="py-2.5 px-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-extrabold text-[10px] uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-98"
             >
               Reject Employee
@@ -1950,7 +2178,7 @@ function AdminDashboard() {
                             <XCircle size={11} />
                           </button>
                           <button
-                            onClick={() => alert(`Rescheduling ${int.name}'s interview...`)}
+                            onClick={() => handleRescheduleInterview(int.id, int.name)}
                             className="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 rounded-lg transition-all text-[9px] font-black uppercase tracking-wider"
                           >
                             Resched
@@ -1988,29 +2216,29 @@ function AdminDashboard() {
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-bg dark:bg-slate-950/20 rounded-2xl border border-stroke dark:border-slate-850">
                 <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Approval Rate</span>
-                <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">92%</div>
+                <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{approvalRate}%</div>
                 <div className="w-full bg-slate-150 dark:bg-slate-850 h-1.5 rounded-full overflow-hidden mt-2">
-                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: "92%" }} />
+                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${approvalRate}%` }} />
                 </div>
               </div>
               <div className="p-4 bg-bg dark:bg-slate-950/20 rounded-2xl border border-stroke dark:border-slate-850">
                 <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Interview Success</span>
-                <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">89%</div>
-                <div className="w-full bg-slate-150 dark:bg-slate-850 h-1.5 rounded-full overflow-hidden mt-2">
-                  <div className="h-full bg-indigo-500 rounded-full" style={{ width: "89%" }} />
+                <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{interviewSuccess}%</div>
+                <div className="w-full bg-slate-150 dark:bg-slate-855 h-1.5 rounded-full overflow-hidden mt-2">
+                  <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${interviewSuccess}%` }} />
                 </div>
               </div>
               <div className="p-4 bg-bg dark:bg-slate-950/20 rounded-2xl border border-stroke dark:border-slate-850">
                 <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Training Completion</span>
-                <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">96%</div>
+                <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{trainingCompletion}%</div>
                 <div className="w-full bg-slate-150 dark:bg-slate-850 h-1.5 rounded-full overflow-hidden mt-2">
-                  <div className="h-full bg-purple-500 rounded-full" style={{ width: "96%" }} />
+                  <div className="h-full bg-purple-500 rounded-full" style={{ width: `${trainingCompletion}%` }} />
                 </div>
               </div>
               <div className="p-4 bg-bg dark:bg-slate-950/20 rounded-2xl border border-stroke dark:border-slate-850">
                 <span className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Avg Approval Time</span>
-                <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">2.4 Days</div>
-                <div className="text-[10px] text-emerald-500 font-bold mt-2">▼ 0.3d improvement</div>
+                <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{avgApprovalTime}</div>
+                <div className="text-[10px] text-emerald-500 font-bold mt-2">▼ Real duration average</div>
               </div>
             </div>
           </div>
@@ -2022,7 +2250,7 @@ function AdminDashboard() {
                 <div className="text-xs font-bold text-slate-800 dark:text-white mt-1">{aiInsightsRecommendation}</div>
               </div>
               <button
-                onClick={() => setAiInsightsRecommendation("")}
+                onClick={() => setInsightsDismissed(true)}
                 className="text-[10px] font-black text-indigo-500 hover:text-indigo-600 uppercase tracking-widest px-3 py-1.5 bg-indigo-500/10 rounded-lg"
               >
                 Dismiss
@@ -2180,7 +2408,12 @@ function AdminDashboard() {
           </div>
 
           <div className="flex flex-col gap-4 max-h-[320px] overflow-y-auto pr-1">
-            {recentActivities.map((act, idx) => (
+            {recentActivities.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-400 dark:text-slate-600">
+                <span className="text-2xl mb-2">📋</span>
+                <span className="text-xs font-semibold text-center">No activity yet — actions taken on candidates will appear here</span>
+              </div>
+            ) : recentActivities.map((act, idx) => (
               <div key={act.id} className="flex gap-4 relative">
                 {/* Timeline vertical connector line */}
                 {idx < recentActivities.length - 1 && (
@@ -2243,7 +2476,9 @@ function AdminDashboard() {
             <div className="max-h-[220px] overflow-y-auto pr-1">
               {auditTab === "login" && (
                 <div className="flex flex-col gap-2">
-                  {auditLogs.login.map((log) => (
+                  {auditLogs.login.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-xs italic">No admin login records yet</div>
+                  ) : auditLogs.login.map((log) => (
                     <div key={log.id} className="flex justify-between items-center p-3 bg-bg dark:bg-slate-950/20 rounded-xl border border-stroke dark:border-slate-850 text-xs font-semibold">
                       <div>
                         <span className="font-bold text-slate-900 dark:text-white">{log.user}</span>
@@ -2257,7 +2492,9 @@ function AdminDashboard() {
 
               {auditTab === "approvals" && (
                 <div className="flex flex-col gap-2">
-                  {auditLogs.approvals.map((log) => (
+                  {auditLogs.approvals.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-xs italic">No approvals recorded yet — approve a candidate to see logs here</div>
+                  ) : auditLogs.approvals.map((log) => (
                     <div key={log.id} className="flex justify-between items-center p-3 bg-bg dark:bg-slate-950/20 rounded-xl border border-stroke dark:border-slate-850 text-xs font-semibold">
                       <div>
                         <span className="font-bold text-emerald-500">Approved</span>
@@ -2272,7 +2509,9 @@ function AdminDashboard() {
 
               {auditTab === "rejections" && (
                 <div className="flex flex-col gap-2">
-                  {auditLogs.rejections.map((log) => (
+                  {auditLogs.rejections.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-xs italic">No rejections recorded yet</div>
+                  ) : auditLogs.rejections.map((log) => (
                     <div key={log.id} className="flex flex-col p-3 bg-bg dark:bg-slate-950/20 rounded-xl border border-stroke dark:border-slate-855 text-xs font-semibold gap-1">
                       <div className="flex justify-between items-center">
                         <div>
@@ -2289,7 +2528,9 @@ function AdminDashboard() {
 
               {auditTab === "docs" && (
                 <div className="flex flex-col gap-2">
-                  {auditLogs.docs.map((log) => (
+                  {auditLogs.docs.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-xs italic">No document changes recorded yet</div>
+                  ) : auditLogs.docs.map((log) => (
                     <div key={log.id} className="flex justify-between items-center p-3 bg-bg dark:bg-slate-950/20 rounded-xl border border-stroke dark:border-slate-850 text-xs font-semibold">
                       <div>
                         <span className="font-bold text-slate-900 dark:text-white">{log.candidate}</span>
@@ -2305,7 +2546,9 @@ function AdminDashboard() {
 
               {auditTab === "interviews" && (
                 <div className="flex flex-col gap-2">
-                  {auditLogs.interviews.map((log) => (
+                  {auditLogs.interviews.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-xs italic">No interview notes recorded yet — pass or reject an interview to see logs here</div>
+                  ) : auditLogs.interviews.map((log) => (
                     <div key={log.id} className="flex flex-col p-3 bg-bg dark:bg-slate-950/20 rounded-xl border border-stroke dark:border-slate-850 text-xs font-semibold gap-1">
                       <div className="flex justify-between items-center">
                         <div>
@@ -2324,9 +2567,9 @@ function AdminDashboard() {
         </div>
       </div>
 
-      {/* ── Visual Charts Row (Grid of 5 remaining charts) ── */}
+      {/* ── Visual Charts Row (Real Data Charts) ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Registration Trend (Line Chart) */}
+        {/* Daily Hours Trend (Real Data - Line Chart) */}
         <div className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center border border-blue-500/20 text-blue-500">
@@ -2334,41 +2577,25 @@ function AdminDashboard() {
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-                Registration Trend
+                Daily Hours Trend
               </h3>
               <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">
-                New employee registrations over time
+                Workforce hours logged over the last 30 days
               </p>
             </div>
           </div>
           <div className="h-[220px] w-full">
-            <LineChart
-              data={{
-                labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"],
-                datasets: [{
-                  label: "New Registrations",
-                  data: [150, 280, 410, 630, 890, 1050, 1180, 1250],
-                  borderColor: "#3b82f6",
-                  backgroundColor: "rgba(59, 130, 246, 0.1)",
-                  fill: true,
-                  tension: 0.4,
-                  borderWidth: 3
-                }]
-              }}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                  x: { grid: { display: false }, ticks: tickOptions },
-                  y: { grid: gridOptions, ticks: tickOptions, beginAtZero: true }
-                }
-              }}
-            />
+            {dailyTrend.length > 0 ? (
+              <LineChart data={trendData} options={trendOptions} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic">
+                No time log data available yet
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Approval vs Rejection (Doughnut Chart) */}
+        {/* Task Status Distribution (Real Data - Doughnut) */}
         <div className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-500">
@@ -2376,29 +2603,25 @@ function AdminDashboard() {
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-                Approval vs Rejection
+                Task Status
               </h3>
               <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">
-                Clearance and validation outcome ratios
+                Task distribution by status
               </p>
             </div>
           </div>
           <div className="h-[220px] w-full relative flex items-center justify-center">
-            <DoughnutChart
-              data={{
-                labels: ["Approved", "Rejected", "In Review"],
-                datasets: [{
-                  data: [1055, 124, 71],
-                  backgroundColor: ["#10b981", "#ef4444", "#f59e0b"],
-                  borderWidth: 0
-                }]
-              }}
-              options={doughnutOptions}
-            />
+            {tsLabels.length > 0 ? (
+              <DoughnutChart data={tsData} options={doughnutOptions} />
+            ) : (
+              <div className="text-slate-400 dark:text-slate-600 text-sm italic">
+                No task data available yet
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Interview Success Rate (Doughnut Chart) */}
+        {/* Leave Status Distribution (Real Data - Doughnut) */}
         <div className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20 text-indigo-500">
@@ -2406,29 +2629,25 @@ function AdminDashboard() {
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-                Interview Success Rate
+                Leave Status
               </h3>
               <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">
-                Onboarding interviewer outcome stats
+                Leave requests by approval status
               </p>
             </div>
           </div>
           <div className="h-[220px] w-full relative flex items-center justify-center">
-            <DoughnutChart
-              data={{
-                labels: ["Pass", "Fail", "Pending/No Show"],
-                datasets: [{
-                  data: [89, 11, 5],
-                  backgroundColor: ["#8b5cf6", "#ef4444", "#64748b"],
-                  borderWidth: 0
-                }]
-              }}
-              options={doughnutOptions}
-            />
+            {lsLabels.length > 0 ? (
+              <DoughnutChart data={lsData} options={doughnutOptions} />
+            ) : (
+              <div className="text-slate-400 dark:text-slate-600 text-sm italic">
+                No leave data available yet
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Training Completion Rate (Bar Chart) */}
+        {/* Attendance Daily (Real Data - Bar Chart) */}
         <div className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-9 h-9 rounded-lg bg-violet-500/10 flex items-center justify-center border border-violet-500/20 text-violet-500">
@@ -2436,39 +2655,25 @@ function AdminDashboard() {
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-                Training Completion Rate
+                Attendance (Last 7 Days)
               </h3>
               <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">
-                Courses completed by functional domain
+                Clock-in count per day this week
               </p>
             </div>
           </div>
           <div className="h-[220px] w-full">
-            <BarChart
-              data={{
-                labels: ["Safety", "Customer Serv.", "Technical", "Compliance"],
-                datasets: [{
-                  label: "Completion %",
-                  data: [96, 94, 91, 98],
-                  backgroundColor: "#10b981",
-                  borderRadius: 6,
-                  barThickness: 24
-                }]
-              }}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                  x: { grid: { display: false }, ticks: tickOptions },
-                  y: { grid: gridOptions, ticks: tickOptions, beginAtZero: true, max: 100 }
-                }
-              }}
-            />
+            {attendance.length > 0 ? (
+              <BarChart data={attData} options={attOptions} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic">
+                No attendance data available yet
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Workforce Attendance Trend (Line Chart) */}
+        {/* Payroll Trend (Real Data - Line+Bar combo) */}
         <div className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 rounded-2xl p-6 shadow-sm md:col-span-2 lg:col-span-1">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-9 h-9 rounded-lg bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-500">
@@ -2476,37 +2681,21 @@ function AdminDashboard() {
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
-                Workforce Attendance Trend
+                Payroll Trend
               </h3>
               <p className="text-xs font-semibold text-slate-400 dark:text-slate-500">
-                Average shift logins over the last month
+                Gross vs Net pay over recent periods
               </p>
             </div>
           </div>
           <div className="h-[220px] w-full">
-            <LineChart
-              data={{
-                labels: ["Week 1", "Week 2", "Week 3", "Week 4"],
-                datasets: [{
-                  label: "Attendance Rate %",
-                  data: [94, 96, 95, 97],
-                  borderColor: "#f59e0b",
-                  backgroundColor: "rgba(245, 158, 11, 0.1)",
-                  fill: true,
-                  tension: 0.3,
-                  borderWidth: 3
-                }]
-              }}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                  x: { grid: { display: false }, ticks: tickOptions },
-                  y: { grid: gridOptions, ticks: tickOptions, beginAtZero: true, max: 100 }
-                }
-              }}
-            />
+            {payrollTrend.length > 0 ? (
+              <BarChart data={ptData} options={ptOptions} />
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic">
+                No payroll data available yet
+              </div>
+            )}
           </div>
         </div>
       </div>

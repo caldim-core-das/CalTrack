@@ -43,6 +43,7 @@ TENANT_APPS = [
     "compliance",
     "settings_hub",
     "inventory",
+    "mileage",
 ]
 
 # Preserve order and ensure daphne is at the very beginning for ASGI/WebSocket support

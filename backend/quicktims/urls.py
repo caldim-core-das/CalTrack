@@ -16,6 +16,7 @@ urlpatterns = [
     path("api/compliance/", include("compliance.urls")),
     path("api/inventory/", include("inventory.urls")),
     path("api/settings/", include("settings_hub.urls")),
+    path("api/mileage/", include("mileage.urls")),
 ]
 
 if settings.DEBUG:

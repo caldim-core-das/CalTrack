@@ -46,6 +46,7 @@ export const routes = {
   reset_password: "/reset-password",
   inventory: "/inventory",
   activation_journey: "/activation-journey",
+  mileage: "/mileage",
   approvals: "/approvals",
   employees_dashboard: "/employees/dashboard",
   employees_pending: "/employees/pending",

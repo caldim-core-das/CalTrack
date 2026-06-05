@@ -763,6 +763,9 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
   const [declineReason, setDeclineReason] = useState("")
   const [localBusy, setLocalBusy] = useState(false)
 
+  const invStatusLower = task.inventory_status?.toLowerCase();
+  const isInventoryOk = !invStatusLower || invStatusLower === "fulfilled" || invStatusLower === "none";
+
   const [beforePhoto, setBeforePhoto] = useState(null)
   const [beforePhotoPreview, setBeforePhotoPreview] = useState(null)
   const [startNotes, setStartNotes] = useState("")
@@ -977,7 +980,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
   const [nearestStock, setNearestStock] = useState({})
 
   useEffect(() => {
-    if (task.inventory_status && task.inventory_status !== "Fulfilled" && task.inventory_status !== "None" && precGPS && task.required_items?.length > 0) {
+    if (!isInventoryOk && precGPS && task.required_items?.length > 0) {
       task.required_items.forEach(async (reqItem) => {
         try {
           const res = await apiRequest(`/inventory/nearest-stock/${reqItem.item_id}/?lat=${precGPS.lat}&lng=${precGPS.lon}`)
@@ -987,7 +990,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
         }
       })
     }
-  }, [task.inventory_status, task.required_items, precGPS])
+  }, [isInventoryOk, task.required_items, precGPS])
 
   // Activity timeline
   const [showTimeline, setShowTimeline] = useState(false)
@@ -2366,7 +2369,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                         <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-black flex items-center gap-1.5 shadow-sm">
                           <CheckCircle2 size={14} /> No specific inventory required.
                         </div>
-                      ) : task.inventory_status === "Fulfilled" ? (
+                      ) : isInventoryOk ? (
                         <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-black flex items-center gap-1.5 shadow-sm">
                           <CheckCircle2 size={14} /> All required inventory is available.
                         </div>
@@ -2490,7 +2493,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                         <button
                           type="button"
                           onClick={async () => {
-                            if (task.inventory_status && task.inventory_status !== "Fulfilled" && task.inventory_status !== "None") {
+                            if (!isInventoryOk) {
                               alert("Cannot start work until required inventory is fulfilled. Please visit the nearest stock location.");
                               return;
                             }
@@ -2499,30 +2502,30 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                             if (!precGPS) { alert("GPS is still locking. Please wait a moment and try again."); return; }
                             await handleStartWorkNew();
                           }}
-                          disabled={localBusy || busy || (task.inventory_status && task.inventory_status !== "Fulfilled" && task.inventory_status !== "None")}
+                          disabled={localBusy || busy || !isInventoryOk}
                           style={{
                             width: "100%",
                             padding: "15px 0",
                             borderRadius: 14,
                             border: "none",
-                            background: (beforePhoto && startNotes.trim() && precGPS && (!task.inventory_status || task.inventory_status === "Fulfilled" || task.inventory_status === "None"))
+                            background: (beforePhoto && startNotes.trim() && precGPS && isInventoryOk)
                               ? "linear-gradient(135deg, #059669 0%, #047857 100%)"
                               : "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)",
                             color: "#fff",
                             fontSize: 13,
                             fontWeight: 900,
-                            cursor: (localBusy || busy || (task.inventory_status && task.inventory_status !== "Fulfilled" && task.inventory_status !== "None")) ? "not-allowed" : "pointer",
+                            cursor: (localBusy || busy || !isInventoryOk) ? "not-allowed" : "pointer",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             gap: 10,
                             letterSpacing: "0.06em",
                             textTransform: "uppercase",
-                            boxShadow: (beforePhoto && startNotes.trim() && precGPS && (!task.inventory_status || task.inventory_status === "Fulfilled" || task.inventory_status === "None"))
+                            boxShadow: (beforePhoto && startNotes.trim() && precGPS && isInventoryOk)
                               ? "0 6px 20px rgba(5,150,105,0.4)"
                               : "0 4px 12px rgba(100,116,139,0.2)",
                             transition: "all 0.25s ease",
-                            opacity: (localBusy || busy || (task.inventory_status && task.inventory_status !== "Fulfilled" && task.inventory_status !== "None")) ? 0.6 : 1,
+                            opacity: (localBusy || busy || !isInventoryOk) ? 0.6 : 1,
                           }}
                         >
                           <Hammer size={16} />

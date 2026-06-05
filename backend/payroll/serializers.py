@@ -39,11 +39,11 @@ class PayrollRecordSerializer(serializers.ModelSerializer):
             "paid_leave_hours", "unpaid_leave_hours",
             "gross_pay", "uk_income_tax", "uk_employee_ni",
             "uk_employer_ni", "uk_tax_code", "uk_ni_category",
-            "holiday_hours_accrued", "net_pay", "region",
+            "holiday_hours_accrued", "net_pay", "mileage_reimbursement", "extras", "region",
             "is_exempt", "wage_floor_compliant",
             "generated_by", "generated_at",
         )
-        read_only_fields = ("id", "gross_pay", "net_pay", "generated_by", "generated_at")
+        read_only_fields = ("id", "gross_pay", "net_pay", "mileage_reimbursement", "generated_by", "generated_at")
 
 
 class PayrollGenerateSerializer(serializers.Serializer):

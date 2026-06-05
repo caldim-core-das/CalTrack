@@ -105,6 +105,10 @@ const InventoryPage = lazy(() =>
   import("./pages/InventoryPage.jsx").then(m => ({ default: m.InventoryPage }))
 )
 
+const MileagePage = lazy(() =>
+  import("./pages/MileagePage.jsx").then(m => ({ default: m.MileagePage }))
+)
+
 const ApprovalCenterPage = lazy(() =>
   import("./pages/ApprovalCenterPage.jsx").then(m => ({ default: m.ApprovalCenterPage }))
 )
@@ -263,6 +267,7 @@ export function App() {
             <Route path={routes.tasks} element={<TasksPage />} />
             <Route path={routes.leaves} element={<LeavesPage />} />
             <Route path={routes.inventory} element={<InventoryPage />} />
+            <Route path={routes.mileage} element={<MileagePage />} />
 
             {/* Employee profile settings — accessible to everyone */}
             <Route path={routes.settings} element={<SettingsPage />} />

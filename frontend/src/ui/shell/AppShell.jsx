@@ -20,7 +20,7 @@ import {
   Home, Clock, CheckSquare, CalendarDays, Banknote, CalendarRange,
   Users, BarChart3, MapPin, Settings, Search, LogOut,
   ChevronLeft, ChevronRight, Rocket, ShieldAlert, Globe, Package, Award,
-  FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle
+  FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Car
 } from "lucide-react"
 
 // Items visible to all authenticated users (employees + admins)
@@ -30,6 +30,7 @@ const NAV_SHARED = [
   { label: "Time", to: routes.time, icon: <Clock size={20} />, color: "#F59E0B" },
   { label: "Jobs", to: routes.tasks, icon: <CheckSquare size={20} />, color: "#14B8A6" },
   { label: "Leaves", to: routes.leaves, icon: <CalendarDays size={20} />, color: "#EC4899" },
+  { label: "Mileage", to: routes.mileage, icon: <Car size={20} />, color: "#EF4444" },
   { label: "Settings", to: routes.settings, icon: <Settings size={20} />, color: "#64748B" },
 ]
 

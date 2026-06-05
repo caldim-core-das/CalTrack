@@ -1,0 +1,330 @@
+
+--- MATCH AT LINE 310 ---
+300:             </div>
+301:           </>
+302:         )}
+303:       </div>
+304:     </div>
+305:   )
+306: }
+307: 
+308: // Lazy-loaded sub-modules
+309: const DashboardMap = lazy(() => import("./DashboardMap.jsx"))
+310: const BarChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.BarChart })))
+311: const LineChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.LineChart })))
+312: const DoughnutChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.DoughnutChart })))
+313: const PieChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.DoughnutChart }))) // Pie is similar to Doughnut
+314: 
+315: // ── Shared Chart Defaults ──
+316: const CHART_COLORS = {
+317:   primary: "#6366F1",
+318:   primaryLight: "rgba(99, 102, 241, 0.15)",
+319:   blue: "#3B82F6",
+
+--- MATCH AT LINE 311 ---
+301:           </>
+302:         )}
+303:       </div>
+304:     </div>
+305:   )
+306: }
+307: 
+308: // Lazy-loaded sub-modules
+309: const DashboardMap = lazy(() => import("./DashboardMap.jsx"))
+310: const BarChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.BarChart })))
+311: const LineChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.LineChart })))
+312: const DoughnutChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.DoughnutChart })))
+313: const PieChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.DoughnutChart }))) // Pie is similar to Doughnut
+314: 
+315: // ── Shared Chart Defaults ──
+316: const CHART_COLORS = {
+317:   primary: "#6366F1",
+318:   primaryLight: "rgba(99, 102, 241, 0.15)",
+319:   blue: "#3B82F6",
+320:   blueLight: "rgba(59, 130, 246, 0.12)",
+
+--- MATCH AT LINE 312 ---
+302:         )}
+303:       </div>
+304:     </div>
+305:   )
+306: }
+307: 
+308: // Lazy-loaded sub-modules
+309: const DashboardMap = lazy(() => import("./DashboardMap.jsx"))
+310: const BarChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.BarChart })))
+311: const LineChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.LineChart })))
+312: const DoughnutChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.DoughnutChart })))
+313: const PieChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.DoughnutChart }))) // Pie is similar to Doughnut
+314: 
+315: // ── Shared Chart Defaults ──
+316: const CHART_COLORS = {
+317:   primary: "#6366F1",
+318:   primaryLight: "rgba(99, 102, 241, 0.15)",
+319:   blue: "#3B82F6",
+320:   blueLight: "rgba(59, 130, 246, 0.12)",
+321:   emerald: "#10B981",
+
+--- MATCH AT LINE 313 ---
+303:       </div>
+304:     </div>
+305:   )
+306: }
+307: 
+308: // Lazy-loaded sub-modules
+309: const DashboardMap = lazy(() => import("./DashboardMap.jsx"))
+310: const BarChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.BarChart })))
+311: const LineChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.LineChart })))
+312: const DoughnutChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.DoughnutChart })))
+313: const PieChart = lazy(() => import("../components/DashboardCharts.jsx").then(m => ({ default: m.DoughnutChart }))) // Pie is similar to Doughnut
+314: 
+315: // ── Shared Chart Defaults ──
+316: const CHART_COLORS = {
+317:   primary: "#6366F1",
+318:   primaryLight: "rgba(99, 102, 241, 0.15)",
+319:   blue: "#3B82F6",
+320:   blueLight: "rgba(59, 130, 246, 0.12)",
+321:   emerald: "#10B981",
+322:   emeraldLight: "rgba(16, 185, 129, 0.12)",
+
+--- MATCH AT LINE 1560 ---
+1550:       {/* ── Row 1: Hours by Employee + Task Status Donut + Leave Status Pie ── */}
+1551:       <div className="grid gap-6 grid-cols-1 lg:grid-cols-[2fr_1fr_1fr]">
+1552:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1553:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1554:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Hours by Employee</span>
+1555:             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full border border-indigo-100 dark:border-indigo-900/50">Last 30 days</span>
+1556:           </div>
+1557:           <div className="p-5 h-[300px] relative">
+1558:             {hoursByEmployee.length ? (
+1559:               <Suspense fallback={<ChartPlaceholder />}>
+1560:                 <BarChart data={hbeData} options={hbeOptions} />
+1561:               </Suspense>
+1562:             ) : (
+1563:               <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic bg-bg dark:bg-slate-950/40 rounded-lg border border-dashed border-stroke dark:border-slate-800">No time data available</div>
+1564:             )}
+1565:           </div>
+1566:         </div>
+1567: 
+1568:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1569:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+
+--- MATCH AT LINE 1575 ---
+1565:           </div>
+1566:         </div>
+1567: 
+1568:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1569:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1570:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Task Status</span>
+1571:           </div>
+1572:           <div className="p-5 h-[300px] relative">
+1573:             {tsLabels.length ? (
+1574:               <Suspense fallback={<ChartPlaceholder />}>
+1575:                 <DoughnutChart data={tsData} options={donutOptions} />
+1576:               </Suspense>
+1577:             ) : (
+1578:               <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic bg-bg dark:bg-slate-900/50 rounded-lg border border-dashed border-stroke dark:border-slate-800">No tasks</div>
+1579:             )}
+1580:           </div>
+1581:         </div>
+1582: 
+1583:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1584:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+
+--- MATCH AT LINE 1590 ---
+1580:           </div>
+1581:         </div>
+1582: 
+1583:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1584:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1585:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Leave Status</span>
+1586:           </div>
+1587:           <div className="p-5 h-[300px] relative">
+1588:             {lsLabels.length ? (
+1589:               <Suspense fallback={<ChartPlaceholder />}>
+1590:                 <DoughnutChart data={lsData} options={pieOptions} />
+1591:               </Suspense>
+1592:             ) : (
+1593:               <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic bg-bg dark:bg-slate-900/50 rounded-lg border border-dashed border-stroke dark:border-slate-800">No leave data</div>
+1594:             )}
+1595:           </div>
+1596:         </div>
+1597:       </div>
+1598: 
+1599:       {/* ── Row 2: Daily Hours Trend (full width) ── */}
+
+--- MATCH AT LINE 1608 ---
+1598: 
+1599:       {/* ── Row 2: Daily Hours Trend (full width) ── */}
+1600:       <div className="grid gap-6 grid-cols-1">
+1601:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1602:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1603:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Daily Hours Trend</span>
+1604:             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full border border-indigo-100 dark:border-indigo-900/50">Last 30 days</span>
+1605:           </div>
+1606:           <div className="p-5 h-[280px] relative">
+1607:             <Suspense fallback={<ChartPlaceholder />}>
+1608:               <LineChart data={trendData} options={trendOptions} />
+1609:             </Suspense>
+1610:           </div>
+1611:         </div>
+1612:       </div>
+1613: 
+1614:       {/* ── Row 3: Attendance + Task Category + Payroll Trend ── */}
+1615:       <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+1616:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1617:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+
+--- MATCH AT LINE 1623 ---
+1613: 
+1614:       {/* ── Row 3: Attendance + Task Category + Payroll Trend ── */}
+1615:       <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+1616:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1617:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1618:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Daily Attendance</span>
+1619:             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full border border-indigo-100 dark:border-indigo-900/50">Last 7 days</span>
+1620:           </div>
+1621:           <div className="p-5 h-[280px] relative">
+1622:             <Suspense fallback={<ChartPlaceholder />}>
+1623:               <BarChart data={attData} options={attOptions} />
+1624:             </Suspense>
+1625:           </div>
+1626:         </div>
+1627: 
+1628:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1629:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1630:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Tasks by Category</span>
+1631:           </div>
+1632:           <div className="p-5 h-[280px] relative">
+
+--- MATCH AT LINE 1635 ---
+1625:           </div>
+1626:         </div>
+1627: 
+1628:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1629:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1630:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Tasks by Category</span>
+1631:           </div>
+1632:           <div className="p-5 h-[280px] relative">
+1633:             {tcLabels.length ? (
+1634:               <Suspense fallback={<ChartPlaceholder />}>
+1635:                 <BarChart data={tcData} options={tcOptions} />
+1636:               </Suspense>
+1637:             ) : (
+1638:               <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic bg-bg dark:bg-slate-950/40 rounded-lg border border-dashed border-stroke dark:border-slate-800">No categorized tasks</div>
+1639:             )}
+1640:           </div>
+1641:         </div>
+1642: 
+1643:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1644:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+
+--- MATCH AT LINE 1650 ---
+1640:           </div>
+1641:         </div>
+1642: 
+1643:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1644:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1645:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Payroll Trend</span>
+1646:           </div>
+1647:           <div className="p-5 h-[280px] relative">
+1648:             {payrollTrend.length ? (
+1649:               <Suspense fallback={<ChartPlaceholder />}>
+1650:                 <BarChart data={ptData} options={ptOptions} />
+1651:               </Suspense>
+1652:             ) : (
+1653:               <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic bg-bg dark:bg-slate-900/50 rounded-lg border border-dashed border-stroke dark:border-slate-800">No payroll data</div>
+1654:             )}
+1655:           </div>
+1656:         </div>
+1657:       </div>
+1658: 
+1659:       {/* ── Row 4: Location-wise Analysis ── */}
+
+--- MATCH AT LINE 1669 ---
+1659:       {/* ── Row 4: Location-wise Analysis ── */}
+1660:       <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+1661:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1662:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1663:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Employees by Location</span>
+1664:             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full border border-indigo-100 dark:border-indigo-900/50">{employeesByLoc.length} locations</span>
+1665:           </div>
+1666:           <div className="p-5 h-[300px] relative">
+1667:             {employeesByLoc.length ? (
+1668:               <Suspense fallback={<ChartPlaceholder />}>
+1669:                 <BarChart data={empLocData} options={empLocOptions} />
+1670:               </Suspense>
+1671:             ) : (
+1672:               <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic bg-bg dark:bg-slate-900/50 rounded-lg border border-dashed border-stroke dark:border-slate-800">No locations configured</div>
+1673:             )}
+1674:           </div>
+1675:         </div>
+1676: 
+1677:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1678:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+
+--- MATCH AT LINE 1685 ---
+1675:         </div>
+1676: 
+1677:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1678:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1679:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Tasks by Location</span>
+1680:             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full border border-indigo-100 dark:border-indigo-900/50">Active vs Total</span>
+1681:           </div>
+1682:           <div className="p-5 h-[300px] relative">
+1683:             {tasksByLoc.length ? (
+1684:               <Suspense fallback={<ChartPlaceholder />}>
+1685:                 <BarChart data={taskLocData} options={taskLocOptions} />
+1686:               </Suspense>
+1687:             ) : (
+1688:               <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic bg-bg dark:bg-slate-900/50 rounded-lg border border-dashed border-stroke dark:border-slate-800">No location task data</div>
+1689:             )}
+1690:           </div>
+1691:         </div>
+1692: 
+1693:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1694:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+
+--- MATCH AT LINE 1701 ---
+1691:         </div>
+1692: 
+1693:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1694:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1695:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Hours by Location</span>
+1696:             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full border border-indigo-100 dark:border-indigo-900/50">Last 30 days</span>
+1697:           </div>
+1698:           <div className="p-5 h-[300px] relative">
+1699:             {hoursByLoc.length ? (
+1700:               <Suspense fallback={<ChartPlaceholder />}>
+1701:                 <BarChart data={hrsLocData} options={hrsLocOptions} />
+1702:               </Suspense>
+1703:             ) : (
+1704:               <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic bg-bg dark:bg-slate-900/50 rounded-lg border border-dashed border-stroke dark:border-slate-800">No location hours data</div>
+1705:             )}
+1706:           </div>
+1707:         </div>
+1708:       </div>
+1709: 
+1710:       {/* ── Row 5: Location Map — Innovative Full-Width ── */}
+
+--- MATCH AT LINE 1813 ---
+1803:       {/* ── Row 5b: Clock-in Status Bar Chart (Full Width) ── */}
+1804:       <div className="grid gap-6 grid-cols-1">
+1805:         <div className="bg-surface dark:bg-slate-900/40 rounded-xl shadow-sm border border-stroke dark:border-slate-800 flex flex-col overflow-hidden">
+1806:           <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+1807:             <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Clock-in Status by Location</span>
+1808:             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1 rounded-full border border-indigo-100 dark:border-indigo-900/50">Today</span>
+1809:           </div>
+1810:           <div className="p-5 h-[320px] relative">
+1811:             {locationSummary.length ? (
+1812:               <Suspense fallback={<ChartPlaceholder />}>
+1813:                 <BarChart data={clockLocData} options={clockLocOptions} />
+1814:               </Suspense>
+1815:             ) : (
+1816:               <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-600 text-sm italic bg-bg dark:bg-slate-950/40 rounded-lg border border-dashed border-stroke dark:border-slate-800">No location data</div>
+1817:             )}
+1818:           </div>
+1819:         </div>
+1820:       </div>
+1821: 
+1822:       {/* ── Row 6: Location Summary Table ── */}
