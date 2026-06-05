@@ -1135,9 +1135,6 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     if (!faceVerifyStatus && task.start_photo) {
       alert("Please capture or upload an ending photo to verify identity."); return;
     }
-    if (!otpVerified) {
-      alert("Please generate and verify the Customer OTP code to proceed."); return;
-    }
     const payload = { 
       notes: note, 
       require_fd: true,
@@ -2713,75 +2710,6 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                           />
                         </div>
 
-                        {/* Customer Digital Signature */}
-                        <div className="flex flex-col gap-2">
-                          <div className="flex items-center justify-between">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer Digital Signature *</label>
-                            <button
-                              type="button"
-                              onClick={clearCanvas}
-                              className="text-[9px] font-black uppercase text-indigo-600 tracking-wider hover:text-indigo-800"
-                            >
-                              Clear Pad
-                            </button>
-                          </div>
-                          <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-slate-50 dark:bg-slate-900 h-32 relative">
-                            <canvas
-                              ref={canvasRef}
-                              width={480}
-                              height={128}
-                              onMouseDown={startDrawing}
-                              onMouseMove={draw}
-                              onMouseUp={stopDrawing}
-                              onMouseLeave={stopDrawing}
-                              onTouchStart={startDrawing}
-                              onTouchMove={draw}
-                              onTouchEnd={stopDrawing}
-                              className="w-full h-full cursor-crosshair touch-none"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Customer OTP Verification */}
-                        <div className="flex flex-col gap-2.5 p-4 rounded-2xl border border-stroke bg-white dark:bg-slate-950 shadow-sm">
-                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Customer OTP Verification *</label>
-                          
-                          {otpVerified ? (
-                            <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-black flex items-center gap-1.5">
-                              <span>✓ Customer OTP Verification Successful</span>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-2">
-                              <button
-                                type="button"
-                                onClick={generateOtp}
-                                className="py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-black rounded-xl uppercase tracking-wider transition-colors border border-indigo-200"
-                              >
-                                Send OTP Code to Customer
-                              </button>
-                              {otpCode && (
-                                <div className="flex gap-2">
-                                  <input
-                                    type="text"
-                                    maxLength={4}
-                                    placeholder="Enter 4-digit code"
-                                    value={otpInput}
-                                    onChange={e => setOtpInput(e.target.value)}
-                                    className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-center font-black text-sm tracking-widest outline-none focus:border-indigo-500"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={verifyOtp}
-                                    className="px-6 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black rounded-xl uppercase tracking-wider transition-colors"
-                                  >
-                                    Verify
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
                         {/* Complete Button */}
                         <button
                           type="button"
@@ -2790,15 +2718,14 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                             localBusy || 
                             busy || 
                             faceVerifyStatus === "verifying" || 
-                            (task.start_photo && faceVerifyStatus !== "matched" && faceVerifyStatus !== "skipped") || 
-                            !otpVerified
+                            (task.start_photo && faceVerifyStatus !== "matched" && faceVerifyStatus !== "skipped")
                           }
                           style={{
                             width: "100%",
                             padding: "15px 0",
                             borderRadius: 14,
                             border: "none",
-                            background: (otpVerified && (!task.start_photo || faceVerifyStatus === "matched" || faceVerifyStatus === "skipped"))
+                            background: (!task.start_photo || faceVerifyStatus === "matched" || faceVerifyStatus === "skipped")
                               ? "linear-gradient(135deg, #059669 0%, #047857 100%)"
                               : "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)",
                             color: "#fff",
@@ -2811,7 +2738,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                             gap: 10,
                             letterSpacing: "0.06em",
                             textTransform: "uppercase",
-                            boxShadow: (otpVerified && (!task.start_photo || faceVerifyStatus === "matched" || faceVerifyStatus === "skipped"))
+                            boxShadow: (!task.start_photo || faceVerifyStatus === "matched" || faceVerifyStatus === "skipped")
                               ? "0 6px 20px rgba(5,150,105,0.4)"
                               : "0 4px 12px rgba(100,116,139,0.2)",
                             transition: "all 0.25s ease",
@@ -4322,7 +4249,7 @@ function AdminTasksTable({ tasks, employees, availableEmployees, jobSites, onRef
                         <Pill tone={statusTone(t.status)}>{statusLabel(t.status)}</Pill>
                       </div>
                       {/* Push gap job selector */}
-                      {t.status === "pending" && suspendedTasks.length > 0 && !t.gap_job && t.acceptance_status !== "accepted" && (
+                      {t.status === "pending" && suspendedTasks.length > 0 && !t.gap_job && (
                         <div style={{
                           marginTop: 6, display: "flex", flexDirection: "column", gap: 4,
                           padding: 8, borderRadius: 10, border: "1px solid #cbd5e1",
@@ -5565,7 +5492,7 @@ function EmployeeTasksPage({ tasks, handleAction, busy, onRefresh }) {
   // Auto-refresh every 30s for employee
   useEffect(() => {
     const interval = setInterval(async () => {
-      await onRefresh()
+      await onRefresh(false)
     }, 30000)
     return () => clearInterval(interval)
   }, [onRefresh])
@@ -5718,8 +5645,8 @@ export function TasksPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
 
-  async function loadTasks() {
-    setLoading(true); setError("")
+  async function loadTasks(showSpinner = true) {
+    if (showSpinner) setLoading(true); setError("")
     try {
       const url = isAdmin ? "/tasks/admin/" : "/tasks/my/"
       const data = await apiRequest(url)
@@ -5735,7 +5662,7 @@ export function TasksPage() {
         setAvailableEmployees(Array.isArray(available) ? available : unwrapResults(available))
       }
     } catch (e) { setError(e?.body?.detail || "Failed to load tasks.") }
-    finally { setLoading(false) }
+    finally { if (showSpinner) setLoading(false) }
   }
 
   async function loadEmployees() {
@@ -5837,7 +5764,7 @@ export function TasksPage() {
 
 
 
-      await loadTasks()
+      await loadTasks(false)
     } catch (e) { setError(e?.body?.detail || e.message || "Action failed.") }
     finally { setBusy(false) }
   }
