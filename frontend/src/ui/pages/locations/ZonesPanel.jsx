@@ -157,6 +157,13 @@ export function ZonesPanel({ locations }) {
             <div style={{ fontWeight: 600, color: "var(--fg)", marginBottom: 4 }}>No zones yet</div>
             <div style={{ fontSize: 13, color: "var(--muted)" }}>Create a zone to group related locations.</div>
           </div>
+        ) : zones.length === 0 && showForm ? (
+          // Empty hint while the create form is open below
+          <div style={{ padding: "18px 4px 4px", textAlign: "center" }}>
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>
+              Fill in the form below to create your first zone.
+            </div>
+          </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {zones.map(zone => (

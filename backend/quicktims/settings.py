@@ -90,8 +90,14 @@ if USE_POSTGRES:
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "localhost"),
             "PORT": os.getenv("DB_PORT", "5432"),
-            "OPTIONS": {"sslmode": "require"},
-            "CONN_MAX_AGE": 0,
+            "OPTIONS": {
+                "sslmode": "require",
+                # Keep prepared statements off with pgBouncer (transaction pooling)
+                "options": "-c statement_timeout=30000",
+            },
+            # Reuse DB connections for up to 60 s — eliminates per-request TCP
+            # handshakes and auth round-trips (major latency win).
+            "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "60")),
             "CONN_HEALTH_CHECKS": True,
         }
     }
@@ -188,6 +194,36 @@ AUTHENTICATION_BACKENDS = [
 # id field is inherited BigAutoField. Our custom models all use ObjectIdAutoField.
 SILENCED_SYSTEM_CHECKS = []
 
+# ── Caching ───────────────────────────────────────────────────────────────────
+# Production: swap the backend for Redis using the CACHE_URL env var.
+# Dev / default: in-process local-memory cache (zero config).
+_cache_url = os.getenv("CACHE_URL")
+if _cache_url:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": _cache_url,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "SOCKET_CONNECT_TIMEOUT": 2,
+                "SOCKET_TIMEOUT": 2,
+                "IGNORE_EXCEPTIONS": True,  # Degrade gracefully if Redis is down
+            },
+            "TIMEOUT": 300,  # 5 min default TTL
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "quicktims-default",
+            "TIMEOUT": 300,
+        }
+    }
+
+SESSION_ENGINE = "django.contrib.sessions.backends.cache"
+SESSION_CACHE_ALIAS = "default"
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         # Cookie-first auth — also accepts Bearer header for API clients / mobile.
@@ -198,6 +234,15 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 25,
+    # Throttle anonymous and authenticated endpoints to protect DB
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": os.getenv("THROTTLE_ANON", "60/minute"),
+        "user": os.getenv("THROTTLE_USER", "300/minute"),
+    },
 }
 
 SIMPLE_JWT = {

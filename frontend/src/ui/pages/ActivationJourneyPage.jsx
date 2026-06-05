@@ -14,7 +14,7 @@ import {
   ChevronRight, Sparkles, FileText, CheckSquare, XCircle, Clock,
   KeyRound, ShieldAlert, CheckCircle2, UserCheck, Info,
   Volume2, VolumeX, Minimize, Maximize, Upload, Database, 
-  Fingerprint, AwardIcon, FileCheck, PhoneIncoming, Globe
+  Fingerprint, FileCheck, PhoneIncoming, Globe
 } from "lucide-react"
 
 // Embedded styling for high-fidelity holographic aesthetics
@@ -563,7 +563,15 @@ export function ActivationJourneyPage() {
       const backendDossier = await apiFetchRegistrationDossier()
       if (backendDossier && backendDossier.regForm?.fullName) {
         if (backendDossier.regForm) setRegForm(backendDossier.regForm)
-        if (backendDossier.docForm) setDocForm(backendDossier.docForm)
+        if (backendDossier.docForm) {
+          const doc = { ...backendDossier.docForm }
+          if (doc.isValidating && !doc.isCompleted) {
+            doc.isValidating = false
+            doc.validationProgress = 0
+            doc.validationLog = []
+          }
+          setDocForm(doc)
+        }
         if (backendDossier.academyState) setAcademyState(backendDossier.academyState)
         if (backendDossier.interviewState) setInterviewState(backendDossier.interviewState)
         if (backendDossier.adminClearance) setAdminClearance(backendDossier.adminClearance)
@@ -580,7 +588,16 @@ export function ActivationJourneyPage() {
         }
         setActiveStep(step)
         
-        localStorage.setItem("caltrack_activation_dossier", JSON.stringify(backendDossier))
+        const cleanedDossier = {
+          ...backendDossier,
+          docForm: backendDossier.docForm ? {
+            ...backendDossier.docForm,
+            isValidating: backendDossier.docForm.isCompleted ? backendDossier.docForm.isValidating : false,
+            validationProgress: backendDossier.docForm.isCompleted ? backendDossier.docForm.validationProgress : 0,
+            validationLog: backendDossier.docForm.isCompleted ? backendDossier.docForm.validationLog : []
+          } : null
+        }
+        localStorage.setItem("caltrack_activation_dossier", JSON.stringify(cleanedDossier))
         return
       }
 
@@ -590,7 +607,15 @@ export function ActivationJourneyPage() {
         try {
           const parsed = JSON.parse(saved)
           if (parsed.regForm) setRegForm(parsed.regForm)
-          if (parsed.docForm) setDocForm(parsed.docForm)
+          if (parsed.docForm) {
+            const doc = { ...parsed.docForm }
+            if (doc.isValidating && !doc.isCompleted) {
+              doc.isValidating = false
+              doc.validationProgress = 0
+              doc.validationLog = []
+            }
+            setDocForm(doc)
+          }
           if (parsed.academyState) setAcademyState(parsed.academyState)
           if (parsed.interviewState) setInterviewState(parsed.interviewState)
           if (parsed.adminClearance) setAdminClearance(parsed.adminClearance)
@@ -607,7 +632,16 @@ export function ActivationJourneyPage() {
           }
           setActiveStep(step)
           
-          apiSaveRegistrationDossier(parsed)
+          const cleanedParsed = {
+            ...parsed,
+            docForm: parsed.docForm ? {
+              ...parsed.docForm,
+              isValidating: parsed.docForm.isCompleted ? parsed.docForm.isValidating : false,
+              validationProgress: parsed.docForm.isCompleted ? parsed.docForm.validationProgress : 0,
+              validationLog: parsed.docForm.isCompleted ? parsed.docForm.validationLog : []
+            } : null
+          }
+          apiSaveRegistrationDossier(cleanedParsed)
         } catch (e) {
           console.error("Failed to load saved activation dossier", e)
         }
@@ -727,20 +761,20 @@ export function ActivationJourneyPage() {
       setDocForm(prev => {
         const newAadhaar = prev.aadhaarFile && prev.aadhaarFile.endsWith(".pdf")
           ? generateAadhaarSVG(regForm.fullName, regForm.profilePic, prev.aadhaarId)
-          : prev.aadhaarFileData;
+          : prev.aadhaarFileFileData;
         const newPan = prev.panFile && prev.panFile.endsWith(".pdf")
           ? generatePanSVG(regForm.fullName, regForm.profilePic, prev.panId)
-          : prev.panFileData;
+          : prev.panFileFileData;
         const newBank = prev.bankPassbookFile && prev.bankPassbookFile.endsWith(".pdf")
           ? generateBankSVG(regForm.fullName, prev.bankAcc, prev.ifscCode)
-          : prev.bankPassbookFileData;
+          : prev.bankPassbookFileFileData;
 
-        if (newAadhaar !== prev.aadhaarFileData || newPan !== prev.panFileData || newBank !== prev.bankPassbookFileData) {
+        if (newAadhaar !== prev.aadhaarFileFileData || newPan !== prev.panFileFileData || newBank !== prev.bankPassbookFileFileData) {
           return {
             ...prev,
-            aadhaarFileData: newAadhaar,
-            panFileData: newPan,
-            bankPassbookFileData: newBank
+            aadhaarFileFileData: newAadhaar,
+            panFileFileData: newPan,
+            bankPassbookFileFileData: newBank
           };
         }
         return prev;
@@ -781,13 +815,17 @@ export function ActivationJourneyPage() {
     setRegForm(prev => ({ ...prev, isBiometricScanning: true }))
     
     // Attempt local webcam access to make it fully authentic
-    navigator.mediaDevices?.getUserMedia({ video: true })
-      .then(stream => {
-        if (webcamVideoRef.current) {
-          webcamVideoRef.current.srcObject = stream
-        }
-      })
-      .catch(e => console.warn("Camera hardware access declined or unavailable. Using holographic scanner overlay.", e))
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          if (webcamVideoRef.current) {
+            webcamVideoRef.current.srcObject = stream
+          }
+        })
+        .catch(e => console.warn("Camera hardware access declined or unavailable. Using holographic scanner overlay.", e))
+    } else {
+      console.warn("Camera hardware access or mediaDevices is undefined. Using holographic scanner overlay.")
+    }
 
     setTimeout(() => {
       let capturedPic = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23090F1C'/><circle cx='50' cy='35' r='18' fill='%233B82F6' opacity='0.5'/><path d='M20,80 Q50,55 80,80 Z' fill='%2310B981' opacity='0.6'/><path d='M30,40 Q30,20 50,20 Q70,20 70,40 Q70,68 50,78 Q30,68 30,40 Z' fill='none' stroke='%233B82F6' stroke-width='1.5'/></svg>"
@@ -898,9 +936,10 @@ export function ActivationJourneyPage() {
     validationRef.current = setInterval(() => {
       prog += 4
       if (prog % 12 === 0 && stepIndex < logs.length) {
+        const nextLog = logs[stepIndex]
         setDocForm(prev => ({
           ...prev,
-          validationLog: [...prev.validationLog, logs[stepIndex]]
+          validationLog: [...prev.validationLog, nextLog]
         }))
         stepIndex++
       }
@@ -914,14 +953,14 @@ export function ActivationJourneyPage() {
           isValidating: false,
           confidenceScore: 99,
           isCompleted: true,
-          aadhaarFileData: prev.aadhaarFileData && prev.aadhaarFileData.startsWith("data:image/") && !prev.aadhaarFile.endsWith(".pdf")
-            ? prev.aadhaarFileData
+          aadhaarFileFileData: prev.aadhaarFileFileData && prev.aadhaarFileFileData.startsWith("data:image/") && !prev.aadhaarFile.endsWith(".pdf")
+            ? prev.aadhaarFileFileData
             : generateAadhaarSVG(regForm.fullName, regForm.profilePic, prev.aadhaarId),
-          panFileData: prev.panFileData && prev.panFileData.startsWith("data:image/") && !prev.panFile.endsWith(".pdf")
-            ? prev.panFileData
+          panFileFileData: prev.panFileFileData && prev.panFileFileData.startsWith("data:image/") && !prev.panFile.endsWith(".pdf")
+            ? prev.panFileFileData
             : generatePanSVG(regForm.fullName, regForm.profilePic, prev.panId),
-          bankPassbookFileData: prev.bankPassbookFileData && prev.bankPassbookFileData.startsWith("data:image/") && !prev.bankPassbookFile.endsWith(".pdf")
-            ? prev.bankPassbookFileData
+          bankPassbookFileFileData: prev.bankPassbookFileFileData && prev.bankPassbookFileFileData.startsWith("data:image/") && !prev.bankPassbookFile.endsWith(".pdf")
+            ? prev.bankPassbookFileFileData
             : generateBankSVG(regForm.fullName, prev.bankAcc, prev.ifscCode)
         }))
         setTimeout(() => {
@@ -1024,13 +1063,17 @@ export function ActivationJourneyPage() {
       }))
 
       // Request webcam for the call PIP
-      navigator.mediaDevices?.getUserMedia({ video: true })
-        .then(stream => {
-          if (webcamVideoRef.current) {
-            webcamVideoRef.current.srcObject = stream
-          }
-        })
-        .catch(e => console.warn("Camera hardware access declined or unavailable for WebRTC call.", e))
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then(stream => {
+            if (webcamVideoRef.current) {
+              webcamVideoRef.current.srcObject = stream
+            }
+          })
+          .catch(e => console.warn("Camera hardware access declined or unavailable for WebRTC call.", e))
+      } else {
+        console.warn("Camera hardware access or mediaDevices is undefined for WebRTC call.")
+      }
     }, 2000)
   }
 
@@ -1114,9 +1157,9 @@ export function ActivationJourneyPage() {
       aadhaarFile: "aadhaar_scan.pdf",
       panFile: "pan_scan.pdf",
       bankPassbookFile: "bank_ledger.pdf",
-      aadhaarFileData: generateAadhaarSVG(newRegForm.fullName, newRegForm.profilePic, "3662-8829-1092"),
-      panFileData: generatePanSVG(newRegForm.fullName, newRegForm.profilePic, "BCHPA8892P"),
-      bankPassbookFileData: generateBankSVG(newRegForm.fullName, "99821882910", "SBIN0003019"),
+      aadhaarFileFileData: generateAadhaarSVG(newRegForm.fullName, newRegForm.profilePic, "3662-8829-1092"),
+      panFileFileData: generatePanSVG(newRegForm.fullName, newRegForm.profilePic, "BCHPA8892P"),
+      bankPassbookFileFileData: generateBankSVG(newRegForm.fullName, "99821882910", "SBIN0003019"),
       isValidating: false,
       validationLog: [
         "Extracting OCR character mesh from Aadhaar: \"aadhaar_scan.pdf\"...",

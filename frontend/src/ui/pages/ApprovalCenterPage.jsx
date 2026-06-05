@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react"
+import { createPortal } from "react-dom"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { 
   apiFetchRegistrationDossier, 
@@ -16,9 +17,10 @@ export function ApprovalCenterPage() {
   const [metrics, setMetrics] = useState({ pending: 0, approved: 0, rejected: 0 })
   
   // Selection — only the real dynamic employee
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState("EMP-2048")
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(null)
   
   // Modal states
+  const [showReviewModal, setShowReviewModal] = useState(false)
   const [showDocModal, setShowDocModal] = useState(null) // null | "aadhaar" | "pan" | "passbook"
   const [showApproveConfirm, setShowApproveConfirm] = useState(false)
   const [showRejectForm, setShowRejectForm] = useState(false)
@@ -272,6 +274,500 @@ export function ApprovalCenterPage() {
     ]
   }, [dossier])
 
+  function renderDossierContent() {
+    try {
+      return (
+      <div className="flex-1 overflow-y-auto p-8 pb-32 space-y-6">
+      
+      {/* Header info */}
+      <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center gap-4">
+          {/* Profile photo from biometric scan */}
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-900 to-indigo-700 border-2 border-indigo-500/40 overflow-hidden flex items-center justify-center shrink-0 shadow-md">
+            {activeEmployee?.regForm?.profilePic ? (
+              <img src={activeEmployee.regForm.profilePic} alt="Biometric" className="w-full h-full object-cover" />
+            ) : (
+              <User className="text-indigo-300 w-7 h-7" />
+            )}
+          </div>
+          <div>
+            <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">Active dossier audit</span>
+            <h2 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">{activeEmployee.name}</h2>
+            <span className="text-[10px] text-slate-400 font-mono">{activeEmployee.id} &bull; Submitted {activeEmployee.regDate}</span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Pill tone="good">Trust Score: {activeEmployee.trustScore}%</Pill>
+          <Pill tone={activeEmployee.status === "Approved" ? "good" : activeEmployee.status === "Rejected" ? "bad" : "warn"}>
+            {activeEmployee.status}
+          </Pill>
+        </div>
+      </div>
+
+      {/* 1. Personal Information */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">1️⃣</span> Personal Information
+          </h3>
+          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800">
+            ✓ VERIFIED
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-xs font-semibold">
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Full Name</span>
+            <span className="text-slate-800 dark:text-slate-200">{activeEmployee.name}</span>
+          </div>
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Phone Number</span>
+            <span className="text-slate-800 dark:text-slate-200">{activeEmployee.phone}</span>
+          </div>
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Email Address</span>
+            <span className="text-slate-800 dark:text-slate-200">{activeEmployee.email}</span>
+          </div>
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Current Location</span>
+            <span className="text-slate-800 dark:text-slate-200">{activeEmployee.location}</span>
+          </div>
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Registration Date</span>
+            <span className="text-slate-800 dark:text-slate-200">{activeEmployee.regDate}</span>
+          </div>
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Employee ID</span>
+            <span className="text-slate-800 dark:text-slate-200 font-mono">{activeEmployee.id}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Registration Verification */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">2️⃣</span> Registration Verification
+          </h3>
+          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+            ✓ VERIFIED
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+
+          <div className={`flex items-center gap-3 p-3 rounded-xl border ${
+            activeEmployee?.regForm?.otpStatus === "verified"
+              ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60"
+              : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800"
+          }`}>
+            <CheckCircle2 size={16} className={activeEmployee?.regForm?.otpStatus === "verified" ? "text-emerald-600 shrink-0" : "text-slate-400 shrink-0"} />
+            <div>
+              <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Phone OTP</div>
+              <div className={`text-xs font-bold ${activeEmployee?.regForm?.otpStatus === "verified" ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>
+                {activeEmployee?.regForm?.otpStatus === "verified" ? "Verified" : "Pending"}
+              </div>
+            </div>
+          </div>
+
+          {/* Face Scan */}
+          <div className={`flex items-center gap-3 p-3 rounded-xl border ${
+            activeEmployee?.regForm?.isBiometricCompleted
+              ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60"
+              : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800"
+          }`}>
+            <CheckCircle2 size={16} className={activeEmployee?.regForm?.isBiometricCompleted ? "text-emerald-600 shrink-0" : "text-slate-400 shrink-0"} />
+            <div>
+              <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Face Scan</div>
+              <div className={`text-xs font-bold ${activeEmployee?.regForm?.isBiometricCompleted ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>
+                {activeEmployee?.regForm?.isBiometricCompleted ? "Completed" : "Pending"}
+              </div>
+            </div>
+          </div>
+
+          {/* Registration Submitted */}
+          <div className={`flex items-center gap-3 p-3 rounded-xl border ${
+            activeEmployee?.regForm?.isCompleted
+              ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60"
+              : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800"
+          }`}>
+            <CheckCircle2 size={16} className={activeEmployee?.regForm?.isCompleted ? "text-emerald-600 shrink-0" : "text-slate-400 shrink-0"} />
+            <div>
+              <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Registration</div>
+              <div className={`text-xs font-bold ${activeEmployee?.regForm?.isCompleted ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>
+                {activeEmployee?.regForm?.isCompleted ? "Submitted" : "Incomplete"}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Trust Score Bar */}
+        <div className="mt-2 p-4 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Trust Score</span>
+            <span className="text-sm font-black text-emerald-600">{activeEmployee.trustScore}%</span>
+          </div>
+          <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2">
+            <div
+              className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-2 rounded-full transition-all duration-700"
+              style={{ width: `${activeEmployee.trustScore}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Registration Evidence */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">3️⃣</span> Registration Evidence
+          </h3>
+          <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+            SYSTEM RECORD
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-semibold">
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Submitted Time</span>
+            <span className="text-slate-800 dark:text-slate-200">
+              {activeEmployee.regDate || "03 Jun 2026"} 10:45 AM
+            </span>
+          </div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">IP Address</span>
+            <span className="text-slate-800 dark:text-slate-200 font-mono">192.168.XXX.XXX</span>
+          </div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Device</span>
+            <span className="text-slate-800 dark:text-slate-200">Web Browser</span>
+          </div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Biometric Match</span>
+            <span className="text-emerald-600 font-bold">
+              {activeEmployee?.regForm?.isBiometricCompleted ? "99.8%" : "—"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Identity Documents */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">4️⃣</span> Identity Documents
+          </h3>
+          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800">
+            ✓ VERIFIED
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between h-28 bg-slate-50 dark:bg-slate-950/20">
+            <div>
+              <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Aadhaar Card</span>
+              <span className="text-xs font-black text-slate-800 dark:text-slate-250 mt-1 block truncate">
+                {activeEmployee?.docForm?.aadhaarFile || "aadhaar_scan.pdf"}
+              </span>
+            </div>
+            <Button onClick={() => setShowDocModal("aadhaar")} className="h-8 w-full mt-2 gap-1.5">
+              <Eye size={12} /> View Aadhaar
+            </Button>
+          </div>
+
+          <div className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between h-28 bg-slate-50 dark:bg-slate-950/20">
+            <div>
+              <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">PAN Card</span>
+              <span className="text-xs font-black text-slate-800 dark:text-slate-250 mt-1 block truncate">
+                {activeEmployee?.docForm?.panFile || "pan_scan.pdf"}
+              </span>
+            </div>
+            <Button onClick={() => setShowDocModal("pan")} className="h-8 w-full mt-2 gap-1.5">
+              <Eye size={12} /> View PAN
+            </Button>
+          </div>
+
+          <div className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between h-28 bg-slate-50 dark:bg-slate-950/20">
+            <div>
+              <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Bank Passbook</span>
+              <span className="text-xs font-black text-slate-800 dark:text-slate-250 mt-1 block truncate">
+                {activeEmployee?.docForm?.bankPassbookFile || "bank_ledger.pdf"}
+              </span>
+            </div>
+            <Button onClick={() => setShowDocModal("passbook")} className="h-8 w-full mt-2 gap-1.5">
+              <Eye size={12} /> View Passbook
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. OCR Validation Report */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">5️⃣</span> OCR Validation Report
+          </h3>
+          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800">
+            ✓ OCR VERIFIED
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-semibold">
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Aadhaar Match (99%)</span>
+            <span className="text-[10px] font-mono text-slate-900 dark:text-slate-200 mt-1 block">{activeEmployee?.docForm?.aadhaarId || "3662-8829-1092"}</span>
+          </div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">PAN Match (98%)</span>
+            <span className="text-[10px] font-mono text-slate-900 dark:text-slate-200 mt-1 block">{activeEmployee?.docForm?.panId || "BCHPA8892P"}</span>
+          </div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Bank Account Routing</span>
+            <span className="text-[10px] font-mono text-slate-900 dark:text-slate-205 mt-1 block">{activeEmployee?.docForm?.bankAcc || "99821882910"}</span>
+          </div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">IFSC Route Code</span>
+            <span className="text-[10px] font-mono text-slate-900 dark:text-slate-205 mt-1 block">{activeEmployee?.docForm?.ifscCode || "SBIN0003019"}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 6. Face Verification */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">6️⃣</span> Face Verification
+          </h3>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${activeEmployee?.regForm?.isBiometricCompleted ? 'text-emerald-600 bg-emerald-50 border-emerald-250 dark:bg-emerald-900/20 dark:border-emerald-800' : 'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-emerald-800'}`}>
+            {activeEmployee?.regForm?.isBiometricCompleted ? "✓ BIOMETRIC VERIFIED" : "PENDING BIOMETRICS"}
+          </span>
+        </div>
+        <div className="flex gap-6 items-center">
+          <div className="w-16 h-16 rounded-2xl bg-black overflow-hidden flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-800">
+            {activeEmployee?.regForm?.profilePic ? (
+              <img src={activeEmployee.regForm.profilePic} alt="Live Selfie" className="w-full h-full object-cover" />
+            ) : (
+              <Fingerprint className="text-indigo-500 w-8 h-8" />
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-xs font-semibold">
+            <div>
+              <span className="text-[8px] text-slate-400 font-bold uppercase block">Capture Quality</span>
+              {activeEmployee?.regForm?.isBiometricCompleted ? "Live Selfie Captured" : "Awaiting Face Scan"}
+            </div>
+            <div>
+              <span className="text-[8px] text-slate-400 font-bold uppercase block">Face Match Score</span>
+              <span className="text-emerald-600 font-bold">{activeEmployee?.regForm?.isBiometricCompleted ? "99.8%" : "—"}</span>
+            </div>
+            <div className="col-span-2 mt-1">
+              <span className="text-[8px] text-slate-400 font-bold uppercase block">Liveness Check</span>
+              <span className="text-emerald-600 font-bold">{activeEmployee?.regForm?.isBiometricCompleted ? "Passed" : "—"}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 7. Training Academy */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">7️⃣</span> Training Academy
+          </h3>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${activeEmployee?.academyState?.isCompleted ? 'text-emerald-600 bg-emerald-50 border-emerald-250 dark:bg-emerald-900/20 dark:border-emerald-800' : 'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800'}`}>
+            {activeEmployee?.academyState?.isCompleted ? "✓ TRAINING PASSED" : "PENDING TRAINING"}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-6 text-xs font-semibold">
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Training Completed</span>
+            <span className="text-slate-800 dark:text-slate-250">{activeEmployee?.academyState?.isCompleted ? "Yes" : "No"}</span>
+          </div>
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Videos Watched</span>
+            <span className="text-slate-800 dark:text-slate-250">
+              {activeEmployee?.academyState?.isCompleted ? "100%" : `${Math.round((activeEmployee?.academyState?.modules?.filter(m => m.completed).length || 0) / 1 * 100)}%`}
+            </span>
+          </div>
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Quiz Score</span>
+            <span className="text-indigo-600 font-bold">{activeEmployee?.academyState?.isCompleted ? "92%" : "—"}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 8. Verification Call */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">8️⃣</span> Verification Call
+          </h3>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${activeEmployee?.interviewState?.isCompleted ? 'text-emerald-600 bg-emerald-50 border-emerald-250 dark:bg-emerald-900/20 dark:border-emerald-800' : 'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800'}`}>
+            {activeEmployee?.interviewState?.isCompleted ? "✓ CALL VERIFIED" : "PENDING CALL"}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-6 text-xs font-semibold mb-2">
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Call Status</span>
+            <span className="text-slate-800 dark:text-slate-250">{activeEmployee?.interviewState?.isCompleted ? "Completed" : "Awaiting Call"}</span>
+          </div>
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Duration</span>
+            <span className="text-slate-800 dark:text-slate-250">{activeEmployee?.interviewState?.isCompleted ? `${activeEmployee?.interviewState?.callDuration || 12} Minutes` : "0 Minutes"}</span>
+          </div>
+          <div>
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Agent Notes</span>
+            <span className="text-emerald-600 font-bold">{activeEmployee?.interviewState?.isCompleted ? "Available" : "Not Started"}</span>
+          </div>
+        </div>
+        {activeEmployee?.interviewState?.interviewLogs && activeEmployee.interviewState.interviewLogs.length > 0 ? (
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800/80 text-[10px] font-mono leading-relaxed text-slate-500 max-h-36 overflow-y-auto">
+            {activeEmployee.interviewState.interviewLogs.map((log, lidx) => (
+              <div key={lidx} className="mb-2">
+                <div className="font-bold text-slate-700 dark:text-slate-350">Q: {log.question.replace(/Officer Sarah|Interviewer:/, "").trim()}</div>
+                <div className="text-blue-500">A: {log.answer}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800/80 text-[10px] font-mono text-center text-slate-400">
+            No verification call logs available yet.
+          </div>
+        )}
+      </div>
+
+      {/* 9. AI Trust Report */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">9️⃣</span> AI Trust Report
+          </h3>
+          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800">
+            ✓ SECURE SYSTEM RECOMMENDATION
+          </span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-semibold mb-4">
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Trust Score</span>
+            <span className="text-emerald-600 font-black">{activeEmployee.trustScore}%</span>
+          </div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Fraud Risk</span>
+            <span className={fraudRisk === "Low" ? "text-slate-850 dark:text-slate-200" : "text-amber-500 font-bold"}>{fraudRisk}</span>
+          </div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Duplicate IP</span>
+            <span className="text-slate-850 dark:text-slate-200">None</span>
+          </div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Document Risk</span>
+            <span className={docRisk === "Low" ? "text-slate-850 dark:text-slate-200" : "text-amber-500 font-bold"}>{docRisk}</span>
+          </div>
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Identity Risk</span>
+            <span className={identityRisk === "Low" ? "text-slate-850 dark:text-slate-200" : "text-amber-500 font-bold"}>{identityRisk}</span>
+          </div>
+        </div>
+        <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-800 rounded-xl flex items-center justify-between">
+          <div>
+            <span className="text-[8px] text-emerald-700 dark:text-emerald-500 font-black uppercase block tracking-wider">AI Recommendation</span>
+            <span className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest font-mono">APPROVE EMPLOYEE</span>
+          </div>
+          <Cpu size={24} className="text-emerald-600 dark:text-emerald-500/50 animate-pulse" />
+        </div>
+      </div>
+
+      {/* Audit Timeline */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
+        <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <Clock className="text-indigo-600 dark:text-indigo-500" size={16} /> Audit Timeline
+        </h3>
+        
+        <div className="space-y-4 font-mono text-[10px] text-slate-500 dark:text-slate-400 leading-normal pl-4 border-l border-indigo-500/20">
+          <div className={`relative ${activeEmployee?.regForm?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
+            <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.regForm?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
+            <span className="text-slate-900 dark:text-white font-bold mr-3">09:12</span> Registration Completed {activeEmployee?.regForm?.isCompleted ? `(Verified ${activeEmployee.name})` : "(Pending)"}
+          </div>
+          <div className={`relative ${activeEmployee?.docForm?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
+            <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.docForm?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
+            <span className="text-slate-900 dark:text-white font-bold mr-3">09:20</span> Documents Uploaded {activeEmployee?.docForm?.isCompleted ? `(${activeEmployee.docForm.aadhaarFile})` : "(Pending)"}
+          </div>
+          <div className={`relative ${activeEmployee?.docForm?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
+            <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.docForm?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
+            <span className="text-slate-900 dark:text-white font-bold mr-3">09:25</span> OCR Verification Passed {activeEmployee?.docForm?.isCompleted ? `(Match Score: ${activeEmployee.docForm.confidenceScore}%)` : "(Pending)"}
+          </div>
+          <div className={`relative ${activeEmployee?.regForm?.isBiometricCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
+            <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.regForm?.isBiometricCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
+            <span className="text-slate-900 dark:text-white font-bold mr-3">09:40</span> Face Verification Passed {activeEmployee?.regForm?.isBiometricCompleted ? "(Facemesh Scan Active)" : "(Pending)"}
+          </div>
+          <div className={`relative ${activeEmployee?.academyState?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
+            <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.academyState?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
+            <span className="text-slate-900 dark:text-white font-bold mr-3">10:15</span> Training Completed {activeEmployee?.academyState?.isCompleted ? "(1/1 Module Certified)" : "(Pending)"}
+          </div>
+          <div className={`relative ${activeEmployee?.interviewState?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
+            <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.interviewState?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
+            <span className="text-slate-900 dark:text-white font-bold mr-3">11:05</span> Verification Call Passed {activeEmployee?.interviewState?.isCompleted ? "(Speech L1 Checked)" : "(Pending)"}
+          </div>
+          <div className={`relative ${activeEmployee?.interviewState?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
+            <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.interviewState?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
+            <span className="text-slate-900 dark:text-white font-bold mr-3">11:20</span> Submitted To Admin Review
+          </div>
+          {activeEmployee.status === "Approved" && (
+            <div className="relative text-emerald-600 dark:text-emerald-500 font-bold">
+              <div className="absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-600" />
+              <span className="font-bold mr-3">11:45</span> Approved By Admin (Activated)
+            </div>
+          )}
+          {activeEmployee.status === "Rejected" && (
+            <div className="relative text-rose-600 dark:text-rose-500 font-bold">
+              <div className="absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full bg-rose-600" />
+              <span className="font-bold mr-3">11:45</span> Rejected By Admin ({activeEmployee.status})
+            </div>
+          )}
+        </div>
+      </div>
+
+    </div>
+    )
+    } catch (error) {
+      return (
+        <div className="flex-1 overflow-y-auto p-8 pb-32 space-y-6 bg-rose-50 dark:bg-rose-950/10 border border-rose-200 dark:border-rose-800 rounded-3xl font-mono text-xs text-rose-600 dark:text-rose-400">
+          <h3 className="font-bold text-sm mb-2">Error Rendering Dossier Content:</h3>
+          <pre className="whitespace-pre-wrap">{error.stack || error.message}</pre>
+        </div>
+      )
+    }
+  }
+
+  function renderDecisionPanel() {
+    try {
+      return (
+      <div className="absolute bottom-0 inset-x-0 h-24 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-10 flex items-center justify-between z-20 shrink-0">
+        <span className="text-xs font-black uppercase text-slate-400 tracking-widest font-mono">
+          Final Decision Panel
+        </span>
+        <div className="flex gap-4">
+          <Button 
+            onClick={handleApprove}
+            disabled={activeEmployee.status !== "Pending Review"}
+            className="px-8 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
+          >
+            Approve Employee
+          </Button>
+          <Button 
+            variant="danger" 
+            onClick={() => setShowRejectForm(true)}
+            disabled={activeEmployee.status !== "Pending Review"}
+            className="px-8 h-12 font-bold rounded-xl"
+          >
+            Reject Employee
+          </Button>
+        </div>
+      </div>
+      )
+    } catch (error) {
+      return (
+        <div className="absolute bottom-0 inset-x-0 h-24 p-4 text-rose-600 bg-rose-50 border-t border-rose-200 font-mono text-xs overflow-auto">
+          <strong>Decision Panel Error:</strong> {error.message}
+        </div>
+      )
+    }
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans">
       
@@ -363,7 +859,15 @@ export function ApprovalCenterPage() {
                 </div>
               </div>
 
-              <Button variant="ghost" className="w-full mt-4 h-9 font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <Button 
+                variant="ghost" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedEmployeeId(emp.id);
+                  setShowReviewModal(true);
+                }}
+                className="w-full mt-4 h-9 font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+              >
                 Review Employee
               </Button>
             </div>
@@ -374,485 +878,63 @@ export function ApprovalCenterPage() {
         <div className="flex-grow flex flex-col bg-slate-50 dark:bg-slate-950 relative overflow-hidden">
           
           {/* Scrollable dossier content */}
-          <div className="flex-1 overflow-y-auto p-8 pb-32 space-y-6">
-            
-            {/* Header info */}
-            <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-              <div className="flex items-center gap-4">
-                {/* Profile photo from biometric scan */}
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-900 to-indigo-700 border-2 border-indigo-500/40 overflow-hidden flex items-center justify-center shrink-0 shadow-md">
-                  {activeEmployee?.regForm?.profilePic ? (
-                    <img src={activeEmployee.regForm.profilePic} alt="Biometric" className="w-full h-full object-cover" />
-                  ) : (
-                    <User className="text-indigo-300 w-7 h-7" />
-                  )}
-                </div>
-                <div>
-                  <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">Active dossier audit</span>
-                  <h2 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">{activeEmployee.name}</h2>
-                  <span className="text-[10px] text-slate-400 font-mono">{activeEmployee.id} &bull; Submitted {activeEmployee.regDate}</span>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Pill tone="good">Trust Score: {activeEmployee.trustScore}%</Pill>
-                <Pill tone={activeEmployee.status === "Approved" ? "good" : activeEmployee.status === "Rejected" ? "bad" : "warn"}>
-                  {activeEmployee.status}
-                </Pill>
-              </div>
-            </div>
+          {renderDossierContent()}
 
-            {/* 1. Personal Information */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="text-indigo-500">1️⃣</span> Personal Information
-                </h3>
-                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800">
-                  ✓ VERIFIED
-                </span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-xs font-semibold">
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Full Name</span>
-                  <span className="text-slate-800 dark:text-slate-200">{activeEmployee.name}</span>
-                </div>
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Phone Number</span>
-                  <span className="text-slate-800 dark:text-slate-200">{activeEmployee.phone}</span>
-                </div>
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Email Address</span>
-                  <span className="text-slate-800 dark:text-slate-200">{activeEmployee.email}</span>
-                </div>
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Current Location</span>
-                  <span className="text-slate-800 dark:text-slate-200">{activeEmployee.location}</span>
-                </div>
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Registration Date</span>
-                  <span className="text-slate-800 dark:text-slate-200">{activeEmployee.regDate}</span>
-                </div>
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Employee ID</span>
-                  <span className="text-slate-800 dark:text-slate-200 font-mono">{activeEmployee.id}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Registration Verification */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="text-indigo-500">2️⃣</span> Registration Verification
-                </h3>
-                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                  ✓ VERIFIED
-                </span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-
-                <div className={`flex items-center gap-3 p-3 rounded-xl border ${
-                  activeEmployee?.regForm?.otpStatus === "verified"
-                    ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60"
-                    : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800"
-                }`}>
-                  <CheckCircle2 size={16} className={activeEmployee?.regForm?.otpStatus === "verified" ? "text-emerald-600 shrink-0" : "text-slate-400 shrink-0"} />
-                  <div>
-                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Phone OTP</div>
-                    <div className={`text-xs font-bold ${activeEmployee?.regForm?.otpStatus === "verified" ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>
-                      {activeEmployee?.regForm?.otpStatus === "verified" ? "Verified" : "Pending"}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Face Scan */}
-                <div className={`flex items-center gap-3 p-3 rounded-xl border ${
-                  activeEmployee?.regForm?.isBiometricCompleted
-                    ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60"
-                    : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800"
-                }`}>
-                  <CheckCircle2 size={16} className={activeEmployee?.regForm?.isBiometricCompleted ? "text-emerald-600 shrink-0" : "text-slate-400 shrink-0"} />
-                  <div>
-                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Face Scan</div>
-                    <div className={`text-xs font-bold ${activeEmployee?.regForm?.isBiometricCompleted ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>
-                      {activeEmployee?.regForm?.isBiometricCompleted ? "Completed" : "Pending"}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Registration Submitted */}
-                <div className={`flex items-center gap-3 p-3 rounded-xl border ${
-                  activeEmployee?.regForm?.isCompleted
-                    ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60"
-                    : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800"
-                }`}>
-                  <CheckCircle2 size={16} className={activeEmployee?.regForm?.isCompleted ? "text-emerald-600 shrink-0" : "text-slate-400 shrink-0"} />
-                  <div>
-                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Registration</div>
-                    <div className={`text-xs font-bold ${activeEmployee?.regForm?.isCompleted ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>
-                      {activeEmployee?.regForm?.isCompleted ? "Submitted" : "Incomplete"}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Trust Score Bar */}
-              <div className="mt-2 p-4 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-200 dark:border-slate-800">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Trust Score</span>
-                  <span className="text-sm font-black text-emerald-600">{activeEmployee.trustScore}%</span>
-                </div>
-                <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-                  <div
-                    className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-2 rounded-full transition-all duration-700"
-                    style={{ width: `${activeEmployee.trustScore}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Registration Evidence */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="text-indigo-500">3️⃣</span> Registration Evidence
-                </h3>
-                <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
-                  SYSTEM RECORD
-                </span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-semibold">
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Submitted Time</span>
-                  <span className="text-slate-800 dark:text-slate-200">
-                    {activeEmployee.regDate || "03 Jun 2026"} 10:45 AM
-                  </span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">IP Address</span>
-                  <span className="text-slate-800 dark:text-slate-200 font-mono">192.168.XXX.XXX</span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Device</span>
-                  <span className="text-slate-800 dark:text-slate-200">Web Browser</span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Biometric Match</span>
-                  <span className="text-emerald-600 font-bold">
-                    {activeEmployee?.regForm?.isBiometricCompleted ? "99.8%" : "—"}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 4. Identity Documents */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="text-indigo-500">4️⃣</span> Identity Documents
-                </h3>
-                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800">
-                  ✓ VERIFIED
-                </span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between h-28 bg-slate-50 dark:bg-slate-950/20">
-                  <div>
-                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Aadhaar Card</span>
-                    <span className="text-xs font-black text-slate-800 dark:text-slate-250 mt-1 block truncate">
-                      {activeEmployee?.docForm?.aadhaarFile || "aadhaar_scan.pdf"}
-                    </span>
-                  </div>
-                  <Button onClick={() => setShowDocModal("aadhaar")} className="h-8 w-full mt-2 gap-1.5">
-                    <Eye size={12} /> View Aadhaar
-                  </Button>
-                </div>
-
-                <div className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between h-28 bg-slate-50 dark:bg-slate-950/20">
-                  <div>
-                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">PAN Card</span>
-                    <span className="text-xs font-black text-slate-800 dark:text-slate-250 mt-1 block truncate">
-                      {activeEmployee?.docForm?.panFile || "pan_scan.pdf"}
-                    </span>
-                  </div>
-                  <Button onClick={() => setShowDocModal("pan")} className="h-8 w-full mt-2 gap-1.5">
-                    <Eye size={12} /> View PAN
-                  </Button>
-                </div>
-
-                <div className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between h-28 bg-slate-50 dark:bg-slate-950/20">
-                  <div>
-                    <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Bank Passbook</span>
-                    <span className="text-xs font-black text-slate-800 dark:text-slate-250 mt-1 block truncate">
-                      {activeEmployee?.docForm?.bankPassbookFile || "bank_ledger.pdf"}
-                    </span>
-                  </div>
-                  <Button onClick={() => setShowDocModal("passbook")} className="h-8 w-full mt-2 gap-1.5">
-                    <Eye size={12} /> View Passbook
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* 5. OCR Validation Report */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="text-indigo-500">5️⃣</span> OCR Validation Report
-                </h3>
-                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800">
-                  ✓ OCR VERIFIED
-                </span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-semibold">
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Aadhaar Match (99%)</span>
-                  <span className="text-[10px] font-mono text-slate-900 dark:text-slate-200 mt-1 block">{activeEmployee?.docForm?.aadhaarId || "3662-8829-1092"}</span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">PAN Match (98%)</span>
-                  <span className="text-[10px] font-mono text-slate-900 dark:text-slate-200 mt-1 block">{activeEmployee?.docForm?.panId || "BCHPA8892P"}</span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Bank Account Routing</span>
-                  <span className="text-[10px] font-mono text-slate-900 dark:text-slate-205 mt-1 block">{activeEmployee?.docForm?.bankAcc || "99821882910"}</span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">IFSC Route Code</span>
-                  <span className="text-[10px] font-mono text-slate-900 dark:text-slate-205 mt-1 block">{activeEmployee?.docForm?.ifscCode || "SBIN0003019"}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 6. Face Verification */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="text-indigo-500">6️⃣</span> Face Verification
-                </h3>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${activeEmployee?.regForm?.isBiometricCompleted ? 'text-emerald-600 bg-emerald-50 border-emerald-250 dark:bg-emerald-900/20 dark:border-emerald-800' : 'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-emerald-800'}`}>
-                  {activeEmployee?.regForm?.isBiometricCompleted ? "✓ BIOMETRIC VERIFIED" : "PENDING BIOMETRICS"}
-                </span>
-              </div>
-              <div className="flex gap-6 items-center">
-                <div className="w-16 h-16 rounded-2xl bg-black overflow-hidden flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-800">
-                  {activeEmployee?.regForm?.profilePic ? (
-                    <img src={activeEmployee.regForm.profilePic} alt="Live Selfie" className="w-full h-full object-cover" />
-                  ) : (
-                    <Fingerprint className="text-indigo-500 w-8 h-8" />
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-xs font-semibold">
-                  <div>
-                    <span className="text-[8px] text-slate-400 font-bold uppercase block">Capture Quality</span>
-                    {activeEmployee?.regForm?.isBiometricCompleted ? "Live Selfie Captured" : "Awaiting Face Scan"}
-                  </div>
-                  <div>
-                    <span className="text-[8px] text-slate-400 font-bold uppercase block">Face Match Score</span>
-                    <span className="text-emerald-600 font-bold">{activeEmployee?.regForm?.isBiometricCompleted ? "99.8%" : "—"}</span>
-                  </div>
-                  <div className="col-span-2 mt-1">
-                    <span className="text-[8px] text-slate-400 font-bold uppercase block">Liveness Check</span>
-                    <span className="text-emerald-600 font-bold">{activeEmployee?.regForm?.isBiometricCompleted ? "Passed" : "—"}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 7. Training Academy */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="text-indigo-500">7️⃣</span> Training Academy
-                </h3>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${activeEmployee?.academyState?.isCompleted ? 'text-emerald-600 bg-emerald-50 border-emerald-250 dark:bg-emerald-900/20 dark:border-emerald-800' : 'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800'}`}>
-                  {activeEmployee?.academyState?.isCompleted ? "✓ TRAINING PASSED" : "PENDING TRAINING"}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-6 text-xs font-semibold">
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Training Completed</span>
-                  <span className="text-slate-800 dark:text-slate-250">{activeEmployee?.academyState?.isCompleted ? "Yes" : "No"}</span>
-                </div>
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Videos Watched</span>
-                  <span className="text-slate-800 dark:text-slate-250">
-                    {activeEmployee?.academyState?.isCompleted ? "100%" : `${Math.round((activeEmployee?.academyState?.modules?.filter(m => m.completed).length || 0) / 1 * 100)}%`}
-                  </span>
-                </div>
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Quiz Score</span>
-                  <span className="text-indigo-600 font-bold">{activeEmployee?.academyState?.isCompleted ? "92%" : "—"}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 8. Verification Call */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="text-indigo-500">8️⃣</span> Verification Call
-                </h3>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${activeEmployee?.interviewState?.isCompleted ? 'text-emerald-600 bg-emerald-50 border-emerald-250 dark:bg-emerald-900/20 dark:border-emerald-800' : 'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800'}`}>
-                  {activeEmployee?.interviewState?.isCompleted ? "✓ CALL VERIFIED" : "PENDING CALL"}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-6 text-xs font-semibold mb-2">
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Call Status</span>
-                  <span className="text-slate-800 dark:text-slate-250">{activeEmployee?.interviewState?.isCompleted ? "Completed" : "Awaiting Call"}</span>
-                </div>
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Duration</span>
-                  <span className="text-slate-800 dark:text-slate-250">{activeEmployee?.interviewState?.isCompleted ? `${activeEmployee?.interviewState?.callDuration || 12} Minutes` : "0 Minutes"}</span>
-                </div>
-                <div>
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Agent Notes</span>
-                  <span className="text-emerald-600 font-bold">{activeEmployee?.interviewState?.isCompleted ? "Available" : "Not Started"}</span>
-                </div>
-              </div>
-              {activeEmployee?.interviewState?.interviewLogs && activeEmployee.interviewState.interviewLogs.length > 0 ? (
-                <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800/80 text-[10px] font-mono leading-relaxed text-slate-500 max-h-36 overflow-y-auto">
-                  {activeEmployee.interviewState.interviewLogs.map((log, lidx) => (
-                    <div key={lidx} className="mb-2">
-                      <div className="font-bold text-slate-700 dark:text-slate-350">Q: {log.question.replace(/Officer Sarah|Interviewer:/, "").trim()}</div>
-                      <div className="text-blue-500">A: {log.answer}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800/80 text-[10px] font-mono text-center text-slate-400">
-                  No verification call logs available yet.
-                </div>
-              )}
-            </div>
-
-            {/* 9. AI Trust Report */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-              <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="text-indigo-500">9️⃣</span> AI Trust Report
-                </h3>
-                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800">
-                  ✓ SECURE SYSTEM RECOMMENDATION
-                </span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-semibold mb-4">
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Trust Score</span>
-                  <span className="text-emerald-600 font-black">{activeEmployee.trustScore}%</span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Fraud Risk</span>
-                  <span className={fraudRisk === "Low" ? "text-slate-850 dark:text-slate-200" : "text-amber-500 font-bold"}>{fraudRisk}</span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Duplicate IP</span>
-                  <span className="text-slate-850 dark:text-slate-200">None</span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Document Risk</span>
-                  <span className={docRisk === "Low" ? "text-slate-850 dark:text-slate-200" : "text-amber-500 font-bold"}>{docRisk}</span>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
-                  <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Identity Risk</span>
-                  <span className={identityRisk === "Low" ? "text-slate-850 dark:text-slate-200" : "text-amber-500 font-bold"}>{identityRisk}</span>
-                </div>
-              </div>
-              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-800 rounded-xl flex items-center justify-between">
-                <div>
-                  <span className="text-[8px] text-emerald-700 dark:text-emerald-500 font-black uppercase block tracking-wider">AI Recommendation</span>
-                  <span className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest font-mono">APPROVE EMPLOYEE</span>
-                </div>
-                <Cpu size={24} className="text-emerald-600 dark:text-emerald-500/50 animate-pulse" />
-              </div>
-            </div>
-
-            {/* Audit Timeline */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-              <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                <Clock className="text-indigo-600 dark:text-indigo-500" size={16} /> Audit Timeline
-              </h3>
-              
-              <div className="space-y-4 font-mono text-[10px] text-slate-500 dark:text-slate-400 leading-normal pl-4 border-l border-indigo-500/20">
-                <div className={`relative ${activeEmployee?.regForm?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
-                  <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.regForm?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
-                  <span className="text-slate-900 dark:text-white font-bold mr-3">09:12</span> Registration Completed {activeEmployee?.regForm?.isCompleted ? `(Verified ${activeEmployee.name})` : "(Pending)"}
-                </div>
-                <div className={`relative ${activeEmployee?.docForm?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
-                  <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.docForm?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
-                  <span className="text-slate-900 dark:text-white font-bold mr-3">09:20</span> Documents Uploaded {activeEmployee?.docForm?.isCompleted ? `(${activeEmployee.docForm.aadhaarFile})` : "(Pending)"}
-                </div>
-                <div className={`relative ${activeEmployee?.docForm?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
-                  <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.docForm?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
-                  <span className="text-slate-900 dark:text-white font-bold mr-3">09:25</span> OCR Verification Passed {activeEmployee?.docForm?.isCompleted ? `(Match Score: ${activeEmployee.docForm.confidenceScore}%)` : "(Pending)"}
-                </div>
-                <div className={`relative ${activeEmployee?.regForm?.isBiometricCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
-                  <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.regForm?.isBiometricCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
-                  <span className="text-slate-900 dark:text-white font-bold mr-3">09:40</span> Face Verification Passed {activeEmployee?.regForm?.isBiometricCompleted ? "(Facemesh Scan Active)" : "(Pending)"}
-                </div>
-                <div className={`relative ${activeEmployee?.academyState?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
-                  <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.academyState?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
-                  <span className="text-slate-900 dark:text-white font-bold mr-3">10:15</span> Training Completed {activeEmployee?.academyState?.isCompleted ? "(1/1 Module Certified)" : "(Pending)"}
-                </div>
-                <div className={`relative ${activeEmployee?.interviewState?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
-                  <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.interviewState?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
-                  <span className="text-slate-900 dark:text-white font-bold mr-3">11:05</span> Verification Call Passed {activeEmployee?.interviewState?.isCompleted ? "(Speech L1 Checked)" : "(Pending)"}
-                </div>
-                <div className={`relative ${activeEmployee?.interviewState?.isCompleted ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'opacity-40'}`}>
-                  <div className={`absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full ${activeEmployee?.interviewState?.isCompleted ? 'bg-indigo-600' : 'bg-slate-350'}`} />
-                  <span className="text-slate-900 dark:text-white font-bold mr-3">11:20</span> Submitted To Admin Review
-                </div>
-                {activeEmployee.status === "Approved" && (
-                  <div className="relative text-emerald-600 dark:text-emerald-500 font-bold">
-                    <div className="absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-600" />
-                    <span className="font-bold mr-3">11:45</span> Approved By Admin (Activated)
-                  </div>
-                )}
-                {activeEmployee.status === "Rejected" && (
-                  <div className="relative text-rose-600 dark:text-rose-500 font-bold">
-                    <div className="absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full bg-rose-600" />
-                    <span className="font-bold mr-3">11:45</span> Rejected By Admin ({activeEmployee.status})
-                  </div>
-                )}
-              </div>
-            </div>
-
-          </div>
-
-          {/* Sticky Decision Panel */}
-          <div className="absolute bottom-0 inset-x-0 h-24 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-10 flex items-center justify-between z-20 shrink-0">
-            <span className="text-xs font-black uppercase text-slate-400 tracking-widest font-mono">
-              Final Decision Panel
-            </span>
-            <div className="flex gap-4">
-              <Button 
-                onClick={handleApprove}
-                disabled={activeEmployee.status !== "Pending Review"}
-                className="px-8 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
-              >
-                Approve Employee
-              </Button>
-              <Button 
-                variant="danger" 
-                onClick={() => setShowRejectForm(true)}
-                disabled={activeEmployee.status !== "Pending Review"}
-                className="px-8 h-12 font-bold rounded-xl"
-              >
-                Reject Employee
-              </Button>
-            </div>
-          </div>
+          {renderDecisionPanel()}
 
         </div>
 
       </div>
 
+      {/* ── EMPLOYEE DOSSIER REVIEW MODAL ── */}
+      {showReviewModal && selectedEmployeeId && createPortal(
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-6xl h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="h-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-8 flex items-center justify-between shrink-0 z-10">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-900 to-indigo-700 border border-indigo-500/40 overflow-hidden flex items-center justify-center shrink-0 shadow-sm">
+                  {activeEmployee?.regForm?.profilePic ? (
+                    <img src={activeEmployee.regForm.profilePic} alt="Biometric" className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="text-indigo-300 w-6 h-6" />
+                  )}
+                </div>
+                <div>
+                  <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block">Technician Audit Dossier</span>
+                  <h2 className="text-base font-black text-slate-900 dark:text-white mt-0.5">{activeEmployee.name}</h2>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <Pill tone="good">Trust Score: {activeEmployee.trustScore}%</Pill>
+                <Pill tone={activeEmployee.status === "Approved" ? "good" : activeEmployee.status === "Rejected" ? "bad" : "warn"}>
+                  {activeEmployee.status}
+                </Pill>
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setShowReviewModal(false)}
+                  className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                >
+                  <X size={16} /> Close Audit
+                </Button>
+              </div>
+            </div>
+
+            {/* Scrollable dossier content */}
+            {renderDossierContent()}
+
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ── DOCUMENT PREVIEW MODAL ── */}
-      {showDocModal && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl p-6">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-850">
+      {showDocModal && createPortal(
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl h-[85vh] overflow-hidden shadow-2xl p-6 flex flex-col">
+            <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-850 shrink-0">
               <h3 className="text-sm font-black uppercase tracking-wider text-slate-850 dark:text-white">
                 Document Preview: {showDocModal === "aadhaar" ? "Aadhaar Card" : showDocModal === "pan" ? "PAN Card" : "Bank Passbook"}
               </h3>
@@ -862,10 +944,18 @@ export function ApprovalCenterPage() {
             </div>
             
             {/* Holographic simulated document view or original uploaded image */}
-            {activeEmployee.docForm?.[`${showDocModal}FileData`] ? (
-              <div className="mt-6 aspect-[1.6/1] bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden shadow-inner relative group">
+            {activeEmployee.docForm?.[
+              showDocModal === "aadhaar" ? "aadhaarFileFileData" :
+              showDocModal === "pan" ? "panFileFileData" :
+              showDocModal === "passbook" ? "bankPassbookFileFileData" : ""
+            ] ? (
+              <div className="mt-6 flex-1 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden shadow-inner relative group min-h-0">
                 <img 
-                  src={activeEmployee.docForm[`${showDocModal}FileData`]} 
+                  src={activeEmployee.docForm[
+                    showDocModal === "aadhaar" ? "aadhaarFileFileData" :
+                    showDocModal === "pan" ? "panFileFileData" :
+                    showDocModal === "passbook" ? "bankPassbookFileFileData" : ""
+                  ]} 
                   alt="Original Government Document" 
                   className="w-full h-full object-contain transition-all duration-300 group-hover:scale-105"
                 />
@@ -874,7 +964,7 @@ export function ApprovalCenterPage() {
                 </div>
               </div>
             ) : (
-              <div className="mt-6 aspect-[1.6/1] bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 rounded-2xl border border-indigo-500/20 p-6 flex flex-col justify-between text-white relative overflow-hidden shadow-inner font-mono">
+              <div className="mt-6 flex-1 bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 rounded-2xl border border-indigo-500/20 p-6 flex flex-col justify-between text-white relative overflow-hidden shadow-inner font-mono min-h-0">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent)]" />
                 
                 <div className="flex justify-between items-start z-10">
@@ -913,18 +1003,19 @@ export function ApprovalCenterPage() {
               </div>
             )}
             
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-850">
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-850 shrink-0">
               <Button onClick={() => setShowDocModal(null)} className="h-10 px-5 font-bold">
                 Close Preview
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── APPROVAL CONFIRMATION DIALOG ── */}
-      {showApproveConfirm && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+      {showApproveConfirm && createPortal(
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
             <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto text-emerald-600 shadow-sm animate-bounce">
               <Check size={32} strokeWidth={3} />
@@ -948,12 +1039,13 @@ export function ApprovalCenterPage() {
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── REJECTION AUDIT FORM MODAL ── */}
-      {showRejectForm && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
+      {showRejectForm && createPortal(
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 my-8">
             <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-850">
               <h3 className="text-sm font-black uppercase tracking-wider text-rose-600 flex items-center gap-1.5 font-mono">
@@ -1101,9 +1193,10 @@ export function ApprovalCenterPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-
     </div>
   )
 }
+

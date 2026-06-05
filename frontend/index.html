@@ -5,9 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="QuickTIMS — Time, Leave & Payroll Management" />
     <link rel="icon" type="image/png" href="/src/assets/logo.png" />
+
+    <!--
+      Performance: resource hints
+      ─────────────────────────────────────────────────────────────────────────
+      preconnect  — opens TLS + DNS before the browser needs the resource
+      dns-prefetch — resolves DNS only (cheaper fallback for older browsers)
+    -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- API origin — adjust to your production backend URL -->
+    <link rel="dns-prefetch" href="http://localhost:8000" />
+
+    <!--
+      Google Fonts — display=swap is already in the URL (font-display: swap).
+      This means text renders immediately in a fallback font while the custom
+      font downloads, eliminating the invisible-text flash (FOIT) that blocks
+      Largest Contentful Paint.
+
+      Only the weights actually used in styles.css are requested so the
+      browser doesn't download unused font files.
+    -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
     <title>QuickTIMS</title>
   </head>
   <body>
