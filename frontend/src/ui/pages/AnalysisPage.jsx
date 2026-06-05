@@ -357,9 +357,9 @@ export function AnalysisPage() {
     const scaleFactor = hourlyRate / 50
 
     const mockEarnings = {
-      daily: [120, 150, 180, 140, 200, 250, 220],
-      weekly: [850, 900, 1100, 1200],
-      monthly: [3400, 3600, 4200, 4500, 4800, 5000],
+      daily: [480, 600, 720, 560, 800, 1000, 880],
+      weekly: [3200, 3600, 4000, 4200],
+      monthly: [12000, 14000, 15000, 16000, 18000, 17000],
     }
 
     const baseData = mockEarnings[timeframe].map(val => Math.round(val * scaleFactor))
@@ -385,10 +385,22 @@ export function AnalysisPage() {
             label: "Earnings ($)",
             data: hasEarnings ? data : baseData,
             borderColor: "#10b981",
-            backgroundColor: "rgba(16, 185, 129, 0.1)",
+            backgroundColor: (ctx) => {
+              const chart = ctx.chart
+              const { ctx: context, chartArea } = chart
+              if (!chartArea) return "rgba(16, 185, 129, 0.1)"
+              const gradient = context.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+              gradient.addColorStop(0, "rgba(16, 185, 129, 0.15)")
+              gradient.addColorStop(1, "rgba(16, 185, 129, 0.01)")
+              return gradient
+            },
             fill: true,
             tension: 0.4,
             borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 8,
+            pointBackgroundColor: "#10b981",
+            pointBorderColor: "#10b981",
           }]
         }
       } else if (timeframe === "weekly") {
@@ -404,11 +416,23 @@ export function AnalysisPage() {
           datasets: [{
             label: "Earnings ($)",
             data: hasEarnings ? data : baseData,
-            borderColor: "#6366f1",
-            backgroundColor: "rgba(99, 102, 241, 0.1)",
+            borderColor: "#10b981",
+            backgroundColor: (ctx) => {
+              const chart = ctx.chart
+              const { ctx: context, chartArea } = chart
+              if (!chartArea) return "rgba(16, 185, 129, 0.1)"
+              const gradient = context.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+              gradient.addColorStop(0, "rgba(16, 185, 129, 0.15)")
+              gradient.addColorStop(1, "rgba(16, 185, 129, 0.01)")
+              return gradient
+            },
             fill: true,
             tension: 0.4,
             borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 8,
+            pointBackgroundColor: "#10b981",
+            pointBorderColor: "#10b981",
           }]
         }
       } else {
@@ -425,55 +449,55 @@ export function AnalysisPage() {
           datasets: [{
             label: "Earnings ($)",
             data: hasEarnings ? data : baseData,
-            borderColor: "#0ea5e9",
-            backgroundColor: "rgba(14, 165, 233, 0.1)",
+            borderColor: "#10b981",
+            backgroundColor: (ctx) => {
+              const chart = ctx.chart
+              const { ctx: context, chartArea } = chart
+              if (!chartArea) return "rgba(16, 185, 129, 0.1)"
+              const gradient = context.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+              gradient.addColorStop(0, "rgba(16, 185, 129, 0.15)")
+              gradient.addColorStop(1, "rgba(16, 185, 129, 0.01)")
+              return gradient
+            },
             fill: true,
             tension: 0.4,
             borderWidth: 3,
+            pointRadius: 5,
+            pointHoverRadius: 8,
+            pointBackgroundColor: "#10b981",
+            pointBorderColor: "#10b981",
           }]
         }
       }
     }
 
-    if (timeframe === "daily") {
-      return {
-        labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-        datasets: [{
-          label: "Earnings ($)",
-          data: baseData,
-          borderColor: "#10b981",
-          backgroundColor: "rgba(16, 185, 129, 0.1)",
-          fill: true,
-          tension: 0.4,
-          borderWidth: 3,
-        }]
-      }
-    } else if (timeframe === "weekly") {
-      return {
-        labels: ["Week 1", "Week 2", "Week 3", "Week 4"],
-        datasets: [{
-          label: "Earnings ($)",
-          data: baseData,
-          borderColor: "#6366f1",
-          backgroundColor: "rgba(99, 102, 241, 0.1)",
-          fill: true,
-          tension: 0.4,
-          borderWidth: 3,
-        }]
-      }
-    } else {
-      return {
-        labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-        datasets: [{
-          label: "Earnings ($)",
-          data: baseData,
-          borderColor: "#0ea5e9",
-          backgroundColor: "rgba(14, 165, 233, 0.1)",
-          fill: true,
-          tension: 0.4,
-          borderWidth: 3,
-        }]
-      }
+    return {
+      labels: timeframe === "daily" 
+        ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] 
+        : timeframe === "weekly" 
+          ? ["Week 1", "Week 2", "Week 3", "Week 4"] 
+          : ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+      datasets: [{
+        label: "Earnings ($)",
+        data: baseData,
+        borderColor: "#10b981",
+        backgroundColor: (ctx) => {
+          const chart = ctx.chart
+          const { ctx: context, chartArea } = chart
+          if (!chartArea) return "rgba(16, 185, 129, 0.1)"
+          const gradient = context.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+          gradient.addColorStop(0, "rgba(16, 185, 129, 0.15)")
+          gradient.addColorStop(1, "rgba(16, 185, 129, 0.01)")
+          return gradient
+        },
+        fill: true,
+        tension: 0.4,
+        borderWidth: 3,
+        pointRadius: 5,
+        pointHoverRadius: 8,
+        pointBackgroundColor: "#10b981",
+        pointBorderColor: "#10b981",
+      }]
     }
   }
 
@@ -801,11 +825,11 @@ export function AnalysisPage() {
       </div>
 
       {/* ── Earnings Analytics (Row 6) ────────────────────────── */}
-      <div className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl p-6 shadow-[0_10px_30px_rgba(0,0,0,0.04)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.2)]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-500">
-              <DollarSign size={16} />
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center border border-emerald-500/20 text-emerald-500 shrink-0">
+              <DollarSign size={18} />
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
@@ -816,15 +840,15 @@ export function AnalysisPage() {
               </p>
             </div>
           </div>
-          <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-stroke dark:border-slate-800">
+          <div className="flex border border-slate-200 dark:border-slate-800 p-1 bg-slate-50 dark:bg-slate-950 rounded-2xl">
             {["daily", "weekly", "monthly"].map((t) => (
               <button
                 key={t}
                 onClick={() => setEarnTimeframe(t)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                className={`px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider transition-all rounded-xl ${
                   earnTimeframe === t
-                    ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
-                    : "text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400"
+                    ? "bg-white dark:bg-slate-800 border border-slate-950 dark:border-slate-200 text-slate-950 dark:text-white shadow-sm"
+                    : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
                 }`}
               >
                 {t}
