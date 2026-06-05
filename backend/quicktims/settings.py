@@ -96,8 +96,8 @@ if USE_POSTGRES:
                 # Keep prepared statements off with pgBouncer (transaction pooling)
                 "options": "-c statement_timeout=30000",
             },
-            # Reuse DB connections for up to 60 s — eliminates per-request TCP
-            # handshakes and auth round-trips (major latency win).
+            # Set to 0 to immediately release connections and avoid EMAXCONNSESSION
+            # since Supabase free tier has a 15 connection limit
             "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "0")),
             "CONN_HEALTH_CHECKS": True,
         }
@@ -120,6 +120,7 @@ else:
 
 
 ROOT_URLCONF = "quicktims.urls"
+APPEND_SLASH = False  # Prevents RuntimeError on POST to non-slash URLs
 
 TEMPLATES = [
     {

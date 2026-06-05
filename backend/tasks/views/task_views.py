@@ -359,6 +359,11 @@ class EmployeeTaskActionView(APIView):
                     {"detail": "You must accept this task before starting it."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            if Task.objects.filter(assigned_to=request.user, status=Task.Status.IN_PROGRESS, company=company).exclude(id=task.id).exists():
+                return Response(
+                    {"detail": "You must complete or suspend your current active job before starting a new one."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             if task.status == Task.Status.PENDING:
                 from time_tracking.models import TimeLog
                 from time_tracking.geo import evaluate
@@ -545,6 +550,11 @@ class EmployeeTaskActionView(APIView):
                 )
             if task.status == Task.Status.COMPLETED:
                 return Response({"detail": "Task is already completed."}, status=status.HTTP_400_BAD_REQUEST)
+            if Task.objects.filter(assigned_to=request.user, status=Task.Status.IN_PROGRESS, company=company).exclude(id=task.id).exists():
+                return Response(
+                    {"detail": "You must complete or suspend your current active job before starting a new one."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             task.travel_status = Task.TravelStatus.ON_THE_WAY
             if not task.started_at:
@@ -575,6 +585,11 @@ class EmployeeTaskActionView(APIView):
                 )
             if task.status == Task.Status.COMPLETED:
                 return Response({"detail": "Task is already completed."}, status=status.HTTP_400_BAD_REQUEST)
+            if Task.objects.filter(assigned_to=request.user, status=Task.Status.IN_PROGRESS, company=company).exclude(id=task.id).exists():
+                return Response(
+                    {"detail": "You must complete or suspend your current active job before starting a new one."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             if task.status == Task.Status.PENDING:
                 from time_tracking.models import TimeLog
@@ -655,6 +670,30 @@ class EmployeeTaskActionView(APIView):
             ser = TaskStatusUpdateSerializer(task, data=request.data, partial=True)
             ser.is_valid(raise_exception=True)
             ser.save()
+
+        # ── Suspend ───────────────────────────────────────────────────────
+        elif action == "suspend":
+            if task.status != Task.Status.IN_PROGRESS:
+                return Response({"detail": "Only active tasks can be suspended."}, status=status.HTTP_400_BAD_REQUEST)
+            reason = request.data.get("reason", "").strip()
+            task.status = Task.Status.SUSPENDED
+            task.suspended_at = timezone.now()
+            task.suspend_reason = reason
+            task.save(update_fields=["status", "suspended_at", "suspend_reason", "updated_at"])
+            _write_task_audit(request.user, "task_suspended", task)
+
+        # ── Resume ────────────────────────────────────────────────────────
+        elif action == "resume":
+            if task.status != Task.Status.SUSPENDED:
+                return Response({"detail": "Only suspended tasks can be resumed."}, status=status.HTTP_400_BAD_REQUEST)
+            if Task.objects.filter(assigned_to=request.user, status=Task.Status.IN_PROGRESS, company=company).exclude(id=task.id).exists():
+                return Response(
+                    {"detail": "You must complete or suspend your current active job before resuming this one."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            task.status = Task.Status.IN_PROGRESS
+            task.save(update_fields=["status", "updated_at"])
+            _write_task_audit(request.user, "task_resumed", task)
 
         else:
             return Response({"detail": f"Unknown action: {action}"}, status=status.HTTP_400_BAD_REQUEST)

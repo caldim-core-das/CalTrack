@@ -262,10 +262,7 @@ class ClockOutView(APIView):
         time_log = TimeLog.objects.filter(employee=employee, clock_out__isnull=True).order_by("-clock_in").first()
         if not time_log:
             return Response({"detail": "No open time log."}, status=400)
-        open_break = Break.objects.filter(time_log=time_log, break_end__isnull=True).order_by("-break_start").first()
-        if open_break:
-            open_break.break_end = timezone.now()
-            open_break.save(update_fields=["break_end"])
+        time_log.breaks.filter(break_end__isnull=True).update(break_end=timezone.now())
         time_log.clock_out = timezone.now()
         time_log.clock_out_lat = request.data.get("lat")
         time_log.clock_out_lon = request.data.get("lon")
