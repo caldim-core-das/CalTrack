@@ -20,7 +20,7 @@ import {
   Home, Clock, CheckSquare, CalendarDays, Banknote, CalendarRange,
   Users, BarChart3, MapPin, Settings, Search, LogOut,
   ChevronLeft, ChevronRight, Rocket, ShieldAlert, Globe, Package, Award,
-  FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Car
+  FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Car, X
 } from "lucide-react"
 
 // Items visible to all authenticated users (employees + admins)
@@ -195,6 +195,51 @@ export function AppShell() {
   const [flyout, setFlyout] = useState(null)
   const [drillDownParent, setDrillDownParent] = useState(null)
   const flyoutTimerRef = useRef(null)
+  const [onlineNotifications, setOnlineNotifications] = useState([])
+
+  const handlePresenceStatusChange = useCallback((data) => {
+    if (!data.is_online) return
+
+    // Prevent showing popup for the current user's own status changes
+    const currentUserName = user?.username || ""
+    const currentUserFullName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim()
+    const eventName = (data.employee_name || "").trim()
+
+    if (
+      eventName.toLowerCase() === currentUserName.toLowerCase() ||
+      (currentUserFullName && eventName.toLowerCase() === currentUserFullName.toLowerCase())
+    ) {
+      return
+    }
+
+    const now = new Date()
+    const formattedTime = now.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+    const formattedDate = now.toLocaleDateString("en-US", {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    })
+    const timestamp = `${formattedDate} ${formattedTime}`
+
+    const id = Math.random().toString(36).substring(2, 9)
+
+    setOnlineNotifications((prev) => [
+      ...prev,
+      {
+        id,
+        employeeName: data.employee_name,
+        timestamp,
+      },
+    ])
+
+    setTimeout(() => {
+      setOnlineNotifications((prev) => prev.filter((n) => n.id !== id))
+    }, 5000)
+  }, [user])
 
   const isAdmin = user?.role === "admin" || user?.role === "manager"
 
@@ -337,6 +382,7 @@ export function AppShell() {
     onMessage: (msg) => {
       if (msg.type === "presence_status_change") {
         window.dispatchEvent(new CustomEvent("quicktims:presenceStatusChange", { detail: msg.data }))
+        handlePresenceStatusChange(msg.data)
       }
     }
   })
@@ -588,6 +634,66 @@ export function AppShell() {
         user={user}
         onClose={() => setFlyout(null)}
       />
+
+      {/* ── Real-time Online Status Notifications ───────────────────── */}
+      <div className="fixed bottom-6 right-6 z-[99999] flex flex-col gap-3 pointer-events-none">
+        <AnimatePresence>
+          {onlineNotifications.map((notif) => (
+            <motion.div
+              key={notif.id}
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.2 } }}
+              className="flex items-center gap-4 p-4 pl-5 bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.3)] relative overflow-hidden pointer-events-auto min-w-[320px] max-w-[400px] border-l-[6px] border-l-emerald-500"
+            >
+              {/* Avatar */}
+              <div className="w-10 h-10 rounded-full bg-emerald-500 text-white font-bold flex items-center justify-center text-sm shrink-0 shadow-md shadow-emerald-500/10">
+                {initials(notif.employeeName)}
+              </div>
+
+              {/* Details */}
+              <div className="flex-1 min-w-0">
+                {/* Header line */}
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-sm truncate">
+                      Employee Online
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold whitespace-nowrap">
+                    {notif.timestamp}
+                  </span>
+                </div>
+                
+                {/* Body info */}
+                <div className="text-xs text-slate-600 dark:text-slate-300 space-y-0.5">
+                  <div className="truncate">
+                    <span className="text-slate-400 dark:text-slate-500 font-bold">Employee:</span>{" "}
+                    <span className="font-extrabold text-slate-800 dark:text-slate-200">{notif.employeeName}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 dark:text-slate-500 font-bold">Status:</span>{" "}
+                    <span className="font-extrabold text-emerald-500 dark:text-emerald-400">Online</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dismiss button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setOnlineNotifications((prev) => prev.filter((n) => n.id !== notif.id))
+                }}
+                className="absolute top-2 right-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                aria-label="Close"
+              >
+                <X size={14} />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }
