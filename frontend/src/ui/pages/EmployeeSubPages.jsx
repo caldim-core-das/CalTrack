@@ -192,48 +192,14 @@ export function ApprovedEmployeesPage() {
 
   async function loadEmployees() {
     setLoading(true)
-    let simulatedApproved = null
-    let savedDossier = localStorage.getItem("caltrack_activation_dossier")
-    try {
-      const backendDossier = await apiFetchRegistrationDossier()
-      if (backendDossier && backendDossier.regForm?.fullName) {
-        savedDossier = JSON.stringify(backendDossier)
-        localStorage.setItem("caltrack_activation_dossier", savedDossier)
-      }
-    } catch (e) {}
-
-    if (savedDossier) {
-      try {
-        const parsed = JSON.parse(savedDossier)
-        if (parsed.adminClearance?.status === "approved") {
-          simulatedApproved = {
-            id: "EMP-2048",
-            employee_id: "EMP-2048",
-            name: parsed.regForm.fullName,
-            title: "Field Operations Tech (L2)",
-            country: "IN",
-            is_active: true
-          }
-        }
-      } catch (e) {}
-    }
-
     try {
       const res = await apiRequest("/employees/")
       const data = Array.isArray(res) ? res : res.results || []
-      let activeEmployees = data.filter(e => e.is_active)
-      if (simulatedApproved) {
-        const exists = activeEmployees.some(e => e.employee_id === simulatedApproved.employee_id || e.name === simulatedApproved.name)
-        if (!exists) {
-          activeEmployees = [simulatedApproved, ...activeEmployees]
-        }
-      }
+      const activeEmployees = data.filter(e => e.is_active)
       setEmployees(activeEmployees)
     } catch (err) {
       console.error("Failed to load approved employees", err)
-      if (simulatedApproved) {
-        setEmployees([simulatedApproved])
-      }
+      setEmployees([])
     } finally {
       setLoading(false)
     }
@@ -313,15 +279,6 @@ export function ApprovedEmployeesPage() {
   const confirmDelete = async () => {
     if (!deletingEmployee) return
     try {
-      if (deletingEmployee.id === "EMP-2048" || deletingEmployee.employee_id === "EMP-2048") {
-        const saved = localStorage.getItem("caltrack_activation_dossier")
-        if (saved) {
-          const parsed = JSON.parse(saved)
-          parsed.adminClearance = { ...parsed.adminClearance, status: "deleted" }
-          localStorage.setItem("caltrack_activation_dossier", JSON.stringify(parsed))
-        }
-      }
-      
       if (deletingEmployee.id !== "EMP-2048") {
         await apiRequest(`/employees/${deletingEmployee.id}/`, { method: "DELETE" })
       }
@@ -655,38 +612,30 @@ export function RejectedEmployeesPage() {
 
   async function loadRejected() {
     setLoading(true)
-    let savedDossier = localStorage.getItem("caltrack_activation_dossier")
     try {
       const backendDossier = await apiFetchRegistrationDossier()
-      if (backendDossier && backendDossier.regForm?.fullName) {
-        savedDossier = JSON.stringify(backendDossier)
-        localStorage.setItem("caltrack_activation_dossier", savedDossier)
+      if (backendDossier && backendDossier.adminClearance?.status === "rejected") {
+        const registrationId = backendDossier.regForm?.employeeId || backendDossier.regForm?.registrationId || `REG-${backendDossier.regForm?.fullName?.replace(/\s+/g, "").toUpperCase().slice(0, 4) || "ANON"}${Date.now().toString().slice(-4)}`
+        setRejected([
+          {
+            id: registrationId,
+            name: backendDossier.regForm.fullName,
+            email: backendDossier.regForm.email,
+            phone: backendDossier.regForm.phone || "",
+            reason: backendDossier.adminClearance.remarks || "Document verification anomaly detected.",
+            rejectedOn: backendDossier.adminClearance.rejectedOn || new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+            dossier: backendDossier
+          }
+        ])
+      } else {
+        setRejected([])
       }
-    } catch (e) {}
-
-    if (savedDossier) {
-      try {
-        const parsed = JSON.parse(savedDossier)
-        if (parsed.adminClearance?.status === "rejected") {
-          const registrationId = parsed.regForm?.employeeId || parsed.regForm?.registrationId || `REG-${parsed.regForm?.fullName?.replace(/\s+/g, "").toUpperCase().slice(0, 4) || "ANON"}${Date.now().toString().slice(-4)}`
-          setRejected([
-            {
-              id: registrationId,
-              name: parsed.regForm.fullName,
-              email: parsed.regForm.email,
-              phone: parsed.regForm.phone || "",
-              reason: parsed.adminClearance.remarks || "Document verification anomaly detected.",
-              rejectedOn: parsed.adminClearance.rejectedOn || new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-              dossier: parsed
-            }
-          ])
-          setLoading(false)
-          return
-        }
-      } catch (e) {}
+    } catch (e) {
+      console.error("Failed to fetch rejected dossier", e)
+      setRejected([])
+    } finally {
+      setLoading(false)
     }
-    setRejected([])
-    setLoading(false)
   }
 
   useEffect(() => {
@@ -741,7 +690,6 @@ export function RejectedEmployeesPage() {
         ifscCode: editForm.ifscCode
       }
       
-      localStorage.setItem("caltrack_activation_dossier", JSON.stringify(dossier))
       await apiSaveRegistrationDossier(dossier)
       
       setEditingItem(null)
@@ -757,7 +705,6 @@ export function RejectedEmployeesPage() {
   const confirmDelete = async () => {
     if (!deletingItem) return
     try {
-      localStorage.removeItem("caltrack_activation_dossier")
       await apiDeleteRegistrationDossier()
       setDeletingItem(null)
       loadRejected()

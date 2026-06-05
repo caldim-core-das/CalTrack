@@ -757,11 +757,20 @@ const SwipeButton = memo(({ onConfirm, text, emoji, colorGradient, shadowColor, 
 
 const TaskCard = memo(({ task, onAction, busy, tasks }) => {
   const navigate = useNavigate()
+  const hasActiveTask = useMemo(() => {
+    return tasks?.some(t => t.id !== task.id && t.status === "in_progress")
+  }, [tasks, task.id])
   const [note, setNote] = useState(task.employee_notes || "")
   const [expanded, setExpanded] = useState(false)
   const [declining, setDeclining] = useState(false)
   const [declineReason, setDeclineReason] = useState("")
+  const [suspending, setSuspending] = useState(false)
+  const [suspendReason, setSuspendReason] = useState("")
   const [localBusy, setLocalBusy] = useState(false)
+  const [suspendReasonCategory, setSuspendReasonCategory] = useState("spare_part")
+  const [suspendDuration, setSuspendDuration] = useState("1h")
+  const [customDeadline, setCustomDeadline] = useState("")
+  const [suspendSlaBlock, setSuspendSlaBlock] = useState(null)
 
   const invStatusLower = task.inventory_status?.toLowerCase();
   const isInventoryOk = !invStatusLower || invStatusLower === "fulfilled" || invStatusLower === "none";
@@ -941,20 +950,9 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
   }
 
   // Detail toggle for accepted task journey progress view
-  const [showJourneyDetails, setShowJourneyDetails] = useState(!!task.travel_status)
+  const [showJourneyDetails, setShowJourneyDetails] = useState(false)
 
-  useEffect(() => {
-    setShowJourneyDetails(!!task.travel_status)
-  }, [task.id, task.travel_status])
-
-  // Suspension & Gap Job state
-  const [suspending, setSuspending] = useState(false)
-  const [suspendReasonCategory, setSuspendReasonCategory] = useState("spare_part")
-  const [suspendReason, setSuspendReason] = useState("")
-  const [suspendDuration, setSuspendDuration] = useState("1h")
-  const [customDeadline, setCustomDeadline] = useState("")
-  const [suspendSlaBlock, setSuspendSlaBlock] = useState(null) // non-null = sla blocker message
-
+  // Suspension & Gap Job state (Note: suspending, suspendReasonCategory, suspendReason, suspendDuration, customDeadline, suspendSlaBlock are declared earlier)
   const [showingGapJobs, setShowingGapJobs] = useState(false)
   const [gapJobs, setGapJobs] = useState([])
   const [fetchingGapJobs, setFetchingGapJobs] = useState(false)
@@ -1237,6 +1235,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
         }),
       })
       setSuspending(false)
+      setShowJourneyDetails(false)
       setSuspendReason("")
       setSuspendReasonCategory("spare_part")
       await onAction(task.id, "_refresh", {})
@@ -1772,7 +1771,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
             </div>
           )}
 
-          {task.status === "pending" && !isPending && (
+          {["pending", "in_progress", "suspended"].includes(task.status) && !isPending && (
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
               {/* ── COMPACT CHECKLIST HEADER ── */}
@@ -1862,10 +1861,16 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
               {/* ── CONTEXTUAL ACTION BUTTON ── */}
               <button
                 type="button"
-                onClick={() => setShowJourneyDetails(true)}
+                onClick={() => {
+                  if (!task.travel_status && hasActiveTask) {
+                    alert("You must complete or suspend your current active job before starting a new one.")
+                    return
+                  }
+                  setShowJourneyDetails(true)
+                }}
                 style={{
                   width: "100%", padding: "13px 0", borderRadius: 14, border: "none",
-                  background: !task.travel_status
+                  background: task.status === "suspended" ? "linear-gradient(135deg, #f59e0b, #d97706)" : !task.travel_status
                     ? "linear-gradient(135deg, #2563eb, #1d4ed8)"
                     : task.travel_status === "on_the_way"
                     ? "linear-gradient(135deg, #7c3aed, #6d28d9)"
@@ -1883,11 +1888,36 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                   transition: "all 0.2s ease",
                 }}
               >
-                {!task.travel_status && <><Car size={16} /> Start Travel</>}
-                {task.travel_status === "on_the_way" && <><MapPin size={16} /> Arrived at Client</>}
-                {task.travel_status === "reached_site" && <><Hammer size={16} /> Start Work</>}
-                {task.travel_status === "working" && <><CheckCircle2 size={16} /> Complete Work</>}
+                {!task.travel_status && task.status !== "suspended" && <><Car size={16} /> Start Travel</>}
+                {task.status === "suspended" && <><Play size={16} /> Resume Job</>}
+                {task.travel_status === "on_the_way" && task.status !== "suspended" && <><MapPin size={16} /> Arrived at Client</>}
+                {task.travel_status === "reached_site" && task.status !== "suspended" && <><Hammer size={16} /> Start Work</>}
+                {task.travel_status === "working" && task.status !== "suspended" && <><CheckCircle2 size={16} /> Complete Work</>}
               </button>
+
+              {task.status === "in_progress" && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSuspending(true);
+                    setShowJourneyDetails(true);
+                  }}
+                  style={{
+                    width: "100%", padding: "12px 0", borderRadius: 14, border: "2px dashed #f59e0b",
+                    background: "transparent",
+                    color: "#d97706", fontSize: 12, fontWeight: 900, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    letterSpacing: "0.06em", textTransform: "uppercase",
+                    marginTop: "12px",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseOver={(e) => { e.currentTarget.style.background = "#fffbeb"; e.currentTarget.style.borderColor = "#d97706" }}
+                  onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#f59e0b" }}
+                >
+                  <AlertCircle size={16} /> Suspend Job
+                </button>
+              )}
 
               {/* ── QUICK ACTION BAR ── */}
               <div className="flex items-center justify-around p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800 shadow-sm w-full">
@@ -1983,13 +2013,17 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                           <ClipboardList size={16} />
                         </div>
                         <div>
-                          <h4 style={{ margin: 0, fontSize: "13px", fontWeight: 900, color: "#1e293b", textTransform: "uppercase", letterSpacing: "0.04em" }}>Before Work Checklist</h4>
-                          <p style={{ margin: "2px 0 0 0", fontSize: "10px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>Complete to unlock [Start Work]</p>
+                          <h4 style={{ margin: 0, fontSize: "13px", fontWeight: 900, color: "#1e293b", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                            {suspending ? "Suspend Job" : "Before Work Checklist"}
+                          </h4>
+                          <p style={{ margin: "2px 0 0 0", fontSize: "10px", color: "#64748b", fontWeight: 700, textTransform: "uppercase" }}>
+                            {suspending ? "Provide a reason to pause this task" : "Complete to unlock [Start Work]"}
+                          </p>
                         </div>
                       </div>
                       <button
                         type="button"
-                        onClick={() => setShowJourneyDetails(false)}
+                        onClick={() => { setSuspending(false); setShowJourneyDetails(false); }}
                         style={{
                           display: "flex", alignItems: "center", gap: "4px",
                           padding: "6px 12px", borderRadius: "10px", border: "1.5px solid #e2e8f0",
@@ -2001,7 +2035,9 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                       </button>
                     </div>
 
-                    {/* Travel Routing Card (ETA & Distance) */}
+                    {!suspending && (
+                      <>
+                        {/* Travel Routing Card (ETA & Distance) */}
                     {precGPS && task.location_lat && (() => {
                       const dist = getDistance(precGPS.lat, precGPS.lon, parseFloat(task.location_lat), parseFloat(task.location_lon))
                       const etaMin = dist !== null ? Math.round(dist / 1000 / 25 * 60) : 0
@@ -2452,10 +2488,10 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                         <SwipeButton
                           text={precGPS ? "Start Work" : "Locking GPS..."}
                           emoji="🔨"
-                          colorGradient={precGPS ? "linear-gradient(135deg, #059669, #047857)" : "linear-gradient(135deg, #94a3b8, #64748b)"}
-                          shadowColor={precGPS ? "rgba(5,150,105,0.3)" : "rgba(148,163,184,0.1)"}
-                          onConfirm={handleStartWorkNew}
-                          disabled={localBusy || busy || !precGPS}
+                          colorGradient={hasActiveTask ? "linear-gradient(135deg, #94a3b8, #64748b)" : precGPS ? "linear-gradient(135deg, #059669, #047857)" : "linear-gradient(135deg, #94a3b8, #64748b)"}
+                          shadowColor={hasActiveTask ? "rgba(148,163,184,0.1)" : precGPS ? "rgba(5,150,105,0.3)" : "rgba(148,163,184,0.1)"}
+                          onConfirm={() => { if (hasActiveTask) { alert("You must complete or suspend your current active job before starting a new one."); return; } handleStartWorkNew(); }}
+                          disabled={localBusy || busy || !precGPS || hasActiveTask}
                         />
                         {!precGPS && (
                           <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, textAlign: "center", marginTop: 4 }}>
@@ -2788,6 +2824,71 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                         </button>
                       </div>
                     )}
+                  </>
+                )}
+
+                {/* Suspend Button */}
+                <div className={suspending ? "mt-2 pt-2" : "mt-2 pt-4 border-t border-slate-200 dark:border-slate-800"}>
+                  {suspending ? (
+                    <div className="flex flex-col gap-3">
+                      <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Reason for Suspending</label>
+                      <textarea
+                        value={suspendReason}
+                        onChange={e => setSuspendReason(e.target.value)}
+                        placeholder="E.g., waiting for parts..."
+                        className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-amber-500"
+                        rows={2}
+                      />
+                      {suspendSlaBlock && (
+                        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2 text-center">
+                          <AlertTriangle size={14} /> {suspendSlaBlock}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setSuspending(false)}
+                          className="flex-1 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleConfirmSuspend}
+                          disabled={localBusy}
+                          className="flex-1 p-3 rounded-xl bg-amber-500 text-white text-xs font-bold"
+                        >
+                          {localBusy ? "Suspending..." : "Confirm Suspend"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setSuspending(true)}
+                      className="w-full py-4 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-500 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <AlertCircle size={14} /> Suspend Job (I'll resume later)
+                    </button>
+                  )}
+                </div>
+
+                    {/* Suspended Area */}
+                    {task.status === "suspended" && (
+                      <div className="mt-3 p-5 rounded-3xl bg-amber-50/50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 flex flex-col gap-4 text-center">
+                        <AlertCircle size={32} className="text-amber-500 mx-auto" />
+                        <div>
+                          <h4 className="text-sm font-black text-amber-800 dark:text-amber-400 m-0 mb-1">Job Suspended</h4>
+                          {task.suspend_reason && <p className="text-xs text-amber-700 dark:text-amber-500 m-0">Reason: {task.suspend_reason}</p>}
+                        </div>
+                        <button
+                          onClick={handleResumeNow}
+                          disabled={localBusy || hasActiveTask}
+                          className={`mt-2 py-4 rounded-xl text-white text-[11px] font-black uppercase tracking-widest ${hasActiveTask ? 'bg-slate-400' : 'bg-amber-600 hover:bg-amber-700'}`}
+                        >
+                          {hasActiveTask ? "Must Complete Active Job First" : "Resume Job Now"}
+                        </button>
+                      </div>
+                    )}
+
                   </div>
                 </div>,
                 document.body
@@ -4221,7 +4322,7 @@ function AdminTasksTable({ tasks, employees, availableEmployees, jobSites, onRef
                         <Pill tone={statusTone(t.status)}>{statusLabel(t.status)}</Pill>
                       </div>
                       {/* Push gap job selector */}
-                      {t.status === "pending" && suspendedTasks.length > 0 && (
+                      {t.status === "pending" && suspendedTasks.length > 0 && !t.gap_job && t.acceptance_status !== "accepted" && (
                         <div style={{
                           marginTop: 6, display: "flex", flexDirection: "column", gap: 4,
                           padding: 8, borderRadius: 10, border: "1px solid #cbd5e1",
@@ -4264,6 +4365,19 @@ function AdminTasksTable({ tasks, employees, availableEmployees, jobSites, onRef
                           >
                             Confirm Push
                           </button>
+                        </div>
+                      )}
+                      {t.gap_job && t.status === "pending" && (
+                        <div style={{
+                          marginTop: 6, display: "flex", flexDirection: "column", gap: 4,
+                          padding: 8, borderRadius: 10, border: "1px solid #cbd5e1",
+                          backgroundColor: t.acceptance_status === "accepted" ? "#ecfdf5" : "#fffbeb", 
+                          width: 160
+                        }}>
+                           <span style={{ fontSize: 9, fontWeight: 900, color: t.acceptance_status === "accepted" ? "#059669" : "#d97706", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                             {t.acceptance_status === "accepted" ? "✅ Gap Job Accepted" : "⏳ Pending Acceptance"}
+                           </span>
+                           <span style={{ fontSize: 8, color: "#64748b" }}>Linked to #{t.gap_job}</span>
                         </div>
                       )}
                     </div>
