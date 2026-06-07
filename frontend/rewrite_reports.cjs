@@ -1,4 +1,9 @@
-import { useEffect, useState } from "react"
+const fs = require('fs');
+const path = require('path');
+
+const targetFile = path.join(__dirname, 'src/ui/pages/ReportsPage.jsx');
+
+const newContent = `import { useEffect, useState } from "react"
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement,
   Title, Tooltip, Legend, ArcElement, Filler
@@ -65,7 +70,7 @@ export function ReportsPage() {
     setLoading(true)
     setError("")
     try {
-      const res = await apiRequest(`/reports/dashboard-analytics/`)
+      const res = await apiRequest(\`/reports/dashboard-analytics/\`)
       setData(res)
     } catch (err) {
       setError(err?.body?.detail || "Failed to load comprehensive reports.")
@@ -190,8 +195,8 @@ export function ReportsPage() {
         {/* ── KPI STRIP ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {[
-            { label: "Total Payroll (Month)", val: `$${kpi.total_payroll_month?.toLocaleString() || 0}`, icon: Banknote, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-500/10" },
-            { label: "Total Hours (Month)", val: `${kpi.total_hours_month || 0}h`, icon: Clock, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-500/10" },
+            { label: "Total Payroll (Month)", val: \`$\${kpi.total_payroll_month?.toLocaleString() || 0}\`, icon: Banknote, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-500/10" },
+            { label: "Total Hours (Month)", val: \`\${kpi.total_hours_month || 0}h\`, icon: Clock, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-500/10" },
             { label: "Active Employees", val: kpi.employees_active || 0, icon: Users, color: "text-purple-500", bg: "bg-purple-50 dark:bg-purple-500/10" },
             { label: "Pending Tasks", val: kpi.active_tasks || 0, icon: CheckSquare, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-500/10" },
             { label: "Pending Leaves", val: kpi.pending_leaves || 0, icon: MapPin, color: "text-rose-500", bg: "bg-rose-50 dark:bg-rose-500/10" },
@@ -199,7 +204,7 @@ export function ReportsPage() {
             <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{item.label}</span>
-                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${item.bg} ${item.color}`}>
+                <div className={\`w-7 h-7 rounded-lg flex items-center justify-center \${item.bg} \${item.color}\`}>
                   <item.icon size={14} />
                 </div>
               </div>
@@ -264,3 +269,7 @@ export function ReportsPage() {
     </div>
   )
 }
+`;
+
+fs.writeFileSync(targetFile, newContent);
+console.log("ReportsPage completely rewritten.");

@@ -44,11 +44,26 @@ export async function apiLogin(identifier, password) {
  * Fetch the current authenticated user from /auth/me/.
  * Browser sends the qt_access cookie automatically.
  * Returns user object or null (null means unauthenticated).
+ * Has a 15-second timeout to handle slow DB connections after login.
+ * On initial page load a 6-second fallback in AuthProvider ensures isReady=true.
  */
 export async function apiFetchMe() {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
   try {
-    return await fetchJSON("/auth/me/")
+    const url = `${API_BASE_URL}/auth/me/`
+    const res = await fetch(url, {
+      credentials: "include",
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+    const text = await res.text()
+    let data
+    try { data = JSON.parse(text) } catch { data = text || null }
+    if (!res.ok) return null
+    return data
   } catch {
+    clearTimeout(timeoutId)
     return null
   }
 }

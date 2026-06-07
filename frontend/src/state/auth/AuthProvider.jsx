@@ -28,7 +28,13 @@ export function AuthProvider({ children }) {
   // check whether the server accepts it.
 
   const refreshMe = useCallback(async () => {
-    const me = await apiFetchMe()
+    let me;
+    try {
+      me = await apiFetchMe()
+      console.log("DEBUG: apiFetchMe raw response:", JSON.stringify(me))
+    } catch (e) {
+      console.error("DEBUG: apiFetchMe exception:", e)
+    }
 
     if (me?.username && me?.role && me?.company) {
       const u = {
@@ -46,6 +52,7 @@ export function AuthProvider({ children }) {
       }
       return u
     } else {
+      console.log("DEBUG: refreshMe check failed — username:", me?.username, "role:", me?.role, "company:", me?.company)
       // Not authenticated (cookies missing, expired, or server rejected them)
       setUser(null)
       return null
@@ -88,7 +95,21 @@ export function AuthProvider({ children }) {
 
   // ── Bootstrap on mount ────────────────────────────────────────────────────
   useEffect(() => {
-    refreshMe().finally(() => setIsReady(true))
+    // Hard fallback: if refreshMe takes more than 6 s (e.g. Django CORS stall),
+    // force isReady=true so the app renders the login page instead of a blank screen.
+    const fallbackTimer = setTimeout(() => {
+      setIsReady(true)
+    }, 6000)
+
+    refreshMe()
+      .then((u) => console.log("DEBUG: refreshMe resolved with:", u))
+      .catch((e) => console.error("DEBUG: refreshMe rejected with:", e))
+      .finally(() => {
+        clearTimeout(fallbackTimer)
+        setIsReady(true)
+      })
+
+    return () => clearTimeout(fallbackTimer)
   }, [refreshMe])
 
   // ── Session expiry event (fired by API client on unrecoverable 401) ───────

@@ -12,9 +12,13 @@ import "./ui/styles.css"
 
 initTheme()
 
+console.log("DEBUG: main.jsx loaded and initTheme() called");
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "mock-client-id.apps.googleusercontent.com"
 
-createRoot(document.getElementById("root")).render(
+const rootEl = document.getElementById("root");
+console.log("DEBUG: Root element found:", rootEl);
+
+createRoot(rootEl).render(
   <StrictMode>
     <ReduxProvider store={store}>
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>

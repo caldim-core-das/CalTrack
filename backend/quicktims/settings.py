@@ -1,15 +1,14 @@
 from datetime import timedelta
 from pathlib import Path
-
-from dotenv import load_dotenv
 import os
 import sys
+from dotenv import load_dotenv
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Prevent loading remote Supabase dotenv when running pytest / django tests
 if "test" not in "".join(sys.argv) and not os.getenv("DJANGO_TESTING"):
-    load_dotenv(override=True)
-
-BASE_DIR = Path(__file__).resolve().parent.parent
+    load_dotenv(BASE_DIR / ".env", override=True)
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-secret-key-change-me")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"

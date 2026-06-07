@@ -23,25 +23,18 @@ import {
   FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Car, X
 } from "lucide-react"
 
-// Items visible to all authenticated users (employees + admins)
-const NAV_SHARED = [
+const ALL_NAV_ITEMS = [
+  { label: "Get Started", to: routes.get_started, icon: <Rocket size={20} />, color: "#0EA5E9", adminOnly: true },
   { label: "Dashboard", to: routes.dashboard, icon: <Home size={20} />, color: "#10B981" },
-  { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1" },
-  { label: "Time", to: routes.time, icon: <Clock size={20} />, color: "#F59E0B" },
-  { label: "Jobs", to: routes.tasks, icon: <CheckSquare size={20} />, color: "#14B8A6" },
-  { label: "Leaves", to: routes.leaves, icon: <CalendarDays size={20} />, color: "#EC4899" },
-  { label: "Mileage", to: routes.mileage, icon: <Car size={20} />, color: "#EF4444" },
-  { label: "Settings", to: routes.settings, icon: <Settings size={20} />, color: "#64748B" },
-]
-
-// Items visible only to admins/managers
-const NAV_ADMIN = [
-  { label: "Get Started", to: routes.get_started, icon: <Rocket size={20} />, color: "#0EA5E9" },
+  { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1", employeeOnly: true },
+  { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6", adminOnly: true },
+  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444", adminOnly: true },
   {
     label: "Employees",
     to: routes.employees,
     icon: <Users size={20} />,
     color: "#D946EF",
+    adminOnly: true,
     children: [
       { label: "Dashboard", to: routes.employees_dashboard, icon: <Home size={16} />, color: "#10B981" },
       { label: "Employee Directory", to: routes.employees, icon: <Users size={16} />, color: "#D946EF" },
@@ -53,17 +46,17 @@ const NAV_ADMIN = [
       { label: "Settings", to: routes.settings, icon: <Settings size={16} />, color: "#64748B" },
     ]
   },
-  { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6" },
-  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444" },
-  { label: "Payroll", to: routes.payroll, icon: <Banknote size={20} />, color: "#6366F1" },
-  { label: "Scheduling", to: routes.scheduling, icon: <CalendarRange size={20} />, color: "#38BDF8" },
-  { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, color: "#FACC15" },
-  { label: "Inventory", to: routes.inventory, icon: <Package size={20} />, color: "#10B981" },
-  { label: "Compliance", to: routes.compliance, icon: <ShieldAlert size={20} />, color: "#2563EB" },
+  { label: "Jobs", to: routes.tasks, icon: <CheckSquare size={20} />, color: "#14B8A6" },
+  { label: "Leaves", to: routes.leaves, icon: <CalendarDays size={20} />, color: "#EC4899" },
+  { label: "Payroll", to: routes.payroll, icon: <Banknote size={20} />, color: "#6366F1", adminOnly: true },
+  { label: "Scheduling", to: routes.scheduling, icon: <CalendarRange size={20} />, color: "#38BDF8", adminOnly: true },
+  { label: "Time", to: routes.time, icon: <Clock size={20} />, color: "#F59E0B" },
+  { label: "Mileage", to: routes.mileage, icon: <Car size={20} />, color: "#EF4444" },
+  { label: "Inventory", to: routes.inventory, icon: <Package size={20} />, color: "#10B981", adminOnly: true },
+  { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, color: "#FACC15", adminOnly: true },
+  { label: "Compliance", to: routes.compliance, icon: <ShieldAlert size={20} />, color: "#2563EB", adminOnly: true },
+  { label: "Settings", to: routes.settings, icon: <Settings size={20} />, color: "#64748B" },
 ]
-
-// Full combined NAV — built per role at render time (see `items` memo below)
-const NAV = [...NAV_SHARED, ...NAV_ADMIN]
 
 const THEME_STORAGE_KEY = "quicktims.theme"
 
@@ -246,13 +239,11 @@ export function AppShell() {
   const items = useMemo(() => {
     if (!user) return []
     const isAdminUser = user.role === "admin" || user.role === "manager"
-    // Employees only see shared nav; admins see shared + admin items (Get Started first, then Dashboard, then others)
-    // We remove the "Analysis" link for admin/manager roles
-    if (isAdminUser) {
-      const sharedForAdmin = NAV_SHARED.filter(item => item.to !== routes.analysis)
-      return [NAV_ADMIN[0], sharedForAdmin[0], ...NAV_ADMIN.slice(1), ...sharedForAdmin.slice(1)]
-    }
-    return NAV_SHARED
+    return ALL_NAV_ITEMS.filter(item => {
+      if (item.adminOnly && !isAdminUser) return false
+      if (item.employeeOnly && isAdminUser) return false
+      return true
+    })
   }, [user])
 
   useEffect(() => {

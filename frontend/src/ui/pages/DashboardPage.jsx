@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState, useRef, lazy, Suspense } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, useMotionValue, useTransform, useSpring, AnimatePresence } from "framer-motion"
-import { 
-  Clock, Users, Briefcase, CalendarDays, DollarSign, Loader2, AlertCircle, Timer, 
-  Activity, MapPin, ShieldAlert, TrendingUp, FileWarning, BadgeCheck, XCircle, 
-  CheckCircle2, ClipboardList, UserCheck, ArrowRight, ArrowUpRight, ArrowDownRight, 
-  Award, BookOpen, Percent, Phone, ShieldCheck, ChevronRight, LogIn, Lock, Trash2, 
+import {
+  Clock, Users, Briefcase, CalendarDays, DollarSign, Loader2, AlertCircle, Timer,
+  Activity, MapPin, ShieldAlert, TrendingUp, FileWarning, BadgeCheck, XCircle,
+  CheckCircle2, ClipboardList, UserCheck, ArrowRight, ArrowUpRight, ArrowDownRight,
+  Award, BookOpen, Percent, Phone, ShieldCheck, ChevronRight, LogIn, Lock, Trash2,
   Calendar, Eye
 } from "lucide-react"
 
@@ -792,7 +792,7 @@ function AdminDashboard() {
       ready: rdyApproval
     }
   }, [dossier])
-  
+
   const interviewsToday = useMemo(() => {
     if (!dossier?.regForm?.fullName) return []
     return [
@@ -955,7 +955,7 @@ function AdminDashboard() {
       setDossier(nextDossier)
       localStorage.setItem("caltrack_activation_dossier", JSON.stringify(nextDossier))
       await apiSaveRegistrationDossier(nextDossier)
-      
+
       // Provision employee record in DB
       const [firstNameRaw, ...lastNameParts] = (name || "").trim().split(" ")
       const firstName = firstNameRaw || ""
@@ -973,7 +973,7 @@ function AdminDashboard() {
         is_active: true
       }
       await apiRequest("/employees/", { method: "POST", json: payload })
-      
+
       const nowStr = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
       setRecentActivities(prev => [
         { id: Math.random(), time: nowStr, event: "Employee Activated", desc: `${name} approved and activated` },
@@ -1004,7 +1004,7 @@ function AdminDashboard() {
       setDossier(nextDossier)
       localStorage.setItem("caltrack_activation_dossier", JSON.stringify(nextDossier))
       await apiSaveRegistrationDossier(nextDossier)
-      
+
       const nowStr = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
       setRecentActivities(prev => [
         { id: Math.random(), time: nowStr, event: "Application Rejected", desc: `${name} review rejected` },
@@ -1963,11 +1963,10 @@ function AdminDashboard() {
                 {item.icon}
               </div>
               <span
-                className={`text-[10px] font-black px-2.5 py-1 rounded-full flex items-center gap-1 ${
-                  item.trend === "up"
+                className={`text-[10px] font-black px-2.5 py-1 rounded-full flex items-center gap-1 ${item.trend === "up"
                     ? "bg-emerald-500/10 text-emerald-500"
                     : "bg-rose-500/10 text-rose-500"
-                }`}
+                  }`}
               >
                 {item.trend === "up" ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
                 {item.change}
@@ -2138,15 +2137,14 @@ function AdminDashboard() {
                       <td className="py-4 text-slate-500">{int.role}</td>
                       <td className="py-4">
                         <span
-                          className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                            int.status === "Passed"
+                          className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${int.status === "Passed"
                               ? "bg-emerald-500/10 text-emerald-500"
                               : int.status === "Rejected"
-                              ? "bg-rose-500/10 text-rose-500"
-                              : int.status === "In Call"
-                              ? "bg-indigo-500/15 text-indigo-500 animate-pulse"
-                              : "bg-amber-500/10 text-amber-500"
-                          }`}
+                                ? "bg-rose-500/10 text-rose-500"
+                                : int.status === "In Call"
+                                  ? "bg-indigo-500/15 text-indigo-500 animate-pulse"
+                                  : "bg-amber-500/10 text-amber-500"
+                            }`}
                         >
                           {int.status}
                         </span>
@@ -2197,7 +2195,7 @@ function AdminDashboard() {
         <div className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col justify-between relative overflow-hidden group">
           {/* Neon decorative background glow */}
           <div className="absolute -right-16 -top-16 w-36 h-36 bg-indigo-500/10 blur-3xl rounded-full group-hover:bg-indigo-500/20 transition-all duration-700 pointer-events-none" />
-          
+
           <div>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-9 h-9 rounded-lg bg-violet-500/10 flex items-center justify-center border border-violet-500/20 text-violet-500">
@@ -2303,13 +2301,12 @@ function AdminDashboard() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Interview</span>
-                  <span className={`font-bold ${
-                    verificationCenterCandidate.interview === "Passed"
+                  <span className={`font-bold ${verificationCenterCandidate.interview === "Passed"
                       ? "text-emerald-500"
                       : verificationCenterCandidate.interview === "Rejected"
-                      ? "text-rose-500"
-                      : "text-amber-500"
-                  }`}>
+                        ? "text-rose-500"
+                        : "text-amber-500"
+                    }`}>
                     {verificationCenterCandidate.interview === "Passed" ? "✅ Passed" : verificationCenterCandidate.interview === "Rejected" ? "❌ Failed" : "🟡 Pending"}
                   </span>
                 </div>
@@ -2344,7 +2341,7 @@ function AdminDashboard() {
 
             <div className="p-5 bg-bg dark:bg-slate-950/20 rounded-2xl border border-stroke dark:border-slate-855 flex flex-col gap-3">
               <div className="text-[10px] font-black uppercase text-slate-455 dark:text-slate-500 tracking-widest">Employee Review</div>
-              
+
               <div className="flex flex-col gap-2 text-xs font-semibold mt-2">
                 <div className="flex justify-between items-center py-1">
                   <span className="text-slate-500">Identity Status</span>
@@ -2356,9 +2353,8 @@ function AdminDashboard() {
                 </div>
                 <div className="flex justify-between items-center py-1">
                   <span className="text-slate-500">Interview Status</span>
-                  <span className={`font-bold ${
-                    verificationCenterCandidate.interview === "Passed" ? "text-emerald-500" : verificationCenterCandidate.interview === "Rejected" ? "text-rose-500" : "text-amber-500"
-                  }`}>
+                  <span className={`font-bold ${verificationCenterCandidate.interview === "Passed" ? "text-emerald-500" : verificationCenterCandidate.interview === "Rejected" ? "text-rose-500" : "text-amber-500"
+                    }`}>
                     {verificationCenterCandidate.interview === "Passed" ? "Passed" : verificationCenterCandidate.interview === "Rejected" ? "Failed" : "Pending"}
                   </span>
                 </div>
@@ -2419,11 +2415,11 @@ function AdminDashboard() {
                 {idx < recentActivities.length - 1 && (
                   <div className="absolute left-[17px] top-6 bottom-[-20px] w-0.5 bg-stroke dark:bg-slate-800/80" />
                 )}
-                
+
                 <div className="w-9 h-9 rounded-full bg-slate-50 dark:bg-slate-850 border border-stroke dark:border-slate-800 flex items-center justify-center text-xs font-black text-indigo-500 shadow-sm flex-shrink-0 z-10">
                   {act.time.split(" ")[0]}
                 </div>
-                
+
                 <div className="flex-1 p-3 bg-bg dark:bg-slate-950/20 rounded-2xl border border-stroke dark:border-slate-850">
                   <div className="font-extrabold text-xs text-slate-900 dark:text-white uppercase tracking-wide">{act.event}</div>
                   <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">{act.desc}</div>
@@ -2462,11 +2458,10 @@ function AdminDashboard() {
                 <button
                   key={tab.id}
                   onClick={() => setAuditTab(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider whitespace-nowrap transition-all ${
-                    auditTab === tab.id
+                  className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider whitespace-nowrap transition-all ${auditTab === tab.id
                       ? "bg-indigo-600 text-white shadow-sm"
                       : "bg-slate-50 dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500"
-                  }`}
+                    }`}
                 >
                   {tab.label}
                 </button>
@@ -2536,9 +2531,8 @@ function AdminDashboard() {
                         <span className="font-bold text-slate-900 dark:text-white">{log.candidate}</span>
                         <span className="text-[10px] text-slate-450 uppercase tracking-wider ml-2">{log.field}</span>
                       </div>
-                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
-                        log.status === "Approved" ? "bg-emerald-500/10 text-emerald-500" : log.status === "Failed (Mesh <90%)" ? "bg-rose-500/10 text-rose-500" : "bg-blue-500/10 text-blue-500"
-                      }`}>{log.status}</span>
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${log.status === "Approved" ? "bg-emerald-500/10 text-emerald-500" : log.status === "Failed (Mesh <90%)" ? "bg-rose-500/10 text-rose-500" : "bg-blue-500/10 text-blue-500"
+                        }`}>{log.status}</span>
                     </div>
                   ))}
                 </div>

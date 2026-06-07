@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useRole } from "../../state/auth/useRole.js"
-import { Banknote, X, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Clock, Users, TrendingUp, DollarSign, Loader2, FileText, Download, Printer, Share2, Globe, Mail, Eye, Palette, Layout, Type, Sparkles, User, MapPin } from "lucide-react"
+import { Banknote, X, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Clock, Users, TrendingUp, DollarSign, Loader2, FileText, Download, Printer, Share2, Globe, Mail, Eye, Palette, Layout, Type, Sparkles, User, MapPin, Calendar, Filter } from "lucide-react"
 
 // Custom hook to detect if dark mode is active
 function useDarkMode() {
@@ -1694,6 +1694,66 @@ export function EmployeeInvoiceHubModal({ record, autoPrint = false, onClose, in
 }
 
 
+
+function FilterDropdown({ options, value, onChange, isDark }) {
+  const [open, setOpen] = useState(false)
+  
+  useEffect(() => {
+    if (!open) return
+    const handle = () => setOpen(false)
+    window.addEventListener("click", handle)
+    return () => window.removeEventListener("click", handle)
+  }, [open])
+
+  return (
+    <div style={{ position: "relative" }} onClick={e => e.stopPropagation()}>
+      <button onClick={() => setOpen(!open)} style={{
+        padding: "10px 16px",
+        background: isDark ? "#1f2937" : "#fff",
+        border: `1px solid ${isDark ? "#374151" : "#e2e8f0"}`,
+        borderRadius: 10,
+        color: isDark ? "#f9fafb" : "#0f172a",
+        fontSize: 13,
+        fontWeight: 700,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        cursor: "pointer",
+        boxShadow: isDark ? "0 4px 12px rgba(0,0,0,0.15)" : "0 2px 8px rgba(0,0,0,0.02)",
+        transition: "all 0.2s"
+      }} className="hover:border-indigo-500">
+        <Calendar size={15} style={{ color: "#6366f1" }} />
+        {options.find(o => o.value === value)?.label || "Select Filter"}
+        <ChevronDown size={14} style={{ opacity: 0.5, marginLeft: 8 }} />
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "100%", right: 0, marginTop: 8, width: 220,
+          background: isDark ? "#1f2937" : "#fff", border: `1px solid ${isDark ? "#374151" : "#e2e8f0"}`,
+          borderRadius: 12, boxShadow: "0 10px 30px rgba(0,0,0,0.15)", zIndex: 50, overflow: "hidden",
+          padding: "6px",
+          animation: "fadeInDown 0.15s ease-out"
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: isDark ? "#9ca3af" : "#64748b", textTransform: "uppercase", padding: "6px 12px 6px 12px", letterSpacing: "0.05em" }}>Payroll Range</div>
+          {options.map(o => (
+            <div key={o.value} onClick={() => { onChange(o.value); setOpen(false) }} style={{
+              padding: "10px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer",
+              color: isDark ? "#f9fafb" : "#0f172a",
+              borderRadius: 8,
+              background: value === o.value ? (isDark ? "#374151" : "#f1f5f9") : "transparent",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              transition: "all 0.15s"
+            }} className="hover:bg-indigo-50 dark:hover:bg-gray-700">
+              {o.label}
+              {value === o.value && <CheckCircle2 size={14} color="#6366f1" />}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function PayrollPage() {
   const isDark = useDarkMode()
   const { isAdmin } = useRole()
@@ -1703,16 +1763,22 @@ export function PayrollPage() {
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [selected, setSelected] = useState(null)
+  
   const [filterEmp, setFilterEmp] = useState("")
   const [sortField, setSortField] = useState("generated_at")
   const [sortDir, setSortDir] = useState("desc")
-  const [regionFilter, setRegionFilter] = useState("all") // "all" | "US" | "UK"
+  const [regionFilter, setRegionFilter] = useState("all")
   const [hoveredRow, setHoveredRow] = useState(null)
 
-  // Generate form state
-  const [empId, setEmpId] = useState("")
-  const [start, setStart] = useState("")
-  const [end, setEnd] = useState("")
+  const [dateFilterMode, setDateFilterMode] = useState("all")
+  const [filterStartDate, setFilterStartDate] = useState("")
+  const [filterEndDate, setFilterEndDate] = useState("")
+  
+  const [activeEmployees, setActiveEmployees] = useState([])
+  const [loadingActiveEmps, setLoadingActiveEmps] = useState(false)
+  
+  const [generateEmpId, setGenerateEmpId] = useState("all")
+  const [generateRegion, setGenerateRegion] = useState("all")
 
   async function load() {
     setLoading(true); setError("")
@@ -1722,7 +1788,9 @@ export function PayrollPage() {
         isAdmin ? apiRequest("/employees/") : Promise.resolve({ results: [] }),
       ])
       setRecords(unwrapResults(rRes))
-      setEmployees(isAdmin ? unwrapResults(eRes) : [])
+      const loadedEmps = isAdmin ? unwrapResults(eRes) : []
+      setEmployees(loadedEmps)
+      if (dateFilterMode === "all") setActiveEmployees(loadedEmps)
     } catch (err) {
       setError(err?.body?.detail || "Failed to load payroll.")
     } finally { setLoading(false) }
@@ -1730,15 +1798,88 @@ export function PayrollPage() {
 
   useEffect(() => { load() }, [isAdmin])
 
-  async function generate(e) {
-    e.preventDefault(); setSubmitting(true); setError("")
+  useEffect(() => {
+    const today = new Date()
+    const formatDate = (d) => d.toISOString().split("T")[0]
+    
+    if (dateFilterMode === "today") {
+      setFilterStartDate(formatDate(today))
+      setFilterEndDate(formatDate(today))
+    } else if (dateFilterMode === "week") {
+      const day = today.getDay()
+      const diff = today.getDate() - day + (day === 0 ? -6 : 1)
+      const start = new Date(today.setDate(diff))
+      const end = new Date(start)
+      end.setDate(end.getDate() + 6)
+      setFilterStartDate(formatDate(start))
+      setFilterEndDate(formatDate(end))
+    } else if (dateFilterMode === "month") {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1)
+      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+      setFilterStartDate(formatDate(start))
+      setFilterEndDate(formatDate(end))
+    } else if (dateFilterMode === "all") {
+      setFilterStartDate("")
+      setFilterEndDate("")
+      setActiveEmployees(employees)
+      setGenerateEmpId("all")
+    }
+  }, [dateFilterMode, employees])
+
+  async function loadActiveEmployees() {
+    if (!filterStartDate || !filterEndDate) return;
+    setLoadingActiveEmps(true)
     try {
-      await apiRequest("/payroll/generate/", { method: "POST", json: { employee: empId, start, end } })
+      const logsRaw = await apiRequest(`/time/logs/?date_from=${filterStartDate}&date_to=${filterEndDate}`)
+      const logs = unwrapResults(logsRaw)
+      const activeIds = new Set(logs.map(l => l.employee?.id || l.employee))
+      const active = employees.filter(e => activeIds.has(e.id))
+      setActiveEmployees(active)
+      setGenerateEmpId("all")
+    } catch (e) {
+      console.error("Failed to load active employees", e)
+      setError("Failed to load employee activity logs for the selected dates.")
+    } finally {
+      setLoadingActiveEmps(false)
+    }
+  }
+
+  useEffect(() => {
+    if (dateFilterMode !== "all" && dateFilterMode !== "custom" && filterStartDate && filterEndDate && employees.length > 0) {
+      loadActiveEmployees()
+    }
+  }, [dateFilterMode, filterStartDate, filterEndDate, employees.length])
+
+  async function generatePayroll(e) {
+    if (e) e.preventDefault()
+    setSubmitting(true)
+    setError("")
+    
+    if (!filterStartDate || !filterEndDate) {
+      setError("Please select a valid date range to generate payroll.")
+      setSubmitting(false)
+      return
+    }
+
+    try {
+      if (generateEmpId === "all") {
+        const toGenerate = activeEmployees.length > 0 ? activeEmployees : employees
+        const results = await Promise.allSettled(toGenerate.map(emp => 
+          apiRequest("/payroll/generate/", { method: "POST", json: { employee: emp.id, start: filterStartDate, end: filterEndDate } })
+        ))
+        const failed = results.filter(r => r.status === "rejected")
+        if (failed.length > 0) {
+          setError(`Generated with ${failed.length} errors. Some records may already exist.`)
+        }
+      } else {
+        await apiRequest("/payroll/generate/", { method: "POST", json: { employee: generateEmpId, start: filterStartDate, end: filterEndDate } })
+      }
       await load()
-      setEmpId(""); setStart(""); setEnd("")
     } catch (err) {
       setError(err?.body?.detail || "Failed to generate payroll.")
-    } finally { setSubmitting(false) }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const filtered = useMemo(() => {
@@ -1751,15 +1892,24 @@ export function PayrollPage() {
     } else if (regionFilter === "UK") {
       list = list.filter(r => r.region?.toUpperCase().includes("UK"))
     }
+    
+    if (dateFilterMode !== "all" && filterStartDate && filterEndDate) {
+      list = list.filter(r => {
+        const pStart = r.period?.start_date
+        const pEnd = r.period?.end_date
+        if (!pStart || !pEnd) return false
+        return pStart <= filterEndDate && pEnd >= filterStartDate
+      })
+    }
+
     list.sort((a, b) => {
       let av = a[sortField] ?? "", bv = b[sortField] ?? ""
       if (sortField === "gross_pay" || sortField === "net_pay") { av = Number(av); bv = Number(bv) }
       return sortDir === "asc" ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1)
     })
     return list
-  }, [records, filterEmp, regionFilter, sortField, sortDir])
+  }, [records, filterEmp, regionFilter, sortField, sortDir, dateFilterMode, filterStartDate, filterEndDate])
 
-  // KPI Stats
   const totalGross = filtered.reduce((s, r) => s + Number(r.gross_pay || 0), 0)
   const totalNet = filtered.reduce((s, r) => s + Number(r.net_pay || 0), 0)
   const totalRegHrs = filtered.reduce((s, r) => s + Number(r.regular_hours || 0), 0)
@@ -1784,7 +1934,6 @@ export function PayrollPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: isDark ? "#0B111D" : "#f8fafc", overflow: "auto" }}>
-      {/* Header */}
       <div style={{ background: isDark ? "#111827" : "#ffffff", borderBottom: `1.5px solid ${isDark ? "#1f2937" : "#e2e8f0"}`, padding: "18px 32px", position: "relative" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: isDark ? "#1f2937" : "#f5f3ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1806,7 +1955,6 @@ export function PayrollPage() {
           </div>
         )}
 
-        {/* KPI Cards */}
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${flagged > 0 ? 5 : 4}, 1fr)`, gap: 12 }}>
           <KpiCard icon={regionFilter === "UK" ? <span style={{ fontSize: 18, fontWeight: 900, color: "#818cf8" }}>£</span> : <DollarSign size={20} />} label="Total Gross" value={`${regionFilter === "UK" ? "£" : "$"}${totalGross.toFixed(2)}`} sub={regionFilter === "all" ? "All regions" : `${regionFilter} Region`} color="#4f46e5" />
           <KpiCard icon={regionFilter === "UK" ? <span style={{ fontSize: 18, fontWeight: 900, color: "#34d399" }}>£</span> : <TrendingUp size={20} />} label="Total Net Pay" value={`${regionFilter === "UK" ? "£" : "$"}${totalNet.toFixed(2)}`} sub="After deductions" color="#059669" />
@@ -1815,42 +1963,77 @@ export function PayrollPage() {
           {flagged > 0 && <KpiCard icon={<AlertTriangle size={20} />} label="Wage Violations" value={flagged} sub="Below minimum wage" color="#dc2626" />}
         </div>
 
-        {/* Generate Form */}
         {isAdmin && (
-          <div style={{ background: isDark ? "#111827" : "#fff", border: `1px solid ${isDark ? "#1f2937" : "#e2e8f0"}`, borderRadius: 16, padding: "20px 24px", boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.2)" : "0 2px 12px rgba(0,0,0,0.01)" }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: isDark ? "#f9fafb" : "#0f172a", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
-              <Banknote size={15} style={{ color: isDark ? "#818cf8" : "#4f46e5" }} /> Generate Payroll
-            </div>
-            <form onSubmit={generate} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: 12, alignItems: "end" }}>
-              <div>
-                <label style={{ fontSize: 10, fontWeight: 800, color: isDark ? "#9ca3af" : "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 4 }}>Employee</label>
-                <select value={empId} onChange={e => setEmpId(e.target.value)} required
-                  style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#374151" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, color: isDark ? "#f9fafb" : "#0f172a", background: isDark ? "#1f2937" : "#fff", outline: "none" }}>
-                  <option value="" style={{ background: isDark ? "#1f2937" : "#fff", color: isDark ? "#f9fafb" : "#0f172a" }}>Select employee…</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id} style={{ background: isDark ? "#1f2937" : "#fff", color: isDark ? "#f9fafb" : "#0f172a" }}>
-                      {emp.user?.first_name || emp.user?.username} ({emp.employee_id})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {[["Start Date", start, setStart], ["End Date", end, setEnd]].map(([lbl, val, set]) => (
-                <div key={lbl}>
-                  <label style={{ fontSize: 10, fontWeight: 800, color: isDark ? "#9ca3af" : "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 4 }}>{lbl}</label>
-                  <input type="date" value={val} onChange={e => set(e.target.value)} required
-                    style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#374151" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, color: isDark ? "#f9fafb" : "#0f172a", background: isDark ? "#1f2937" : "#fff", outline: "none" }} />
+          <div style={{ background: isDark ? "#1e293b" : "#ffffff", border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`, borderRadius: 12, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ background: isDark ? "#312e81" : "#e0e7ff", padding: "8px", borderRadius: "8px" }}>
+                  <Banknote size={18} color={isDark ? "#818cf8" : "#4f46e5"} />
                 </div>
-              ))}
-              <button type="submit" disabled={submitting}
-                style={{ padding: "10px 20px", background: isDark ? "#6366f1" : "#4f46e5", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, opacity: submitting ? 0.7 : 1, height: "40px" }}
-                className="hover:bg-indigo-600 active:scale-95 transition-all">
-                {submitting ? <><Loader2 size={14} style={{ animation: "spin 0.7s linear infinite" }} /> Generating…</> : "Generate"}
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: isDark ? "#f8fafc" : "#0f172a" }}>Generate Payroll</h2>
+              </div>
+              <FilterDropdown 
+                options={[
+                  { value: "today", label: "Today" },
+                  { value: "week", label: "This Week" },
+                  { value: "month", label: "This Month" },
+                  { value: "custom", label: "Custom Date Range" },
+                  { value: "all", label: "All Payroll" }
+                ]}
+                value={dateFilterMode}
+                onChange={setDateFilterMode}
+                isDark={isDark}
+              />
+            </div>
+
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "flex-end" }}>
+              <div style={{ display: "flex", gap: 12, flex: 1, minWidth: 260 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>Start Date</label>
+                  <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} disabled={dateFilterMode !== "custom"}
+                    style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", opacity: dateFilterMode !== "custom" ? 0.6 : 1 }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>End Date</label>
+                  <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} disabled={dateFilterMode !== "custom"}
+                    style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", opacity: dateFilterMode !== "custom" ? 0.6 : 1 }} />
+                </div>
+              </div>
+
+              <div style={{ flex: 2, minWidth: 280 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>Target Employee</label>
+                <div style={{ display: "flex", gap: 12 }}>
+                  <select value={generateEmpId} onChange={e => setGenerateEmpId(e.target.value)}
+                    style={{ flex: 1, padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", cursor: "pointer" }}>
+                    <option value="all">All Active Employees</option>
+                    {activeEmployees.map(emp => (
+                      <option key={emp.id} value={emp.id} style={{ background: isDark ? "#0f172a" : "#fff" }}>
+                        {emp.user?.first_name || emp.user?.username} ({emp.employee_id})
+                      </option>
+                    ))}
+                  </select>
+
+                  {dateFilterMode === "custom" && (
+                    <button onClick={loadActiveEmployees} disabled={loadingActiveEmps || !filterStartDate || !filterEndDate}
+                      style={{ padding: "0 16px", background: isDark ? "#334155" : "#f8fafc", color: isDark ? "#cbd5e1" : "#475569", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all 0.2s" }}
+                      className="hover:bg-slate-200 dark:hover:bg-slate-700">
+                      {loadingActiveEmps ? <Loader2 size={14} className="animate-spin" /> : <Users size={14} />}
+                      Load
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <button onClick={generatePayroll} disabled={submitting || (generateEmpId === "all" && activeEmployees.length === 0)}
+                style={{ padding: "0 24px", background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 2px 6px rgba(79, 70, 229, 0.25)", height: "42px", opacity: (submitting || (generateEmpId === "all" && activeEmployees.length === 0)) ? 0.7 : 1 }}
+                className="hover:bg-indigo-600 transition-colors">
+                {submitting ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
+                {generateEmpId === "all" ? "Batch Generate" : "Generate"}
               </button>
-            </form>
+            </div>
           </div>
         )}
 
-        {/* Records Table */}
         <div style={{ background: isDark ? "#111827" : "#fff", border: `1px solid ${isDark ? "#1f2937" : "#e2e8f0"}`, borderRadius: 16, boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.2)" : "0 2px 12px rgba(0,0,0,0.01)", overflow: "hidden" }}>
           <div style={{ padding: "16px 20px", borderBottom: `1px solid ${isDark ? "#1f2937" : "#f1f5f9"}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: isDark ? "#f9fafb" : "#0f172a", display: "flex", alignItems: "center", gap: 8 }}>
@@ -1875,7 +2058,7 @@ export function PayrollPage() {
             </div>
           ) : filtered.length === 0 ? (
             <div style={{ padding: 48, textAlign: "center", color: "#94a3b8", fontSize: 13, fontWeight: 600 }}>
-              No payroll records found. Generate one above.
+              No payroll records found for the selected filter.
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -1997,11 +2180,11 @@ export function PayrollPage() {
 
       {selected && <EmployeeInvoiceHubModal record={selected} onClose={() => setSelected(null)} />}
 
-
       <style>{`
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes fadeInRight{from{opacity:0;transform:translateY(-50%) translateX(-6px)}to{opacity:1;transform:translateY(-50%) translateX(0)}}
         @keyframes fadeInLeft{from{opacity:0;transform:translateY(-50%) translateX(6px)}to{opacity:1;transform:translateY(-50%) translateX(0)}}
+        @keyframes fadeInDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
         
         .kpi-card-3d:hover {
           transform: translateY(-8px) rotateX(6deg) rotateY(-3deg) scale(1.03) !important;
