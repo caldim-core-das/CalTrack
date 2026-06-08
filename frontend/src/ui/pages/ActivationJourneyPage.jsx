@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
 import { routes } from "../routes.js"
+import { CalTrackLogo } from "../components/CalTrackLogo.jsx"
 import { 
   apiFetchRegistrationDossier, 
   apiSaveRegistrationDossier, 
@@ -1284,13 +1285,11 @@ export function ActivationJourneyPage() {
 
       {/* TOP HUD BAR */}
       <div className="w-full border-b border-blue-500/10 py-5 px-8 glass-panel flex items-center justify-between sticky top-0 z-[100] backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-blue-500/30">
-            <Cpu className="text-white w-5 h-5 animate-pulse" />
-          </div>
+        <div className="flex items-center gap-4">
+          <CalTrackLogo size="sm" showTagline={false} />
+          <div className="h-8 w-px bg-blue-500/20" />
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-orbitron font-black text-sm tracking-[0.2em] text-white">CALTRACK</span>
               <span className="px-2 py-0.5 rounded text-[8px] font-black font-orbitron bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 tracking-wider">SECURE AUDIT</span>
             </div>
             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Automated Activation Pipeline</div>
@@ -1298,17 +1297,6 @@ export function ActivationJourneyPage() {
         </div>
 
         <div className="flex items-center gap-4 font-orbitron">
-          <button 
-            type="button"
-            onClick={resetEntireJourney}
-            className="px-4 py-2 border border-rose-200 hover:border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-600 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-1.5"
-          >
-            <RefreshCcw className="w-3.5 h-3.5 text-rose-600" />
-            ↺ RESET DOSSIER
-          </button>
-
-
-          
           <button 
             type="button"
             onClick={() => navigate(routes.login)}
@@ -1442,19 +1430,19 @@ export function ActivationJourneyPage() {
               <div className="space-y-3 text-[11px] font-semibold">
                 <div>
                   <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">WebRTC Call logs</div>
-                  <div className="text-slate-200 mt-0.5">
+                  <div className={`${interviewState.isCompleted ? "text-emerald-400 font-bold" : "text-slate-200"} mt-0.5`}>
                     {interviewState.isCompleted ? "✓ Audit Cleared" : "Awaiting Call"}
                   </div>
                 </div>
                 <div>
                   <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Biometric Check</div>
-                  <div className="text-slate-200 mt-0.5">
+                  <div className={`${regForm.isBiometricCompleted ? "text-emerald-400 font-bold" : "text-slate-200"} mt-0.5`}>
                     {regForm.isBiometricCompleted ? "✓ Facemesh Scanned" : "Scanning Required"}
                   </div>
                 </div>
                 <div>
                   <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Document OCR Integrity</div>
-                  <div className="text-emerald-400 neon-text-green mt-0.5">
+                  <div className={`${docForm.isCompleted ? "text-emerald-400 font-bold" : "text-slate-200"} mt-0.5`}>
                     {docForm.isCompleted ? "✓ Verified Checksum" : "Awaiting Uploads"}
                   </div>
                 </div>

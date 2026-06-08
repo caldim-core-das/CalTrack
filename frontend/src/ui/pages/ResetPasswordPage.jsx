@@ -1,8 +1,9 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSearchParams, useNavigate } from "react-router-dom"
+import { motion } from "framer-motion"
 import { apiPasswordResetConfirm, extractAuthError } from "../../api/authService.js"
 import { CalTrackLogo } from "../components/CalTrackLogo.jsx"
-import { Lock, RefreshCcw, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Lock, Eye, EyeOff, RefreshCcw, AlertCircle, ShieldCheck, Check } from "lucide-react"
 
 export function ResetPasswordPage() {
   const [searchParams] = useSearchParams()
@@ -12,9 +13,46 @@ export function ResetPasswordPage() {
 
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState(false)
+  const [employeeId, setEmployeeId] = useState("EMP1025")
+
+  // Redirect to login page 3 seconds after success
+  useEffect(() => {
+    if (success) {
+      const timer = setTimeout(() => {
+        navigate("/login")
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [success, navigate])
+
+  // Password requirements real-time checks
+  const hasEightChars = password.length >= 8
+  const hasUpper = /[A-Z]/.test(password)
+  const hasNumber = /[0-9]/.test(password)
+  const hasSymbol = /[^A-Za-z0-9]/.test(password)
+
+  // Compute password strength bar & percentage
+  const criteriaCount = [hasEightChars, hasUpper, hasNumber, hasSymbol].filter(Boolean).length
+  let strengthPercent = 0
+  let strengthBar = "░░░░░░░░░░"
+  if (criteriaCount === 1) {
+    strengthPercent = 20
+    strengthBar = "██░░░░░░░░"
+  } else if (criteriaCount === 2) {
+    strengthPercent = 50
+    strengthBar = "█████░░░░░"
+  } else if (criteriaCount === 3) {
+    strengthPercent = 80
+    strengthBar = "████████░░"
+  } else if (criteriaCount === 4) {
+    strengthPercent = 100
+    strengthBar = "██████████"
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -34,7 +72,10 @@ export function ResetPasswordPage() {
 
     setLoading(true)
     try {
-      await apiPasswordResetConfirm({ uid, token, new_password: password })
+      const response = await apiPasswordResetConfirm({ uid, token, new_password: password })
+      if (response && response.employee_id) {
+        setEmployeeId(response.employee_id)
+      }
       setSuccess(true)
     } catch (err) {
       setError(extractAuthError(err, "Failed to reset password. Link may be expired."))
@@ -44,73 +85,187 @@ export function ResetPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FDFDFF] flex flex-col justify-center items-center p-6">
-      <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "radial-gradient(125% 125% at 50% 10%, #ffffff 40%, #fbbf24 100%)", backgroundSize: "100% 100%" }} />
-      <div className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: "radial-gradient(#4338CA 2px, transparent 2px)", backgroundSize: "80px 80px" }} />
+    <div className="flex min-h-screen bg-[#03050d] text-slate-100 font-body overflow-hidden relative w-full justify-center items-center p-6">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        .font-display { font-family: 'Outfit', sans-serif; }
+        .font-body { font-family: 'Plus Jakarta Sans', sans-serif; }
+      `}</style>
       
-      <div className="relative z-10 w-full max-w-[400px]">
-        <div className="flex justify-center mb-10">
+      {/* Holographic scanning grids & scanline telemetry */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.03]" style={{ backgroundImage: "radial-gradient(#4f46e5 2px, transparent 2px)", backgroundSize: "40px 40px" }} />
+      <div className="absolute w-[600px] h-[600px] rounded-full bg-indigo-500/5 blur-[120px] pointer-events-none" />
+      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-40 animate-pulse pointer-events-none" style={{ animationDuration: '3s' }} />
+
+      <div className="relative z-10 w-full max-w-[440px]">
+        {/* Brand logo top-center */}
+        <div className="flex justify-center mb-8">
           <CalTrackLogo size="lg" showTagline={false} />
         </div>
 
-        <div className="bg-white rounded-[2rem] p-8 shadow-xl shadow-indigo-100/40 border border-[#F1F5F9]">
-          <h2 className="text-[24px] font-black text-[#0F172A] leading-tight mb-2 text-center">Set New Password</h2>
-          
+        <div className="bg-slate-900/60 backdrop-blur-xl rounded-[2rem] p-8 sm:p-10 border border-slate-800 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
           {success ? (
-            <div className="text-center py-6">
-              <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 size={32} className="text-green-500" />
-              </div>
-              <p className="text-sm font-medium text-[#64748B] mb-8">Your password has been successfully reset. You can now use your new password to sign in.</p>
-              <button onClick={() => navigate("/login")} className="w-full py-4 bg-indigo-600 text-white text-[13px] font-black uppercase tracking-widest rounded-2xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">
-                Back to Sign In
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-5 mt-8">
-              <p className="text-[13px] font-medium text-[#64748B] text-center mb-6">Create a strong new password for your account.</p>
-              
-              <div className="relative group">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8] group-focus-within:text-indigo-600 transition-colors" size={18} />
-                <input
-                  type="password"
-                  className="w-full pl-14 pr-5 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]"
-                  placeholder="New Password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center py-4 space-y-6"
+            >
+              {/* Blue Holographic Wave / Floating Particles background */}
+              <div className="relative flex justify-center py-6">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-32 h-32 rounded-full border border-indigo-500/30 animate-ping" style={{ animationDuration: "3s" }} />
+                  <div className="w-24 h-24 rounded-full border border-cyan-500/25 animate-pulse" style={{ animationDuration: "2s" }} />
+                  {[...Array(6)].map((_, i) => (
+                    <span 
+                      key={i} 
+                      className="absolute w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse"
+                      style={{ 
+                        top: `${20 + Math.random() * 60}%`, 
+                        left: `${20 + Math.random() * 60}%`,
+                        animationDelay: `${i * 0.25}s`,
+                        animationDuration: `${1.2 + Math.random() * 1.8}s`
+                      }}
+                    />
+                  ))}
+                </div>
+                
+                {/* Shield unlock animation */}
+                <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-450 shadow-[0_0_20px_rgba(16,185,129,0.25)] animate-pulse">
+                  <ShieldCheck size={40} className="transform transition-transform scale-110" />
+                </div>
               </div>
 
-              <div className="relative group">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8] group-focus-within:text-indigo-600 transition-colors" size={18} />
-                <input
-                  type="password"
-                  className="w-full pl-14 pr-5 py-5 bg-[#F8FAFC] border border-[#F1F5F9] rounded-2xl text-[15px] font-medium focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-[#94A3B8]"
-                  placeholder="Confirm New Password"
-                  value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)}
-                  required
-                />
+              <div className="space-y-2">
+                <h2 className="text-xl font-display font-black text-emerald-450 tracking-wider uppercase">
+                  ✓ ACCESS RESTORED
+                </h2>
+                <p className="text-[11px] font-mono text-slate-400 uppercase tracking-widest">
+                  Authentication Credentials Updated
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-950/50 border border-slate-800 text-left space-y-4 font-mono">
+                <div>
+                  <div className="text-[10px] uppercase text-slate-500 tracking-wider">Employee ID:</div>
+                  <div className="text-sm font-bold text-slate-350">{employeeId}</div>
+                </div>
+
+                <div className="border-t border-slate-800 pt-3 flex items-center justify-between">
+                  <span className="text-[10px] uppercase text-slate-500 font-medium">System Status:</span>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold border border-emerald-500/25">
+                    ONLINE
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-400 animate-pulse pt-2 font-mono">
+                Redirecting To Workforce Portal...
+              </p>
+            </motion.div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="text-center">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-[9px] font-mono uppercase tracking-widest bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 mb-3">
+                  Phase 04 — New Password Creation
+                </span>
+                <h1 className="text-lg font-display font-black text-slate-200 tracking-wider uppercase">
+                  SECURE ACCESS RESTORATION
+                </h1>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono uppercase text-slate-500 tracking-wider block ml-1">New Password</label>
+                  <div className="relative group">
+                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      className="w-full pl-14 pr-12 py-4 bg-slate-950/50 border border-slate-800 rounded-2xl text-[14px] font-medium text-slate-350 focus:bg-slate-950 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-slate-600 font-mono"
+                      placeholder="••••••••••••••••"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      required
+                    />
+                    <button type="button" className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-350 transition-colors" onClick={() => setShowPassword(p => !p)}>
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-mono uppercase text-slate-500 tracking-wider block ml-1">Confirm Password</label>
+                  <div className="relative group">
+                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors" size={18} />
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      className="w-full pl-14 pr-12 py-4 bg-slate-950/50 border border-slate-800 rounded-2xl text-[14px] font-medium text-slate-350 focus:bg-slate-950 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all placeholder:text-slate-600 font-mono"
+                      placeholder="••••••••••••••••"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      required
+                    />
+                    <button type="button" className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-350 transition-colors" onClick={() => setShowConfirmPassword(p => !p)}>
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Password Strength display and list */}
+              <div className="p-4 rounded-2xl bg-slate-950/30 border border-slate-800 space-y-3 font-mono">
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-slate-500 uppercase tracking-wider">Password Strength</span>
+                  <span className={`font-bold ${
+                    strengthPercent >= 80 ? "text-emerald-400" :
+                    strengthPercent >= 50 ? "text-amber-400" :
+                    password ? "text-rose-400" : "text-slate-600"
+                  }`}>
+                    {strengthBar} {strengthPercent}%
+                  </span>
+                </div>
+
+                <div className="border-t border-slate-800/80 my-2" />
+
+                <div className="space-y-2">
+                  <span className="text-[9px] uppercase text-slate-600 tracking-wider block mb-1">Requirements</span>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] font-semibold">
+                    <div className="flex items-center gap-2">
+                      <Check size={14} className={hasEightChars ? "text-emerald-400" : "text-slate-600"} strokeWidth={3} />
+                      <span className={hasEightChars ? "text-slate-350" : "text-slate-500"}>8+ Characters</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check size={14} className={hasUpper ? "text-emerald-400" : "text-slate-600"} strokeWidth={3} />
+                      <span className={hasUpper ? "text-slate-350" : "text-slate-500"}>Uppercase Letter</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check size={14} className={hasNumber ? "text-emerald-400" : "text-slate-600"} strokeWidth={3} />
+                      <span className={hasNumber ? "text-slate-350" : "text-slate-500"}>Number</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Check size={14} className={hasSymbol ? "text-emerald-400" : "text-slate-600"} strokeWidth={3} />
+                      <span className={hasSymbol ? "text-slate-350" : "text-slate-500"}>Special Symbol</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {error && (
-                <div className="p-4 bg-red-50 text-red-600 text-xs font-bold rounded-2xl border border-red-100 flex items-center gap-3">
+                <div className="p-4 bg-rose-500/10 text-rose-500 text-xs font-semibold rounded-2xl border border-rose-500/20 flex items-center gap-3">
                   <AlertCircle size={15} /> {error}
                 </div>
               )}
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full py-5 bg-indigo-600 text-white text-[13px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-indigo-100/50 hover:bg-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:shadow-none mt-2"
+                disabled={loading || strengthPercent < 100}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[12px] font-bold uppercase tracking-widest rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                {loading ? <RefreshCcw className="animate-spin" size={18} /> : "Reset Password"}
+                {loading ? <RefreshCcw className="animate-spin" size={18} /> : "Restore Access"}
               </button>
-              
-              <div className="text-center mt-6">
-                <button type="button" onClick={() => navigate("/login")} className="text-[12px] font-bold text-[#64748B] hover:text-indigo-600 transition-colors">
-                  Cancel
+
+              <div className="text-center pt-2">
+                <button type="button" onClick={() => navigate("/login")} className="text-[11px] font-bold text-slate-500 hover:text-indigo-400 transition-colors">
+                  Cancel Recovery
                 </button>
               </div>
             </form>

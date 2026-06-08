@@ -1,5 +1,11 @@
-import ThemeSwitch from "@/components/ui/theme-switch";
+"use client";
 
-export default function DemoOne() {
-  return <ThemeSwitch />;
+import IntroAnimation from "./scroll-morph-hero";
+
+export default function Demo() {
+    return (
+        <div className="w-full h-[800px] border rounded-lg overflow-hidden relative">
+            <IntroAnimation />
+        </div>
+    );
 }
