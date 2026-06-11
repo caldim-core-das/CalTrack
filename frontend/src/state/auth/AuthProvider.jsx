@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
       // Silent error logging or handling
     }
 
-    if (me?.username && me?.role && me?.company) {
+    if (me?.username && me?.role) {
       const u = {
         username:  me.username,
         email:     me.email      ?? "",

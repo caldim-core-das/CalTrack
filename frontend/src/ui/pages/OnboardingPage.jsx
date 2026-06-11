@@ -44,6 +44,9 @@ export function OnboardingPage() {
   // Step 2
   const [modules, setModules] = useState(["time"])
 
+  // Step 3
+  const [emails, setEmails] = useState(["", "", ""])
+
   const selectedRegion = REGIONS.find(r => r.code === region)
 
   const step1Valid = orgName.trim() && region && (region !== "US" || defaultState.trim())
@@ -52,11 +55,13 @@ export function OnboardingPage() {
     setLoading(true)
     setError("")
     try {
+      const validEmails = emails.map(e => e.trim()).filter(e => e)
       const payload = {
         company_name: orgName.trim(),
         primary_country: region,
         team_size: teamSize,
         selected_modules: modules,
+        invites: validEmails,
       }
       if (region === "US" && defaultState.trim()) {
         payload.default_state = defaultState.trim()
@@ -340,12 +345,30 @@ export function OnboardingPage() {
               </p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
-                <input type="email" className="input" placeholder="alice@example.com" style={{ fontSize: 15, padding: "14px 16px", borderRadius: 12 }} />
-                <input type="email" className="input" placeholder="bob@example.com" style={{ fontSize: 15, padding: "14px 16px", borderRadius: 12 }} />
-                <input type="email" className="input" placeholder="charlie@example.com" style={{ fontSize: 15, padding: "14px 16px", borderRadius: 12 }} />
+                {emails.map((email, i) => (
+                  <input
+                    key={i}
+                    type="email"
+                    className="input"
+                    placeholder={`e.g. colleague${i + 1}@example.com`}
+                    value={email}
+                    onChange={e => {
+                      const newEmails = [...emails]
+                      newEmails[i] = e.target.value
+                      setEmails(newEmails)
+                    }}
+                    style={{ fontSize: 15, padding: "14px 16px", borderRadius: 12 }}
+                  />
+                ))}
               </div>
 
-              <button className="btn btnGhost" style={{ fontSize: 13, fontWeight: 800, color: "#5d5fef", marginBottom: 32 }}>+ ADD MORE</button>
+              <button 
+                className="btn btnGhost" 
+                onClick={() => setEmails([...emails, ""])}
+                style={{ fontSize: 13, fontWeight: 800, color: "#5d5fef", marginBottom: 32 }}
+              >
+                + ADD MORE
+              </button>
 
               {/* Summary strip */}
               <div style={{ padding: "14px 18px", borderRadius: 12, background: "var(--bg)", border: "1px solid var(--stroke2)", marginBottom: 24, display: "flex", gap: 20, fontSize: 12, color: "var(--muted)" }}>

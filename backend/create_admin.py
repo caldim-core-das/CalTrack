@@ -25,16 +25,16 @@ try:
 except Company.DoesNotExist:
     print("Demo tenant not found, continuing with public schema (Employee creation may fail)")
 
+from accounts.services import create_organization_admin_user
+
 # ── Admin user ────────────────────────────────────────────────
-admin, created = User.objects.get_or_create(username="admin")
-admin.set_password("admin123")
-admin.role = "admin"
-admin.is_staff = True
-admin.is_superuser = True
-admin.is_active = True
-admin.first_name = "Admin"
-admin.last_name = "User"
-admin.save()
+admin, created = create_organization_admin_user(
+    email="admin",
+    password="admin123",
+    first_name="Admin",
+    last_name="User",
+    is_superuser=True
+)
 print(f"{'Created' if created else 'Updated'} admin  -> username: admin  / password: admin123")
 
 # ── Employee user ─────────────────────────────────────────────
