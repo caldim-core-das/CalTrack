@@ -15,6 +15,13 @@ DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 
+# ── Subpath / Reverse-proxy settings ─────────────────────────────────────────
+# Required when Django is served under a subpath (e.g. /Caltrack/) behind Nginx.
+# Set FORCE_SCRIPT_NAME=/Caltrack in production .env
+FORCE_SCRIPT_NAME = os.getenv("FORCE_SCRIPT_NAME", "")
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 SHARED_APPS = [
     "daphne",
     "django_tenants",
@@ -82,21 +89,27 @@ USE_POSTGRES = os.getenv("DB_NAME") or os.getenv("DB_HOST")
 
 if USE_POSTGRES:
     DATABASE_ROUTERS = ('django_tenants.routers.TenantSyncRouter',)
+
+    # Build OPTIONS dynamically — sslmode is opt-in via DB_SSLMODE env var.
+    # Docker local PostgreSQL: leave DB_SSLMODE unset (no SSL).
+    # Supabase / any remote TLS host: set DB_SSLMODE=require in .env.
+    _db_options = {}
+    _sslmode = os.getenv("DB_SSLMODE", "")
+    if _sslmode:
+        _db_options["sslmode"] = _sslmode
+    _stmt_timeout = os.getenv("DB_STATEMENT_TIMEOUT", "")
+    if _stmt_timeout:
+        _db_options["options"] = f"-c statement_timeout={_stmt_timeout}"
+
     DATABASES = {
         "default": {
             "ENGINE": "django_tenants.postgresql_backend",
-            "NAME": os.getenv("DB_NAME", "postgres"),
-            "USER": os.getenv("DB_USER", "postgres"),
+            "NAME": os.getenv("DB_NAME", "caltrack"),
+            "USER": os.getenv("DB_USER", "caltrack_user"),
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "localhost"),
             "PORT": os.getenv("DB_PORT", "5432"),
-            "OPTIONS": {
-                "sslmode": "require",
-                # Keep prepared statements off with pgBouncer (transaction pooling)
-                "options": "-c statement_timeout=30000",
-            },
-            # Set to 0 to immediately release connections and avoid EMAXCONNSESSION
-            # since Supabase free tier has a 15 connection limit
+            "OPTIONS": _db_options,
             "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "0")),
             "CONN_HEALTH_CHECKS": True,
         }
@@ -264,12 +277,18 @@ AUTH_COOKIE_SAMESITE = os.getenv("AUTH_COOKIE_SAMESITE", "Lax" if DEBUG else "St
 # CORS_ALLOW_ALL_ORIGINS + CORS_ALLOW_CREDENTIALS together are rejected by browsers.
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
+    # Local development
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
     "http://localhost:5175",
     "http://127.0.0.1:5175",
+    # Production VPS
+    "https://caldimproducts.com",
+    "http://caldimproducts.com",
+    "https://www.caldimproducts.com",
+    "http://www.caldimproducts.com",
 ]
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://.*\.localhost:517[3-5]$",
@@ -277,6 +296,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
+    # Local development
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:5174",
@@ -289,11 +309,18 @@ CSRF_TRUSTED_ORIGINS = [
     "http://*.127.0.0.1:5173",
     "http://*.127.0.0.1:5174",
     "http://*.127.0.0.1:5175",
+    # Production VPS
+    "https://caldimproducts.com",
+    "http://caldimproducts.com",
+    "https://www.caldimproducts.com",
+    "http://www.caldimproducts.com",
 ]
 
 
-MEDIA_URL = "/media/"
+MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 MEDIA_ROOT = BASE_DIR / "media"
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # ── Django Channels ──────────────────────────────────────────────────────────
 if DEBUG:
@@ -336,3 +363,5 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "True") == "True"
+

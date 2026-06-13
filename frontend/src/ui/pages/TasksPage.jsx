@@ -20,6 +20,15 @@ import { ClipboardList, Clock, CheckCircle2, AlertCircle, MapPin, Calendar as Ca
 import { SelfieCapture, getPosition } from "./TimePage.jsx"
 import { verifyFaces } from "../../utils/faceVerify.js"
 
+const BACKEND_HTTP_HOST = import.meta.env.PROD
+  ? `${window.location.origin}/Caltrack`
+  : "http://localhost:8000"
+
+const BACKEND_WS_HOST = import.meta.env.PROD
+  ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/Caltrack`
+  : "ws://localhost:8000"
+
+
 // Custom hook to detect if dark mode is active
 function useDarkMode() {
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"))
@@ -800,7 +809,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     // Connect to employee tracking WebSocket
     const WS_BASE =
       (typeof import.meta !== "undefined" && import.meta.env?.VITE_WS_BASE_URL) ||
-      "ws://localhost:8000"
+      BACKEND_WS_HOST
 
     try {
       const ws = new WebSocket(`${WS_BASE}/ws/live/employee/`)
@@ -1009,7 +1018,8 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     
     let startPhotoUrl = task.start_photo
     if (startPhotoUrl && startPhotoUrl.startsWith('/')) {
-      const host = "http://localhost:8000"
+      const host = BACKEND_HTTP_HOST
+
       startPhotoUrl = `${host}${startPhotoUrl}`;
     }
 
@@ -2708,7 +2718,8 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                               <span className="text-[9px] font-black text-slate-400 uppercase">Start Photo</span>
                               <div className="w-full h-32 rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
                                 {task.start_photo ? (
-                                  <img src={`http://localhost:8000${task.start_photo}`} className="w-full h-full object-contain" />
+                                  <img src={`${BACKEND_HTTP_HOST}${task.start_photo}`} className="w-full h-full object-contain" />
+
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-400 font-bold uppercase">No Start Photo</div>
                                 )}

@@ -9,7 +9,12 @@
  * also fails the user is signed out via the session-expired event.
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api"
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (
+  import.meta.env.PROD
+    ? `${window.location.origin}/Caltrack/api`
+    : "http://localhost:8000/api"
+)
+
 
 // Track offline state so the banner can be shown once
 let _offline = false

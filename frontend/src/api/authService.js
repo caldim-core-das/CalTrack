@@ -7,7 +7,12 @@
  * the browser automatically attaches and receives cookies.
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api"
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (
+  import.meta.env.PROD
+    ? `${window.location.origin}/Caltrack/api`
+    : "http://localhost:8000/api"
+)
+
 
 async function fetchJSON(path, options = {}) {
   const url = `${API_BASE_URL}${path}`

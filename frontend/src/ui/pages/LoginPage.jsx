@@ -2,7 +2,8 @@ import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { useAuth } from "../../state/auth/useAuth.js"
-import { extractAuthError, apiDeleteRegistrationDossier } from "../../api/authService.js"
+import { extractAuthError, apiDeleteRegistrationDossier, API_BASE_URL } from "../../api/authService.js"
+
 import { validateLoginForm } from "../../utils/validate.js"
 import { routes } from "../routes.js"
 import { useGoogleLogin } from "@react-oauth/google"
@@ -232,8 +233,9 @@ export function LoginPage() {
     await new Promise(r => setTimeout(r, 1500))
     
     try {
-      const response = await fetch("http://localhost:8000/api/auth/password-reset/verify-identity/", {
+      const response = await fetch(`${API_BASE_URL}/auth/password-reset/verify-identity/`, {
         method: "POST",
+
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identity: identityInput.trim() })
       })

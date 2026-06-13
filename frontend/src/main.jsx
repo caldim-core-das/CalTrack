@@ -38,7 +38,7 @@ const rootEl = document.getElementById("root");
 createRoot(rootEl).render(
   <StrictMode>
     <ReduxProvider store={store}>
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <BrowserRouter basename="/Caltrack" future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <GoogleOAuthProvider clientId={googleClientId}>
           <AuthProvider>
             <App />
