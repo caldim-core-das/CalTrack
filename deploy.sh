@@ -50,7 +50,8 @@ else
 fi
 
 cd "$APP_DIR"
-docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml --env-file backend/.env up -d
+
 
 echo "  Waiting 15 seconds for PostgreSQL to be ready..."
 sleep 15
