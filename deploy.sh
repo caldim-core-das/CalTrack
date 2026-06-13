@@ -76,7 +76,8 @@ python manage.py migrate --noinput
 
 # ─── 6. Collect static files ─────────────────────────────────────────────────
 echo "[6/9] Collecting static files..."
-python manage.py collectstatic_schemas --noinput
+python manage.py collectstatic --noinput
+
 
 
 # ─── 7. Build and Copy React frontend build ──────────────────────────────────
