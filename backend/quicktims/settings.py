@@ -29,12 +29,14 @@ SHARED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
+    "django.contrib.staticfiles",
     "accounts",
     "corsheaders",
     "rest_framework",
     "channels",
     "django_celery_beat",
 ]
+
 
 TENANT_APPS = [
     "django.contrib.contenttypes",
