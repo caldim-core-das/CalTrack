@@ -76,6 +76,16 @@ class JWTTenantAuthMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "websocket":
+            # Strip FORCE_SCRIPT_NAME prefix if set (e.g., /Caltrack)
+            script_name = getattr(settings, "FORCE_SCRIPT_NAME", "")
+            if script_name:
+                if scope["path"].startswith(script_name):
+                    scope["path"] = scope["path"][len(script_name):]
+                if "raw_path" in scope:
+                    script_name_bytes = script_name.encode("utf-8")
+                    if scope["raw_path"].startswith(script_name_bytes):
+                        scope["raw_path"] = scope["raw_path"][len(script_name_bytes):]
+
             # 1. Try cookie (preferred — JS-invisible)
             token_string = _extract_cookie_token(scope)
 

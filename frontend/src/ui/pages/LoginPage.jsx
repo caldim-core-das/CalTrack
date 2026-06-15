@@ -81,7 +81,10 @@ const CARDS = [
     title: "Insights Engine",
     desc: "1. AI-powered workforce trend predictions\n2. Attrition risk scoring per employee\n3. Engagement survey result analysis\n4. Absenteeism pattern recognition\n5. Seasonal demand forecasting\n6. Cost saving opportunity identification\n7. Benchmark against industry standards\n8. Custom KPI dashboard builder\n9. Real-time data pipeline monitoring\n10. Automated insight notifications"
   },
-]
+].map(card => ({
+  ...card,
+  src: card.src.startsWith("http") ? card.src : `${import.meta.env.BASE_URL || "/"}${card.src.replace(/^\//, "")}`
+}))
 
 /* ─── FLOATING CYBER CARD ─── */
 function HoloCard({ card, index, onSelect }) {
