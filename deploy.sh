@@ -135,7 +135,7 @@ WorkingDirectory=/var/www/Caltrack/backend
 EnvironmentFile=/var/www/Caltrack/backend/.env
 ExecStart=/var/www/Caltrack/backend/.venv/bin/daphne \
           -b 127.0.0.1 \
-          -p 8001 \
+          -p 8002 \
           quicktims.asgi:application
 Restart=always
 RestartSec=5
