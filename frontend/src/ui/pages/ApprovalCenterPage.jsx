@@ -108,11 +108,10 @@ export function ApprovalCenterPage() {
       docForm: dossier?.docForm || {
         aadhaarId: "",
         panId: "",
-        bankAcc: "",
-        ifscCode: "",
+        drivingLicenseId: "",
         aadhaarFile: "—",
         panFile: "—",
-        bankPassbookFile: "—",
+        drivingLicenseFile: "—",
         isCompleted: false,
         confidenceScore: 0
       },
@@ -256,20 +255,19 @@ export function ApprovalCenterPage() {
     alert(`Employee ${activeEmployee.name} Application Rejected`)
   }
 
-  // Queue: only show the real registered employee from the dossier
+  // Queue: only show the real registered employee from the dossier if pending review
   const queueEmployees = useMemo(() => {
     if (!dossier?.regForm?.fullName) return []
+    if (dossier?.adminClearance?.status === "approved" || dossier?.adminClearance?.status === "rejected") {
+      return []
+    }
     return [
       {
         id: "EMP-2048",
         name: dossier.regForm.fullName,
         regDate: dossier.regForm.regDate || "—",
         trustScore: dossier.trustScore || 0,
-        status: dossier?.adminClearance?.status === "approved"
-          ? "Approved"
-          : dossier?.adminClearance?.status === "rejected"
-          ? "Rejected"
-          : "Pending Review"
+        status: "Pending Review"
       }
     ]
   }, [dossier])
@@ -485,13 +483,13 @@ export function ApprovalCenterPage() {
 
           <div className="p-4 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between h-28 bg-slate-50 dark:bg-slate-950/20">
             <div>
-              <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Bank Passbook</span>
+              <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">Driving License</span>
               <span className="text-xs font-black text-slate-800 dark:text-slate-250 mt-1 block truncate">
-                {activeEmployee?.docForm?.bankPassbookFile || "bank_ledger.pdf"}
+                {activeEmployee?.docForm?.drivingLicenseFile || "driving_license.pdf"}
               </span>
             </div>
-            <Button onClick={() => setShowDocModal("passbook")} className="h-8 w-full mt-2 gap-1.5">
-              <Eye size={12} /> View Passbook
+            <Button onClick={() => setShowDocModal("license")} className="h-8 w-full mt-2 gap-1.5">
+              <Eye size={12} /> View License
             </Button>
           </div>
         </div>
@@ -516,13 +514,9 @@ export function ApprovalCenterPage() {
             <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">PAN Match (98%)</span>
             <span className="text-[10px] font-mono text-slate-900 dark:text-slate-200 mt-1 block">{activeEmployee?.docForm?.panId || "BCHPA8892P"}</span>
           </div>
-          <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Bank Account Routing</span>
-            <span className="text-[10px] font-mono text-slate-900 dark:text-slate-205 mt-1 block">{activeEmployee?.docForm?.bankAcc || "99821882910"}</span>
-          </div>
-          <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">IFSC Route Code</span>
-            <span className="text-[10px] font-mono text-slate-900 dark:text-slate-205 mt-1 block">{activeEmployee?.docForm?.ifscCode || "SBIN0003019"}</span>
+          <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800 col-span-2">
+            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Driving License ID</span>
+            <span className="text-[10px] font-mono text-slate-900 dark:text-slate-200 mt-1 block">{activeEmployee?.docForm?.drivingLicenseId || "DL-1420110023456"}</span>
           </div>
         </div>
       </div>
@@ -590,86 +584,6 @@ export function ApprovalCenterPage() {
         </div>
       </div>
 
-      {/* 8. Verification Call */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-            <span className="text-indigo-500">8️⃣</span> Verification Call
-          </h3>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${activeEmployee?.interviewState?.isCompleted ? 'text-emerald-600 bg-emerald-50 border-emerald-250 dark:bg-emerald-900/20 dark:border-emerald-800' : 'text-slate-500 bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800'}`}>
-            {activeEmployee?.interviewState?.isCompleted ? "✓ CALL VERIFIED" : "PENDING CALL"}
-          </span>
-        </div>
-        <div className="grid grid-cols-3 gap-6 text-xs font-semibold mb-2">
-          <div>
-            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Call Status</span>
-            <span className="text-slate-800 dark:text-slate-250">{activeEmployee?.interviewState?.isCompleted ? "Completed" : "Awaiting Call"}</span>
-          </div>
-          <div>
-            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Duration</span>
-            <span className="text-slate-800 dark:text-slate-250">{activeEmployee?.interviewState?.isCompleted ? `${activeEmployee?.interviewState?.callDuration || 12} Minutes` : "0 Minutes"}</span>
-          </div>
-          <div>
-            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Agent Notes</span>
-            <span className="text-emerald-600 font-bold">{activeEmployee?.interviewState?.isCompleted ? "Available" : "Not Started"}</span>
-          </div>
-        </div>
-        {activeEmployee?.interviewState?.interviewLogs && activeEmployee.interviewState.interviewLogs.length > 0 ? (
-          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800/80 text-[10px] font-mono leading-relaxed text-slate-500 max-h-36 overflow-y-auto">
-            {activeEmployee.interviewState.interviewLogs.map((log, lidx) => (
-              <div key={lidx} className="mb-2">
-                <div className="font-bold text-slate-700 dark:text-slate-350">Q: {(log.question || "").replace(/Officer Sarah|Interviewer:/, "").trim()}</div>
-                <div className="text-blue-500">A: {log.answer || ""}</div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800/80 text-[10px] font-mono text-center text-slate-400">
-            No verification call logs available yet.
-          </div>
-        )}
-      </div>
-
-      {/* 9. AI Trust Report */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
-        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-            <span className="text-indigo-500">9️⃣</span> AI Trust Report
-          </h3>
-          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800">
-            ✓ SECURE SYSTEM RECOMMENDATION
-          </span>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-xs font-semibold mb-4">
-          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
-            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Trust Score</span>
-            <span className="text-emerald-600 font-black">{activeEmployee.trustScore}%</span>
-          </div>
-          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
-            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Fraud Risk</span>
-            <span className={fraudRisk === "Low" ? "text-slate-850 dark:text-slate-200" : "text-amber-500 font-bold"}>{fraudRisk}</span>
-          </div>
-          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
-            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Duplicate IP</span>
-            <span className="text-slate-850 dark:text-slate-200">None</span>
-          </div>
-          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
-            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Document Risk</span>
-            <span className={docRisk === "Low" ? "text-slate-850 dark:text-slate-200" : "text-amber-500 font-bold"}>{docRisk}</span>
-          </div>
-          <div className="p-3 bg-slate-50 dark:bg-slate-950/20 border border-slate-100 dark:border-slate-800 rounded-xl">
-            <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Identity Risk</span>
-            <span className={identityRisk === "Low" ? "text-slate-850 dark:text-slate-200" : "text-amber-500 font-bold"}>{identityRisk}</span>
-          </div>
-        </div>
-        <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-250 dark:border-emerald-800 rounded-xl flex items-center justify-between">
-          <div>
-            <span className="text-[8px] text-emerald-700 dark:text-emerald-500 font-black uppercase block tracking-wider">AI Recommendation</span>
-            <span className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest font-mono">APPROVE EMPLOYEE</span>
-          </div>
-          <Cpu size={24} className="text-emerald-600 dark:text-emerald-500/50 animate-pulse" />
-        </div>
-      </div>
 
       {/* Audit Timeline */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 space-y-4 shadow-sm">
@@ -876,12 +790,24 @@ export function ApprovalCenterPage() {
 
         {/* Right Column: Verification Dossier */}
         <div className="flex-grow flex flex-col bg-slate-50 dark:bg-slate-950 relative overflow-hidden">
-          
-          {/* Scrollable dossier content */}
-          {renderDossierContent()}
+          {queueEmployees.length > 0 ? (
+            <>
+              {/* Scrollable dossier content */}
+              {renderDossierContent()}
 
-          {renderDecisionPanel()}
-
+              {renderDecisionPanel()}
+            </>
+          ) : (
+            <div className="flex-grow flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-4">
+              <div className="w-20 h-20 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 flex items-center justify-center text-slate-400 dark:text-slate-500 shadow-sm">
+                <CheckCircle2 size={36} className="text-slate-400 dark:text-slate-500" />
+              </div>
+              <div className="space-y-1.5">
+                <h3 className="text-sm font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 font-mono">Queue Cleared</h3>
+                <p className="text-xs text-slate-500 max-w-sm">No technician registration dossiers are currently awaiting admin clearance.</p>
+              </div>
+            </div>
+          )}
         </div>
 
       </div>
@@ -932,84 +858,98 @@ export function ApprovalCenterPage() {
 
       {/* ── DOCUMENT PREVIEW MODAL ── */}
       {showDocModal && createPortal(
-        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl h-[85vh] overflow-hidden shadow-2xl p-6 flex flex-col">
-            <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-850 shrink-0">
-              <h3 className="text-sm font-black uppercase tracking-wider text-slate-850 dark:text-white">
-                Document Preview: {showDocModal === "aadhaar" ? "Aadhaar Card" : showDocModal === "pan" ? "PAN Card" : "Bank Passbook"}
-              </h3>
-              <button onClick={() => setShowDocModal(null)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-850 text-slate-400">
-                <X size={18} />
-              </button>
-            </div>
-            
-            {/* Holographic simulated document view or original uploaded image */}
-            {activeEmployee.docForm?.[
-              showDocModal === "aadhaar" ? "aadhaarFileFileData" :
-              showDocModal === "pan" ? "panFileFileData" :
-              showDocModal === "passbook" ? "bankPassbookFileFileData" : ""
-            ] ? (
-              <div className="mt-6 flex-1 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden shadow-inner relative group min-h-0">
-                <img 
-                  src={activeEmployee.docForm[
-                    showDocModal === "aadhaar" ? "aadhaarFileFileData" :
-                    showDocModal === "pan" ? "panFileFileData" :
-                    showDocModal === "passbook" ? "bankPassbookFileFileData" : ""
-                  ]} 
-                  alt="Original Government Document" 
-                  className="w-full h-full object-contain transition-all duration-300 group-hover:scale-105"
-                />
-                <div className="absolute top-3 right-3 px-2 py-0.5 rounded text-[8px] font-black font-orbitron bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 tracking-wider">
-                  ORIGINAL UPLOAD
+        (() => {
+          const fileData = activeEmployee.docForm?.[
+            showDocModal === "aadhaar" ? "aadhaarFileFileData" :
+            showDocModal === "pan" ? "panFileFileData" :
+            showDocModal === "license" ? "drivingLicenseFileFileData" : ""
+          ];
+          const isPdf = fileData && (
+            fileData.startsWith("data:application/pdf") || 
+            fileData.startsWith("data:application/octet-stream") ||
+            fileData.includes("application/pdf")
+          );
+          return (
+            <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-5xl h-[85vh] overflow-hidden shadow-2xl p-6 flex flex-col">
+                <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-slate-850 shrink-0">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-850 dark:text-white">
+                    Document Preview: {showDocModal === "aadhaar" ? "Aadhaar Card" : showDocModal === "pan" ? "PAN Card" : "Driving License"}
+                  </h3>
+                  <button onClick={() => setShowDocModal(null)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-850 text-slate-400">
+                    <X size={18} />
+                  </button>
                 </div>
-              </div>
-            ) : (
-              <div className="mt-6 flex-1 bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 rounded-2xl border border-indigo-500/20 p-6 flex flex-col justify-between text-white relative overflow-hidden shadow-inner font-mono min-h-0">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent)]" />
                 
-                <div className="flex justify-between items-start z-10">
-                  <div>
-                    <div className="text-[8px] text-indigo-400 font-bold uppercase tracking-widest">CALTRACK AUDIT MATRIX</div>
-                    <div className="text-xs font-black uppercase tracking-widest mt-1">
-                      {showDocModal === "aadhaar" ? "UNION OF INDIA AADHAAR CARD" : showDocModal === "pan" ? "INCOME TAX DEPARTMENT GOVT. OF INDIA" : "STATE BANK OF RETAIL SYSTEM"}
+                {/* Holographic simulated document view or original uploaded image/pdf */}
+                {fileData ? (
+                  <div className="mt-6 flex-1 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden shadow-inner relative group min-h-0">
+                    {isPdf ? (
+                      <embed 
+                        src={fileData} 
+                        type="application/pdf" 
+                        className="w-full h-full rounded-2xl"
+                      />
+                    ) : (
+                      <img 
+                        src={fileData} 
+                        alt="Original Government Document" 
+                        className="w-full h-full object-contain transition-all duration-300 group-hover:scale-105"
+                      />
+                    )}
+                    <div className="absolute top-3 right-3 px-2 py-0.5 rounded text-[8px] font-black font-orbitron bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 tracking-wider">
+                      ORIGINAL UPLOAD
                     </div>
                   </div>
-                  <ShieldCheck size={28} className="text-indigo-400/40" />
-                </div>
+                ) : (
+                  <div className="mt-6 flex-1 bg-gradient-to-tr from-slate-900 via-indigo-950 to-slate-900 rounded-2xl border border-indigo-500/20 p-6 flex flex-col justify-between text-white relative overflow-hidden shadow-inner font-mono min-h-0">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent)]" />
+                    
+                    <div className="flex justify-between items-start z-10">
+                      <div>
+                        <div className="text-[8px] text-indigo-400 font-bold uppercase tracking-widest">CALTRACK AUDIT MATRIX</div>
+                        <div className="text-xs font-black uppercase tracking-widest mt-1">
+                          {showDocModal === "aadhaar" ? "UNION OF INDIA AADHAAR CARD" : showDocModal === "pan" ? "INCOME TAX DEPARTMENT GOVT. OF INDIA" : "TRANSPORT DEPARTMENT GOVT. OF INDIA"}
+                        </div>
+                      </div>
+                      <ShieldCheck size={28} className="text-indigo-400/40" />
+                    </div>
 
-                <div className="flex gap-4 items-center z-10 mt-3">
-                  <div className="w-14 h-14 bg-slate-950/60 border border-slate-800 rounded flex items-center justify-center shrink-0 overflow-hidden">
-                    {activeEmployee.regForm?.profilePic ? (
-                      <img src={activeEmployee.regForm.profilePic} alt="Profile" className="w-full h-full object-cover filter grayscale contrast-125" />
-                    ) : (
-                      <Fingerprint className="text-indigo-400/40 w-8 h-8" />
-                    )}
-                  </div>
-                  <div className="text-[9px] text-slate-300 space-y-1">
-                    <div>NAME: {activeEmployee.name}</div>
-                    <div>ID TYPE: {showDocModal === "aadhaar" ? "UIDAI / AADHAAR" : showDocModal === "pan" ? "ITD / PAN" : "BANK LEDGER"}</div>
-                    <div>DOC NUMBER: {
-                      showDocModal === "aadhaar" ? (activeEmployee.docForm?.aadhaarId || "3662-8829-1092") :
-                      showDocModal === "pan" ? (activeEmployee.docForm?.panId || "BCHPA8892P") :
-                      (activeEmployee.docForm?.bankAcc || "99821882910")
-                    }</div>
-                  </div>
-                </div>
+                    <div className="flex gap-4 items-center z-10 mt-3">
+                      <div className="w-14 h-14 bg-slate-950/60 border border-slate-800 rounded flex items-center justify-center shrink-0 overflow-hidden">
+                        {activeEmployee.regForm?.profilePic ? (
+                          <img src={activeEmployee.regForm.profilePic} alt="Profile" className="w-full h-full object-cover filter grayscale contrast-125" />
+                        ) : (
+                          <Fingerprint className="text-indigo-400/40 w-8 h-8" />
+                        )}
+                      </div>
+                      <div className="text-[9px] text-slate-300 space-y-1">
+                        <div>NAME: {activeEmployee.name}</div>
+                        <div>ID TYPE: {showDocModal === "aadhaar" ? "UIDAI / AADHAAR" : showDocModal === "pan" ? "ITD / PAN" : "TRANSPORT / DL"}</div>
+                        <div>DOC NUMBER: {
+                          showDocModal === "aadhaar" ? (activeEmployee.docForm?.aadhaarId || "3662-8829-1092") :
+                          showDocModal === "pan" ? (activeEmployee.docForm?.panId || "BCHPA8892P") :
+                          (activeEmployee.docForm?.drivingLicenseId || "DL-1420110023456")
+                        }</div>
+                      </div>
+                    </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex justify-between text-[7px] text-slate-500 font-semibold z-10 uppercase tracking-widest">
-                  <span>SECURITY CHECK: PASSED</span>
-                  <span>MATCH RATIO: 99%</span>
+                    <div className="mt-4 pt-3 border-t border-slate-800/80 flex justify-between text-[7px] text-slate-500 font-semibold z-10 uppercase tracking-widest">
+                      <span>SECURITY CHECK: PASSED</span>
+                      <span>MATCH RATIO: 99%</span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-850 shrink-0">
+                  <Button onClick={() => setShowDocModal(null)} className="h-10 px-5 font-bold">
+                    Close Preview
+                  </Button>
                 </div>
               </div>
-            )}
-            
-            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100 dark:border-slate-850 shrink-0">
-              <Button onClick={() => setShowDocModal(null)} className="h-10 px-5 font-bold">
-                Close Preview
-              </Button>
             </div>
-          </div>
-        </div>,
+          );
+        })(),
         document.body
       )}
 

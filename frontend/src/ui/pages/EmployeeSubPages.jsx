@@ -647,8 +647,7 @@ export function RejectedEmployeesPage() {
     address: "",
     aadhaarId: "",
     panId: "",
-    bankAcc: "",
-    ifscCode: ""
+    drivingLicenseId: ""
   })
   
   const [editError, setEditError] = useState("")
@@ -706,8 +705,7 @@ export function RejectedEmployeesPage() {
       address: dossier.regForm?.address || "",
       aadhaarId: dossier.docForm?.aadhaarId || "",
       panId: dossier.docForm?.panId || "",
-      bankAcc: dossier.docForm?.bankAcc || "",
-      ifscCode: dossier.docForm?.ifscCode || ""
+      drivingLicenseId: dossier.docForm?.drivingLicenseId || ""
     })
     setEditError("")
   }
@@ -730,8 +728,7 @@ export function RejectedEmployeesPage() {
         ...dossier.docForm,
         aadhaarId: editForm.aadhaarId,
         panId: editForm.panId,
-        bankAcc: editForm.bankAcc,
-        ifscCode: editForm.ifscCode
+        drivingLicenseId: editForm.drivingLicenseId
       }
       
       await apiSaveRegistrationDossier(dossier)
@@ -883,13 +880,9 @@ export function RejectedEmployeesPage() {
                 <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">PAN ID</span>
                 <span className="text-slate-900 dark:text-white font-mono">{viewingItem.dossier?.docForm?.panId || "—"}</span>
               </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Bank Account</span>
-                <span className="text-slate-900 dark:text-white font-mono">{viewingItem.dossier?.docForm?.bankAcc || "—"}</span>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">IFSC Code</span>
-                <span className="text-slate-900 dark:text-white font-mono">{viewingItem.dossier?.docForm?.ifscCode || "—"}</span>
+              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800 col-span-2">
+                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Driving License ID</span>
+                <span className="text-slate-900 dark:text-white font-mono">{viewingItem.dossier?.docForm?.drivingLicenseId || "—"}</span>
               </div>
             </div>
 
@@ -984,22 +977,13 @@ export function RejectedEmployeesPage() {
                     onChange={e => setEditForm(p => ({ ...p, panId: e.target.value }))}
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block font-mono">Bank Account</label>
+                <div className="space-y-1 col-span-2">
+                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block font-mono">Driving License ID</label>
                   <input
                     type="text"
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                    value={editForm.bankAcc}
-                    onChange={e => setEditForm(p => ({ ...p, bankAcc: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-slate-500 tracking-wider block font-mono">IFSC Code</label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-indigo-500"
-                    value={editForm.ifscCode}
-                    onChange={e => setEditForm(p => ({ ...p, ifscCode: e.target.value }))}
+                    value={editForm.drivingLicenseId}
+                    onChange={e => setEditForm(p => ({ ...p, drivingLicenseId: e.target.value }))}
                   />
                 </div>
               </div>
@@ -1083,7 +1067,7 @@ export function DocumentVaultPage() {
             const fresh = [
               { name: parsed.regForm.fullName, type: "Aadhaar Card", file: parsed.docForm.aadhaarFile || "aadhaar_scan.pdf", check: "OCR Approved (99%)" },
               { name: parsed.regForm.fullName, type: "PAN Card", file: parsed.docForm.panFile || "pan_scan.pdf", check: "OCR Approved (98%)" },
-              { name: parsed.regForm.fullName, type: "Bank Passbook", file: parsed.docForm.bankPassbookFile || "passbook.pdf", check: "Checksum Passed" },
+              { name: parsed.regForm.fullName, type: "Driving License", file: parsed.docForm.drivingLicenseFile || "driving_license.pdf", check: "OCR Approved (99%)" },
             ]
             setVault(fresh)
             return

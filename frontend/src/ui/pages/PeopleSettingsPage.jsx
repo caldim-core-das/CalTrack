@@ -1154,7 +1154,7 @@ export function PeopleSettingsPage() {
                                             <div style={{ fontSize: 13, color: isDark ? "#cbd5e1" : "#334155", display: "flex", flexDirection: "column", gap: 6 }}>
                                                 <div><strong>Aadhaar ID:</strong> {dossierData.docForm.aadhaarId || "—"} ({dossierData.docForm.aadhaarFile || "No file"})</div>
                                                 <div><strong>PAN ID:</strong> {dossierData.docForm.panId || "—"} ({dossierData.docForm.panFile || "No file"})</div>
-                                                <div><strong>Bank Details:</strong> Acc {dossierData.docForm.bankAcc || "—"} (IFSC: {dossierData.docForm.ifscCode || "—"}) - {dossierData.docForm.bankPassbookFile || "No file"}</div>
+                                                <div><strong>Driving License:</strong> ID {dossierData.docForm.drivingLicenseId || "—"} - {dossierData.docForm.drivingLicenseFile || "No file"}</div>
                                             </div>
                                         </div>
 

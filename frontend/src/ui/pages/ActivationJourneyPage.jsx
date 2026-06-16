@@ -408,28 +408,25 @@ const generatePanSVG = (name, profilePic, idNumber) => {
   return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
 };
 
-const generateBankSVG = (name, accNum, ifscCode) => {
-  const number = accNum || "99821882910";
-  const ifsc = ifscCode || "SBIN0003019";
+const generateDrivingLicenseSVG = (name, dlNum) => {
+  const number = dlNum || "DL-1420110023456";
   const cleanName = name ? name.toUpperCase().replace(/'/g, "&apos;") : "CANDIDATE NAME";
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380" width="600" height="380">
-    <rect width="600" height="380" rx="20" fill="#FCFBF9" stroke="#EADBC8" stroke-width="4"/>
-    <rect x="4" y="4" width="592" height="60" rx="16" fill="#1B4F72"/>
-    <text x="300" y="42" fill="#FFFFFF" font-family="sans-serif" font-size="22" font-weight="bold" text-anchor="middle">STATE BANK OF INDIA</text>
-    <text x="300" y="85" fill="#1B4F72" font-family="sans-serif" font-size="16" font-weight="bold" text-anchor="middle">SAVINGS BANK PASSBOOK</text>
+    <rect width="600" height="380" rx="20" fill="#F4F6F7" stroke="#BDC3C7" stroke-width="4"/>
+    <rect x="4" y="4" width="592" height="60" rx="16" fill="#1E8449"/>
+    <text x="300" y="42" fill="#FFFFFF" font-family="sans-serif" font-size="22" font-weight="bold" text-anchor="middle">TRANSPORT DEPARTMENT</text>
+    <text x="300" y="85" fill="#196F3D" font-family="sans-serif" font-size="16" font-weight="bold" text-anchor="middle">DRIVING LICENSE - GOVT. OF INDIA</text>
     <rect x="45" y="120" width="510" height="200" rx="10" fill="#FFFFFF" stroke="#D5DBDB" stroke-width="2"/>
-    <text x="70" y="155" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">Account Holder:</text>
-    <text x="220" y="155" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">${cleanName}</text>
-    <text x="70" y="185" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">Account Number:</text>
-    <text x="220" y="185" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">${number}</text>
-    <text x="70" y="215" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">IFSC Code:</text>
-    <text x="220" y="215" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">${ifsc}</text>
-    <text x="70" y="245" fill="#555" font-family="sans-serif" font-weight="bold">Branch:</text>
-    <text x="220" y="245" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">Gachibowli, Hyderabad</text>
-    <text x="70" y="275" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">MICR Code:</text>
-    <text x="220" y="275" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">500002010</text>
-    <rect x="4" y="340" width="592" height="36" rx="12" fill="#1B4F72"/>
+    <text x="70" y="165" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">Name:</text>
+    <text x="220" y="165" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">${cleanName}</text>
+    <text x="70" y="205" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">License Number:</text>
+    <text x="220" y="205" fill="#B91C1C" font-family="sans-serif" font-size="16" font-weight="bold">${number}</text>
+    <text x="70" y="245" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">Class of Vehicle:</text>
+    <text x="220" y="245" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">LMV / MCWG</text>
+    <text x="70" y="285" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">Validity:</text>
+    <text x="220" y="285" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">Non-Transport: 14/08/2034</text>
+    <rect x="4" y="340" width="592" height="36" rx="12" fill="#1E8449"/>
   </svg>`;
 
   return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
@@ -476,11 +473,10 @@ export function ActivationJourneyPage() {
   const [docForm, setDocForm] = useState({
     aadhaarId: "",
     panId: "",
-    bankAcc: "",
-    ifscCode: "",
+    drivingLicenseId: "",
     aadhaarFile: null,
     panFile: null,
-    bankPassbookFile: null,
+    drivingLicenseFile: null,
     isValidating: false,
     validationLog: [],
     validationProgress: 0,
@@ -736,7 +732,7 @@ export function ActivationJourneyPage() {
   const logConsoleRef = useRef(null)
   const aadhaarInputRef = useRef(null)
   const panInputRef = useRef(null)
-  const bankInputRef = useRef(null)
+  const dlInputRef = useRef(null)
 
   // Auto scroll validation log console in Step 2
   useEffect(() => {
@@ -785,22 +781,22 @@ export function ActivationJourneyPage() {
   useEffect(() => {
     if (docForm.isCompleted && regForm.fullName) {
       setDocForm(prev => {
-        const newAadhaar = prev.aadhaarFile && prev.aadhaarFile.endsWith(".pdf")
-          ? generateAadhaarSVG(regForm.fullName, regForm.profilePic, prev.aadhaarId)
-          : prev.aadhaarFileFileData;
-        const newPan = prev.panFile && prev.panFile.endsWith(".pdf")
-          ? generatePanSVG(regForm.fullName, regForm.profilePic, prev.panId)
-          : prev.panFileFileData;
-        const newBank = prev.bankPassbookFile && prev.bankPassbookFile.endsWith(".pdf")
-          ? generateBankSVG(regForm.fullName, prev.bankAcc, prev.ifscCode)
-          : prev.bankPassbookFileFileData;
+        const newAadhaar = prev.aadhaarFileFileData && !prev.aadhaarFileFileData.startsWith("data:image/svg+xml")
+          ? prev.aadhaarFileFileData
+          : generateAadhaarSVG(regForm.fullName, regForm.profilePic, prev.aadhaarId);
+        const newPan = prev.panFileFileData && !prev.panFileFileData.startsWith("data:image/svg+xml")
+          ? prev.panFileFileData
+          : generatePanSVG(regForm.fullName, regForm.profilePic, prev.panId);
+        const newDL = prev.drivingLicenseFileFileData && !prev.drivingLicenseFileFileData.startsWith("data:image/svg+xml")
+          ? prev.drivingLicenseFileFileData
+          : generateDrivingLicenseSVG(regForm.fullName, prev.drivingLicenseId);
 
-        if (newAadhaar !== prev.aadhaarFileFileData || newPan !== prev.panFileFileData || newBank !== prev.bankPassbookFileFileData) {
+        if (newAadhaar !== prev.aadhaarFileFileData || newPan !== prev.panFileFileData || newDL !== prev.drivingLicenseFileFileData) {
           return {
             ...prev,
             aadhaarFileFileData: newAadhaar,
             panFileFileData: newPan,
-            bankPassbookFileFileData: newBank
+            drivingLicenseFileFileData: newDL
           };
         }
         return prev;
@@ -969,12 +965,12 @@ export function ActivationJourneyPage() {
 
 
   const triggerAIValidation = () => {
-    if (!docForm.aadhaarFile || !docForm.panFile || !docForm.bankPassbookFile) {
-      alert("Please upload Aadhaar, PAN, and Bank details first.")
+    if (!docForm.aadhaarFile || !docForm.panFile || !docForm.drivingLicenseFile) {
+      alert("Please upload Aadhaar, PAN, and Driving License details first.")
       return
     }
-    if (!docForm.aadhaarId || !docForm.panId || !docForm.bankAcc || !docForm.ifscCode) {
-      alert("Please enter Aadhaar, PAN, Bank Account, and IFSC input fields first.")
+    if (!docForm.aadhaarId || !docForm.panId || !docForm.drivingLicenseId) {
+      alert("Please enter Aadhaar, PAN, and Driving License ID input fields first.")
       return
     }
 
@@ -987,7 +983,7 @@ export function ActivationJourneyPage() {
       `Extracting OCR signatures from PAN: "${docForm.panFile}"...`,
       `Checking PAN ID "${docForm.panId}" validity with NSDL registry... Approved`,
       `Analyzing profile webcam photo coordinates against document avatars... Match 99.8%`,
-      `Validating Bank Account "${docForm.bankAcc}" (IFSC: "${docForm.ifscCode}") routing active status... Verified`,
+      `Validating Driving License ID "${docForm.drivingLicenseId}" authentication status... Verified`,
       "Running anti-duplicate and multi-identity sybil fraud checks... Clearance Clear",
       "Generating quantum trust confidence report index..."
     ]
@@ -1015,15 +1011,15 @@ export function ActivationJourneyPage() {
           isValidating: false,
           confidenceScore: 99,
           isCompleted: true,
-          aadhaarFileFileData: prev.aadhaarFileFileData && prev.aadhaarFileFileData.startsWith("data:image/") && !prev.aadhaarFile.endsWith(".pdf")
+          aadhaarFileFileData: prev.aadhaarFileFileData && !prev.aadhaarFileFileData.startsWith("data:image/svg+xml")
             ? prev.aadhaarFileFileData
             : generateAadhaarSVG(regForm.fullName, regForm.profilePic, prev.aadhaarId),
-          panFileFileData: prev.panFileFileData && prev.panFileFileData.startsWith("data:image/") && !prev.panFile.endsWith(".pdf")
+          panFileFileData: prev.panFileFileData && !prev.panFileFileData.startsWith("data:image/svg+xml")
             ? prev.panFileFileData
             : generatePanSVG(regForm.fullName, regForm.profilePic, prev.panId),
-          bankPassbookFileFileData: prev.bankPassbookFileFileData && prev.bankPassbookFileFileData.startsWith("data:image/") && !prev.bankPassbookFile.endsWith(".pdf")
-            ? prev.bankPassbookFileFileData
-            : generateBankSVG(regForm.fullName, prev.bankAcc, prev.ifscCode)
+          drivingLicenseFileFileData: prev.drivingLicenseFileFileData && !prev.drivingLicenseFileFileData.startsWith("data:image/svg+xml")
+            ? prev.drivingLicenseFileFileData
+            : generateDrivingLicenseSVG(regForm.fullName, prev.drivingLicenseId)
         }))
         setTimeout(() => {
           setActiveStep(3)
@@ -1217,11 +1213,10 @@ export function ActivationJourneyPage() {
     setDocForm({
       aadhaarId: "",
       panId: "",
-      bankAcc: "",
-      ifscCode: "",
+      drivingLicenseId: "",
       aadhaarFile: null,
       panFile: null,
-      bankPassbookFile: null,
+      drivingLicenseFile: null,
       isValidating: false,
       validationLog: [],
       validationProgress: 0,
@@ -1454,7 +1449,7 @@ export function ActivationJourneyPage() {
             <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full filter blur-xl" />
             <h2 className="font-orbitron font-black text-xs text-emerald-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
               <Database className="w-4 h-4 text-emerald-400" />
-              QUANTUM TRUST MATRIX
+              VERIFICATION STATUS
             </h2>
 
             <div className="flex items-center gap-6 mt-4">
@@ -1486,21 +1481,21 @@ export function ActivationJourneyPage() {
 
               <div className="space-y-3 text-[11px] font-semibold">
                 <div>
-                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">WebRTC Call logs</div>
+                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Interview</div>
                   <div className={`${interviewState.isCompleted ? "text-emerald-400 font-bold" : "text-slate-200"} mt-0.5`}>
-                    {interviewState.isCompleted ? "✓ Audit Cleared" : "Awaiting Call"}
+                    {interviewState.isCompleted ? "✓ Completed" : "Not Started"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Biometric Check</div>
+                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Identity Scan</div>
                   <div className={`${regForm.isBiometricCompleted ? "text-emerald-400 font-bold" : "text-slate-200"} mt-0.5`}>
-                    {regForm.isBiometricCompleted ? "✓ Facemesh Scanned" : "Scanning Required"}
+                    {regForm.isBiometricCompleted ? "✓ Verified" : "Pending"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Document OCR Integrity</div>
+                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Document Check</div>
                   <div className={`${docForm.isCompleted ? "text-emerald-400 font-bold" : "text-slate-200"} mt-0.5`}>
-                    {docForm.isCompleted ? "✓ Verified Checksum" : "Awaiting Uploads"}
+                    {docForm.isCompleted ? "✓ Verified" : "Awaiting Upload"}
                   </div>
                 </div>
               </div>
@@ -1874,9 +1869,9 @@ export function ActivationJourneyPage() {
                 />
                 <input
                   type="file"
-                  ref={bankInputRef}
+                  ref={dlInputRef}
                   style={{ display: "none" }}
-                  onChange={(e) => handleFileChange(e, "bankPassbookFile")}
+                  onChange={(e) => handleFileChange(e, "drivingLicenseFile")}
                   accept=".pdf,.png,.jpg,.jpeg"
                 />
                 {docForm.isValidating && <div className="laser-bar" />}
@@ -1914,22 +1909,14 @@ export function ActivationJourneyPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Bank Account Number</label>
+                    <div className="space-y-2 col-span-2">
+                      <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Driving License ID</label>
                       <input
                         type="text"
+                        placeholder="e.g. DL-1420110023456"
                         className="w-full px-4 py-3 rounded-xl cyber-input text-sm font-semibold"
-                        value={docForm.bankAcc}
-                        onChange={e => setDocForm(prev => ({ ...prev, bankAcc: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Bank IFSC Code</label>
-                      <input
-                        type="text"
-                        className="w-full px-4 py-3 rounded-xl cyber-input text-sm font-semibold"
-                        value={docForm.ifscCode}
-                        onChange={e => setDocForm(prev => ({ ...prev, ifscCode: e.target.value }))}
+                        value={docForm.drivingLicenseId}
+                        onChange={e => setDocForm(prev => ({ ...prev, drivingLicenseId: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -1939,7 +1926,7 @@ export function ActivationJourneyPage() {
                     {[
                       { title: "Aadhaar Card Scan", field: "aadhaarFile", name: "aadhaar_scan.pdf" },
                       { title: "PAN Card Scan", field: "panFile", name: "pan_scan.pdf" },
-                      { title: "Bank Passbook Scan", field: "bankPassbookFile", name: "bank_ledger.pdf" }
+                      { title: "Driving License Scan", field: "drivingLicenseFile", name: "driving_license.pdf" }
                     ].map((up) => (
                       <div
                         key={up.field}
@@ -1947,7 +1934,7 @@ export function ActivationJourneyPage() {
                           if (uploadingDocs[up.field]) return
                           if (up.field === "aadhaarFile") aadhaarInputRef.current?.click()
                           if (up.field === "panFile") panInputRef.current?.click()
-                          if (up.field === "bankPassbookFile") bankInputRef.current?.click()
+                          if (up.field === "drivingLicenseFile") dlInputRef.current?.click()
                         }}
                         className={`p-4 rounded-xl border border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 h-28 ${docForm[up.field] ? "bg-blue-500/5 border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]" :
                           uploadingDocs[up.field] ? "bg-slate-950/80 border-blue-500/50 animate-pulse" :
@@ -1998,12 +1985,12 @@ export function ActivationJourneyPage() {
                     </div>
                   ) : docForm.isCompleted ? (
                     <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/25 text-center space-y-2">
-                      <div className="text-emerald-400 font-orbitron font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 animate-pulse" />
-                        AI VALIDATION MATRIX COMPLETE
+                      <div className="text-emerald-400 font-semibold text-sm flex items-center justify-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        Documents Verified Successfully
                       </div>
-                      <p className="text-[11px] text-slate-355">
-                        OCR extraction matching database matches {regForm.fullName}. Confidence level index: <strong className="text-emerald-450 font-orbitron">99%</strong>.
+                      <p className="text-[11px] text-slate-400">
+                        All uploaded documents have been verified and submitted for admin review.
                       </p>
                     </div>
                   ) : (
@@ -2211,7 +2198,7 @@ export function ActivationJourneyPage() {
                       <div>
                         <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Academy Status</div>
                         <div className="text-sm font-orbitron font-black text-white mt-1">
-                          {academyState.modules.filter(m => m.completed).length} / 5 COMPLETED
+                          {academyState.modules.filter(m => m.completed).length} / {academyState.modules.length} COMPLETED
                         </div>
                       </div>
                       <div className="h-8 w-[1px] bg-slate-855" />
@@ -2266,148 +2253,158 @@ export function ActivationJourneyPage() {
                 className="hud-card rounded-2xl p-6 md:p-8 relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full filter blur-2xl" />
-                <div className="flex items-center justify-between pb-6 border-b border-slate-850">
-                  <div className="flex items-center gap-3">
-                    <span className="font-orbitron font-black text-2xl text-blue-500">04</span>
-                    <div>
-                      <h3 className="text-base font-black text-white uppercase tracking-wider">ADMIN CONTROL ROOM</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Final audited employee status clearance cockpit</p>
-                    </div>
+                {/* Header */}
+                <div className="flex items-center justify-between pb-5 border-b border-slate-850">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Application Review</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Your application has been submitted for admin review</p>
                   </div>
-                  <span className={`px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${adminClearance.status === "approved" ? "bg-emerald-500/10 border border-emerald-500/25 text-emerald-400" :
-                    adminClearance.status === "rejected" ? "bg-red-500/10 border border-red-500/25 text-red-400" :
-                      "bg-amber-500/10 border border-amber-500/25 text-amber-400"
-                    }`}>
-                    {adminClearance.status === "approved" ? "APPROVED" : adminClearance.status === "rejected" ? "REJECTED" : "AUDIT PENDING"}
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    adminClearance.status === "approved"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : adminClearance.status === "rejected"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-amber-100 text-amber-700"
+                  }`}>
+                    {adminClearance.status === "approved" ? "✓ Approved" : adminClearance.status === "rejected" ? "✕ Rejected" : "⏳ Under Review"}
                   </span>
                 </div>
 
                 <div className="mt-6 space-y-6">
-                  {/* Summary audit logs */}
-                  <div className="p-5 rounded-xl bg-slate-950/60 border border-slate-850 space-y-4">
-                    <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest pb-3 border-b border-slate-900 flex items-center gap-1.5 font-orbitron">
-                      <Database className="w-4 h-4 text-blue-500" /> SYSTEM AUDITED ONBOARDING DOSSIER
+                  {/* Application Summary */}
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                    <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+                      <h4 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Application Summary</h4>
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 dark:divide-slate-800">
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold">
-                      <div className="flex flex-col p-3 rounded-lg bg-slate-900/40 border border-slate-850 gap-2">
-                        <div className="flex justify-between items-center text-[10px] tracking-wide">
-                          <span className="text-slate-400">1. PERSONAL REGISTRATION:</span>
-                          <span className={regForm.isCompleted ? "text-emerald-400" : "text-amber-450 font-bold"}>
-                            {regForm.isCompleted ? "✓ CONFIRMED" : "PENDING"}
+                      {/* Personal Info */}
+                      <div className="p-4 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Personal Details</span>
+                          <span className={`text-xs font-bold ${regForm.isCompleted ? "text-emerald-600" : "text-amber-500"}`}>
+                            {regForm.isCompleted ? "✓ Complete" : "Pending"}
                           </span>
                         </div>
                         {regForm.isCompleted && (
-                          <div className="text-[9px] text-slate-500 font-mono space-y-0.5 mt-1 border-t border-slate-800/45 pt-1.5">
-                            <div>NAME: {regForm.fullName}</div>
-                            <div>EMAIL: {regForm.email}</div>
-                            <div>PHONE: {regForm.phone}</div>
+                          <div className="mt-1 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+                            <div className="flex gap-2"><span className="font-semibold w-16 shrink-0">Name</span><span>{regForm.fullName}</span></div>
+                            <div className="flex gap-2"><span className="font-semibold w-16 shrink-0">Email</span><span className="truncate">{regForm.email}</span></div>
+                            <div className="flex gap-2"><span className="font-semibold w-16 shrink-0">Phone</span><span>{regForm.phone}</span></div>
                           </div>
                         )}
                       </div>
 
-                      <div className="flex flex-col p-3 rounded-lg bg-slate-900/40 border border-slate-850 justify-between">
-                        <div className="flex justify-between items-center text-[10px] tracking-wide">
-                          <span className="text-slate-400">2. BIOMETRIC VECTORS:</span>
-                          <span className={regForm.isBiometricCompleted ? "text-emerald-400" : "text-amber-450 font-bold"}>
-                            {regForm.isBiometricCompleted ? "✓ ENROLLED" : "PENDING"}
+                      {/* Photo */}
+                      <div className="p-4 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Photo Verification</span>
+                          <span className={`text-xs font-bold ${regForm.isBiometricCompleted ? "text-emerald-600" : "text-amber-500"}`}>
+                            {regForm.isBiometricCompleted ? "✓ Verified" : "Pending"}
                           </span>
                         </div>
                         {regForm.isBiometricCompleted && (
-                          <div className="flex gap-3 items-center border-t border-slate-800/45 pt-1.5">
-                            <div className="w-10 h-10 rounded-lg bg-slate-950 border border-slate-850 overflow-hidden flex items-center justify-center shrink-0">
+                          <div className="flex items-center gap-3 mt-1">
+                            <div className="w-10 h-10 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0">
                               {regForm.profilePic ? (
                                 <img src={regForm.profilePic} alt="Profile" className="w-full h-full object-cover" />
                               ) : (
-                                <Fingerprint className="w-5 h-5 text-blue-500" />
+                                <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                                  <User className="w-5 h-5 text-slate-400" />
+                                </div>
                               )}
                             </div>
-                            <div className="text-[9px] text-slate-500 font-mono leading-tight">
-                              <div>FACEMESH MAPPED: 1:1 CONFIRMED</div>
-                              <div>CONFIDENCE INDEX: 99.8%</div>
-                            </div>
+                            <span className="text-xs text-slate-500">Selfie captured and matched</span>
                           </div>
                         )}
                       </div>
 
-                      <div className="flex flex-col p-3 rounded-lg bg-slate-900/40 border border-slate-850 gap-2">
-                        <div className="flex justify-between items-center text-[10px] tracking-wide">
-                          <span className="text-slate-400">3. OCR DOCUMENT MATCH:</span>
-                          <span className={docForm.isCompleted ? "text-emerald-400" : "text-amber-450 font-bold"}>
-                            {docForm.isCompleted ? `✓ VERIFIED (${docForm.confidenceScore}%)` : "PENDING"}
+                      {/* Documents */}
+                      <div className="p-4 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Documents</span>
+                          <span className={`text-xs font-bold ${docForm.isCompleted ? "text-emerald-600" : "text-amber-500"}`}>
+                            {docForm.isCompleted ? "✓ Verified" : "Pending"}
                           </span>
                         </div>
                         {docForm.isCompleted && (
-                          <div className="text-[9px] text-slate-500 font-mono space-y-0.5 mt-1 border-t border-slate-800/45 pt-1.5">
-                            <div>AADHAAR ID: {docForm.aadhaarId} ({docForm.aadhaarFile})</div>
-                            <div>PAN ID: {docForm.panId} ({docForm.panFile})</div>
-                            <div>BANK ACC: {docForm.bankAcc} ({docForm.bankPassbookFile})</div>
+                          <div className="mt-1 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+                            <div className="flex gap-2"><span className="font-semibold w-24 shrink-0">Aadhaar</span><span>{docForm.aadhaarId}</span></div>
+                            <div className="flex gap-2"><span className="font-semibold w-24 shrink-0">PAN Card</span><span>{docForm.panId}</span></div>
+                            <div className="flex gap-2"><span className="font-semibold w-24 shrink-0">Driving Licence</span><span>{docForm.drivingLicenseId}</span></div>
                           </div>
                         )}
                       </div>
 
-                      <div className="flex flex-col p-3 rounded-lg bg-slate-900/40 border border-slate-850 justify-between">
-                        <div className="flex justify-between items-center text-[10px] tracking-wide">
-                          <span className="text-slate-400">4. TRAINING CERTIFICATES:</span>
-                          <span className={academyState.isCompleted ? "text-emerald-400" : "text-amber-450 font-bold"}>
-                            {academyState.isCompleted ? "✓ 5/5 PASSED" : "PENDING"}
+                      {/* Training */}
+                      <div className="p-4 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Training</span>
+                          <span className={`text-xs font-bold ${academyState.isCompleted ? "text-emerald-600" : "text-amber-500"}`}>
+                            {academyState.isCompleted ? `✓ ${academyState.modules.length}/${academyState.modules.length} Passed` : "Pending"}
                           </span>
                         </div>
                         {academyState.isCompleted && (
-                          <div className="text-[9px] text-slate-500 font-mono mt-1 border-t border-slate-800/45 pt-1.5">
-                            QUIZZES CLEARED: MODULES 1-5 COMPLIANT CERTIFIED
-                          </div>
+                          <div className="mt-1 text-xs text-slate-500">Compliance training module completed and quiz passed.</div>
                         )}
                       </div>
 
                     </div>
                   </div>
 
-                  {/* Technician Waiting Screen */}
+                  {/* Waiting State */}
                   {adminClearance.status === "pending" && (
-                    <div className="p-6 rounded-xl bg-blue-950/20 border border-blue-500/10 text-center space-y-4">
-                      <div className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/25 flex items-center justify-center mx-auto text-blue-400">
-                        <RefreshCcw className="w-5 h-5 animate-spin" />
+                    <div className="p-6 rounded-xl bg-blue-50 border border-blue-100 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center mx-auto">
+                        <RefreshCcw className="w-5 h-5 text-blue-500 animate-spin" />
                       </div>
                       <div>
-                        <div className="text-xs font-black text-slate-200 uppercase tracking-widest font-orbitron">Awaiting Administrative Clearance</div>
-                        <p className="text-[10px] text-slate-400 mt-2 leading-normal max-w-sm mx-auto">
-                          Your completed dossier has been compiled and transmitted to the Caltrack Admin Portal Settings panel. Please await verification and clearance from your system administrator.
+                        <div className="text-sm font-bold text-slate-700">Waiting for Admin Approval</div>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-sm mx-auto">
+                          Your application has been submitted. The admin team will review your details and get back to you shortly.
                         </p>
                       </div>
                     </div>
                   )}
 
+                  {/* Approved */}
                   {adminClearance.status === "approved" && (
-                    <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-center font-bold text-xs text-emerald-400 uppercase tracking-widest animate-pulse font-orbitron">
-                      ✓ CLEARANCE GRANTED. EMPLOYEE ACTIVE PASS ISSUED.
+                    <div className="p-5 rounded-xl bg-emerald-50 border border-emerald-100 text-center space-y-2">
+                      <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                      <div className="text-sm font-bold text-emerald-700">Application Approved!</div>
+                      <p className="text-xs text-slate-500">You are now an active employee. Welcome to the team!</p>
                     </div>
                   )}
+
+                  {/* Rejected */}
                   {adminClearance.status === "rejected" && (
                     <div className="space-y-3">
-                      <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/25 text-center font-bold text-xs text-red-400 uppercase tracking-widest animate-pulse font-orbitron">
-                        ✕ CLEARANCE DENIED. ONBOARDING SEQUENCE HALTED.
+                      <div className="p-5 rounded-xl bg-red-50 border border-red-100 text-center space-y-2">
+                        <XCircle className="w-8 h-8 text-red-500 mx-auto" />
+                        <div className="text-sm font-bold text-red-700">Application Rejected</div>
+                        <p className="text-xs text-slate-500">Please review the reason below and re-apply with corrected information.</p>
                       </div>
-                      <div className="p-3 bg-red-950/20 border border-red-900/30 rounded-xl text-[10px] text-slate-300 leading-relaxed font-semibold">
-                        <strong>Auditor Remarks:</strong> {adminClearance.remarks || "Identity documents mismatch with biometric registration profile."}
-                      </div>
+                      {adminClearance.remarks && (
+                        <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-xs text-slate-600 leading-relaxed">
+                          <span className="font-semibold text-red-600">Reason: </span>{adminClearance.remarks}
+                        </div>
+                      )}
                       <button
                         type="button"
                         onClick={() => {
                           localStorage.removeItem("caltrack_activation_dossier")
                           apiDeleteRegistrationDossier()
                           setRegForm(p => ({ ...p, isCompleted: false, otpStatus: "unverified", isBiometricCompleted: false, fullName: "", email: "", phone: "", address: "", profilePic: null }))
-                          setDocForm(p => ({ ...p, isCompleted: false, confidenceScore: 0, aadhaarFile: null, panFile: null, bankPassbookFile: null, aadhaarId: "", panId: "", bankAcc: "", ifscCode: "" }))
+                          setDocForm(p => ({ ...p, isCompleted: false, confidenceScore: 0, aadhaarFile: null, panFile: null, drivingLicenseFile: null, aadhaarId: "", panId: "", drivingLicenseId: "" }))
                           setAcademyState(p => ({ ...p, isCompleted: false, modules: p.modules.map(m => ({ ...m, completed: false, progress: 0 })) }))
                           setInterviewState(p => ({ ...p, isCompleted: true, status: "Passed" }))
                           setAdminClearance({ status: "pending", remarks: "" })
                           setOtpCode("")
-
                           setActiveStep(1)
                         }}
-                        className="w-full py-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-[10px] font-black uppercase text-slate-300 rounded-xl tracking-wider transition-colors font-orbitron"
+                        className="w-full py-3 bg-white hover:bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-600 rounded-xl transition-colors"
                       >
-                        Reset Journey & Correct Credentials
+                        Re-apply with Corrected Information
                       </button>
                     </div>
                   )}
@@ -2459,7 +2456,7 @@ export function ActivationJourneyPage() {
                     <option value="Aadhaar Card mismatch with registration name.">Aadhaar Card mismatch with registration name.</option>
                     <option value="Biometric face vector variance exceeds 10% threshold.">Biometric face vector variance exceeds 10% threshold.</option>
                     <option value="WebRTC compliance interview speech verification failed.">WebRTC compliance interview speech verification failed.</option>
-                    <option value="IFSC route code mismatch with government bank records.">IFSC route code mismatch with government bank records.</option>
+                    <option value="Driving License mismatch with government transport records.">Driving License mismatch with government transport records.</option>
                     <option value="Document OCR extraction checksum error. Scan resolution low.">Document OCR extraction checksum error. Scan resolution low.</option>
                   </select>
                 </div>
@@ -2564,7 +2561,7 @@ export function ActivationJourneyPage() {
                       setShowCelebration(false)
                       setActiveStep(1)
                       setRegForm(p => ({ ...p, isCompleted: false, otpStatus: "unverified", isBiometricCompleted: false, fullName: "", email: "", phone: "", address: "", profilePic: null }))
-                      setDocForm(p => ({ ...p, isCompleted: false, confidenceScore: 0, aadhaarFile: null, panFile: null, bankPassbookFile: null, aadhaarId: "", panId: "", bankAcc: "", ifscCode: "" }))
+                      setDocForm(p => ({ ...p, isCompleted: false, confidenceScore: 0, aadhaarFile: null, panFile: null, drivingLicenseFile: null, aadhaarId: "", panId: "", drivingLicenseId: "" }))
                       setAcademyState(p => ({ ...p, isCompleted: false, modules: p.modules.map(m => ({ ...m, completed: false, progress: 0 })) }))
                       setInterviewState(p => ({ ...p, isCompleted: false, status: "Scheduled" }))
                       setAdminClearance(p => ({ ...p, status: "pending" }))
@@ -2594,3 +2591,4 @@ export function ActivationJourneyPage() {
     </div>
   )
 }
+
