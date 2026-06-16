@@ -4,7 +4,16 @@ import traceback
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import connection, transaction
+from django.db.models import Q
 from companies.models import Company
+
+try:
+    from django_tenants.utils import schema_context
+except ImportError:
+    from contextlib import contextmanager
+    @contextmanager
+    def schema_context(schema_name):
+        yield
 
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
@@ -810,9 +819,6 @@ class RegistrationDossierView(APIView):
         return Response({"success": True})
 
 
-from django.db.models import Q
-from django_tenants.utils import schema_context
-
 class PasswordResetVerifyIdentityView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -828,23 +834,33 @@ class PasswordResetVerifyIdentityView(APIView):
         found_user = user
         found_employee = None
         
-        # If not found directly, search all tenant schemas for employee_id
+        # If not found directly, search all tenant schemas for employee_id or username/email
         if not found_user and hasattr(connection, 'set_tenant'):
             from companies.models import Company
             from employees.models import Employee
-            for company in Company.objects.all():
-                with schema_context(company.schema_name):
-                    emp = Employee.objects.filter(employee_id__iexact=identity).first()
-                    if emp:
-                        found_user = emp.user
-                        found_employee = emp
-                        break
+            for company in Company.objects.exclude(schema_name='public'):
+                try:
+                    with schema_context(company.schema_name):
+                        emp = Employee.objects.filter(
+                            Q(employee_id__iexact=identity) |
+                            Q(user__username__iexact=identity) |
+                            Q(user__email__iexact=identity)
+                        ).select_related('user').first()
+                        if emp:
+                            found_user = emp.user
+                            found_employee = emp
+                            break
+                except Exception:
+                    continue
         
         # If found user via public model, try to fetch employee details
         if found_user and not found_employee and getattr(found_user, "company", None):
-            with schema_context(found_user.company.schema_name):
-                from employees.models import Employee
-                found_employee = Employee.objects.filter(user=found_user).first()
+            try:
+                with schema_context(found_user.company.schema_name):
+                    from employees.models import Employee
+                    found_employee = Employee.objects.filter(user=found_user).first()
+            except Exception:
+                pass
 
         # Masking email helper
         def mask_email(email_str):
@@ -885,3 +901,267 @@ class PasswordResetVerifyIdentityView(APIView):
             "email_masked": mask_email(email)
         })
 
+def _normalize_phone(phone):
+    if not phone:
+        return ""
+    import re
+    clean = re.sub(r"[^\d+]", "", str(phone))  # remove all non-digits and non-plus characters
+    if not clean.startswith("+"):
+        if len(clean) == 10:
+            clean = f"+91{clean}"
+        elif clean.startswith("91") and len(clean) == 12:
+            clean = f"+{clean}"
+        else:
+            clean = f"+{clean}"
+    return clean
+
+
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+
+class SendOTPView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = []
+
+    def post(self, request):
+        import random
+        import os
+        import time
+        import hashlib
+        from django.core.cache import cache
+        from django.conf import settings
+        from accounts.models import OTPAuditLog
+
+        phone = request.data.get("phone")
+        if not phone:
+            return Response({"detail": "Phone number is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ip = get_client_ip(request)
+        normalized_phone = _normalize_phone(phone)
+
+        # 1. Rate Limiting by IP (Max 5 requests per IP per minute)
+        ip_cache_key = f"otp_rate_ip_{ip}"
+        ip_count = cache.get(ip_cache_key, 0)
+        if ip_count >= 5:
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="rate_limited_ip",
+                details="IP address exceeded 5 requests per minute."
+            )
+            return Response(
+                {"detail": "Too many OTP requests from this IP. Please wait a minute."}, 
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        # 2. Rate Limiting by Phone (Max 5 requests per phone per hour)
+        phone_cache_key = f"otp_rate_phone_{normalized_phone}"
+        phone_count = cache.get(phone_cache_key, 0)
+        if phone_count >= 5:
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="rate_limited_phone",
+                details="Phone number exceeded 5 requests per hour."
+            )
+            return Response(
+                {"detail": "Too many OTP requests for this phone number. Please try again in an hour."}, 
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        # 3. Resend Cooldown (30 seconds)
+        cache_key = f"otp_{normalized_phone}"
+        existing_otp = cache.get(cache_key)
+        if existing_otp and isinstance(existing_otp, dict):
+            last_sent_at = existing_otp.get("last_sent_at", 0)
+            elapsed = time.time() - last_sent_at
+            if elapsed < 30:
+                wait_time = int(30 - elapsed)
+                return Response(
+                    {"detail": f"Please wait {wait_time} seconds before requesting a new OTP."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Generate a secure 4-digit code
+        code = str(random.randint(1000, 9999))
+
+        # Encrypt/Hash OTP using SHA-256 keyed with Django SECRET_KEY
+        hashed_code = hashlib.sha256(f"{settings.SECRET_KEY}:{code}".encode()).hexdigest()
+
+        # Store in cache with 5-minute timeout (300 seconds)
+        otp_data = {
+            "hashed_code": hashed_code,
+            "expires_at": time.time() + 300,
+            "attempts": 0,
+            "last_sent_at": time.time()
+        }
+        cache.set(cache_key, otp_data, timeout=300)
+
+        # Update rate limiting counters
+        cache.set(ip_cache_key, ip_count + 1, timeout=60)
+        cache.set(phone_cache_key, phone_count + 1, timeout=3600)
+
+        # Try to send SMS via Twilio if config exists and isn't placeholder
+        sent_real_sms = False
+        delivery_error = ""
+        try:
+            from twilio.rest import Client as TwilioClient
+            account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+            auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+            from_number = os.getenv("TWILIO_FROM_NUMBER")
+            if account_sid and auth_token and from_number and not account_sid.startswith("your_"):
+                client = TwilioClient(account_sid, auth_token)
+                client.messages.create(
+                    body=f"Caltrack security verification code: {code}. Expires in 5 minutes.",
+                    from_=from_number,
+                    to=normalized_phone
+                )
+                sent_real_sms = True
+        except ImportError:
+            delivery_error = "Twilio client library not installed"
+        except Exception as e:
+            delivery_error = str(e)
+            print(f"Twilio SMS send error: {e}")
+
+        delivery_channel = "sms" if sent_real_sms else "console"
+
+        # Print OTP to server console
+        print("\n" + "=" * 50)
+        print(f"  [SMS GATEWAY] OTP for {normalized_phone} is: {code} (Original input: {phone})")
+        if delivery_error:
+            print(f"  [SMS GATEWAY] Twilio delivery skipped/failed: {delivery_error}")
+        print("" + "=" * 50 + "\n")
+
+        # Log to Audit Trail
+        OTPAuditLog.objects.create(
+            phone=normalized_phone,
+            ip_address=ip,
+            action="send_request",
+            details=f"OTP generated and sent via {delivery_channel}. Expiry in 5 mins."
+        )
+
+        response_data = {
+            "success": True, 
+            "message": "OTP sent successfully.",
+            "delivery_channel": delivery_channel
+        }
+        if settings.DEBUG:
+            response_data["code"] = code
+
+        return Response(response_data)
+
+
+class VerifyOTPView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = []
+
+    def post(self, request):
+        import time
+        import hashlib
+        from django.core.cache import cache
+        from django.conf import settings
+        from accounts.models import OTPAuditLog
+
+        phone = request.data.get("phone")
+        code = request.data.get("code")
+
+        if not phone or not code:
+            return Response({"detail": "Phone number and verification code are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ip = get_client_ip(request)
+        normalized_phone = _normalize_phone(phone)
+        cache_key = f"otp_{normalized_phone}"
+        otp_data = cache.get(cache_key)
+
+        if not otp_data or not isinstance(otp_data, dict):
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="verify_failed",
+                details="OTP not found or already expired."
+            )
+            return Response(
+                {"detail": "OTP code expired or not found. Please request a new one."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check maximum attempts (5)
+        if otp_data.get("attempts", 0) >= 5:
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="attempts_exceeded",
+                details="Exceeded 5 validation attempts."
+            )
+            return Response(
+                {"detail": "Maximum verification attempts exceeded. Please request a new OTP."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check expiry
+        if time.time() > otp_data.get("expires_at", 0):
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="verify_failed",
+                details="OTP expired."
+            )
+            return Response(
+                {"detail": "OTP has expired. Please request a new one."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Hashed code comparison
+        hashed_input = hashlib.sha256(f"{settings.SECRET_KEY}:{str(code).strip()}".encode()).hexdigest()
+
+        if otp_data.get("hashed_code") == hashed_input:
+            # Successfully verified
+            cache.delete(cache_key)
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="verify_success",
+                details="OTP successfully verified."
+            )
+            return Response({"success": True, "message": "OTP verified successfully."})
+        else:
+            # Increment attempts
+            attempts = otp_data.get("attempts", 0) + 1
+            otp_data["attempts"] = attempts
+            remaining = 5 - attempts
+
+            if remaining <= 0:
+                cache.delete(cache_key)
+                OTPAuditLog.objects.create(
+                    phone=normalized_phone,
+                    ip_address=ip,
+                    action="attempts_exceeded",
+                    details="Attempts limit reached on failed validation."
+                )
+                return Response(
+                    {"detail": "Maximum verification attempts exceeded. Please request a new OTP."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                remaining_time = int(otp_data.get("expires_at", 0) - time.time())
+                if remaining_time > 0:
+                    cache.set(cache_key, otp_data, timeout=remaining_time)
+                else:
+                    cache.delete(cache_key)
+
+                OTPAuditLog.objects.create(
+                    phone=normalized_phone,
+                    ip_address=ip,
+                    action="verify_failed",
+                    details=f"Invalid code entered. Attempts: {attempts} of 5."
+                )
+                return Response(
+                    {"detail": f"Invalid verification code. {remaining} attempts remaining."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )

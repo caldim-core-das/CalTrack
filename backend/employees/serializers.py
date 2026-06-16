@@ -69,6 +69,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "last_logout_at",
             "last_activity_at",
             "current_availability",
+            "is_active",
             "created_at",
             "updated_at",
         )
@@ -217,24 +218,44 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
         if not company:
             raise serializers.ValidationError({"detail": "You must be associated with a company to add members."})
 
-        if User.objects.filter(username__iexact=username).exists():
-            raise serializers.ValidationError({"detail": f"The username '{username}' is already taken by another user in the system. Usernames must be globally unique."})
+        from django.db.models import Q
+        user = User.objects.filter(Q(username__iexact=username) | Q(email__iexact=email)).first()
 
         try:
-            user = User.objects.create_user(
-                username=username,
-                password=password,
-                email=email,
-                first_name=first_name,
-                last_name=last_name,
-                role=role,
-                company=company
-            )
+            if user:
+                # If they are associated with public or None, associate with the new company
+                if not user.company or user.company.schema_name == 'public':
+                    user.company = company
+                if first_name:
+                    user.first_name = first_name
+                if last_name:
+                    user.last_name = last_name
+                user.save()
+            else:
+                user = User.objects.create_user(
+                    username=username,
+                    password=password,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    role=role,
+                    company=company
+                )
             
             if not validated_data.get("employee_id"):
                 validated_data["employee_id"] = generate_next_employee_id(company)
                 
-            return Employee.objects.create(user=user, company=company, **validated_data)
+            employee, created = Employee.objects.get_or_create(
+                user=user,
+                company=company,
+                defaults=validated_data
+            )
+            if not created:
+                for attr, value in validated_data.items():
+                    setattr(employee, attr, value)
+                employee.save()
+                
+            return employee
         except Exception as e:
             # Handle potential integrity errors (duplicate username, etc)
             raise serializers.ValidationError({"detail": str(e)})

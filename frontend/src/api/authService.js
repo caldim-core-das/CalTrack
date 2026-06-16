@@ -10,7 +10,7 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (
   import.meta.env.PROD
     ? `${window.location.origin}/Caltrack/api`
-    : "http://localhost:8000/api"
+    : `${window.location.protocol}//${window.location.hostname}:8000/api`
 )
 
 
@@ -219,4 +219,25 @@ export async function apiDeleteRegistrationDossier() {
     console.error("Delete dossier API error", err)
   }
 }
+
+/**
+ * Send OTP via backend
+ */
+export async function apiSendOTP(phone) {
+  return fetchJSON("/auth/send-otp/", {
+    method: "POST",
+    body: JSON.stringify({ phone })
+  })
+}
+
+/**
+ * Verify OTP via backend
+ */
+export async function apiVerifyOTP(phone, code) {
+  return fetchJSON("/auth/verify-otp/", {
+    method: "POST",
+    body: JSON.stringify({ phone, code })
+  })
+}
+
 

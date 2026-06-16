@@ -22,11 +22,11 @@ import { verifyFaces } from "../../utils/faceVerify.js"
 
 const BACKEND_HTTP_HOST = import.meta.env.PROD
   ? `${window.location.origin}/Caltrack`
-  : "http://localhost:8000"
+  : `${window.location.protocol}//${window.location.hostname}:8000`
 
 const BACKEND_WS_HOST = import.meta.env.PROD
   ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/Caltrack`
-  : "ws://localhost:8000"
+  : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8000`
 
 
 // Custom hook to detect if dark mode is active

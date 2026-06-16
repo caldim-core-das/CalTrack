@@ -20,7 +20,7 @@ const WS_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_WS_BASE_URL) ||
   (import.meta.env.PROD
     ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/Caltrack`
-    : "ws://localhost:8000")
+    : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8000`)
 
 
 const FATAL_CODES = new Set([4001, 4002, 4003, 4004])
