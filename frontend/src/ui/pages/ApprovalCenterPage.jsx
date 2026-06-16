@@ -618,8 +618,8 @@ export function ApprovalCenterPage() {
           <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800/80 text-[10px] font-mono leading-relaxed text-slate-500 max-h-36 overflow-y-auto">
             {activeEmployee.interviewState.interviewLogs.map((log, lidx) => (
               <div key={lidx} className="mb-2">
-                <div className="font-bold text-slate-700 dark:text-slate-350">Q: {log.question.replace(/Officer Sarah|Interviewer:/, "").trim()}</div>
-                <div className="text-blue-500">A: {log.answer}</div>
+                <div className="font-bold text-slate-700 dark:text-slate-350">Q: {(log.question || "").replace(/Officer Sarah|Interviewer:/, "").trim()}</div>
+                <div className="text-blue-500">A: {log.answer || ""}</div>
               </div>
             ))}
           </div>

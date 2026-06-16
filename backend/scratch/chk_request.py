@@ -1,34 +1,22 @@
-import os
-from dotenv import load_dotenv
-load_dotenv(override=True)
+import requests
 
-import django
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "quicktims.settings")
-django.setup()
+url = "http://localhost:8000/api/auth/login/"
+payload = {
+    "username": "admin@caltrack.com",
+    "password": "Admin@1234"
+}
 
-from django.test import Client
-from django.contrib.auth import get_user_model
-from companies.models import Company
-from django.db import connection
+session = requests.Session()
+r = session.post(url, json=payload)
+print("Login status:", r.status_code)
+print("Login response:", r.json() if r.status_code == 200 else r.text)
 
-User = get_user_model()
-client = Client()
-
-print("--- Testing /api/auth/me/ ---")
-company = Company.objects.filter(schema_name='caldim_5').first()
-if company:
-    connection.set_tenant(company)
-    print(f"Set tenant to {company.schema_name}")
-
-user = User.objects.filter(username='admin').first()
-if user:
-    client.force_login(user)
-    print(f"Logged in as {user.username}")
-
-try:
-    response = client.get('/api/auth/me/', HTTP_HOST='caldim_5.localhost:8000')
-    print("Response status:", response.status_code)
-    print("Response content:", response.content.decode('utf-8'))
-except Exception as e:
-    import traceback
-    traceback.print_exc()
+# Now call the employees endpoint
+r_emp = session.get("http://localhost:8000/api/employees/")
+print("\nEmployees status:", r_emp.status_code)
+if r_emp.status_code == 200:
+    data = r_emp.json()
+    print("Employees count:", len(data) if isinstance(data, list) else data.get("count", "N/A"))
+    print("Employees data:", data)
+else:
+    print("Employees error:", r_emp.text)

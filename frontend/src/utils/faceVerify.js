@@ -104,3 +104,28 @@ export async function verifyFaces(clockInPhoto, clockOutPhoto) {
     status: isMatch ? "matched" : "mismatch",
   }
 }
+
+/**
+ * Detects if a face exists in an active HTMLVideoElement.
+ * Returns the detection object or null.
+ */
+export async function detectFaceInVideo(videoElement) {
+  if (!videoElement || videoElement.readyState < 2 || videoElement.videoWidth === 0) {
+    return null
+  }
+  const loaded = await loadFaceModels()
+  if (!loaded) return null
+  try {
+    const detection = await faceapi.detectSingleFace(
+      videoElement,
+      new faceapi.TinyFaceDetectorOptions({ inputSize: 160, scoreThreshold: 0.3 })
+    )
+    return detection
+  } catch (err) {
+    console.error("Error in detectFaceInVideo:", err)
+    return null
+  }
+}
+
+
+

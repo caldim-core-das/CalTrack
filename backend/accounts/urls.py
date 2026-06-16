@@ -5,7 +5,8 @@ from .views import (
     GoogleLoginView, RegisterView, AdminRegistrationView,
     ProfileUpdateView, PasswordChangeView, EmailChangeView, TwoFactorSetupView,
     AcceptInviteView, PasswordResetRequestView, PasswordResetConfirmView,
-    RegistrationDossierView, PasswordResetVerifyIdentityView
+    RegistrationDossierView, PasswordResetVerifyIdentityView,
+    SendOTPView, VerifyOTPView
 )
 
 urlpatterns = [
@@ -25,5 +26,7 @@ urlpatterns = [
     path("password-reset/request/", PasswordResetRequestView.as_view(), name="password-reset-request"),
     path("password-reset/confirm/", PasswordResetConfirmView.as_view(), name="password-reset-confirm"),
     path("registration-dossier/", RegistrationDossierView.as_view(), name="registration-dossier"),
+    path("send-otp/",       SendOTPView.as_view(),                name="send-otp"),
+    path("verify-otp/",     VerifyOTPView.as_view(),              name="verify-otp"),
 ]
 
