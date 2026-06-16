@@ -16,6 +16,7 @@ Endpoints:
   GET  /api/live-locations/eta/               – admin: ETA from each employee to a point
 """
 import math
+import os
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.response import Response
@@ -50,9 +51,11 @@ def build_live_snapshot(company):
     open_logs = (
         TimeLog.objects.filter(clock_out__isnull=True)
         .select_related("employee", "employee__user", "employee__assigned_job_site", "location")
-        .order_by("employee", "-clock_in")
-        .distinct("employee")
     )
+    if os.getenv("DB_NAME") or os.getenv("DB_HOST"):
+        open_logs = open_logs.order_by("employee", "-clock_in").distinct("employee")
+    else:
+        open_logs = open_logs.order_by("-clock_in")
 
     employees = []
     seen = set()

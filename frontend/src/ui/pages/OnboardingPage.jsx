@@ -4,6 +4,7 @@ import { apiRequest } from "../../api/client"
 import { Check, ArrowRight, Building2, Users2, Workflow, Clock, Banknote, CalendarDays, Sparkles, RefreshCcw } from "lucide-react"
 import { CalTrackLogo } from "../components/CalTrackLogo.jsx"
 import { routes } from "../routes.js"
+import { useAuth } from "../../state/auth/useAuth.js"
 
 // ── Region config (mirrors backend Region seed data) ─────────────────────────
 const REGIONS = [
@@ -31,6 +32,7 @@ const REGIONS = [
 
 export function OnboardingPage() {
   const navigate = useNavigate()
+  const { logout } = useAuth()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -96,8 +98,29 @@ export function OnboardingPage() {
         <div style={{ position: "absolute", bottom: -50, right: 0, width: 300, height: 300, background: "#ec4899", opacity: 0.1, filter: "blur(100px)", borderRadius: "50%", pointerEvents: "none" }} />
 
         <div style={{ zIndex: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 64 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 64 }}>
             <CalTrackLogo size="md" showTagline />
+            <button
+              onClick={async () => {
+                await logout()
+                navigate(routes.login)
+              }}
+              style={{
+                background: "rgba(255, 255, 255, 0.1)",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                color: "#fff",
+                padding: "8px 16px",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: "bold",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => e.target.style.background = "rgba(255, 255, 255, 0.2)"}
+              onMouseLeave={(e) => e.target.style.background = "rgba(255, 255, 255, 0.1)"}
+            >
+              Sign Out
+            </button>
           </div>
           <h1 style={{ fontSize: 48, fontWeight: 800, fontFamily: "var(--font-display)", letterSpacing: -1, lineHeight: 1.1, marginBottom: 24 }}>
             Smarter teams.<br />

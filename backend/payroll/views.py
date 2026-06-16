@@ -429,7 +429,7 @@ class PayrollGenerateView(APIView):
             trip_date__gte=start,
             trip_date__lte=end,
         )
-        mileage_reimbursement = sum(t.reimbursement_amount for t in trips)
+        mileage_reimbursement = sum((t.reimbursement_amount for t in trips), Decimal("0"))
         trip_count = trips.count()
 
         # Add mileage reimbursement to net pay
