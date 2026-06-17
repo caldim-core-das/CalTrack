@@ -69,7 +69,7 @@ export function OnboardingPage() {
         payload.default_state = defaultState.trim()
       }
       await apiRequest("/company/create", { method: "POST", json: payload })
-      window.location.href = routes.dashboard
+      window.location.href = import.meta.env.BASE_URL || "/"
     } catch (err) {
       setLoading(false)
       const msg =

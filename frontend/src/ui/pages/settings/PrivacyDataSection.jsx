@@ -85,7 +85,7 @@ export default function PrivacyDataSection({ showToast, SectionHeader }) {
       if (!password) { setDeleting(false); return }
       await apiRequest("/settings/data/delete-account/", { method: "POST", json: { password } })
       showToast("Account scheduled for deletion. You'll be signed out shortly.")
-      setTimeout(() => window.location.href = "/login", 3000)
+      setTimeout(() => window.location.href = import.meta.env.BASE_URL || "/", 3000)
     } catch (err) {
       showToast(err?.body?.message || "Failed to delete account.", "error")
     } finally {
