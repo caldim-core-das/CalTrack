@@ -3,18 +3,21 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useNavigate } from "react-router-dom"
 import { routes } from "../routes.js"
 import { CalTrackLogo } from "../components/CalTrackLogo.jsx"
-import { 
-  apiFetchRegistrationDossier, 
-  apiSaveRegistrationDossier, 
-  apiDeleteRegistrationDossier 
+import {
+  apiFetchRegistrationDossier,
+  apiSaveRegistrationDossier,
+  apiDeleteRegistrationDossier,
+  apiSendOTP,
+  apiVerifyOTP
 } from "../../api/authService.js"
-import { 
+import { detectFaceInVideo } from "../../utils/faceVerify.js"
+import {
   Check, ArrowRight, ShieldCheck, Cpu, User, Mail, Phone,
-  MapPin, CheckCircle, AlertCircle, Camera, Award, 
+  MapPin, CheckCircle, AlertCircle, Camera, Award,
   Play, Video, PhoneCall, RefreshCcw, Lock, ExternalLink,
   ChevronRight, Sparkles, FileText, CheckSquare, XCircle, Clock,
   KeyRound, ShieldAlert, CheckCircle2, UserCheck, Info,
-  Volume2, VolumeX, Minimize, Maximize, Upload, Database, 
+  Volume2, VolumeX, Minimize, Maximize, Upload, Database,
   Fingerprint, FileCheck, PhoneIncoming, Globe
 } from "lucide-react"
 
@@ -347,7 +350,7 @@ const generateAadhaarSVG = (name, profilePic, idNumber) => {
   const photo = profilePic || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='%23E2E8F0'/><circle cx='50' cy='35' r='18' fill='%2394A3B8'/><path d='M20,80 Q50,55 80,80 Z' fill='%2394A3B8'/></svg>";
   const number = idNumber || "3662-8829-1092";
   const cleanName = name ? name.replace(/'/g, "&apos;") : "Candidate Name";
-  
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380" width="600" height="380">
     <rect width="600" height="380" rx="20" fill="#F9FBF7" stroke="#E0E4DC" stroke-width="4"/>
     <rect x="4" y="4" width="592" height="60" rx="16" fill="#FF9933"/>
@@ -370,7 +373,7 @@ const generateAadhaarSVG = (name, profilePic, idNumber) => {
     <text x="300" y="310" fill="#008000" font-family="sans-serif" font-size="14" font-weight="bold" text-anchor="middle">Aadhaar - ordinary resident's identity</text>
     <rect x="4" y="340" width="592" height="36" rx="12" fill="#128807"/>
   </svg>`;
-  
+
   return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
 };
 
@@ -378,7 +381,7 @@ const generatePanSVG = (name, profilePic, idNumber) => {
   const photo = profilePic || "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='%23E2E8F0'/><circle cx='50' cy='35' r='18' fill='%2394A3B8'/><path d='M20,80 Q50,55 80,80 Z' fill='%2394A3B8'/></svg>";
   const number = idNumber || "BCHPA8892P";
   const cleanName = name ? name.toUpperCase().replace(/'/g, "&apos;") : "CANDIDATE NAME";
-  
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380" width="600" height="380">
     <rect width="600" height="380" rx="20" fill="#EAF2F8" stroke="#A9CCE3" stroke-width="4"/>
     <rect x="4" y="4" width="592" height="60" rx="16" fill="#2980B9"/>
@@ -401,43 +404,54 @@ const generatePanSVG = (name, profilePic, idNumber) => {
     <text x="350" y="320" fill="#B91C1C" font-family="sans-serif" font-size="24" font-weight="bold" letter-spacing="2">${number}</text>
     <rect x="4" y="340" width="592" height="36" rx="12" fill="#1F618D"/>
   </svg>`;
-  
+
   return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
 };
 
-const generateBankSVG = (name, accNum, ifscCode) => {
-  const number = accNum || "99821882910";
-  const ifsc = ifscCode || "SBIN0003019";
+const generateDrivingLicenseSVG = (name, dlNum) => {
+  const number = dlNum || "DL-1420110023456";
   const cleanName = name ? name.toUpperCase().replace(/'/g, "&apos;") : "CANDIDATE NAME";
-  
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 380" width="600" height="380">
-    <rect width="600" height="380" rx="20" fill="#FCFBF9" stroke="#EADBC8" stroke-width="4"/>
-    <rect x="4" y="4" width="592" height="60" rx="16" fill="#1B4F72"/>
-    <text x="300" y="42" fill="#FFFFFF" font-family="sans-serif" font-size="22" font-weight="bold" text-anchor="middle">STATE BANK OF INDIA</text>
-    <text x="300" y="85" fill="#1B4F72" font-family="sans-serif" font-size="16" font-weight="bold" text-anchor="middle">SAVINGS BANK PASSBOOK</text>
+    <rect width="600" height="380" rx="20" fill="#F4F6F7" stroke="#BDC3C7" stroke-width="4"/>
+    <rect x="4" y="4" width="592" height="60" rx="16" fill="#1E8449"/>
+    <text x="300" y="42" fill="#FFFFFF" font-family="sans-serif" font-size="22" font-weight="bold" text-anchor="middle">TRANSPORT DEPARTMENT</text>
+    <text x="300" y="85" fill="#196F3D" font-family="sans-serif" font-size="16" font-weight="bold" text-anchor="middle">DRIVING LICENSE - GOVT. OF INDIA</text>
     <rect x="45" y="120" width="510" height="200" rx="10" fill="#FFFFFF" stroke="#D5DBDB" stroke-width="2"/>
-    <text x="70" y="155" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">Account Holder:</text>
-    <text x="220" y="155" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">${cleanName}</text>
-    <text x="70" y="185" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">Account Number:</text>
-    <text x="220" y="185" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">${number}</text>
-    <text x="70" y="215" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">IFSC Code:</text>
-    <text x="220" y="215" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">${ifsc}</text>
-    <text x="70" y="245" fill="#555" font-family="sans-serif" font-weight="bold">Branch:</text>
-    <text x="220" y="245" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">Gachibowli, Hyderabad</text>
-    <text x="70" y="275" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">MICR Code:</text>
-    <text x="220" y="275" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">500002010</text>
-    <rect x="4" y="340" width="592" height="36" rx="12" fill="#1B4F72"/>
+    <text x="70" y="165" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">Name:</text>
+    <text x="220" y="165" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">${cleanName}</text>
+    <text x="70" y="205" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">License Number:</text>
+    <text x="220" y="205" fill="#B91C1C" font-family="sans-serif" font-size="16" font-weight="bold">${number}</text>
+    <text x="70" y="245" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">Class of Vehicle:</text>
+    <text x="220" y="245" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">LMV / MCWG</text>
+    <text x="70" y="285" fill="#555" font-family="sans-serif" font-size="14" font-weight="bold">Validity:</text>
+    <text x="220" y="285" fill="#000" font-family="sans-serif" font-size="14" font-weight="bold">Non-Transport: 14/08/2034</text>
+    <rect x="4" y="340" width="592" height="36" rx="12" fill="#1E8449"/>
   </svg>`;
-  
+
   return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
 };
 
+
+const maskPhoneNumber = (phone) => {
+  if (!phone) return ""
+  const str = String(phone).trim()
+  if (str.length > 7) {
+    return str.slice(0, 3) + "*".repeat(str.length - 7) + str.slice(-4)
+  }
+  if (str.length > 4) {
+    return str.slice(0, 1) + "*".repeat(str.length - 3) + str.slice(-2)
+  }
+  return str
+}
 
 export function ActivationJourneyPage() {
   const navigate = useNavigate()
   const [activeStep, setActiveStep] = useState(1)
   const [timelineProgress, setTimelineProgress] = useState(20)
   const [regSubStep, setRegSubStep] = useState(1) // 1: Contact, 2: OTP, 3: Biometrics
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [otpDeliveryChannel, setOtpDeliveryChannel] = useState("console")
 
   // ── Step 1: Registration State ──
   const [regForm, setRegForm] = useState({
@@ -459,11 +473,10 @@ export function ActivationJourneyPage() {
   const [docForm, setDocForm] = useState({
     aadhaarId: "",
     panId: "",
-    bankAcc: "",
-    ifscCode: "",
+    drivingLicenseId: "",
     aadhaarFile: null,
     panFile: null,
-    bankPassbookFile: null,
+    drivingLicenseFile: null,
     isValidating: false,
     validationLog: [],
     validationProgress: 0,
@@ -484,13 +497,15 @@ export function ActivationJourneyPage() {
 
   // ── Step 4: Video Interview State ──
   const [interviewState, setInterviewState] = useState({
-    status: "Scheduled", // "Scheduled", "Calling", "Connected", "Completed"
+    status: "Passed",
     activeQuestionIndex: 0,
-    callDuration: 0,
+    callDuration: 12,
     subtitles: "",
     soundWaveActive: false,
-    interviewLogs: [],
-    isCompleted: false
+    interviewLogs: [
+      { sender: "System", text: "Compliance WebRTC check bypassed by system configuration." }
+    ],
+    isCompleted: true
   })
 
   // Helper function to return dynamic interview questions mapped to current user
@@ -530,15 +545,13 @@ export function ActivationJourneyPage() {
     if (regForm.otpStatus === "verified") pts += 25
     if (regForm.isBiometricCompleted) pts += 15
     if (docForm.isCompleted) pts += 20
-    if (academyState.isCompleted) pts += 10
-    if (interviewState.isCompleted) pts += 10
+    if (academyState.isCompleted) pts += 20
     return Math.min(pts, 100)
   }, [
     regForm.otpStatus,
     regForm.isBiometricCompleted,
     docForm.isCompleted,
-    academyState.isCompleted,
-    interviewState.isCompleted
+    academyState.isCompleted
   ])
 
   // Save dossier to localStorage and backend
@@ -576,11 +589,9 @@ export function ActivationJourneyPage() {
         if (backendDossier.academyState) setAcademyState(backendDossier.academyState)
         if (backendDossier.interviewState) setInterviewState(backendDossier.interviewState)
         if (backendDossier.adminClearance) setAdminClearance(backendDossier.adminClearance)
-        
+
         let step = 1
-        if (backendDossier.interviewState?.isCompleted) {
-          step = 5
-        } else if (backendDossier.academyState?.isCompleted) {
+        if (backendDossier.academyState?.isCompleted) {
           step = 4
         } else if (backendDossier.docForm?.isCompleted) {
           step = 3
@@ -588,7 +599,7 @@ export function ActivationJourneyPage() {
           step = 2
         }
         setActiveStep(step)
-        
+
         const cleanedDossier = {
           ...backendDossier,
           docForm: backendDossier.docForm ? {
@@ -620,11 +631,9 @@ export function ActivationJourneyPage() {
           if (parsed.academyState) setAcademyState(parsed.academyState)
           if (parsed.interviewState) setInterviewState(parsed.interviewState)
           if (parsed.adminClearance) setAdminClearance(parsed.adminClearance)
-          
+
           let step = 1
-          if (parsed.interviewState?.isCompleted) {
-            step = 5
-          } else if (parsed.academyState?.isCompleted) {
+          if (parsed.academyState?.isCompleted) {
             step = 4
           } else if (parsed.docForm?.isCompleted) {
             step = 3
@@ -632,7 +641,7 @@ export function ActivationJourneyPage() {
             step = 2
           }
           setActiveStep(step)
-          
+
           const cleanedParsed = {
             ...parsed,
             docForm: parsed.docForm ? {
@@ -663,7 +672,7 @@ export function ActivationJourneyPage() {
               setShowCelebration(true)
             }
           }
-        } catch (err) {}
+        } catch (err) { }
       }
     }
     window.addEventListener("storage", handleStorageChange)
@@ -693,7 +702,7 @@ export function ActivationJourneyPage() {
               setShowCelebration(true)
             }
           }
-        } catch (err) {}
+        } catch (err) { }
       }
     }, 1500)
 
@@ -714,6 +723,7 @@ export function ActivationJourneyPage() {
 
   // Reference loops for intervals
   const otpTimerRef = useRef(null)
+  const resendCooldownRef = useRef(null)
 
   const validationRef = useRef(null)
   const videoRef = useRef(null)
@@ -722,7 +732,7 @@ export function ActivationJourneyPage() {
   const logConsoleRef = useRef(null)
   const aadhaarInputRef = useRef(null)
   const panInputRef = useRef(null)
-  const bankInputRef = useRef(null)
+  const dlInputRef = useRef(null)
 
   // Auto scroll validation log console in Step 2
   useEffect(() => {
@@ -737,12 +747,11 @@ export function ActivationJourneyPage() {
     if (regForm.isCompleted) completedSteps++
     if (docForm.isCompleted) completedSteps++
     if (academyState.isCompleted) completedSteps++
-    if (interviewState.isCompleted) completedSteps++
     if (adminClearance.status === "approved") completedSteps++
 
-    const progress = Math.min((completedSteps / 5) * 100 + 20, 100)
+    const progress = Math.min((completedSteps / 4) * 100 + 20, 100)
     setTimelineProgress(progress)
-  }, [regForm.isCompleted, docForm.isCompleted, academyState.isCompleted, interviewState.isCompleted, adminClearance.status])
+  }, [regForm.isCompleted, docForm.isCompleted, academyState.isCompleted, adminClearance.status])
 
   // Timers for OTP & Email
   useEffect(() => {
@@ -756,26 +765,38 @@ export function ActivationJourneyPage() {
     return () => clearInterval(otpTimerRef.current)
   }, [regForm.otpTimer])
 
+  // Resend Cooldown timer
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      resendCooldownRef.current = setInterval(() => {
+        setResendCooldown(prev => prev - 1)
+      }, 1000)
+    } else {
+      clearInterval(resendCooldownRef.current)
+    }
+    return () => clearInterval(resendCooldownRef.current)
+  }, [resendCooldown])
+
   // Keep dynamically-generated documents in sync with registration updates
   useEffect(() => {
     if (docForm.isCompleted && regForm.fullName) {
       setDocForm(prev => {
-        const newAadhaar = prev.aadhaarFile && prev.aadhaarFile.endsWith(".pdf")
-          ? generateAadhaarSVG(regForm.fullName, regForm.profilePic, prev.aadhaarId)
-          : prev.aadhaarFileFileData;
-        const newPan = prev.panFile && prev.panFile.endsWith(".pdf")
-          ? generatePanSVG(regForm.fullName, regForm.profilePic, prev.panId)
-          : prev.panFileFileData;
-        const newBank = prev.bankPassbookFile && prev.bankPassbookFile.endsWith(".pdf")
-          ? generateBankSVG(regForm.fullName, prev.bankAcc, prev.ifscCode)
-          : prev.bankPassbookFileFileData;
+        const newAadhaar = prev.aadhaarFileFileData && !prev.aadhaarFileFileData.startsWith("data:image/svg+xml")
+          ? prev.aadhaarFileFileData
+          : generateAadhaarSVG(regForm.fullName, regForm.profilePic, prev.aadhaarId);
+        const newPan = prev.panFileFileData && !prev.panFileFileData.startsWith("data:image/svg+xml")
+          ? prev.panFileFileData
+          : generatePanSVG(regForm.fullName, regForm.profilePic, prev.panId);
+        const newDL = prev.drivingLicenseFileFileData && !prev.drivingLicenseFileFileData.startsWith("data:image/svg+xml")
+          ? prev.drivingLicenseFileFileData
+          : generateDrivingLicenseSVG(regForm.fullName, prev.drivingLicenseId);
 
-        if (newAadhaar !== prev.aadhaarFileFileData || newPan !== prev.panFileFileData || newBank !== prev.bankPassbookFileFileData) {
+        if (newAadhaar !== prev.aadhaarFileFileData || newPan !== prev.panFileFileData || newDL !== prev.drivingLicenseFileFileData) {
           return {
             ...prev,
             aadhaarFileFileData: newAadhaar,
             panFileFileData: newPan,
-            bankPassbookFileFileData: newBank
+            drivingLicenseFileFileData: newDL
           };
         }
         return prev;
@@ -786,27 +807,40 @@ export function ActivationJourneyPage() {
 
 
   // ── STEP 1: FUNCTIONS ──
-  const triggerMobileOTP = () => {
+  const triggerMobileOTP = async () => {
     if (!regForm.phone) return alert("Please enter a phone number first.")
     setRegForm(prev => ({ ...prev, otpStatus: "sending" }))
-    setTimeout(() => {
-      const code = Math.floor(1000 + Math.random() * 9000).toString()
-      setGeneratedPhoneOtp(code)
+    try {
+      const res = await apiSendOTP(regForm.phone)
+      if (res.code) {
+        setGeneratedPhoneOtp(res.code)
+      } else {
+        setGeneratedPhoneOtp("SENT")
+      }
+      setOtpDeliveryChannel(res.delivery_channel || "console")
+      setResendCooldown(30)
       setRegForm(prev => ({ ...prev, otpStatus: "sent", otpTimer: 59 }))
       setHudToast({
         type: "sms",
         title: "SMS GATEWAY ALERT",
-        msg: `Caltrack security verification code sent to ${regForm.phone}: ${code}`
+        msg: res.code
+          ? `Caltrack security verification code sent to ${regForm.phone}: ${res.code}`
+          : `Caltrack security verification code sent to ${regForm.phone}`
       })
       setTimeout(() => setHudToast(null), 8000)
-    }, 1200)
+    } catch (err) {
+      setRegForm(prev => ({ ...prev, otpStatus: "unverified" }))
+      alert("Failed to send OTP: " + (err.body?.detail || err.body?.message || JSON.stringify(err)))
+    }
   }
 
-  const confirmMobileOTP = () => {
-    if (otpCode === generatedPhoneOtp && generatedPhoneOtp !== "") {
+  const confirmMobileOTP = async () => {
+    if (!otpCode) return alert("Please enter the verification code.")
+    try {
+      await apiVerifyOTP(regForm.phone, otpCode)
       setRegForm(prev => ({ ...prev, otpStatus: "verified" }))
-    } else {
-      alert(`Verification Code Mismatch! Please check the SMS gateway alert card.`)
+    } catch (err) {
+      alert("Verification failed: " + (err.body?.detail || err.body?.message || "Invalid or expired OTP code."))
     }
   }
 
@@ -814,8 +848,8 @@ export function ActivationJourneyPage() {
 
   const triggerBiometricScan = () => {
     setRegForm(prev => ({ ...prev, isBiometricScanning: true }))
-    
-    // Attempt local webcam access to make it fully authentic
+
+    // Attempt local webcam access
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ video: true })
         .then(stream => {
@@ -823,44 +857,67 @@ export function ActivationJourneyPage() {
             webcamVideoRef.current.srcObject = stream
           }
         })
-        .catch(e => console.warn("Camera hardware access declined or unavailable. Using holographic scanner overlay.", e))
+        .catch(e => {
+          console.error("Camera access failed", e)
+          setRegForm(prev => ({ ...prev, isBiometricScanning: false }))
+          alert("Camera access denied or unavailable. Please enable webcam permissions to proceed.")
+        })
     } else {
-      console.warn("Camera hardware access or mediaDevices is undefined. Using holographic scanner overlay.")
+      setRegForm(prev => ({ ...prev, isBiometricScanning: false }))
+      alert("Camera hardware access is not supported on this browser device.")
+    }
+  }
+
+  const capturePhotoAndContinue = () => {
+    let capturedPic = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23090F1C'/><circle cx='50' cy='35' r='18' fill='%233B82F6' opacity='0.5'/><path d='M20,80 Q50,55 80,80 Z' fill='%2310B981' opacity='0.6'/><path d='M30,40 Q30,20 50,20 Q70,20 70,40 Q70,68 50,78 Q30,68 30,40 Z' fill='none' stroke='%233B82F6' stroke-width='1.5'/></svg>"
+    
+    try {
+      if (webcamVideoRef.current && webcamVideoRef.current.srcObject) {
+        const video = webcamVideoRef.current
+        const canvas = document.createElement("canvas")
+        canvas.width = video.videoWidth || 320
+        canvas.height = video.videoHeight || 240
+        const ctx = canvas.getContext("2d")
+        if (ctx) {
+          ctx.translate(canvas.width, 0)
+          ctx.scale(-1, 1)
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+          capturedPic = canvas.toDataURL("image/png")
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to capture webcam frame, using fallback", err)
     }
 
-    setTimeout(() => {
-      let capturedPic = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23090F1C'/><circle cx='50' cy='35' r='18' fill='%233B82F6' opacity='0.5'/><path d='M20,80 Q50,55 80,80 Z' fill='%2310B981' opacity='0.6'/><path d='M30,40 Q30,20 50,20 Q70,20 70,40 Q70,68 50,78 Q30,68 30,40 Z' fill='none' stroke='%233B82F6' stroke-width='1.5'/></svg>"
-      
-      try {
-        if (webcamVideoRef.current && webcamVideoRef.current.srcObject) {
-          const video = webcamVideoRef.current
-          const canvas = document.createElement("canvas")
-          canvas.width = video.videoWidth || 320
-          canvas.height = video.videoHeight || 240
-          const ctx = canvas.getContext("2d")
-          if (ctx) {
-            ctx.translate(canvas.width, 0)
-            ctx.scale(-1, 1)
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-            capturedPic = canvas.toDataURL("image/png")
-          }
-        }
-      } catch (err) {
-        console.warn("Failed to capture webcam frame, using fallback mesh avatar", err)
-      }
+    // Stop webcam stream
+    if (webcamVideoRef.current?.srcObject) {
+      const stream = webcamVideoRef.current.srcObject
+      stream.getTracks().forEach(track => track.stop())
+      webcamVideoRef.current.srcObject = null
+    }
 
-      // stop stream if active
-      if (webcamVideoRef.current?.srcObject) {
-        const stream = webcamVideoRef.current.srcObject
-        stream.getTracks().forEach(track => track.stop())
-      }
-      setRegForm(prev => ({ 
-        ...prev, 
-        isBiometricScanning: false, 
-        isBiometricCompleted: true,
-        profilePic: capturedPic
-      }))
-    }, 4000)
+    const formattedDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+    
+    setRegForm(prev => ({
+      ...prev,
+      isBiometricScanning: false,
+      isBiometricCompleted: true,
+      profilePic: capturedPic,
+      isCompleted: true,
+      regDate: formattedDate
+    }))
+
+    setHudToast({
+      type: "biometric",
+      title: "PHOTO CAPTURED",
+      msg: "Selfie captured successfully. Proceeding to Document Verification."
+    })
+    setTimeout(() => setHudToast(null), 5000)
+
+    // Move to step 2 after a brief delay for transition
+    setTimeout(() => {
+      setActiveStep(2)
+    }, 1200)
   }
 
   const handleStep1Submit = (e) => {
@@ -870,7 +927,7 @@ export function ActivationJourneyPage() {
     }
     if (regForm.otpStatus !== "verified") return alert("Please verify your Mobile OTP first.")
     if (!regForm.isBiometricCompleted) return alert("Please complete your Biometric Profile Scan first.")
-    
+
     const formattedDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
     setRegForm(prev => ({ ...prev, isCompleted: true, regDate: formattedDate }))
     setActiveStep(2)
@@ -893,13 +950,13 @@ export function ActivationJourneyPage() {
 
     setUploadingDocs(prev => ({ ...prev, [field]: true }))
     setDocForm(prev => ({ ...prev, [field]: null }))
-    
+
     const reader = new FileReader()
     reader.onload = () => {
-      setDocForm(prev => ({ 
-        ...prev, 
+      setDocForm(prev => ({
+        ...prev,
         [field]: file.name,
-        [`${field}FileData`]: reader.result 
+        [`${field}FileData`]: reader.result
       }))
       setUploadingDocs(prev => ({ ...prev, [field]: false }))
     }
@@ -908,17 +965,17 @@ export function ActivationJourneyPage() {
 
 
   const triggerAIValidation = () => {
-    if (!docForm.aadhaarFile || !docForm.panFile || !docForm.bankPassbookFile) {
-      alert("Please upload Aadhaar, PAN, and Bank details first.")
+    if (!docForm.aadhaarFile || !docForm.panFile || !docForm.drivingLicenseFile) {
+      alert("Please upload Aadhaar, PAN, and Driving License details first.")
       return
     }
-    if (!docForm.aadhaarId || !docForm.panId || !docForm.bankAcc || !docForm.ifscCode) {
-      alert("Please enter Aadhaar, PAN, Bank Account, and IFSC input fields first.")
+    if (!docForm.aadhaarId || !docForm.panId || !docForm.drivingLicenseId) {
+      alert("Please enter Aadhaar, PAN, and Driving License ID input fields first.")
       return
     }
 
     setDocForm(prev => ({ ...prev, isValidating: true, validationProgress: 0, validationLog: [] }))
-    
+
     const logs = [
       `Extracting OCR character mesh from Aadhaar: "${docForm.aadhaarFile}"...`,
       `Validating Aadhaar ID "${docForm.aadhaarId}" status... Active`,
@@ -926,7 +983,7 @@ export function ActivationJourneyPage() {
       `Extracting OCR signatures from PAN: "${docForm.panFile}"...`,
       `Checking PAN ID "${docForm.panId}" validity with NSDL registry... Approved`,
       `Analyzing profile webcam photo coordinates against document avatars... Match 99.8%`,
-      `Validating Bank Account "${docForm.bankAcc}" (IFSC: "${docForm.ifscCode}") routing active status... Verified`,
+      `Validating Driving License ID "${docForm.drivingLicenseId}" authentication status... Verified`,
       "Running anti-duplicate and multi-identity sybil fraud checks... Clearance Clear",
       "Generating quantum trust confidence report index..."
     ]
@@ -954,15 +1011,15 @@ export function ActivationJourneyPage() {
           isValidating: false,
           confidenceScore: 99,
           isCompleted: true,
-          aadhaarFileFileData: prev.aadhaarFileFileData && prev.aadhaarFileFileData.startsWith("data:image/") && !prev.aadhaarFile.endsWith(".pdf")
+          aadhaarFileFileData: prev.aadhaarFileFileData && !prev.aadhaarFileFileData.startsWith("data:image/svg+xml")
             ? prev.aadhaarFileFileData
             : generateAadhaarSVG(regForm.fullName, regForm.profilePic, prev.aadhaarId),
-          panFileFileData: prev.panFileFileData && prev.panFileFileData.startsWith("data:image/") && !prev.panFile.endsWith(".pdf")
+          panFileFileData: prev.panFileFileData && !prev.panFileFileData.startsWith("data:image/svg+xml")
             ? prev.panFileFileData
             : generatePanSVG(regForm.fullName, regForm.profilePic, prev.panId),
-          bankPassbookFileFileData: prev.bankPassbookFileFileData && prev.bankPassbookFileFileData.startsWith("data:image/") && !prev.bankPassbookFile.endsWith(".pdf")
-            ? prev.bankPassbookFileFileData
-            : generateBankSVG(regForm.fullName, prev.bankAcc, prev.ifscCode)
+          drivingLicenseFileFileData: prev.drivingLicenseFileFileData && !prev.drivingLicenseFileFileData.startsWith("data:image/svg+xml")
+            ? prev.drivingLicenseFileFileData
+            : generateDrivingLicenseSVG(regForm.fullName, prev.drivingLicenseId)
         }))
         setTimeout(() => {
           setActiveStep(3)
@@ -1000,8 +1057,8 @@ export function ActivationJourneyPage() {
 
         const updatedModules = prev.modules.map(m => {
           if (m.id === prev.activeModuleId) {
-            return { 
-              ...m, 
+            return {
+              ...m,
               progress: Math.min(nextProgress, 100)
             }
           }
@@ -1055,10 +1112,10 @@ export function ActivationJourneyPage() {
   const triggerInterviewCall = () => {
     setInterviewState(prev => ({ ...prev, status: "Calling", subtitles: "Establishing secure WebRTC handshake..." }))
     setTimeout(() => {
-      setInterviewState(prev => ({ 
-        ...prev, 
-        status: "Connected", 
-        activeQuestionIndex: 0, 
+      setInterviewState(prev => ({
+        ...prev,
+        status: "Connected",
+        activeQuestionIndex: 0,
         subtitles: interviewQuestions[0].text,
         soundWaveActive: true
       }))
@@ -1125,15 +1182,15 @@ export function ActivationJourneyPage() {
   }
 
   const confirmAdminReject = (reason) => {
-    setAdminClearance({ 
-      status: "rejected", 
-      remarks: reason || "Identity documents mismatch with biometric registration profile." 
+    setAdminClearance({
+      status: "rejected",
+      remarks: reason || "Identity documents mismatch with biometric registration profile."
     })
     setShowRejectionDialog(false)
   }
 
 
- 
+
   const resetEntireJourney = () => {
     localStorage.removeItem("caltrack_activation_dossier")
     apiDeleteRegistrationDossier()
@@ -1156,11 +1213,10 @@ export function ActivationJourneyPage() {
     setDocForm({
       aadhaarId: "",
       panId: "",
-      bankAcc: "",
-      ifscCode: "",
+      drivingLicenseId: "",
       aadhaarFile: null,
       panFile: null,
-      bankPassbookFile: null,
+      drivingLicenseFile: null,
       isValidating: false,
       validationLog: [],
       validationProgress: 0,
@@ -1177,13 +1233,15 @@ export function ActivationJourneyPage() {
       isCompleted: false
     })
     setInterviewState({
-      status: "Scheduled",
+      status: "Passed",
       activeQuestionIndex: 0,
-      callDuration: 0,
+      callDuration: 12,
       subtitles: "",
       soundWaveActive: false,
-      interviewLogs: [],
-      isCompleted: false
+      interviewLogs: [
+        { sender: "System", text: "Compliance WebRTC check bypassed by system configuration." }
+      ],
+      isCompleted: true
     })
     setAdminClearance({
       status: "pending",
@@ -1205,13 +1263,11 @@ export function ActivationJourneyPage() {
     const isStep1Valid = regForm.otpStatus === "verified" && regForm.isBiometricCompleted
     const isStep2Valid = docForm.isCompleted
     const isStep3Valid = academyState.isCompleted
-    const isStep4Valid = interviewState.isCompleted
 
-    const canGoNext = 
+    const canGoNext =
       (activeStep === 1 && isStep1Valid) ||
       (activeStep === 2 && isStep2Valid) ||
-      (activeStep === 3 && isStep3Valid) ||
-      (activeStep === 4 && isStep4Valid);
+      (activeStep === 3 && isStep3Valid);
 
     return (
       <div className="flex justify-between items-center mt-8 pt-6 border-t border-slate-200/60 dark:border-slate-800/60">
@@ -1227,7 +1283,7 @@ export function ActivationJourneyPage() {
           <div />
         )}
 
-        {activeStep < 5 && canGoNext && (
+        {activeStep < 4 && canGoNext && (
           <button
             type="button"
             onClick={() => setActiveStep(prev => prev + 1)}
@@ -1272,7 +1328,7 @@ export function ActivationJourneyPage() {
               </div>
             </div>
             <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-900 rounded-b-2xl overflow-hidden">
-              <motion.div 
+              <motion.div
                 initial={{ width: "100%" }}
                 animate={{ width: "0%" }}
                 transition={{ duration: 8, ease: "linear" }}
@@ -1297,7 +1353,7 @@ export function ActivationJourneyPage() {
         </div>
 
         <div className="flex items-center gap-4 font-orbitron">
-          <button 
+          <button
             type="button"
             onClick={() => navigate(routes.login)}
             className="px-4 py-2 border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all"
@@ -1308,12 +1364,12 @@ export function ActivationJourneyPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 mt-10 grid grid-cols-1 lg:grid-cols-12 gap-8 relative z-10">
-        
+
         {/* =====================================================================
             LEFT SIDEBAR HUD
             ===================================================================== */}
         <div className="lg:col-span-4 flex flex-col gap-6">
-          
+
           {/* Mission Progress HUD */}
           <div className="hud-card rounded-2xl p-6 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full filter blur-xl" />
@@ -1325,8 +1381,8 @@ export function ActivationJourneyPage() {
             {/* Vertical timeline stepper */}
             <div className="relative pl-6 space-y-7">
               <div className="absolute left-[31px] top-4 bottom-4 w-0.5 bg-slate-850 z-0">
-                <motion.div 
-                  className="w-full bg-gradient-to-b from-blue-500 to-emerald-500" 
+                <motion.div
+                  className="w-full bg-gradient-to-b from-blue-500 to-emerald-500"
                   initial={{ height: "20%" }}
                   animate={{ height: `${timelineProgress}%` }}
                   transition={{ duration: 0.6 }}
@@ -1337,24 +1393,21 @@ export function ActivationJourneyPage() {
                 { num: 1, title: "Registration", status: regForm.isCompleted ? "✓ Verified Complete" : "Interactive Input", detail: regForm.fullName },
                 { num: 2, title: "KYC & Documents", status: docForm.isCompleted ? "✓ OCR validated" : "Upload Aadhaar/PAN", detail: docForm.isCompleted ? `Confidence Index: ${docForm.confidenceScore}%` : "Awaiting files" },
                 { num: 3, title: "Training Academy", status: academyState.isCompleted ? "✓ Academy certified" : "Module playback", detail: academyState.isCompleted ? "5 Modules Mastered" : "Video track active" },
-                { num: 4, title: "Verification Call", status: interviewState.isCompleted ? "✓ Passed L1 check" : "Live WebRTC call", detail: interviewState.isCompleted ? "Audited & Passed" : "Auditor connection" },
-                { num: 5, title: "Admin Review", status: adminClearance.status === "approved" ? "✓ Authorized" : adminClearance.status === "rejected" ? "✕ Denied" : "Awaiting Clearance", detail: adminClearance.status === "approved" ? "Active Workforce Pass" : "Security clearance" }
+                { num: 4, title: "Admin Review", status: adminClearance.status === "approved" ? "✓ Authorized" : adminClearance.status === "rejected" ? "✕ Denied" : "Awaiting Clearance", detail: adminClearance.status === "approved" ? "Active Workforce Pass" : "Security clearance" }
               ].map((step) => {
                 const isActive = activeStep === step.num
                 const isDone = step.num === 1 ? regForm.isCompleted :
-                               step.num === 2 ? docForm.isCompleted :
-                               step.num === 3 ? academyState.isCompleted :
-                               step.num === 4 ? interviewState.isCompleted :
-                               adminClearance.status === "approved"
+                  step.num === 2 ? docForm.isCompleted :
+                    step.num === 3 ? academyState.isCompleted :
+                      adminClearance.status === "approved"
 
-                const canVisit = step.num === 1 || 
+                const canVisit = step.num === 1 ||
                   (step.num === 2 && regForm.isCompleted) ||
                   (step.num === 3 && regForm.isCompleted && docForm.isCompleted) ||
-                  (step.num === 4 && regForm.isCompleted && docForm.isCompleted && academyState.isCompleted) ||
-                  (step.num === 5 && regForm.isCompleted && docForm.isCompleted && academyState.isCompleted && interviewState.isCompleted);
+                  (step.num === 4 && regForm.isCompleted && docForm.isCompleted && academyState.isCompleted);
 
                 return (
-                  <div 
+                  <div
                     key={step.num}
                     onClick={() => {
                       if (canVisit) {
@@ -1363,12 +1416,11 @@ export function ActivationJourneyPage() {
                     }}
                     className={`flex items-start gap-4 transition-all duration-300 relative z-10 ${canVisit ? "cursor-pointer group hover:opacity-90" : "cursor-not-allowed opacity-30"} ${isActive ? "scale-[1.02]" : ""}`}
                   >
-                    <div 
-                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold border-2 transition-all duration-300 ${
-                        isDone ? "bg-emerald-500/10 border-emerald-500 text-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.15)]" :
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold border-2 transition-all duration-300 ${isDone ? "bg-emerald-500/10 border-emerald-500 text-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.15)]" :
                         isActive ? "bg-indigo-600 border-indigo-600 text-white shadow-[0_0_15px_rgba(79,70,229,0.25)]" :
-                        "bg-slate-50 border-slate-200 text-slate-400"
-                      }`}
+                          "bg-slate-50 border-slate-200 text-slate-400"
+                        }`}
                     >
                       {isDone ? <Check className="w-4.5 h-4.5 text-emerald-600" strokeWidth={3} /> : step.num}
                     </div>
@@ -1397,18 +1449,18 @@ export function ActivationJourneyPage() {
             <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full filter blur-xl" />
             <h2 className="font-orbitron font-black text-xs text-emerald-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
               <Database className="w-4 h-4 text-emerald-400" />
-              QUANTUM TRUST MATRIX
+              VERIFICATION STATUS
             </h2>
 
             <div className="flex items-center gap-6 mt-4">
               <div className="relative w-28 h-28 flex items-center justify-center shrink-0 bg-[#060a14] rounded-full border border-slate-800 shadow-inner">
                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="40" stroke="rgba(255,255,255,0.03)" strokeWidth="8" fill="transparent" />
-                  <motion.circle 
-                    cx="50" cy="50" r="40" 
-                    stroke="url(#complianceGlow)" 
-                    strokeWidth="8" 
-                    fill="transparent" 
+                  <motion.circle
+                    cx="50" cy="50" r="40"
+                    stroke="url(#complianceGlow)"
+                    strokeWidth="8"
+                    fill="transparent"
                     strokeDasharray={251.2}
                     initial={{ strokeDashoffset: 251.2 }}
                     animate={{ strokeDashoffset: 251.2 - (251.2 * activeScore) / 100 }}
@@ -1429,21 +1481,21 @@ export function ActivationJourneyPage() {
 
               <div className="space-y-3 text-[11px] font-semibold">
                 <div>
-                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">WebRTC Call logs</div>
+                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Interview</div>
                   <div className={`${interviewState.isCompleted ? "text-emerald-400 font-bold" : "text-slate-200"} mt-0.5`}>
-                    {interviewState.isCompleted ? "✓ Audit Cleared" : "Awaiting Call"}
+                    {interviewState.isCompleted ? "✓ Completed" : "Not Started"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Biometric Check</div>
+                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Identity Scan</div>
                   <div className={`${regForm.isBiometricCompleted ? "text-emerald-400 font-bold" : "text-slate-200"} mt-0.5`}>
-                    {regForm.isBiometricCompleted ? "✓ Facemesh Scanned" : "Scanning Required"}
+                    {regForm.isBiometricCompleted ? "✓ Verified" : "Pending"}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Document OCR Integrity</div>
+                  <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Document Check</div>
                   <div className={`${docForm.isCompleted ? "text-emerald-400 font-bold" : "text-slate-200"} mt-0.5`}>
-                    {docForm.isCompleted ? "✓ Verified Checksum" : "Awaiting Uploads"}
+                    {docForm.isCompleted ? "✓ Verified" : "Awaiting Upload"}
                   </div>
                 </div>
               </div>
@@ -1456,10 +1508,10 @@ export function ActivationJourneyPage() {
             ===================================================================== */}
         <div className="lg:col-span-8">
           <AnimatePresence mode="wait">
-            
+
             {/* ── STEP 1: REGISTRATION & PROFILE ── */}
             {activeStep === 1 && (
-              <motion.div 
+              <motion.div
                 key="step1"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -1468,7 +1520,7 @@ export function ActivationJourneyPage() {
                 className="hud-card rounded-2xl p-6 md:p-8 relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full filter blur-2xl" />
-                
+
                 {/* Step Header with sub-step indicators */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-slate-850 gap-4">
                   <div className="flex items-center gap-3">
@@ -1477,21 +1529,20 @@ export function ActivationJourneyPage() {
                       <h3 className="text-base font-black text-white uppercase tracking-wider">TECHNICIAN REGISTRATION</h3>
                       <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">
                         {regSubStep === 1 ? "Step 1.1: Contact Information Details" :
-                         regSubStep === 2 ? "Step 1.2: Secure Mobile OTP Verification" :
-                         "Step 1.3: Biometric Facemesh Profile Scan"}
+                          regSubStep === 2 ? "Step 1.2: Secure Mobile OTP Verification" :
+                            "Step 1.3: Biometric Facemesh Profile Scan"}
                       </p>
                     </div>
                   </div>
-                  
+
                   {/* Sub-step progress indicators */}
                   <div className="flex items-center gap-2">
                     {[1, 2, 3].map((s) => (
-                      <div 
-                        key={s} 
-                        className={`h-1.5 rounded-full transition-all duration-300 ${
-                          regSubStep === s ? "w-8 bg-indigo-600" :
+                      <div
+                        key={s}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${regSubStep === s ? "w-8 bg-indigo-600" :
                           regSubStep > s ? "w-4 bg-emerald-500" : "w-4 bg-slate-200"
-                        }`}
+                          }`}
                       />
                     ))}
                   </div>
@@ -1500,7 +1551,7 @@ export function ActivationJourneyPage() {
                 <div className="mt-6 space-y-6">
                   {/* SUB-STEP 1: Contact Details */}
                   {regSubStep === 1 && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-6"
@@ -1508,7 +1559,7 @@ export function ActivationJourneyPage() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                         <div className="space-y-2">
                           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Full Name</label>
-                          <input 
+                          <input
                             required
                             type="text"
                             className="w-full px-4 py-3 rounded-xl cyber-input text-sm font-semibold"
@@ -1519,7 +1570,7 @@ export function ActivationJourneyPage() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Email Address</label>
-                          <input 
+                          <input
                             required
                             type="email"
                             className="w-full px-4 py-3 rounded-xl cyber-input text-sm font-semibold"
@@ -1530,7 +1581,7 @@ export function ActivationJourneyPage() {
                         </div>
                         <div className="space-y-2">
                           <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Phone Number</label>
-                          <input 
+                          <input
                             required
                             type="tel"
                             className="w-full px-4 py-3 rounded-xl cyber-input text-sm font-semibold"
@@ -1543,7 +1594,7 @@ export function ActivationJourneyPage() {
 
                       <div className="space-y-2">
                         <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Permanent Residence Address</label>
-                        <textarea 
+                        <textarea
                           required
                           rows={3}
                           className="w-full px-4 py-3 rounded-xl cyber-input text-sm font-semibold resize-none"
@@ -1568,7 +1619,7 @@ export function ActivationJourneyPage() {
 
                   {/* SUB-STEP 2: Phone OTP Verification */}
                   {regSubStep === 2 && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-6"
@@ -1584,12 +1635,17 @@ export function ActivationJourneyPage() {
                         </div>
 
                         <p className="text-xs text-slate-500 leading-relaxed font-semibold">
-                          We will send a 4-digit security code to your registered mobile number <strong className="text-slate-800">{regForm.phone}</strong> to confirm identity.
+                          We will send a 4-digit security code to your registered mobile number <strong className="text-slate-800">{maskPhoneNumber(regForm.phone)}</strong> to confirm identity.
                         </p>
 
                         {regForm.otpStatus === "unverified" && (
-                          <button type="button" onClick={triggerMobileOTP} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-xl text-white shadow-sm transition-all">
-                            Send Verification OTP
+                          <button
+                            type="button"
+                            disabled={resendCooldown > 0}
+                            onClick={triggerMobileOTP}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-400 text-[10px] font-black uppercase tracking-wider rounded-xl text-white shadow-sm transition-all"
+                          >
+                            {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : "Send Verification OTP"}
                           </button>
                         )}
 
@@ -1599,7 +1655,7 @@ export function ActivationJourneyPage() {
 
                         {(regForm.otpStatus === "sent" || regForm.otpStatus === "verified") && (
                           <div className="flex gap-3">
-                            <input 
+                            <input
                               disabled={regForm.otpStatus === "verified"}
                               type="text"
                               maxLength={4}
@@ -1609,9 +1665,21 @@ export function ActivationJourneyPage() {
                               onChange={e => setOtpCode(e.target.value)}
                             />
                             {regForm.otpStatus === "verified" ? (
-                              <div className="flex-grow py-3 bg-emerald-50 border border-emerald-200 text-emerald-600 text-xs font-black text-center uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5">
-                                <CheckCircle className="w-4 h-4 text-emerald-600" /> Verified Successfully
-                              </div>
+                              <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                                className="flex-grow py-3 bg-emerald-50 border border-emerald-200 text-emerald-600 text-xs font-black text-center uppercase tracking-widest rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-500/10"
+                              >
+                                <motion.span
+                                  initial={{ rotate: -90 }}
+                                  animate={{ rotate: 0 }}
+                                  transition={{ delay: 0.2 }}
+                                >
+                                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                </motion.span>
+                                Verified Successfully
+                              </motion.div>
                             ) : (
                               <button type="button" onClick={confirmMobileOTP} className="flex-grow py-3 bg-emerald-600 hover:bg-emerald-700 text-[10px] font-black uppercase tracking-wider rounded-xl text-white transition-all">
                                 Confirm Code ({regForm.otpTimer}s)
@@ -1619,9 +1687,34 @@ export function ActivationJourneyPage() {
                             )}
                           </div>
                         )}
+
                         {regForm.otpStatus === "sent" && (
-                          <div className="text-[9px] text-slate-400 font-semibold bg-blue-50 border border-blue-100 p-2.5 rounded-lg">
-                            Check simulated SMS gateway alert box on the right for your verification code.
+                          <div className="space-y-2">
+                            {/* Real-time Delivery Status */}
+                            <div className={`text-[10px] font-bold p-2.5 rounded-lg flex items-center gap-1.5 border ${otpDeliveryChannel === "sms"
+                                ? "bg-emerald-50 border-emerald-100 text-emerald-700"
+                                : "bg-blue-50 border-blue-100 text-blue-700"
+                              }`}>
+                              <Info className="w-3.5 h-3.5" />
+                              <span>
+                                {otpDeliveryChannel === "sms"
+                                  ? "Real-time OTP successfully dispatched via SMS gateway."
+                                  : "Development Fallback: OTP code outputted to console & HUD banner."}
+                              </span>
+                            </div>
+
+                            {/* Resend Cooldown Countdown */}
+                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-150">
+                              <span>Didn't receive the OTP?</span>
+                              <button
+                                type="button"
+                                disabled={resendCooldown > 0}
+                                onClick={triggerMobileOTP}
+                                className="text-indigo-650 hover:text-indigo-800 disabled:text-slate-400 font-black uppercase tracking-wider transition-all"
+                              >
+                                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend OTP"}
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1648,7 +1741,7 @@ export function ActivationJourneyPage() {
 
                   {/* SUB-STEP 3: Biometric Profile Scan */}
                   {regSubStep === 3 && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-6"
@@ -1670,14 +1763,15 @@ export function ActivationJourneyPage() {
                               </div>
                             ) : (
                               <>
-                                <video 
+                                <video
                                   ref={webcamVideoRef}
-                                  autoPlay 
-                                  playsInline 
+                                  autoPlay
+                                  playsInline
+                                  muted
                                   className="w-full h-full object-cover transform scale-x-[-1]"
                                 />
                                 {regForm.isBiometricScanning && (
-                                  <div className="absolute inset-0 bg-blue-500/5 backdrop-blur-[0.5px] flex items-center justify-center pointer-events-none">
+                                  <div className="absolute inset-0 bg-blue-500/5 flex items-center justify-center pointer-events-none">
                                     <svg className="w-full h-full text-blue-400/50" viewBox="0 0 100 100">
                                       <path d="M30,45 Q30,22 50,22 Q70,22 70,45 Q70,72 50,82 Q30,72 30,45 Z" fill="none" stroke="#3b82f6" strokeWidth="0.75" strokeDasharray="3 3" className="animate-pulse" />
                                       <circle cx="42" cy="42" r="1.5" fill="#10b981" />
@@ -1702,8 +1796,12 @@ export function ActivationJourneyPage() {
                               Caltrack automated systems require a liveness biometric selfie scan to match with your government credentials in Step 2.
                             </p>
                             {regForm.isBiometricScanning ? (
-                              <button disabled className="px-6 py-3 bg-indigo-50 border border-indigo-200 text-[10px] text-indigo-600 rounded-xl font-black uppercase tracking-widest animate-pulse">
-                                Scanning facial geometry...
+                              <button
+                                type="button"
+                                onClick={capturePhotoAndContinue}
+                                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 shadow-md shadow-emerald-600/10 animate-bounce"
+                              >
+                                <Camera className="w-4 h-4" /> Capture Photo & Continue
                               </button>
                             ) : regForm.isBiometricCompleted ? (
                               <div className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest flex items-center gap-1">
@@ -1726,7 +1824,7 @@ export function ActivationJourneyPage() {
                         >
                           ← Back to OTP Verification
                         </button>
-                        <button 
+                        <button
                           type="button"
                           disabled={regForm.otpStatus !== "verified" || !regForm.isBiometricCompleted}
                           onClick={(e) => {
@@ -1747,7 +1845,7 @@ export function ActivationJourneyPage() {
 
             {/* ── STEP 2: DOCUMENT INTEGRATION ── */}
             {activeStep === 2 && (
-              <motion.div 
+              <motion.div
                 key="step2"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -1755,25 +1853,25 @@ export function ActivationJourneyPage() {
                 transition={{ duration: 0.3 }}
                 className="hud-card rounded-2xl p-6 md:p-8 relative overflow-hidden"
               >
-                <input 
-                  type="file" 
-                  ref={aadhaarInputRef} 
-                  style={{ display: "none" }} 
-                  onChange={(e) => handleFileChange(e, "aadhaarFile")} 
+                <input
+                  type="file"
+                  ref={aadhaarInputRef}
+                  style={{ display: "none" }}
+                  onChange={(e) => handleFileChange(e, "aadhaarFile")}
                   accept=".pdf,.png,.jpg,.jpeg"
                 />
-                <input 
-                  type="file" 
-                  ref={panInputRef} 
-                  style={{ display: "none" }} 
-                  onChange={(e) => handleFileChange(e, "panFile")} 
+                <input
+                  type="file"
+                  ref={panInputRef}
+                  style={{ display: "none" }}
+                  onChange={(e) => handleFileChange(e, "panFile")}
                   accept=".pdf,.png,.jpg,.jpeg"
                 />
-                <input 
-                  type="file" 
-                  ref={bankInputRef} 
-                  style={{ display: "none" }} 
-                  onChange={(e) => handleFileChange(e, "bankPassbookFile")} 
+                <input
+                  type="file"
+                  ref={dlInputRef}
+                  style={{ display: "none" }}
+                  onChange={(e) => handleFileChange(e, "drivingLicenseFile")}
                   accept=".pdf,.png,.jpg,.jpeg"
                 />
                 {docForm.isValidating && <div className="laser-bar" />}
@@ -1792,7 +1890,7 @@ export function ActivationJourneyPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-2">
                       <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Aadhaar Card ID</label>
-                      <input 
+                      <input
                         type="text"
                         className="w-full px-4 py-3 rounded-xl cyber-input text-sm font-semibold"
                         value={docForm.aadhaarId}
@@ -1801,7 +1899,7 @@ export function ActivationJourneyPage() {
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">PAN Card ID</label>
-                      <input 
+                      <input
                         type="text"
                         className="w-full px-4 py-3 rounded-xl cyber-input text-sm font-semibold"
                         value={docForm.panId}
@@ -1811,22 +1909,14 @@ export function ActivationJourneyPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Bank Account Number</label>
-                      <input 
+                    <div className="space-y-2 col-span-2">
+                      <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Driving License ID</label>
+                      <input
                         type="text"
+                        placeholder="e.g. DL-1420110023456"
                         className="w-full px-4 py-3 rounded-xl cyber-input text-sm font-semibold"
-                        value={docForm.bankAcc}
-                        onChange={e => setDocForm(prev => ({ ...prev, bankAcc: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Bank IFSC Code</label>
-                      <input 
-                        type="text"
-                        className="w-full px-4 py-3 rounded-xl cyber-input text-sm font-semibold"
-                        value={docForm.ifscCode}
-                        onChange={e => setDocForm(prev => ({ ...prev, ifscCode: e.target.value }))}
+                        value={docForm.drivingLicenseId}
+                        onChange={e => setDocForm(prev => ({ ...prev, drivingLicenseId: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -1836,21 +1926,20 @@ export function ActivationJourneyPage() {
                     {[
                       { title: "Aadhaar Card Scan", field: "aadhaarFile", name: "aadhaar_scan.pdf" },
                       { title: "PAN Card Scan", field: "panFile", name: "pan_scan.pdf" },
-                      { title: "Bank Passbook Scan", field: "bankPassbookFile", name: "bank_ledger.pdf" }
+                      { title: "Driving License Scan", field: "drivingLicenseFile", name: "driving_license.pdf" }
                     ].map((up) => (
-                      <div 
+                      <div
                         key={up.field}
                         onClick={() => {
                           if (uploadingDocs[up.field]) return
                           if (up.field === "aadhaarFile") aadhaarInputRef.current?.click()
                           if (up.field === "panFile") panInputRef.current?.click()
-                          if (up.field === "bankPassbookFile") bankInputRef.current?.click()
+                          if (up.field === "drivingLicenseFile") dlInputRef.current?.click()
                         }}
-                        className={`p-4 rounded-xl border border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 h-28 ${
-                          docForm[up.field] ? "bg-blue-500/5 border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]" : 
+                        className={`p-4 rounded-xl border border-dashed flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 h-28 ${docForm[up.field] ? "bg-blue-500/5 border-blue-500/30 shadow-[0_0_15px_rgba(59,130,246,0.1)]" :
                           uploadingDocs[up.field] ? "bg-slate-950/80 border-blue-500/50 animate-pulse" :
-                          "bg-slate-950/40 border-slate-800 hover:border-slate-700"
-                        }`}
+                            "bg-slate-950/40 border-slate-800 hover:border-slate-700"
+                          }`}
                       >
                         {uploadingDocs[up.field] ? (
                           <>
@@ -1896,17 +1985,17 @@ export function ActivationJourneyPage() {
                     </div>
                   ) : docForm.isCompleted ? (
                     <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/25 text-center space-y-2">
-                      <div className="text-emerald-400 font-orbitron font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 animate-pulse" />
-                        AI VALIDATION MATRIX COMPLETE
+                      <div className="text-emerald-400 font-semibold text-sm flex items-center justify-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        Documents Verified Successfully
                       </div>
-                      <p className="text-[11px] text-slate-355">
-                        OCR extraction matching database matches {regForm.fullName}. Confidence level index: <strong className="text-emerald-450 font-orbitron">99%</strong>.
+                      <p className="text-[11px] text-slate-400">
+                        All uploaded documents have been verified and submitted for admin review.
                       </p>
                     </div>
                   ) : (
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={triggerAIValidation}
                       className="w-full py-4 glow-btn-blue font-orbitron text-xs font-black uppercase tracking-[0.15em] rounded-xl text-white flex items-center justify-center gap-2"
                     >
@@ -1920,7 +2009,7 @@ export function ActivationJourneyPage() {
 
             {/* ── STEP 3: VIDEO TRAINING ACADEMY ── */}
             {activeStep === 3 && (
-              <motion.div 
+              <motion.div
                 key="step3"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -1943,7 +2032,7 @@ export function ActivationJourneyPage() {
                   {/* High Tech Video Streamer */}
                   <div className="md:col-span-7 flex flex-col gap-4">
                     <div className="aspect-video w-full bg-[#050812] border border-slate-850 rounded-xl overflow-hidden relative flex flex-col justify-between p-4 shadow-inner">
-                      
+
                       {activeQuiz ? (
                         <div className="absolute inset-0 bg-[#090e1c] flex flex-col justify-between p-5 z-20">
                           <div>
@@ -1952,7 +2041,7 @@ export function ActivationJourneyPage() {
                             </div>
                             <h4 className="text-xs font-black text-white leading-snug mt-1">{activeQuiz.question}</h4>
                           </div>
-                          
+
                           <div className="space-y-2 mt-3">
                             {activeQuiz.options.map((opt, oIdx) => (
                               <button
@@ -1974,11 +2063,11 @@ export function ActivationJourneyPage() {
                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-between p-4">
                           {/* Loop video background when streaming */}
                           {academyState.isVideoPlaying && (
-                            <video 
-                              autoPlay 
-                              loop 
-                              muted 
-                              playsInline 
+                            <video
+                              autoPlay
+                              loop
+                              muted
+                              playsInline
                               className="absolute inset-0 w-full h-full object-cover opacity-35 mix-blend-screen pointer-events-none z-0"
                               src="https://player.vimeo.com/external/371433846.sd.mp4?s=236da2f3c054a4d8285ab64010ecd02818b4e3f2&profile_id=165&oauth2_token_id=57447761"
                             />
@@ -2033,9 +2122,9 @@ export function ActivationJourneyPage() {
                             <div className="text-[10px] font-black text-white uppercase tracking-wider line-clamp-1">
                               Playing: {academyState.modules.find(m => m.id === academyState.activeModuleId)?.title}
                             </div>
-                            
+
                             <div className="w-full h-1 bg-slate-850 rounded-full overflow-hidden">
-                              <div 
+                              <div
                                 className="h-full bg-blue-500 transition-all duration-300"
                                 style={{ width: `${academyState.modules.find(m => m.id === academyState.activeModuleId)?.progress}%` }}
                               />
@@ -2057,8 +2146,8 @@ export function ActivationJourneyPage() {
 
                               <div className="flex items-center gap-3">
                                 {academyState.isVideoPlaying && (
-                                  <button 
-                                    type="button" 
+                                  <button
+                                    type="button"
                                     onClick={() => {
                                       clearInterval(videoRef.current)
                                       setAcademyState(prev => {
@@ -2098,7 +2187,7 @@ export function ActivationJourneyPage() {
                           <div className="text-[10px] font-black text-slate-350 uppercase tracking-widest">Select a Module on the right to Play</div>
                         </div>
                       )}
-                      
+
                       {/* Laser scanner overlay */}
                       <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.1)_50%)] bg-[size:100%_4px] pointer-events-none opacity-20" />
                     </div>
@@ -2109,7 +2198,7 @@ export function ActivationJourneyPage() {
                       <div>
                         <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Academy Status</div>
                         <div className="text-sm font-orbitron font-black text-white mt-1">
-                          {academyState.modules.filter(m => m.completed).length} / 5 COMPLETED
+                          {academyState.modules.filter(m => m.completed).length} / {academyState.modules.length} COMPLETED
                         </div>
                       </div>
                       <div className="h-8 w-[1px] bg-slate-855" />
@@ -2125,14 +2214,13 @@ export function ActivationJourneyPage() {
                   {/* Modules Sidebar */}
                   <div className="md:col-span-5 space-y-2 max-h-[350px] overflow-y-auto pr-1">
                     {academyState.modules.map((mod) => (
-                      <div 
+                      <div
                         key={mod.id}
                         onClick={() => selectAcademyModule(mod.id)}
-                        className={`p-3 rounded-xl border cursor-pointer transition-all duration-300 ${
-                          mod.isPlaying ? "bg-indigo-500/10 border-indigo-500/40" :
+                        className={`p-3 rounded-xl border cursor-pointer transition-all duration-300 ${mod.isPlaying ? "bg-indigo-500/10 border-indigo-500/40" :
                           mod.completed ? "bg-emerald-500/5 border-emerald-500/20" :
-                          "bg-slate-950/40 border-slate-850 hover:bg-slate-900"
-                        }`}
+                            "bg-slate-950/40 border-slate-850 hover:bg-slate-900"
+                          }`}
                       >
                         <div className="flex justify-between items-start gap-2">
                           <span className="text-xs font-black text-slate-200 line-clamp-2 leading-tight">
@@ -2154,9 +2242,9 @@ export function ActivationJourneyPage() {
               </motion.div>
             )}
 
-            {/* ── STEP 4: VERIFICATION CALL ── */}
+            {/* ── STEP 4: ADMIN CLEARANCE CONTROL ── */}
             {activeStep === 4 && (
-              <motion.div 
+              <motion.div
                 key="step4"
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -2165,317 +2253,158 @@ export function ActivationJourneyPage() {
                 className="hud-card rounded-2xl p-6 md:p-8 relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full filter blur-2xl" />
-                <div className="flex items-center justify-between pb-6 border-b border-slate-850">
-                  <div className="flex items-center gap-3">
-                    <span className="font-orbitron font-black text-2xl text-blue-500">04</span>
-                    <div>
-                      <h3 className="text-base font-black text-white uppercase tracking-wider">SECURE COMPLIANCE VERIFICATION CALL</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Perform L1 video call to confirm credentials & service knowledge</p>
-                    </div>
+                {/* Header */}
+                <div className="flex items-center justify-between pb-5 border-b border-slate-850">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Application Review</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Your application has been submitted for admin review</p>
                   </div>
-                </div>
-
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-12 gap-6">
-                  {/* Call gateway and response options */}
-                  <div className="md:col-span-5 space-y-4">
-                    <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-850 space-y-3">
-                      <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest">INTERVIEW RUBRICS</div>
-                      <div className="text-xs font-semibold text-slate-300 leading-relaxed">
-                        Verify information with compliance agent. Once call launches, select options to answer compliance questions.
-                      </div>
-                    </div>
-
-                    {/* Interactive Q&A Choices */}
-                    {interviewState.status === "Connected" && (
-                      <div className="space-y-3">
-                        <div className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Select Answer Response</div>
-                        <button 
-                          type="button"
-                          onClick={() => handleInterviewAnswer(interviewQuestions[interviewState.activeQuestionIndex].option1)}
-                          className="w-full text-left p-3 rounded-xl bg-blue-600/10 border border-blue-500/30 hover:border-blue-500 text-xs font-bold text-white transition-all flex justify-between items-center"
-                        >
-                          <span>{interviewQuestions[interviewState.activeQuestionIndex].option1}</span>
-                          <ChevronRight className="w-4 h-4 text-blue-400 shrink-0" />
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => handleInterviewAnswer(interviewQuestions[interviewState.activeQuestionIndex].option2)}
-                          className="w-full text-left p-3 rounded-xl bg-slate-950/50 border border-slate-800 hover:border-slate-650 text-xs font-bold text-slate-300 transition-all flex justify-between items-center"
-                        >
-                          <span>{interviewQuestions[interviewState.activeQuestionIndex].option2}</span>
-                          <ChevronRight className="w-4 h-4 text-slate-500 shrink-0" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* High Tech Video Streamer */}
-                  <div className="md:col-span-7">
-                    <div className="aspect-video w-full bg-[#05070f] rounded-xl border border-slate-850 relative flex flex-col justify-between p-4 overflow-hidden">
-                      <div className="flex items-center justify-between z-10">
-                        <span className="px-2 py-0.5 rounded bg-black/60 border border-slate-800 text-[8px] font-black font-orbitron text-slate-400 tracking-wider">
-                          {interviewState.status === "Connected" ? "L1 GATEWAY STREAM ACTIVE" : "HANDSHAKE IDLE"}
-                        </span>
-                        {interviewState.status === "Connected" && (
-                          <span className="px-2 py-0.5 rounded bg-red-500/10 border border-red-500/25 text-[8px] font-black text-red-400 tracking-wider flex items-center gap-1 animate-pulse">
-                            <span className="w-1 h-1 rounded-full bg-red-500" /> SECURE REC
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Screen renderer */}
-                      {interviewState.status === "Calling" ? (
-                        <div className="my-auto text-center space-y-3">
-                          <RefreshCcw className="w-10 h-10 text-blue-500 animate-spin mx-auto" />
-                          <div className="text-xs font-black text-blue-400 uppercase tracking-widest font-orbitron">NEGOTIATING HANDSHAKE KEYS...</div>
-                        </div>
-                      ) : interviewState.status === "Connected" ? (
-                        <div className="flex-1 flex gap-4 mt-2 items-center justify-between relative z-10">
-                          {/* Auditor Card */}
-                          <div className="flex-1 bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col items-center text-center justify-center h-full relative overflow-hidden">
-                            {/* Loop video background representing Officer Sarah's feed */}
-                            <video 
-                              autoPlay 
-                              loop 
-                              muted 
-                              playsInline 
-                              className="absolute inset-0 w-full h-full object-cover opacity-25 pointer-events-none z-0"
-                              src="https://player.vimeo.com/external/435674703.sd.mp4?s=7f5ab5f4f89d3c50937a0fc6d7ec318e8749e7a1&profile_id=165&oauth2_token_id=57447761"
-                            />
-                            <div className="relative z-10 flex flex-col items-center justify-center w-full h-full">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 border border-indigo-500/30 flex items-center justify-center mb-1 shadow-[0_0_15px_rgba(99,102,241,0.2)] animate-pulse">
-                                <UserCheck className="w-5 h-5 text-white" />
-                              </div>
-                              <div className="text-[10px] font-black text-white uppercase tracking-wider">OFFICER SARAH</div>
-                              <div className="text-[7.5px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">L1 Compliance Auditor</div>
-                              
-                              {/* Pulsing speech waveform */}
-                              <div className="flex gap-1 items-end justify-center h-8 my-2">
-                                {[...Array(6)].map((_, i) => (
-                                  <div key={i} className="sound-bar" style={{ animationDelay: `${i * 0.15}s`, width: '2px', backgroundColor: '#6366f1' }} />
-                                ))}
-                              </div>
-                              
-                              <div className="text-[9px] font-semibold text-slate-200 bg-slate-950/80 p-2 rounded-lg border border-slate-855 max-w-[240px] leading-relaxed line-clamp-3">
-                                {interviewState.subtitles}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* User PiP Stream Box */}
-                          <div className="w-24 h-32 bg-slate-950 border border-slate-850 rounded-xl overflow-hidden shrink-0 relative shadow-2xl flex items-center justify-center">
-                            <video 
-                              ref={webcamVideoRef}
-                              autoPlay 
-                              playsInline 
-                              className="w-full h-full object-cover transform scale-x-[-1]"
-                            />
-                            {/* Face scanner SVG coordinate mesh overlay */}
-                            <div className="absolute inset-0 bg-emerald-500/5 backdrop-blur-[0.5px] flex items-center justify-center pointer-events-none">
-                              <svg className="w-full h-full text-emerald-400/40" viewBox="0 0 100 100">
-                                <path d="M30,45 Q30,25 50,25 Q70,25 70,45 Q70,70 50,80 Q30,70 30,45 Z" fill="none" stroke="#10b981" strokeWidth="0.5" strokeDasharray="2 2" className="animate-pulse" />
-                                <circle cx="42" cy="42" r="1" fill="#10b981" />
-                                <circle cx="58" cy="42" r="1" fill="#10b981" />
-                                <circle cx="50" cy="52" r="1" fill="#10b981" />
-                                <text x="50" y="15" textAnchor="middle" fill="#10b981" fontSize="4.5" fontFamily="monospace" className="tracking-wider">USER FEED</text>
-                              </svg>
-                            </div>
-                          </div>
-                        </div>
-
-                      ) : interviewState.status === "Completed" ? (
-                        <div className="my-auto text-center space-y-2">
-                          <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto animate-bounce" />
-                          <div className="text-xs font-black text-emerald-400 uppercase tracking-widest">VERIFICATION INTERVIEW PASSED</div>
-                          <div className="text-[9px] text-slate-500 font-bold mt-1">L1 Compliance audit vectors parsed and stored.</div>
-                        </div>
-                      ) : (
-                        <div className="my-auto text-center space-y-4">
-                          <PhoneIncoming className="w-12 h-12 text-blue-500 mx-auto animate-pulse" />
-                          <div>
-                            <div className="text-xs font-black text-slate-200 uppercase tracking-widest">Compliance Call Ready</div>
-                            <div className="text-[9px] text-slate-500 font-bold mt-1">Verify name and credentials with Auditor.</div>
-                          </div>
-                          <button 
-                            type="button" 
-                            onClick={triggerInterviewCall}
-                            className="px-6 py-2.5 glow-btn-blue text-[10px] font-black uppercase tracking-widest rounded-xl text-white mx-auto block"
-                          >
-                            Launch Video Verification Terminal
-                          </button>
-                        </div>
-                      )}
-
-                      <div className="text-[8px] text-slate-600 font-bold uppercase tracking-widest text-center mt-auto">
-                        AES-256 P2P Audio Visual Encryption Channel
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {renderStepNavigation()}
-              </motion.div>
-            )}
-
-            {/* ── STEP 5: ADMIN CLEARANCE CONTROL ── */}
-            {activeStep === 5 && (
-              <motion.div 
-                key="step5"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="hud-card rounded-2xl p-6 md:p-8 relative overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full filter blur-2xl" />
-                <div className="flex items-center justify-between pb-6 border-b border-slate-850">
-                  <div className="flex items-center gap-3">
-                    <span className="font-orbitron font-black text-2xl text-blue-500">05</span>
-                    <div>
-                      <h3 className="text-base font-black text-white uppercase tracking-wider">ADMIN CONTROL ROOM</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Final audited employee status clearance cockpit</p>
-                    </div>
-                  </div>
-                  <span className={`px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${
-                    adminClearance.status === "approved" ? "bg-emerald-500/10 border border-emerald-500/25 text-emerald-400" :
-                    adminClearance.status === "rejected" ? "bg-red-500/10 border border-red-500/25 text-red-400" :
-                    "bg-amber-500/10 border border-amber-500/25 text-amber-400"
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    adminClearance.status === "approved"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : adminClearance.status === "rejected"
+                      ? "bg-red-100 text-red-700"
+                      : "bg-amber-100 text-amber-700"
                   }`}>
-                    {adminClearance.status === "approved" ? "APPROVED" : adminClearance.status === "rejected" ? "REJECTED" : "AUDIT PENDING"}
+                    {adminClearance.status === "approved" ? "✓ Approved" : adminClearance.status === "rejected" ? "✕ Rejected" : "⏳ Under Review"}
                   </span>
                 </div>
 
                 <div className="mt-6 space-y-6">
-                  {/* Summary audit logs */}
-                  <div className="p-5 rounded-xl bg-slate-950/60 border border-slate-850 space-y-4">
-                    <div className="text-[10px] font-black text-blue-400 uppercase tracking-widest pb-3 border-b border-slate-900 flex items-center gap-1.5 font-orbitron">
-                      <Database className="w-4 h-4 text-blue-500" /> SYSTEM AUDITED ONBOARDING DOSSIER
+                  {/* Application Summary */}
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                    <div className="px-4 py-3 bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+                      <h4 className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Application Summary</h4>
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 dark:divide-slate-800">
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold">
-                      <div className="flex flex-col p-3 rounded-lg bg-slate-900/40 border border-slate-850 gap-2">
-                        <div className="flex justify-between items-center text-[10px] tracking-wide">
-                          <span className="text-slate-400">1. PERSONAL REGISTRATION:</span>
-                          <span className={regForm.isCompleted ? "text-emerald-400" : "text-amber-450 font-bold"}>
-                            {regForm.isCompleted ? "✓ CONFIRMED" : "PENDING"}
+                      {/* Personal Info */}
+                      <div className="p-4 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Personal Details</span>
+                          <span className={`text-xs font-bold ${regForm.isCompleted ? "text-emerald-600" : "text-amber-500"}`}>
+                            {regForm.isCompleted ? "✓ Complete" : "Pending"}
                           </span>
                         </div>
                         {regForm.isCompleted && (
-                          <div className="text-[9px] text-slate-500 font-mono space-y-0.5 mt-1 border-t border-slate-800/45 pt-1.5">
-                            <div>NAME: {regForm.fullName}</div>
-                            <div>EMAIL: {regForm.email}</div>
-                            <div>PHONE: {regForm.phone}</div>
+                          <div className="mt-1 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+                            <div className="flex gap-2"><span className="font-semibold w-16 shrink-0">Name</span><span>{regForm.fullName}</span></div>
+                            <div className="flex gap-2"><span className="font-semibold w-16 shrink-0">Email</span><span className="truncate">{regForm.email}</span></div>
+                            <div className="flex gap-2"><span className="font-semibold w-16 shrink-0">Phone</span><span>{regForm.phone}</span></div>
                           </div>
                         )}
                       </div>
 
-                      <div className="flex flex-col p-3 rounded-lg bg-slate-900/40 border border-slate-850 justify-between">
-                        <div className="flex justify-between items-center text-[10px] tracking-wide">
-                          <span className="text-slate-400">2. BIOMETRIC VECTORS:</span>
-                          <span className={regForm.isBiometricCompleted ? "text-emerald-400" : "text-amber-450 font-bold"}>
-                            {regForm.isBiometricCompleted ? "✓ ENROLLED" : "PENDING"}
+                      {/* Photo */}
+                      <div className="p-4 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Photo Verification</span>
+                          <span className={`text-xs font-bold ${regForm.isBiometricCompleted ? "text-emerald-600" : "text-amber-500"}`}>
+                            {regForm.isBiometricCompleted ? "✓ Verified" : "Pending"}
                           </span>
                         </div>
                         {regForm.isBiometricCompleted && (
-                          <div className="flex gap-3 items-center border-t border-slate-800/45 pt-1.5">
-                            <div className="w-10 h-10 rounded-lg bg-slate-950 border border-slate-850 overflow-hidden flex items-center justify-center shrink-0">
+                          <div className="flex items-center gap-3 mt-1">
+                            <div className="w-10 h-10 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0">
                               {regForm.profilePic ? (
                                 <img src={regForm.profilePic} alt="Profile" className="w-full h-full object-cover" />
                               ) : (
-                                <Fingerprint className="w-5 h-5 text-blue-500" />
+                                <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                                  <User className="w-5 h-5 text-slate-400" />
+                                </div>
                               )}
                             </div>
-                            <div className="text-[9px] text-slate-500 font-mono leading-tight">
-                              <div>FACEMESH MAPPED: 1:1 CONFIRMED</div>
-                              <div>CONFIDENCE INDEX: 99.8%</div>
-                            </div>
+                            <span className="text-xs text-slate-500">Selfie captured and matched</span>
                           </div>
                         )}
                       </div>
 
-                      <div className="flex flex-col p-3 rounded-lg bg-slate-900/40 border border-slate-850 gap-2">
-                        <div className="flex justify-between items-center text-[10px] tracking-wide">
-                          <span className="text-slate-400">3. OCR DOCUMENT MATCH:</span>
-                          <span className={docForm.isCompleted ? "text-emerald-400" : "text-amber-450 font-bold"}>
-                            {docForm.isCompleted ? `✓ VERIFIED (${docForm.confidenceScore}%)` : "PENDING"}
+                      {/* Documents */}
+                      <div className="p-4 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Documents</span>
+                          <span className={`text-xs font-bold ${docForm.isCompleted ? "text-emerald-600" : "text-amber-500"}`}>
+                            {docForm.isCompleted ? "✓ Verified" : "Pending"}
                           </span>
                         </div>
                         {docForm.isCompleted && (
-                          <div className="text-[9px] text-slate-500 font-mono space-y-0.5 mt-1 border-t border-slate-800/45 pt-1.5">
-                            <div>AADHAAR ID: {docForm.aadhaarId} ({docForm.aadhaarFile})</div>
-                            <div>PAN ID: {docForm.panId} ({docForm.panFile})</div>
-                            <div>BANK ACC: {docForm.bankAcc} ({docForm.bankPassbookFile})</div>
+                          <div className="mt-1 space-y-1 text-xs text-slate-600 dark:text-slate-400">
+                            <div className="flex gap-2"><span className="font-semibold w-24 shrink-0">Aadhaar</span><span>{docForm.aadhaarId}</span></div>
+                            <div className="flex gap-2"><span className="font-semibold w-24 shrink-0">PAN Card</span><span>{docForm.panId}</span></div>
+                            <div className="flex gap-2"><span className="font-semibold w-24 shrink-0">Driving Licence</span><span>{docForm.drivingLicenseId}</span></div>
                           </div>
                         )}
                       </div>
 
-                      <div className="flex flex-col p-3 rounded-lg bg-slate-900/40 border border-slate-850 justify-between">
-                        <div className="flex justify-between items-center text-[10px] tracking-wide">
-                          <span className="text-slate-400">4. TRAINING CERTIFICATES:</span>
-                          <span className={academyState.isCompleted ? "text-emerald-400" : "text-amber-450 font-bold"}>
-                            {academyState.isCompleted ? "✓ 5/5 PASSED" : "PENDING"}
+                      {/* Training */}
+                      <div className="p-4 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-500">Training</span>
+                          <span className={`text-xs font-bold ${academyState.isCompleted ? "text-emerald-600" : "text-amber-500"}`}>
+                            {academyState.isCompleted ? `✓ ${academyState.modules.length}/${academyState.modules.length} Passed` : "Pending"}
                           </span>
                         </div>
                         {academyState.isCompleted && (
-                          <div className="text-[9px] text-slate-500 font-mono mt-1 border-t border-slate-800/45 pt-1.5">
-                            QUIZZES CLEARED: MODULES 1-5 COMPLIANT CERTIFIED
-                          </div>
+                          <div className="mt-1 text-xs text-slate-500">Compliance training module completed and quiz passed.</div>
                         )}
                       </div>
 
-                      <div className="flex justify-between items-center p-3 rounded-lg bg-slate-900/40 border border-slate-850 col-span-1 md:col-span-2">
-                        <span className="text-slate-400 text-[10px]">5. WEBRTC AUDITOR CHECK:</span>
-                        <span className={interviewState.isCompleted ? "text-emerald-400" : "text-amber-450 font-bold"}>
-                          {interviewState.isCompleted ? "✓ COMPLIANCE PASSED" : "PENDING"}
-                        </span>
-                      </div>
                     </div>
                   </div>
 
-                  {/* Technician Waiting Screen */}
+                  {/* Waiting State */}
                   {adminClearance.status === "pending" && (
-                    <div className="p-6 rounded-xl bg-blue-950/20 border border-blue-500/10 text-center space-y-4">
-                      <div className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/25 flex items-center justify-center mx-auto text-blue-400">
-                        <RefreshCcw className="w-5 h-5 animate-spin" />
+                    <div className="p-6 rounded-xl bg-blue-50 border border-blue-100 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-blue-100 border border-blue-200 flex items-center justify-center mx-auto">
+                        <RefreshCcw className="w-5 h-5 text-blue-500 animate-spin" />
                       </div>
                       <div>
-                        <div className="text-xs font-black text-slate-200 uppercase tracking-widest font-orbitron">Awaiting Administrative Clearance</div>
-                        <p className="text-[10px] text-slate-400 mt-2 leading-normal max-w-sm mx-auto">
-                          Your completed dossier has been compiled and transmitted to the Caltrack Admin Portal Settings panel. Please await verification and clearance from your system administrator.
+                        <div className="text-sm font-bold text-slate-700">Waiting for Admin Approval</div>
+                        <p className="text-xs text-slate-500 mt-1 leading-relaxed max-w-sm mx-auto">
+                          Your application has been submitted. The admin team will review your details and get back to you shortly.
                         </p>
                       </div>
                     </div>
                   )}
 
+                  {/* Approved */}
                   {adminClearance.status === "approved" && (
-                    <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-center font-bold text-xs text-emerald-400 uppercase tracking-widest animate-pulse font-orbitron">
-                      ✓ CLEARANCE GRANTED. EMPLOYEE ACTIVE PASS ISSUED.
+                    <div className="p-5 rounded-xl bg-emerald-50 border border-emerald-100 text-center space-y-2">
+                      <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                      <div className="text-sm font-bold text-emerald-700">Application Approved!</div>
+                      <p className="text-xs text-slate-500">You are now an active employee. Welcome to the team!</p>
                     </div>
                   )}
+
+                  {/* Rejected */}
                   {adminClearance.status === "rejected" && (
                     <div className="space-y-3">
-                      <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/25 text-center font-bold text-xs text-red-400 uppercase tracking-widest animate-pulse font-orbitron">
-                        ✕ CLEARANCE DENIED. ONBOARDING SEQUENCE HALTED.
+                      <div className="p-5 rounded-xl bg-red-50 border border-red-100 text-center space-y-2">
+                        <XCircle className="w-8 h-8 text-red-500 mx-auto" />
+                        <div className="text-sm font-bold text-red-700">Application Rejected</div>
+                        <p className="text-xs text-slate-500">Please review the reason below and re-apply with corrected information.</p>
                       </div>
-                      <div className="p-3 bg-red-950/20 border border-red-900/30 rounded-xl text-[10px] text-slate-300 leading-relaxed font-semibold">
-                        <strong>Auditor Remarks:</strong> {adminClearance.remarks || "Identity documents mismatch with biometric registration profile."}
-                      </div>
-                      <button 
+                      {adminClearance.remarks && (
+                        <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-xs text-slate-600 leading-relaxed">
+                          <span className="font-semibold text-red-600">Reason: </span>{adminClearance.remarks}
+                        </div>
+                      )}
+                      <button
                         type="button"
                         onClick={() => {
                           localStorage.removeItem("caltrack_activation_dossier")
                           apiDeleteRegistrationDossier()
                           setRegForm(p => ({ ...p, isCompleted: false, otpStatus: "unverified", isBiometricCompleted: false, fullName: "", email: "", phone: "", address: "", profilePic: null }))
-                          setDocForm(p => ({ ...p, isCompleted: false, confidenceScore: 0, aadhaarFile: null, panFile: null, bankPassbookFile: null, aadhaarId: "", panId: "", bankAcc: "", ifscCode: "" }))
+                          setDocForm(p => ({ ...p, isCompleted: false, confidenceScore: 0, aadhaarFile: null, panFile: null, drivingLicenseFile: null, aadhaarId: "", panId: "", drivingLicenseId: "" }))
                           setAcademyState(p => ({ ...p, isCompleted: false, modules: p.modules.map(m => ({ ...m, completed: false, progress: 0 })) }))
-                          setInterviewState(p => ({ ...p, isCompleted: false, status: "Scheduled" }))
+                          setInterviewState(p => ({ ...p, isCompleted: true, status: "Passed" }))
                           setAdminClearance({ status: "pending", remarks: "" })
                           setOtpCode("")
-
                           setActiveStep(1)
                         }}
-                        className="w-full py-3 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-[10px] font-black uppercase text-slate-300 rounded-xl tracking-wider transition-colors font-orbitron"
+                        className="w-full py-3 bg-white hover:bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-600 rounded-xl transition-colors"
                       >
-                        Reset Journey & Correct Credentials
+                        Re-apply with Corrected Information
                       </button>
                     </div>
                   )}
@@ -2495,13 +2424,13 @@ export function ActivationJourneyPage() {
           ===================================================================== */}
       <AnimatePresence>
         {showRejectionDialog && (
-          <motion.div 
+          <motion.div
             className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#030612]/90 backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <motion.div 
+            <motion.div
               className="hud-card max-w-md w-full rounded-2xl p-6 border border-red-500/30 shadow-[0_0_40px_rgba(239,68,68,0.15)] relative overflow-hidden"
               initial={{ scale: 0.95, y: 15 }}
               animate={{ scale: 1, y: 0 }}
@@ -2510,7 +2439,7 @@ export function ActivationJourneyPage() {
               <h3 className="font-orbitron font-black text-sm tracking-widest text-white uppercase flex items-center gap-2 text-red-400">
                 <ShieldAlert className="w-5 h-5 text-red-450" /> REJECT APPLICATION
               </h3>
-              
+
               <div className="mt-4 space-y-4 text-xs">
                 <p className="text-slate-400 font-semibold leading-relaxed">
                   Please log the compliance anomaly remark below. This will halt the onboarding sequence and flag the technician dossier for re-submission.
@@ -2518,7 +2447,7 @@ export function ActivationJourneyPage() {
 
                 <div className="space-y-2">
                   <label className="text-[9px] text-slate-500 font-bold uppercase tracking-widest font-orbitron">Anomaly Reason</label>
-                  <select 
+                  <select
                     className="w-full px-3 py-2.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs font-semibold text-white focus:border-red-500 focus:outline-none"
                     onChange={e => setRejectionRemarks(e.target.value)}
                     value={rejectionRemarks}
@@ -2527,7 +2456,7 @@ export function ActivationJourneyPage() {
                     <option value="Aadhaar Card mismatch with registration name.">Aadhaar Card mismatch with registration name.</option>
                     <option value="Biometric face vector variance exceeds 10% threshold.">Biometric face vector variance exceeds 10% threshold.</option>
                     <option value="WebRTC compliance interview speech verification failed.">WebRTC compliance interview speech verification failed.</option>
-                    <option value="IFSC route code mismatch with government bank records.">IFSC route code mismatch with government bank records.</option>
+                    <option value="Driving License mismatch with government transport records.">Driving License mismatch with government transport records.</option>
                     <option value="Document OCR extraction checksum error. Scan resolution low.">Document OCR extraction checksum error. Scan resolution low.</option>
                   </select>
                 </div>
@@ -2545,14 +2474,14 @@ export function ActivationJourneyPage() {
               </div>
 
               <div className="mt-6 flex gap-3">
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowRejectionDialog(false)}
                   className="flex-1 py-2.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-[10px] font-black uppercase tracking-wider rounded-xl text-slate-400 transition-colors font-orbitron"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="button"
                   onClick={() => confirmAdminReject(rejectionRemarks)}
                   className="flex-grow py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-[10px] font-black uppercase tracking-wider rounded-xl text-white font-orbitron"
@@ -2571,13 +2500,13 @@ export function ActivationJourneyPage() {
       <AnimatePresence>
 
         {showCelebration && (
-          <motion.div 
+          <motion.div
             className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#030612]/95 backdrop-blur-lg"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <motion.div 
+            <motion.div
               className="hud-card max-w-lg w-full rounded-3xl p-8 border border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.15)] relative overflow-hidden"
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
@@ -2591,7 +2520,7 @@ export function ActivationJourneyPage() {
               <div className="text-center mt-6 space-y-4">
                 <h3 className="font-orbitron font-black text-lg tracking-widest text-white">WORKFORCE ACTIVATION COMPLETE</h3>
                 <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest">STATUS: SYSTEM ACTIVE</p>
-                
+
                 <p className="text-xs text-slate-400 leading-relaxed max-w-sm mx-auto">
                   Technician {regForm.fullName} has completed all biometric scans, document OCR validation checks, training classes, L1 audits, and administrative reviews.
                 </p>
@@ -2601,7 +2530,7 @@ export function ActivationJourneyPage() {
                   {/* Ticking live scan line overlay */}
                   <div className="laser-bar" style={{ opacity: 0.3, animationDuration: "4s" }} />
                   <div className="absolute top-3 right-4 text-[8px] font-black font-orbitron text-blue-400 tracking-[0.2em] uppercase">CALTRACK ACTIVE PASS</div>
-                  
+
                   <div className="flex gap-4 items-center">
                     <div className="w-14 h-14 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 overflow-hidden">
                       {regForm.profilePic ? (
@@ -2624,7 +2553,7 @@ export function ActivationJourneyPage() {
                 </div>
 
                 <div className="pt-6 flex gap-3">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => {
                       localStorage.removeItem("caltrack_activation_dossier")
@@ -2632,7 +2561,7 @@ export function ActivationJourneyPage() {
                       setShowCelebration(false)
                       setActiveStep(1)
                       setRegForm(p => ({ ...p, isCompleted: false, otpStatus: "unverified", isBiometricCompleted: false, fullName: "", email: "", phone: "", address: "", profilePic: null }))
-                      setDocForm(p => ({ ...p, isCompleted: false, confidenceScore: 0, aadhaarFile: null, panFile: null, bankPassbookFile: null, aadhaarId: "", panId: "", bankAcc: "", ifscCode: "" }))
+                      setDocForm(p => ({ ...p, isCompleted: false, confidenceScore: 0, aadhaarFile: null, panFile: null, drivingLicenseFile: null, aadhaarId: "", panId: "", drivingLicenseId: "" }))
                       setAcademyState(p => ({ ...p, isCompleted: false, modules: p.modules.map(m => ({ ...m, completed: false, progress: 0 })) }))
                       setInterviewState(p => ({ ...p, isCompleted: false, status: "Scheduled" }))
                       setAdminClearance(p => ({ ...p, status: "pending" }))
@@ -2643,7 +2572,7 @@ export function ActivationJourneyPage() {
                   >
                     Reset Simulator
                   </button>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => {
                       setShowCelebration(false)
@@ -2662,3 +2591,4 @@ export function ActivationJourneyPage() {
     </div>
   )
 }
+

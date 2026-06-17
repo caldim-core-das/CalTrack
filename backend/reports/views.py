@@ -71,9 +71,11 @@ class DashboardAnalyticsView(APIView):
 
         from django.core.cache import cache
         cache_key = f"dashboard_analytics_{company.id}"
-        cached_data = cache.get(cache_key)
-        if cached_data:
-            return Response(cached_data)
+        bypass_cache = request.query_params.get("refresh") == "true"
+        if not bypass_cache:
+            cached_data = cache.get(cache_key)
+            if cached_data:
+                return Response(cached_data)
 
         today = timezone.localdate()
         seven_days_ago = today - timedelta(days=7)
@@ -163,7 +165,7 @@ class DashboardAnalyticsView(APIView):
 
         daily_trend = []
         for i in range(30):
-            d = thirty_days_ago + timedelta(days=i)
+            d = today - timedelta(days=29 - i)
             key = str(d)
             daily_trend.append({
                 "date": key,
@@ -207,7 +209,7 @@ class DashboardAnalyticsView(APIView):
         # ── Clock-ins per Day (last 7 days, bar chart) ──
         attendance_daily = []
         for i in range(7):
-            d = seven_days_ago + timedelta(days=i)
+            d = today - timedelta(days=6 - i)
             count = TimeLog.objects.filter(employee__company=company, work_date=d).count()
             day_label = d.strftime("%a")
             attendance_daily.append({

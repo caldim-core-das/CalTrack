@@ -15,6 +15,13 @@ DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 
+# ── Subpath / Reverse-proxy settings ─────────────────────────────────────────
+# Required when Django is served under a subpath (e.g. /Caltrack/) behind Nginx.
+# Set FORCE_SCRIPT_NAME=/Caltrack in production .env
+FORCE_SCRIPT_NAME = os.getenv("FORCE_SCRIPT_NAME", "")
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 SHARED_APPS = [
     "daphne",
     "django_tenants",
@@ -22,12 +29,14 @@ SHARED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
+    "django.contrib.staticfiles",
     "accounts",
     "corsheaders",
     "rest_framework",
     "channels",
     "django_celery_beat",
 ]
+
 
 TENANT_APPS = [
     "django.contrib.contenttypes",
@@ -265,17 +274,24 @@ AUTH_COOKIE_SECURE   = not DEBUG           # HTTPS-only in production; False in 
 # "Lax" is required for cross-origin dev (frontend:5173 → backend:8000).
 # In production with same domain, change back to "Strict" via env var.
 AUTH_COOKIE_SAMESITE = os.getenv("AUTH_COOKIE_SAMESITE", "Lax" if DEBUG else "Strict")
+AUTH_COOKIE_DOMAIN = os.getenv("AUTH_COOKIE_DOMAIN", ".localhost" if DEBUG else None)
 
 # ── CORS — must name origins explicitly when credentials=True ────────────────
 # CORS_ALLOW_ALL_ORIGINS + CORS_ALLOW_CREDENTIALS together are rejected by browsers.
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
+    # Local development
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
     "http://localhost:5175",
     "http://127.0.0.1:5175",
+    # Production VPS
+    "https://caldimproducts.com",
+    "http://caldimproducts.com",
+    "https://www.caldimproducts.com",
+    "http://www.caldimproducts.com",
 ]
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://.*\.localhost:517[3-5]$",
@@ -283,6 +299,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
+    # Local development
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:5174",
@@ -295,11 +312,18 @@ CSRF_TRUSTED_ORIGINS = [
     "http://*.127.0.0.1:5173",
     "http://*.127.0.0.1:5174",
     "http://*.127.0.0.1:5175",
+    # Production VPS
+    "https://caldimproducts.com",
+    "http://caldimproducts.com",
+    "https://www.caldimproducts.com",
+    "http://www.caldimproducts.com",
 ]
 
 
-MEDIA_URL = "/media/"
+MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 MEDIA_ROOT = BASE_DIR / "media"
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # ── Django Channels ──────────────────────────────────────────────────────────
 if DEBUG:
@@ -342,3 +366,5 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "True") == "True"
+

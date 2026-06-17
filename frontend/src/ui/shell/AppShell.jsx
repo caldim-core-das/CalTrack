@@ -252,12 +252,12 @@ export function AppShell() {
   }, [sidebarCollapsed])
 
   useEffect(() => {
-    if (location.pathname.startsWith("/settings")) {
-      setDrillDownParent(null)
-      return
-    }
     const parent = items.find(item => item.children && location.pathname.startsWith(item.to))
-    if (parent) setDrillDownParent(parent)
+    if (parent) {
+      setDrillDownParent(parent)
+    } else {
+      setDrillDownParent(null)
+    }
   }, [location.pathname, items])
 
   const showTooltip = (label, e) => {

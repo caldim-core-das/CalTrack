@@ -304,8 +304,11 @@ function useWsLocationTracker(isClockedIn, simActive = false, simCoords = null) 
       // WebSocket handshake — no token in the URL needed.
       const WS_BASE =
         (typeof import.meta !== "undefined" && import.meta.env?.VITE_WS_BASE_URL) ||
-        "ws://localhost:8000"
+        (import.meta.env.PROD
+          ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/Caltrack`
+          : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8000`)
       const ws = new WebSocket(`${WS_BASE}/ws/live/employee/`)
+
       wsRef.current = ws
 
       ws.onopen = () => sendGpsPing()
