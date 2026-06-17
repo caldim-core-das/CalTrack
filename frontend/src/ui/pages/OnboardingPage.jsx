@@ -69,7 +69,7 @@ export function OnboardingPage() {
         payload.default_state = defaultState.trim()
       }
       await apiRequest("/company/create", { method: "POST", json: payload })
-      window.location.href = routes.dashboard
+      window.location.href = import.meta.env.BASE_URL || "/"
     } catch (err) {
       setLoading(false)
       const msg =
@@ -161,7 +161,7 @@ export function OnboardingPage() {
       </div>
 
       {/* Right Pane */}
-      <div style={{ flex: 1.3, background: "var(--surface)", display: "flex", flexDirection: "column", padding: "64px" }}>
+      <div style={{ flex: 1.3, background: "var(--surface)", display: "flex", flexDirection: "column", padding: "64px", overflowY: "auto" }}>
         <div style={{ width: "100%", maxWidth: 500, margin: "auto" }}>
 
           {/* Progress */}
