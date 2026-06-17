@@ -316,7 +316,7 @@ class TeamInviteListCreateView(APIView):
             "success": email_sent,
             "data": TeamInviteSerializer(invite).data,
             "message": f"Invite created. Email sent to {email}." if email_sent else f"Invite created, but EMAIL FAILED: {error_message}",
-        }, status=status.HTTP_201_CREATED if email_sent else status.HTTP_500_INTERNAL_SERVER_ERROR)
+        }, status=status.HTTP_201_CREATED)
 
 
 class TeamInviteRevokeView(APIView):
