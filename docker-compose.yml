@@ -1,0 +1,61 @@
+# ─── QuickTIMS — Database-only Docker Compose ────────────────────────────────
+#
+# WHAT THIS RUNS:
+#   • db       — PostgreSQL 16 (replaces Supabase)
+#   • redis    — Redis 7 (for Celery + Django Channels)
+#
+# WHAT YOU STILL RUN MANUALLY:
+#   • Django backend  →  cd backend && daphne -b 0.0.0.0 -p 8000 quicktims.asgi:application
+#   • Celery worker   →  cd backend && celery -A quicktims worker -l info
+#   • Celery beat     →  cd backend && celery -A quicktims beat -l info
+#   • Frontend        →  cd frontend && npm run dev
+#
+# USAGE:
+#   Start:     docker compose up -d
+#   Stop:      docker compose down
+#   Reset DB:  docker compose down -v   (WARNING: deletes all data)
+#   Logs:      docker compose logs -f db
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL 16 ─────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: caltrack_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-caltrack}
+      POSTGRES_USER: ${DB_USER:-caltrack_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-caltrack_pass}
+    ports:
+      - "5432:5432"                  # accessible at localhost:5432
+    volumes:
+      - caltrack_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-caltrack_user} -d ${DB_NAME:-caltrack}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Redis 7 ───────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: caltrack_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"                  # accessible at localhost:6379
+    volumes:
+      - caltrack_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  caltrack_pgdata:
+    driver: local
+  caltrack_redis:
+    driver: local
