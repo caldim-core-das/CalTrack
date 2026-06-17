@@ -28,12 +28,18 @@ from employees.utils import generate_next_employee_id
 
 # ── Cookie helper ─────────────────────────────────────────────────────────────
 
+def _get_refresh_cookie_path():
+    """Build the refresh-cookie path, respecting FORCE_SCRIPT_NAME for subpath deployments."""
+    prefix = getattr(settings, "FORCE_SCRIPT_NAME", "") or ""
+    return f"{prefix}/api/auth/refresh/"
+
+
 def _set_auth_cookies(response, access_token, refresh_token=None):
     """
     Attach httpOnly JWT cookies to *response*.
 
     Access cookie  — sent to every path (needed for all API calls).
-    Refresh cookie — restricted to /api/auth/refresh/ so it is never
+    Refresh cookie — restricted to <prefix>/api/auth/refresh/ so it is never
                      accidentally exposed to other endpoints.
     """
     secure   = getattr(settings, "AUTH_COOKIE_SECURE", not settings.DEBUG)
@@ -59,7 +65,7 @@ def _set_auth_cookies(response, access_token, refresh_token=None):
             httponly=True,
             secure=secure,
             samesite=samesite,
-            path="/api/auth/refresh/",   # only sent to the refresh endpoint
+            path=_get_refresh_cookie_path(),
         )
     return response
 
@@ -67,7 +73,7 @@ def _set_auth_cookies(response, access_token, refresh_token=None):
 def _clear_auth_cookies(response):
     """Remove both auth cookies from the browser."""
     response.delete_cookie(settings.AUTH_COOKIE, path="/")
-    response.delete_cookie(settings.AUTH_COOKIE_REFRESH, path="/api/auth/refresh/")
+    response.delete_cookie(settings.AUTH_COOKIE_REFRESH, path=_get_refresh_cookie_path())
     return response
 import uuid
 import traceback
@@ -600,12 +606,13 @@ class AcceptInviteView(APIView):
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         refresh = CustomTokenObtainPairSerializer.get_token(user)
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
+        response = Response({
+            "success": True,
             "user": UserSerializer(user).data,
             "message": "Login successfully"
         }, status=status.HTTP_201_CREATED)
+        _set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        return response
 
 class PasswordResetRequestView(APIView):
     permission_classes = [permissions.AllowAny]
