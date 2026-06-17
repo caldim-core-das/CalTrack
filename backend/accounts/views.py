@@ -289,9 +289,10 @@ class AdminRegistrationView(APIView):
             last_name=last_name
         )
 
+        refresh = CustomTokenObtainPairSerializer.get_token(user)
         response = Response({
             "success": True, 
-            "message": "Registration successful. Please log in.",
+            "message": "Registration successful.",
             "user": {
                 "email": user.email,
                 "role": user.role,
@@ -299,6 +300,7 @@ class AdminRegistrationView(APIView):
             }
         }, status=status.HTTP_201_CREATED)
         
+        _set_auth_cookies(response, str(refresh.access_token), str(refresh))
         return response
 
 

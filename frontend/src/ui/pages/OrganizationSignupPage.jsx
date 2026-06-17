@@ -43,7 +43,9 @@ export function OrganizationSignupPage() {
       })
       
       if (res && res.success) {
-        navigate(routes.login, { replace: true })
+        // Force reload to let App.jsx grab the user from the /me endpoint
+        // and handle the redirect logic to /onboarding
+        window.location.href = import.meta.env.BASE_URL || "/"
       } else {
         setError("Registration failed. Please try again.")
       }
