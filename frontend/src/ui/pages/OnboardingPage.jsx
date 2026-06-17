@@ -161,7 +161,7 @@ export function OnboardingPage() {
       </div>
 
       {/* Right Pane */}
-      <div style={{ flex: 1.3, background: "var(--surface)", display: "flex", flexDirection: "column", padding: "64px" }}>
+      <div style={{ flex: 1.3, background: "var(--surface)", display: "flex", flexDirection: "column", padding: "64px", overflowY: "auto" }}>
         <div style={{ width: "100%", maxWidth: 500, margin: "auto" }}>
 
           {/* Progress */}
