@@ -20,6 +20,10 @@ const ActivationJourneyPage = lazy(() =>
   import("./pages/ActivationJourneyPage.jsx").then(m => ({ default: m.ActivationJourneyPage }))
 )
 
+const CreatePasswordPage = lazy(() =>
+  import("./pages/CreatePasswordPage.jsx").then(m => ({ default: m.CreatePasswordPage }))
+)
+
 
 const DashboardPage = lazy(() =>
   import("./pages/DashboardPage.jsx").then(m => ({ default: m.DashboardPage }))
@@ -250,6 +254,11 @@ export function App() {
           <Route
             path={routes.activation_journey}
             element={<ActivationJourneyPage />}
+          />
+
+          <Route
+            path={routes.create_password}
+            element={<CreatePasswordPage />}
           />
 
           <Route

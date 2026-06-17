@@ -55,4 +55,5 @@ export const routes = {
   employees_rejected: "/employees/rejected",
   employees_documents: "/employees/documents",
   employees_training: "/employees/training",
+  create_password: "/create-password",
 }

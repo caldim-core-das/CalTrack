@@ -819,6 +819,397 @@ class RegistrationDossierView(APIView):
         return Response({"success": True})
 
 
+class RegistrationDossierApproveView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            from django.utils import timezone
+            from django.core.mail import send_mail
+            from employees.models import Employee
+
+            file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+            if not os.path.exists(file_path):
+                return Response({"error": "No registration request dossier found."}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    dossier = json.load(f)
+            except Exception as e:
+                return Response({"error": f"Failed to load dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            reg_form = dossier.get("regForm", {})
+            email = reg_form.get("email")
+            full_name = reg_form.get("fullName", "")
+            phone = reg_form.get("phone", "")
+            region = reg_form.get("region", "IN")
+
+            if not email:
+                return Response({"error": "Registrant email not found in dossier."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Generate token and expiration
+            token = uuid.uuid4().hex
+            expires_at = timezone.now() + timezone.timedelta(hours=24)
+
+            # Update dossier status
+            admin_clearance = dossier.get("adminClearance", {})
+            admin_clearance["status"] = "approved"
+            admin_clearance["remarks"] = "Application reviewed and approved. Invitation email sent."
+            admin_clearance["invitationStatus"] = "Sent"
+            admin_clearance["invitationToken"] = token
+            admin_clearance["invitationSentAt"] = timezone.now().isoformat()
+            admin_clearance["invitationExpiresAt"] = expires_at.isoformat()
+            
+            # Initialize audit logs if not exists
+            if "auditLogs" not in admin_clearance:
+                admin_clearance["auditLogs"] = []
+
+            admin_clearance["auditLogs"].append({
+                "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                "action": "Application Approved",
+                "details": f"Registration request approved by {request.user.get_full_name() or request.user.username}. Secure invitation dispatched."
+            })
+
+            dossier["adminClearance"] = admin_clearance
+
+            # Create/Update User & Employee as inactive
+            User = get_user_model()
+            username = email.split("@")[0] if email else f"user_{uuid.uuid4().hex[:6]}"
+            user = User.objects.filter(email__iexact=email).first()
+            company = getattr(request, "company", None) or getattr(request.user, "company", None)
+            if not company:
+                emp = Employee.objects.filter(user=request.user).first()
+                if emp:
+                    company = emp.company
+            if not company:
+                from companies.models import Company
+                company = Company.objects.exclude(schema_name="public").first() or Company.objects.first()
+
+            if not user:
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=uuid.uuid4().hex,
+                    first_name=full_name.split(" ")[0] if " " in full_name else full_name,
+                    last_name=" ".join(full_name.split(" ")[1:]) if " " in full_name else "—",
+                    role=User.Role.EMPLOYEE,
+                    company=company,
+                    is_active=False
+                )
+            else:
+                user.is_active = False
+                user.company = company
+                user.save()
+
+            employee = Employee.objects.filter(user=user).first()
+            if employee:
+                # Check if this employee_id is already taken in the target company (excluding this record itself)
+                collision = Employee.objects.filter(company=company, employee_id=employee.employee_id).exclude(id=employee.id).exists()
+                if collision or employee.employee_id == "EMP-2048":
+                    employee.employee_id = generate_next_employee_id(company)
+                employee.company = company
+                employee.phone = phone
+                employee.country = region
+                employee.is_active = False
+                employee.save()
+            else:
+                employee = Employee.objects.create(
+                    user=user,
+                    company=company,
+                    employee_id=reg_form.get("employee_id") or generate_next_employee_id(company),
+                    phone=phone,
+                    title="Field Operations Tech (L2)",
+                    hourly_rate=18.50,
+                    country=region,
+                    is_active=False
+                )
+
+            # Send simulated invitation email
+            frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
+            activation_link = f"{frontend_url}/create-password?token={token}"
+            subject = "Invitation to Join Caltrack - Action Required"
+            message = f"""Dear {full_name},
+
+Congratulations! Your registration request with Caltrack has been approved.
+
+To activate your account and set up your password, please click the secure link below:
+{activation_link}
+
+This activation link will expire in 24 hours.
+
+Best regards,
+The Caltrack Team
+"""
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                    fail_silently=False
+                )
+                admin_clearance["invitationEmailStatus"] = "Delivered"
+                admin_clearance["auditLogs"].append({
+                    "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                    "action": "Email Delivered",
+                    "details": f"Invitation email successfully sent to {email}. Delivery channel: Console SMTP Simulator."
+                })
+            except Exception as e:
+                admin_clearance["invitationEmailStatus"] = "Failed"
+                admin_clearance["auditLogs"].append({
+                    "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                    "action": "Email Delivery Failed",
+                    "details": f"Failed to dispatch invitation to {email}: {str(e)}"
+                })
+
+            # Save dossier
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(dossier, f, indent=4, ensure_ascii=False)
+            except Exception as e:
+                return Response({"error": f"Failed to save dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({"success": True, "invitationStatus": "Sent"})
+        except Exception as approve_error:
+            import traceback
+            tb = traceback.format_exc()
+            try:
+                with open(os.path.join(settings.BASE_DIR, "traceback_output.txt"), "w", encoding="utf-8") as f:
+                    f.write(tb)
+            except Exception:
+                pass
+            raise approve_error
+
+
+class RegistrationDossierRejectView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from django.utils import timezone
+        from django.core.mail import send_mail
+
+        remarks = request.data.get("remarks", "Document Verification Failed")
+        reason_category = request.data.get("reasonCategory", "Other")
+
+        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+        if not os.path.exists(file_path):
+            return Response({"error": "No registration request dossier found."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                dossier = json.load(f)
+        except Exception as e:
+            return Response({"error": f"Failed to load dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        reg_form = dossier.get("regForm", {})
+        email = reg_form.get("email")
+        full_name = reg_form.get("fullName", "")
+
+        if not email:
+            return Response({"error": "Registrant email not found in dossier."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update dossier status
+        admin_clearance = dossier.get("adminClearance", {})
+        admin_clearance["status"] = "rejected"
+        admin_clearance["remarks"] = remarks
+        admin_clearance["reasonCategory"] = reason_category
+        admin_clearance["rejectedBy"] = request.user.get_full_name() or request.user.username
+        admin_clearance["rejectedOn"] = timezone.now().strftime("%d %b %Y")
+        
+        if "auditLogs" not in admin_clearance:
+            admin_clearance["auditLogs"] = []
+
+        admin_clearance["auditLogs"].append({
+            "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+            "action": "Application Rejected",
+            "details": f"Registration request rejected by {request.user.get_full_name() or request.user.username}. Reason: {remarks}"
+        })
+
+        dossier["adminClearance"] = admin_clearance
+
+        # Send simulated rejection email
+        subject = "Caltrack Registration Update"
+        message = f"""Dear {full_name},
+
+Thank you for your interest in joining Caltrack.
+
+After reviewing your registration dossier, we regret to inform you that your application could not be approved at this time for the following reason(s):
+
+{remarks}
+
+If you believe this was in error or if you need to upload corrected documents, please re-submit your registration via the portal.
+
+Best regards,
+The Caltrack Team
+"""
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=False
+            )
+            admin_clearance["rejectionEmailStatus"] = "Sent"
+            admin_clearance["auditLogs"].append({
+                "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                "action": "Rejection Dispatched",
+                "details": f"Rejection notice successfully sent to {email}."
+            })
+        except Exception as e:
+            admin_clearance["rejectionEmailStatus"] = "Failed"
+            admin_clearance["auditLogs"].append({
+                "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                "action": "Rejection Dispatch Failed",
+                "details": f"Failed to dispatch rejection notice to {email}: {str(e)}"
+            })
+
+        # Save dossier
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(dossier, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            return Response({"error": f"Failed to save dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"success": True, "status": "Rejected"})
+
+
+class RegistrationDossierVerifyTokenView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        from django.utils import timezone
+
+        token = request.data.get("token")
+        if not token:
+            return Response({"error": "Token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+        if not os.path.exists(file_path):
+            return Response({"error": "No registration dossier found."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                dossier = json.load(f)
+        except Exception as e:
+            return Response({"error": "Failed to read dossier data."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        admin_clearance = dossier.get("adminClearance", {})
+        stored_token = admin_clearance.get("invitationToken")
+        expires_at_str = admin_clearance.get("invitationExpiresAt")
+
+        if not stored_token or stored_token != token:
+            return Response({"error": "Invalid invitation token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check expiration
+        if expires_at_str:
+            expires_at = timezone.datetime.fromisoformat(expires_at_str)
+            if timezone.is_naive(expires_at):
+                expires_at = timezone.make_aware(expires_at)
+            if timezone.now() > expires_at:
+                return Response({"error": "Invitation token has expired."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if admin_clearance.get("status") == "activated":
+            return Response({"error": "Account has already been activated."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reg_form = dossier.get("regForm", {})
+        return Response({
+            "valid": True,
+            "fullName": reg_form.get("fullName"),
+            "email": reg_form.get("email"),
+            "employeeId": reg_form.get("employee_id") or "EMP-2048"
+        })
+
+
+class RegistrationDossierActivateView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        from django.utils import timezone
+        from employees.models import Employee
+
+        token = request.data.get("token")
+        password = request.data.get("password")
+
+        if not token or not password:
+            return Response({"error": "Token and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+        if not os.path.exists(file_path):
+            return Response({"error": "No registration dossier found."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                dossier = json.load(f)
+        except Exception as e:
+            return Response({"error": "Failed to read dossier data."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        admin_clearance = dossier.get("adminClearance", {})
+        stored_token = admin_clearance.get("invitationToken")
+        expires_at_str = admin_clearance.get("invitationExpiresAt")
+
+        if not stored_token or stored_token != token:
+            return Response({"error": "Invalid or expired invitation token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check expiration
+        if expires_at_str:
+            expires_at = timezone.datetime.fromisoformat(expires_at_str)
+            if timezone.is_naive(expires_at):
+                expires_at = timezone.make_aware(expires_at)
+            if timezone.now() > expires_at:
+                return Response({"error": "Invitation token has expired."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if admin_clearance.get("status") == "activated":
+            return Response({"error": "Account has already been activated."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reg_form = dossier.get("regForm", {})
+        email = reg_form.get("email")
+
+        # Activate in DB
+        User = get_user_model()
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response({"error": "User record not found in system databases."}, status=status.HTTP_404_NOT_FOUND)
+
+        user.set_password(password)
+        user.is_active = True
+        user.save()
+
+        employee = Employee.objects.filter(user=user).first()
+        if employee:
+            employee.is_active = True
+            employee.save()
+
+        # Update dossier status
+        admin_clearance["status"] = "activated"
+        admin_clearance["invitationStatus"] = "Activated"
+        
+        if "auditLogs" not in admin_clearance:
+            admin_clearance["auditLogs"] = []
+
+        admin_clearance["auditLogs"].append({
+            "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+            "action": "Credentials Created",
+            "details": f"Technician successfully set security credentials. System access granted."
+        })
+        admin_clearance["auditLogs"].append({
+            "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+            "action": "Workforce Activated",
+            "details": f"Employee portal account transitioned to active state. Welcome to the Caltrack workspace!"
+        })
+
+        dossier["adminClearance"] = admin_clearance
+
+        # Save dossier
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(dossier, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            return Response({"error": f"Failed to save dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"success": True})
+
+
 class PasswordResetVerifyIdentityView(APIView):
     permission_classes = [permissions.AllowAny]
 
