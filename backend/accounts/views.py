@@ -340,11 +340,14 @@ class RegisterView(APIView):
                 if existing_company and existing_company.users.count() == 0:
                     company = existing_company
                 else:
-                    company = Company.objects.create(
+                    company = Company(
                         company_name=organization_name,
                         team_size=request.data.get("team_size"),
                         selected_modules=request.data.get("selected_modules", [])
                     )
+                    if request.data.get("start_trial") is False:
+                        company._skip_trial_activation = True
+                    company.save()
                     from companies.models import Domain
                     Domain.objects.create(
                         domain=f"{company.schema_name}.localhost",

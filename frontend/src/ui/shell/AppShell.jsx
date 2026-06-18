@@ -15,6 +15,8 @@ import { NotificationService } from "../../utils/notifications.js"
 import { useWebSocket } from "../../hooks/useWebSocket.js"
 import { useDispatch } from "react-redux"
 import { addSosAlert, addGeofenceBreach } from "../../store/liveLocationSlice.js"
+import { fetchTrialStatus, fetchTrialNotifications } from "../../store/trialSlice.js"
+import { TrialBanner } from "../components/TrialBanner.jsx"
 
 import {
   Home, Clock, CheckSquare, CalendarDays, Banknote, CalendarRange,
@@ -177,6 +179,7 @@ export function AppShell() {
   const { user, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const [offline, setOffline] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
@@ -250,6 +253,13 @@ export function AppShell() {
   useEffect(() => {
     localStorage.setItem("caltrack.sidebarCollapsed", sidebarCollapsed)
   }, [sidebarCollapsed])
+
+  useEffect(() => {
+    if (user) {
+      dispatch(fetchTrialStatus())
+      dispatch(fetchTrialNotifications())
+    }
+  }, [user, dispatch])
 
   useEffect(() => {
     const parent = items.find(item => item.children && location.pathname.startsWith(item.to))
@@ -353,8 +363,6 @@ export function AppShell() {
     }
   }, [workspaceMenuOpen])
 
-  const dispatch = useDispatch()
-
   const handleGlobalWsMessage = useCallback((msg) => {
     if (msg.type === "sos_alert") {
       dispatch(addSosAlert(msg.data))
@@ -392,6 +400,7 @@ export function AppShell() {
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-bg text-fg font-body">
+      <TrialBanner />
       <CommandPalette open={cmdOpen} setOpen={setCmdOpen} />
 
       {/* ── Topbar ───────────────────────────── */}

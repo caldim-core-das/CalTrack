@@ -163,8 +163,13 @@ export function LoginPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState(null)
-  const [agreedUpdates, setAgreedUpdates] = useState(true)
+  const [agreedUpdates, setAgreedUpdates] = useState(false)
   const [agreedTerms, setAgreedTerms] = useState(false)
+
+  // Trial Step
+  const [startTrial, setStartTrial] = useState(true)
+
+  // ──────────────────────────────────────────────────────────
   const [employeeStatus, setEmployeeStatus] = useState(null)
   const [dossierInfo, setDossierInfo] = useState(null)
   const [resetLink, setResetLink] = useState("")
@@ -363,7 +368,12 @@ export function LoginPage() {
       setLoading(true)
       try {
         const [first, ...rest] = fullName.trim().split(" ")
-        const u = await register({ username: username.trim(), password, email: email.trim(), first_name: first || "", last_name: rest.join(" ") || "", organization_name: orgName.trim() })
+        const u = await register({ 
+          username: username.trim(), password, email: email.trim(), 
+          first_name: first || "", last_name: rest.join(" ") || "", 
+          organization_name: orgName.trim(),
+          start_trial: startTrial
+        })
         navigate(postLoginRoute(u), { replace: true })
       } catch (err) { setError(extractAuthError(err, "Registration failed.")) }
       finally { setLoading(false) }
@@ -989,9 +999,9 @@ export function LoginPage() {
                   <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-200 -translate-y-1/2 z-0 mx-8" />
                   <div
                     className="absolute top-1/2 left-0 h-0.5 bg-indigo-600 -translate-y-1/2 z-0 transition-all duration-500 mx-8"
-                    style={{ width: `calc(${(regStep - 1) / 3 * 100}%)` }}
+                    style={{ width: `calc(${(regStep - 1) / 4 * 100}%)` }}
                   />
-                  {[1, 2, 3, 4].map((s) => (
+                  {[1, 2, 3, 4, 5].map((s) => (
                     <div key={s} className="relative z-10 flex flex-col items-center">
                       <div
                         className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-black transition-all duration-300 border-2 ${
@@ -1075,6 +1085,42 @@ export function LoginPage() {
                       </motion.div>
                     )}
                     {regStep === 4 && (
+                      <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+                        <div className="flex items-center gap-2 text-indigo-600 font-bold text-[9px] uppercase tracking-widest mb-1">
+                          <Sparkles size={14} /> PREMIUM FEATURES
+                        </div>
+                        <h2 className="text-lg font-display font-black text-slate-900 mb-2">Get Started with a Free 14-Day Trial</h2>
+                        <p className="text-xs text-slate-600 mb-4">Enjoy full access to premium features for 14 days at no cost.</p>
+                        
+                        <div className="space-y-3">
+                          <div
+                            onClick={() => setStartTrial(true)}
+                            className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-3 ${startTrial ? "border-indigo-600 bg-indigo-50/50" : "border-slate-200 bg-slate-50 hover:border-indigo-300"}`}
+                          >
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${startTrial ? "bg-indigo-600 border-indigo-600" : "border-slate-300"}`}>
+                              {startTrial && <Check size={12} color="#fff" strokeWidth={3} />}
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-slate-800">Start Free Trial</div>
+                              <div className="text-[11px] text-slate-500">Access all premium modules instantly.</div>
+                            </div>
+                          </div>
+                          <div
+                            onClick={() => setStartTrial(false)}
+                            className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center gap-3 ${!startTrial ? "border-indigo-600 bg-indigo-50/50" : "border-slate-200 bg-slate-50 hover:border-indigo-300"}`}
+                          >
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center border ${!startTrial ? "bg-indigo-600 border-indigo-600" : "border-slate-300"}`}>
+                              {!startTrial && <Check size={12} color="#fff" strokeWidth={3} />}
+                            </div>
+                            <div>
+                              <div className="text-sm font-bold text-slate-800">Skip for Now</div>
+                              <div className="text-[11px] text-slate-500">Continue with basic features.</div>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                    {regStep === 5 && (
                       <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
                         <div className="flex items-center gap-2 text-indigo-600 font-bold text-[9px] uppercase tracking-widest mb-1">
                           <ShieldCheck size={14} /> Finalize Security
@@ -1124,16 +1170,16 @@ export function LoginPage() {
                     </button>
                   )}
                   <button
-                    type={mode === "register" && regStep < 4 ? "button" : "submit"}
-                    disabled={loading || (mode === "register" && regStep === 4 && !agreedTerms)}
+                    type={mode === "register" && regStep < 5 ? "button" : "submit"}
+                    disabled={loading || (mode === "register" && regStep === 5 && !agreedTerms)}
                     onClick={() => {
-                      if (mode === "register" && regStep < 4) setRegStep(p => p + 1)
+                      if (mode === "register" && regStep < 5) setRegStep(p => p + 1)
                     }}
                     className={`flex-[2] py-4 bg-indigo-600 text-white text-[12px] font-bold uppercase tracking-widest rounded-2xl shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-40 disabled:shadow-none cursor-pointer`}
                   >
                     {loading ? <RefreshCcw className="animate-spin" size={18} /> :
                       mode === "signin" ? "Sign In" :
-                      regStep === 4 ? (agreedTerms ? "Continue" : <RefreshCcw size={18} />) : "Continue"}
+                      regStep === 5 ? (agreedTerms ? "Continue" : <RefreshCcw size={18} />) : "Continue"}
                   </button>
                 </div>
               </form>

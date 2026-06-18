@@ -70,7 +70,11 @@ class CompanySerializer(serializers.ModelSerializer):
                 validated_data["region"] = Region.objects.get(code=country)
             except Region.DoesNotExist:
                 pass
-        return super().create(validated_data)
+        company = Company(**validated_data)
+        if self.context.get("skip_trial_activation"):
+            company._skip_trial_activation = True
+        company.save()
+        return company
 
     def update(self, instance, validated_data):
         # If primary_country changes, update region too

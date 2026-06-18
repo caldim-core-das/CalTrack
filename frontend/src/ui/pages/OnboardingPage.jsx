@@ -47,6 +47,9 @@ export function OnboardingPage() {
   const [modules, setModules] = useState(["time"])
 
   // Step 3
+  const [startTrial, setStartTrial] = useState(true)
+
+  // Step 4
   const [emails, setEmails] = useState(["", "", ""])
 
   const selectedRegion = REGIONS.find(r => r.code === region)
@@ -64,6 +67,7 @@ export function OnboardingPage() {
         team_size: teamSize,
         selected_modules: modules,
         invites: validEmails,
+        start_trial: startTrial,
       }
       if (region === "US" && defaultState.trim()) {
         payload.default_state = defaultState.trim()
@@ -166,8 +170,8 @@ export function OnboardingPage() {
 
           {/* Progress */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 48 }}>
-            {[1, 2, 3].map(s => (
-              <div key={s} style={{ display: "flex", alignItems: "center", gap: 12, flex: s !== 3 ? 1 : 0 }}>
+            {[1, 2, 3, 4].map(s => (
+              <div key={s} style={{ display: "flex", alignItems: "center", gap: 12, flex: s !== 4 ? 1 : 0 }}>
                 <div style={{
                   width: 32, height: 32, borderRadius: "50%",
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -178,7 +182,7 @@ export function OnboardingPage() {
                 }}>
                   {step > s ? <Check size={16} /> : s}
                 </div>
-                {s !== 3 && <div style={{ flex: 1, height: 2, background: step > s ? "#059669" : "var(--stroke2)", borderRadius: 2 }} />}
+                {s !== 4 && <div style={{ flex: 1, height: 2, background: step > s ? "#059669" : "var(--stroke2)", borderRadius: 2 }} />}
               </div>
             ))}
           </div>
@@ -354,8 +358,78 @@ export function OnboardingPage() {
             </div>
           )}
 
-          {/* ── Step 3: Invite Team ── */}
+          {/* ── Step 3: Trial Selection ── */}
           {step === 3 && (
+            <div style={{ animation: "fadeUp 0.4s ease both" }}>
+              <div style={{ display: "inline-flex", padding: "6px 12px", borderRadius: 20, background: "#eff0fe", color: "#5d5fef", fontSize: 11, fontWeight: 800, letterSpacing: 0.5, marginBottom: 24 }}>
+                <Sparkles size={14} style={{ marginRight: 6 }} /> PREMIUM FEATURES
+              </div>
+              <h2 style={{ fontSize: 32, fontWeight: 800, fontFamily: "var(--font-display)", letterSpacing: -1, margin: "0 0 12px 0", color: "var(--fg)" }}>
+                Get Started with a Free 14-Day Trial
+              </h2>
+              <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 32 }}>
+                Enjoy full access to premium features for 14 days at no cost. No credit card required.
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 32 }}>
+                <div
+                  onClick={() => setStartTrial(true)}
+                  style={{
+                    border: startTrial ? "2px solid #5d5fef" : "1px solid var(--stroke2)",
+                    background: startTrial ? "#eff0fe" : "var(--surface)",
+                    padding: "20px",
+                    borderRadius: 12,
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    display: "flex", alignItems: "center", gap: 16
+                  }}
+                >
+                  <div style={{ width: 24, height: 24, borderRadius: "50%", border: startTrial ? "none" : "2px solid var(--stroke)", background: startTrial ? "#5d5fef" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {startTrial && <Check size={14} color="#fff" strokeWidth={3} />}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 15, color: "var(--fg)" }}>Start Free Trial</div>
+                    <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>Access all premium modules and analytics instantly.</div>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setStartTrial(false)}
+                  style={{
+                    border: !startTrial ? "2px solid #5d5fef" : "1px solid var(--stroke2)",
+                    background: !startTrial ? "#eff0fe" : "var(--surface)",
+                    padding: "20px",
+                    borderRadius: 12,
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    display: "flex", alignItems: "center", gap: 16
+                  }}
+                >
+                  <div style={{ width: 24, height: 24, borderRadius: "50%", border: !startTrial ? "none" : "2px solid var(--stroke)", background: !startTrial ? "#5d5fef" : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {!startTrial && <Check size={14} color="#fff" strokeWidth={3} />}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 15, color: "var(--fg)" }}>Skip for Now</div>
+                    <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>Continue with basic features. You can activate your trial later.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 16 }}>
+                <button className="btn btnGhost" onClick={() => setStep(2)} style={{ padding: 16, borderRadius: 12, fontSize: 14, fontWeight: 800 }}>BACK</button>
+                <button
+                  className="btn btnPrimary"
+                  onClick={() => setStep(4)}
+                  style={{ flex: 1, padding: 16, background: "#5d5fef", fontSize: 14, fontWeight: 800, borderRadius: 12, border: "none" }}
+                >
+                  CONTINUE <ArrowRight size={18} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 4: Invite Team ── */}
+          {step === 4 && (
             <div style={{ animation: "fadeUp 0.4s ease both" }}>
               <div style={{ display: "inline-flex", padding: "6px 12px", borderRadius: 20, background: "#eff0fe", color: "#5d5fef", fontSize: 11, fontWeight: 800, letterSpacing: 0.5, marginBottom: 24 }}>
                 <Users2 size={14} style={{ marginRight: 6 }} /> BRING YOUR TEAM
@@ -403,11 +477,11 @@ export function OnboardingPage() {
               <div style={{ display: "flex", gap: 16 }}>
                 <button
                   className="btn btnGhost"
-                  onClick={handleCreateCompany}
+                  onClick={() => setStep(3)}
                   style={{ padding: 16, borderRadius: 12, fontSize: 14, fontWeight: 800 }}
                   disabled={loading}
                 >
-                  SKIP FOR NOW
+                  BACK
                 </button>
                 <button
                   className="btn btnPrimary"

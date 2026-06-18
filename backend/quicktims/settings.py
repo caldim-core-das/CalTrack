@@ -35,6 +35,7 @@ SHARED_APPS = [
     "rest_framework",
     "channels",
     "django_celery_beat",
+    "trial_management",
 ]
 
 

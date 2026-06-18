@@ -27,7 +27,8 @@ class CompanyCreateView(views.APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = CompanySerializer(data=request.data)
+        skip_trial = request.data.get("start_trial") is False
+        serializer = CompanySerializer(data=request.data, context={"skip_trial_activation": skip_trial})
         if serializer.is_valid():
             company = serializer.save()
 
