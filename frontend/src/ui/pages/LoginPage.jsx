@@ -152,7 +152,8 @@ export function LoginPage() {
   const navigate = useNavigate()
 
   const [mode, setMode] = useState("signin")
-  const [username, setUsername] = useState("")
+  const [username, setUsername] = useState(() => localStorage.getItem("caltrack_remember_username") || "")
+  const [rememberMe, setRememberMe] = useState(() => !!localStorage.getItem("caltrack_remember_username"))
   const [password, setPassword] = useState("")
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -331,6 +332,11 @@ export function LoginPage() {
           setFailedReason("Unable to retrieve user profile after successful login.")
           setShowFailedLogin(true)
           return
+        }
+        if (rememberMe) {
+          localStorage.setItem("caltrack_remember_username", username.trim())
+        } else {
+          localStorage.removeItem("caltrack_remember_username")
         }
         const savedDossier = localStorage.getItem("caltrack_activation_dossier")
         if (savedDossier && u.role === "employee") {
@@ -1046,7 +1052,14 @@ export function LoginPage() {
                         </button>
                       </div>
                     </div>
-                    <div className="flex justify-end mt-1 pr-1">
+                    <div className="flex justify-between items-center mt-2 pr-1">
+                      <label className="flex items-center gap-2.5 cursor-pointer group select-none">
+                        <div className={`w-4 h-4 rounded flex items-center justify-center transition-all border ${rememberMe ? "bg-indigo-600 border-indigo-500 text-white" : "border-slate-200 bg-slate-50 group-hover:border-indigo-400"}`}>
+                          {rememberMe && <Check size={10} strokeWidth={4} />}
+                        </div>
+                        <input type="checkbox" className="hidden" checked={rememberMe} onChange={() => setRememberMe(!rememberMe)} />
+                        <span className="text-[11px] font-bold text-slate-600 hover:text-indigo-600 transition-colors duration-300">Remember me</span>
+                      </label>
                       <button type="button" onClick={() => setMode("forgot_password")} className="text-[11px] font-bold text-slate-600 hover:text-indigo-600 transition-colors duration-300">
                         Forgot Password?
                       </button>

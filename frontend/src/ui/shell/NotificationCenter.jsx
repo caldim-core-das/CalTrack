@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Bell, CheckSquare, Clock, ArrowRight, CalendarDays, Banknote, AlertCircle, LogIn } from "lucide-react"
+import { Bell, CheckSquare, Clock, ArrowRight, CalendarDays, Banknote, AlertCircle, LogIn, X } from "lucide-react"
 
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
@@ -201,6 +201,19 @@ export function NotificationCenter() {
       return new Set()
     }
   })
+  const [dismissedIds, setDismissedIds] = useState(() => {
+    try {
+      const raw = localStorage.getItem("qt.notifications.dismissedIds")
+      const parsed = raw ? JSON.parse(raw) : []
+      return new Set(Array.isArray(parsed) ? parsed : [])
+    } catch {
+      return new Set()
+    }
+  })
+
+  const displayedItems = useMemo(() => {
+    return items.filter(item => !dismissedIds.has(item.id))
+  }, [items, dismissedIds])
 
   useEffect(() => {
     const handleClick = (e) => {
@@ -214,6 +227,12 @@ export function NotificationCenter() {
     const arr = Array.from(nextSet)
     const capped = arr.slice(-200)
     localStorage.setItem("qt.notifications.readIds", JSON.stringify(capped))
+  }
+
+  function persistDismissedIds(nextSet) {
+    const arr = Array.from(nextSet)
+    const capped = arr.slice(-200)
+    localStorage.setItem("qt.notifications.dismissedIds", JSON.stringify(capped))
   }
 
   function markRead(id) {
@@ -231,6 +250,25 @@ export function NotificationCenter() {
       const next = new Set(prev)
       for (const n of items) next.add(n.id)
       persistReadIds(next)
+      return next
+    })
+  }
+
+  function dismissNotification(id) {
+    setDismissedIds((prev) => {
+      if (prev.has(id)) return prev
+      const next = new Set(prev)
+      next.add(id)
+      persistDismissedIds(next)
+      return next
+    })
+  }
+
+  function clearAllNotifications() {
+    setDismissedIds((prev) => {
+      const next = new Set(prev)
+      for (const n of items) next.add(n.id)
+      persistDismissedIds(next)
       return next
     })
   }
@@ -293,7 +331,7 @@ export function NotificationCenter() {
     if (open) load()
   }, [open, load])
 
-  const unreadCount = useMemo(() => items.filter((n) => !readIds.has(n.id)).length, [items, readIds])
+  const unreadCount = useMemo(() => displayedItems.filter((n) => !readIds.has(n.id)).length, [displayedItems, readIds])
 
   return (
     <div style={{ position: "relative" }} ref={ref}>
@@ -306,6 +344,12 @@ export function NotificationCenter() {
         <div style={{ position: "absolute", top: 8, right: 8, width: 8, height: 8, background: "#ef4444", borderRadius: "50%", border: "2px solid var(--surface)", display: unreadCount ? "block" : "none" }} />
       </button>
 
+      <style>{`
+        .notification-item { position: relative; }
+        .notification-item:hover .dismiss-btn { opacity: 1 !important; }
+        .dismiss-btn:hover { background: var(--surface2) !important; color: var(--fg) !important; }
+      `}</style>
+
       {open && (
         <div style={{
           position: "absolute", top: "calc(100% + 8px)", right: -12, width: 360,
@@ -316,22 +360,41 @@ export function NotificationCenter() {
         }}>
           <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--stroke)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800 }}>Notifications</h3>
-            <button
-              type="button"
-              onClick={markAllRead}
-              disabled={!items.length || !unreadCount}
-              style={{
-                background: "none",
-                border: "none",
-                fontSize: 11,
-                color: !items.length || !unreadCount ? "var(--muted)" : "#5d5fef",
-                fontWeight: 800,
-                cursor: !items.length || !unreadCount ? "default" : "pointer",
-                opacity: !items.length || !unreadCount ? 0.7 : 1
-              }}
-            >
-              MARK ALL READ
-            </button>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={markAllRead}
+                disabled={!displayedItems.length || !unreadCount}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 11,
+                  color: !displayedItems.length || !unreadCount ? "var(--muted)" : "#5d5fef",
+                  fontWeight: 800,
+                  cursor: !displayedItems.length || !unreadCount ? "default" : "pointer",
+                  opacity: !displayedItems.length || !unreadCount ? 0.7 : 1
+                }}
+              >
+                MARK READ
+              </button>
+              <span style={{ color: "var(--stroke)", fontSize: 11 }}>|</span>
+              <button
+                type="button"
+                onClick={clearAllNotifications}
+                disabled={!displayedItems.length}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 11,
+                  color: !displayedItems.length ? "var(--muted)" : "#ef4444",
+                  fontWeight: 800,
+                  cursor: !displayedItems.length ? "default" : "pointer",
+                  opacity: !displayedItems.length ? 0.7 : 1
+                }}
+              >
+                CLEAR ALL
+              </button>
+            </div>
           </div>
 
           <div style={{ maxHeight: 320, overflowY: "auto", display: "flex", flexDirection: "column" }}>
@@ -343,12 +406,13 @@ export function NotificationCenter() {
               <div style={{ padding: "18px 20px", color: "#B91C1C", fontSize: 13, fontWeight: 700, background: "#FEF2F2" }}>
                 {error}
               </div>
-            ) : items.length ? (
-              items.map((n) => {
+            ) : displayedItems.length ? (
+              displayedItems.map((n) => {
                 const unread = !readIds.has(n.id)
                 return (
                   <div
                     key={n.id}
+                    className="notification-item"
                     style={{
                       padding: "16px 20px",
                       display: "flex",
@@ -357,6 +421,7 @@ export function NotificationCenter() {
                       background: "transparent",
                       cursor: "pointer",
                       transition: "background 0.2s",
+                      position: "relative"
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface2)")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -381,7 +446,7 @@ export function NotificationCenter() {
                     >
                       {n.icon?.el || <Clock size={16} />}
                     </div>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: 1, paddingRight: 12 }}>
                       <div style={{ fontSize: 13, color: "var(--fg)", lineHeight: 1.4, marginBottom: 4 }}>
                         {n.body}
                       </div>
@@ -390,6 +455,35 @@ export function NotificationCenter() {
                       </div>
                     </div>
                     {unread ? <div style={{ width: 8, height: 8, background: "#5d5fef", borderRadius: "50%", marginTop: 6 }} /> : null}
+                    
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        dismissNotification(n.id)
+                      }}
+                      style={{
+                        position: "absolute",
+                        right: 8,
+                        top: 16,
+                        background: "var(--surface)",
+                        border: "1px solid var(--stroke)",
+                        borderRadius: "50%",
+                        width: 20,
+                        height: 20,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        opacity: 0,
+                        transition: "opacity 0.2s, background 0.2s",
+                        color: "var(--muted)",
+                        zIndex: 10
+                      }}
+                      className="dismiss-btn"
+                    >
+                      <X size={10} strokeWidth={3} />
+                    </button>
                   </div>
                 )
               })
@@ -405,7 +499,7 @@ export function NotificationCenter() {
                type="button"
                onClick={() => {
                  setOpen(false)
-                 if (items[0]?.to) navigate(items[0].to)
+                 if (displayedItems[0]?.to) navigate(displayedItems[0].to)
                  else navigate(routes.dashboard)
                }}
                style={{ background: "none", border: "none", fontSize: 12, fontWeight: 800, color: "var(--muted)", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
