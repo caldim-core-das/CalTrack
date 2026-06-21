@@ -199,6 +199,32 @@ export function LoginPage() {
     return dismissed ? routes.dashboard : routes.get_started
   }
 
+  const handleQuickLogin = async (usr, pwd) => {
+    setUsername(usr)
+    setPassword(pwd)
+    setLoading(true)
+    setError("")
+    try {
+      const u = await login(usr.trim(), pwd)
+      if (!u) {
+        setError("Login failed. Please check your credentials.")
+        setFailedIdentity(usr)
+        setFailedReason("Unable to retrieve user profile.")
+        setShowFailedLogin(true)
+        return
+      }
+      navigate(postLoginRoute(u), { replace: true })
+    } catch (err) {
+      const errMsg = extractAuthError(err, "Login failed.")
+      setError(errMsg)
+      setFailedIdentity(usr)
+      setFailedReason(errMsg)
+      setShowFailedLogin(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const googleLoginHandler = useGoogleLogin({
     onSuccess: async (tr) => {
       setLoading(true)
@@ -979,6 +1005,30 @@ export function LoginPage() {
                   {mode === "signin" ? "Welcome Back" : "Create Account"}
                 </h1>
               </div>
+
+              {mode === "signin" && (
+                <div className="mb-6 p-4 rounded-2xl bg-indigo-50/40 border border-indigo-100/50">
+                  <p className="text-center text-[9px] font-mono text-indigo-600 font-bold uppercase tracking-[0.2em] mb-3">
+                    Quick Demo Access
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickLogin("admin", "admin123")}
+                      className="py-2.5 px-3 bg-white hover:bg-indigo-50 border border-indigo-200/60 rounded-xl text-xs font-bold text-indigo-700 shadow-sm transition-all active:scale-[0.97] cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <ShieldCheck size={14} className="text-indigo-600" /> Admin
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickLogin("employee", "employee123")}
+                      className="py-2.5 px-3 bg-white hover:bg-indigo-50 border border-indigo-200/60 rounded-xl text-xs font-bold text-indigo-700 shadow-sm transition-all active:scale-[0.97] cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <User size={14} className="text-indigo-600" /> Employee
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Connect With Buttons */}
               <div className="mb-6">

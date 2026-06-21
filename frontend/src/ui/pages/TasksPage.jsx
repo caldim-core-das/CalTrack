@@ -127,6 +127,7 @@ function SlaBadge({ slaStatus, slaMinutes }) {
 }
 
 const EMPTY_FORM = {
+  service_request: "",
   title: "", description: "", category: "other", priority: "medium",
   status: "pending",
   assigned_to: "", due_date: new Date().toISOString().slice(0, 10),
@@ -3109,6 +3110,65 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
   const [hoveredEmpId, setHoveredEmpId] = useState(null)
   const addressInputRef = useRef(null)
 
+  // ── Service Requests Import State ─────────────────────────────
+  const [reviewedRequests, setReviewedRequests] = useState([])
+  useEffect(() => {
+    apiRequest("/admin/service-requests/?status=reviewed")
+      .then((res) => {
+        if (res?.success && Array.isArray(res.data)) {
+          setReviewedRequests(res.data)
+        }
+      })
+      .catch((err) => console.error("Error loading reviewed requests:", err))
+  }, [])
+
+  function handleSelectServiceRequest(srId) {
+    if (!srId) {
+      set("service_request", "")
+      return
+    }
+    const selected = reviewedRequests.find((r) => String(r.id) === String(srId))
+    if (!selected) return
+
+    set("service_request", selected.id)
+    set("title", `Service Request: ${selected.issue_title}`)
+    set("description", selected.description)
+
+    // Map service category to task category
+    const catMap = {
+      plumbing: "plumber",
+      electrical: "electrician",
+      carpentry: "carpenter",
+      hvac: "hvac",
+      cleaning: "cleaning",
+      pest_control: "other",
+      painting: "repair",
+      appliance_repair: "repair",
+      security: "other",
+      general: "maintenance",
+    }
+    set("category", catMap[selected.service_category] || "other")
+
+    // Map priority
+    const priorityMap = {
+      low: "low",
+      normal: "medium",
+      high: "high",
+      urgent: "urgent",
+    }
+    set("priority", priorityMap[selected.priority] || "medium")
+
+    // Map client details
+    set("client_name", selected.customer_name)
+    set("client_contact_number", selected.phone)
+    set("client_email", selected.email || "")
+    set("job_address", selected.address)
+    set("due_date", selected.preferred_date)
+
+    // Trigger address input for geocoding
+    setAddressInput(selected.address)
+  }
+
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
   // Sort employees by availability + GPS distance priority (Urban Company / Swiggy flow)
@@ -3326,6 +3386,37 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
       <div className="bg-surface dark:bg-slate-900/40 p-6 rounded-3xl border border-stroke dark:border-slate-800 shadow-sm flex flex-col gap-6">
         <div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-stroke dark:border-slate-800 pb-2 flex items-center gap-2">
           <Sparkles size={13} className="text-indigo-500" /> General Details
+        </div>
+
+        <div>
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">
+            Import from Reviewed Service Request (Optional)
+          </label>
+          <select
+            value={form.service_request || ""}
+            onChange={(e) => handleSelectServiceRequest(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: 12,
+              border: "1.5px solid #cbd5e1",
+              background: "#fff",
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#334155",
+              outline: "none",
+              cursor: "pointer",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+            }}
+            className="dark:bg-slate-950 dark:border-slate-800 dark:text-slate-300"
+          >
+            <option value="">— Select Reviewed Booking —</option>
+            {reviewedRequests.map((sr) => (
+              <option key={sr.id} value={sr.id}>
+                {sr.request_id} — {sr.customer_name} ({sr.issue_title})
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>

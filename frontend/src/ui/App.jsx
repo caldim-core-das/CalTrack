@@ -137,6 +137,22 @@ const TrainingRecordsPage = lazy(() =>
   import("./pages/EmployeeSubPages.jsx").then(m => ({ default: m.TrainingRecordsPage }))
 )
 
+const BookingPage = lazy(() =>
+  import("./pages/BookingPage.jsx").then(m => ({ default: m.BookingPage }))
+)
+const FeedbackPage = lazy(() =>
+  import("./pages/FeedbackPage.jsx").then(m => ({ default: m.FeedbackPage }))
+)
+const ServiceRequestsPage = lazy(() =>
+  import("./pages/ServiceRequestsPage.jsx").then(m => ({ default: m.ServiceRequestsPage }))
+)
+const FeedbackManagementPage = lazy(() =>
+  import("./pages/FeedbackManagementPage.jsx").then(m => ({ default: m.FeedbackManagementPage }))
+)
+const EmployeeJobsPage = lazy(() =>
+  import("./pages/EmployeeJobsPage.jsx").then(m => ({ default: m.EmployeeJobsPage }))
+)
+
 // ─── Route Guards ────────────────────────────────────────────
 
 /**
@@ -279,6 +295,9 @@ export function App() {
             }
           />
 
+          <Route path={routes.booking} element={<BookingPage />} />
+          <Route path={routes.feedback} element={<FeedbackPage />} />
+
           {/* ── Authenticated shell ── */}
           <Route
             element={
@@ -304,6 +323,7 @@ export function App() {
             <Route path={routes.leaves} element={<LeavesPage />} />
             <Route path={routes.inventory} element={<InventoryPage />} />
             <Route path={routes.mileage} element={<MileagePage />} />
+            <Route path={routes.employee_jobs} element={<EmployeeJobsPage />} />
 
             {/* Employee profile settings — accessible to everyone */}
             <Route path={routes.settings} element={<SettingsPage />} />
@@ -328,6 +348,8 @@ export function App() {
               <Route path={routes.employees_rejected} element={<RejectedEmployeesPage />} />
               <Route path={routes.employees_documents} element={<DocumentVaultPage />} />
               <Route path={routes.employees_training} element={<TrainingRecordsPage />} />
+              <Route path={routes.admin_service_requests} element={<ServiceRequestsPage />} />
+              <Route path={routes.admin_feedback} element={<FeedbackManagementPage />} />
             </Route>
 
             {/* ── Admin-only settings (employees redirected to /settings/profile) ── */}

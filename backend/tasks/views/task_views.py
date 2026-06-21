@@ -119,6 +119,22 @@ class AdminTaskListCreateView(GenericAPIView):
             company=request.company,
             acceptance_status=Task.AcceptanceStatus.PENDING_ACCEPTANCE,
         )
+        
+        # Update ServiceRequest status & assigned employee if linked
+        if task.service_request:
+            from django.db import transaction
+            from service_requests.models import ServiceRequest
+            from service_requests.state_machine import apply_transition
+            from employees.models import Employee
+
+            sr = task.service_request
+            employee = Employee.objects.filter(user=task.assigned_to).first()
+            with transaction.atomic():
+                sr.assigned_employee = employee
+                if sr.status == ServiceRequest.Status.REVIEWED:
+                    apply_transition(sr, ServiceRequest.Status.ASSIGNED)
+                sr.save(update_fields=["status", "assigned_employee", "updated_at"])
+
         # Notify assigned employee
         if task.assigned_to:
             push_task_notification(
@@ -178,6 +194,15 @@ class AdminTaskDetailView(APIView):
             saved_task.save(update_fields=[
                 "acceptance_status", "decline_reason", "declined_at", "declined_by"
             ])
+            
+            # Re-sync ServiceRequest assignee
+            if saved_task.service_request:
+                from employees.models import Employee
+                employee = Employee.objects.filter(user=saved_task.assigned_to).first()
+                sr = saved_task.service_request
+                sr.assigned_employee = employee
+                sr.save(update_fields=["assigned_employee", "updated_at"])
+
             # Notify new assignee
             if saved_task.assigned_to:
                 push_task_notification(
@@ -698,6 +723,40 @@ class EmployeeTaskActionView(APIView):
         else:
             return Response({"detail": f"Unknown action: {action}"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Synchronize linked ServiceRequest status
+        if getattr(task, "service_request", None):
+            try:
+                from django.db import transaction
+                from service_requests.models import ServiceRequest, ServiceFeedback
+                from service_requests.state_machine import apply_transition
+                
+                sr = task.service_request
+                
+                if task.acceptance_status == Task.AcceptanceStatus.DECLINED:
+                    with transaction.atomic():
+                        sr.status = ServiceRequest.Status.REVIEWED
+                        sr.assigned_employee = None
+                        sr.save(update_fields=["status", "assigned_employee", "updated_at"])
+                elif task.status == Task.Status.COMPLETED:
+                    if sr.status != ServiceRequest.Status.FEEDBACK_PENDING:
+                        with transaction.atomic():
+                            sr.status = ServiceRequest.Status.FEEDBACK_PENDING
+                            sr.save(update_fields=["status", "updated_at"])
+                            feedback, _ = ServiceFeedback.objects.get_or_create(service_request=sr)
+                        
+                        from service_requests.notifications import send_feedback_link
+                        send_feedback_link(sr, str(feedback.feedback_token))
+                elif task.status == Task.Status.IN_PROGRESS:
+                    if sr.status == ServiceRequest.Status.ACCEPTED:
+                        apply_transition(sr, ServiceRequest.Status.IN_PROGRESS)
+                        sr.save(update_fields=["status", "updated_at"])
+                elif task.acceptance_status == Task.AcceptanceStatus.ACCEPTED:
+                    if sr.status == ServiceRequest.Status.ASSIGNED:
+                        apply_transition(sr, ServiceRequest.Status.ACCEPTED)
+                        sr.save(update_fields=["status", "updated_at"])
+            except Exception as e:
+                print(f"[handle_action synchronization] Error syncing ServiceRequest: {e}")
+
         return Response(TaskSerializer(task).data)
 
 
@@ -731,6 +790,15 @@ class AdminTaskCancelView(APIView):
             f"[CANCELLED] {reason}" if reason else "[CANCELLED by admin]"
         )
         task.save(update_fields=["status", "admin_notes", "updated_at"])
+
+        # Reset linked ServiceRequest
+        if getattr(task, "service_request", None):
+            from service_requests.models import ServiceRequest
+            sr = task.service_request
+            sr.status = ServiceRequest.Status.REVIEWED
+            sr.assigned_employee = None
+            sr.save(update_fields=["status", "assigned_employee", "updated_at"])
+
 
         # Clock out open timelog if any
         if task.time_log and task.time_log.clock_out is None:

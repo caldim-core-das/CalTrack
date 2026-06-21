@@ -117,6 +117,24 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             if user:
                 attrs[self.username_field] = user.username
 
+        # Self-heal user company assignment if missing, before super().validate() generates tokens
+        resolved_username = attrs.get(self.username_field)
+        if resolved_username:
+            User = get_user_model()
+            try:
+                user = User.objects.filter(username__iexact=resolved_username).first()
+                if not user:
+                    user = User.objects.filter(email__iexact=resolved_username).first()
+                
+                if user and not getattr(user, "company", None):
+                    from companies.models import Company
+                    company = Company.objects.filter(schema_name="demo_v2").first() or Company.objects.filter(schema_name="demo").first() or Company.objects.first()
+                    if company:
+                        user.company = company
+                        user.save(update_fields=["company"])
+            except Exception as e:
+                print(f"Error self-healing company during validation: {e}")
+
         return super().validate(attrs)
 
     @classmethod
@@ -402,7 +420,14 @@ class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        return Response(UserSerializer(request.user, context={"request": request}).data)
+        user = request.user
+        if user and not getattr(user, "company", None):
+            from companies.models import Company
+            company = Company.objects.filter(schema_name="demo_v2").first() or Company.objects.filter(schema_name="demo").first() or Company.objects.first()
+            if company:
+                user.company = company
+                user.save(update_fields=["company"])
+        return Response(UserSerializer(user, context={"request": request}).data)
 
 
 class ProfileUpdateView(APIView):

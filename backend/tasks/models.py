@@ -84,6 +84,14 @@ class Task(models.Model):
         null=True, blank=True,
         related_name="created_tasks",
     )
+    service_request  = models.ForeignKey(
+        'service_requests.ServiceRequest',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="tasks",
+        help_text="The service request this job/task was created from."
+    )
+
 
     # Scheduling
     due_date         = models.DateField(default=timezone.localdate)

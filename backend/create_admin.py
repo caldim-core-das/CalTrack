@@ -20,8 +20,11 @@ User = get_user_model()
 # Set tenant context to 'demo_v2' for tenant-specific models (Employee)
 try:
     tenant = Company.objects.get(schema_name='demo_v2')
-    connection.set_tenant(tenant)
-    print("Set tenant context to 'demo'")
+    if hasattr(connection, 'set_tenant'):
+        connection.set_tenant(tenant)
+        print("Set tenant context to 'demo'")
+    else:
+        print("set_tenant not supported on this database backend, continuing without tenant context setting")
 except Company.DoesNotExist:
     print("Demo tenant not found, continuing with public schema (Employee creation may fail)")
 
@@ -35,6 +38,19 @@ admin, created = create_organization_admin_user(
     last_name="User",
     is_superuser=True
 )
+try:
+    if 'tenant' in locals() and tenant:
+        admin.company = tenant
+        admin.save()
+        print(f"Associated admin with company: {tenant.company_name}")
+    else:
+        company = Company.objects.first()
+        if company:
+            admin.company = company
+            admin.save()
+            print(f"Associated admin with company: {company.company_name}")
+except Exception as e:
+    print(f"Could not associate admin with company: {e}")
 print(f"{'Created' if created else 'Updated'} admin  -> username: admin  / password: admin123")
 
 # ── Employee user ─────────────────────────────────────────────

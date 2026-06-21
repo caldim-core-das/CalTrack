@@ -1,0 +1,16 @@
+
+==================================================
+STARTING WORKFLOW INTEGRATION TEST
+==================================================
+[OK] Found company: Public Tenant
+[OK] ServiceRequest created: SR-0006 (Status: new_request)
+[OK] ServiceRequest transitioned to: reviewed
+[OK] Task created: Service Request: Programmatic HVAC Issue (Assigned to: employee)
+[OK] ServiceRequest status after Task creation: assigned (Assigned employee: employee)
+[OK] Employee accepted task. ServiceRequest status: accepted
+[OK] Employee started task. ServiceRequest status: in_progress
+[OK] Feedback link generated: 0b4505da-6823-48aa-996a-255069f7799e (Created: True)
+[OK] Employee completed task. ServiceRequest status: feedback_pending
+==================================================
+WORKFLOW INTEGRATION TEST PASSED SUCCESSFULLY!
+==================================================

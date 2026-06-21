@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.http import JsonResponse
 from django.utils.deprecation import MiddlewareMixin
 from django.db import connection
@@ -68,18 +69,25 @@ class CompanyMiddleware(MiddlewareMixin):
             else:
                 print(f"DEBUG: CompanyMiddleware - set_tenant not supported on this backend.")
         else:
+            request.company = None
+            request.tenant = None
             print(f"DEBUG: CompanyMiddleware - No tenant resolved for: {request.path}")
 
         # ── Step 4: Block tenant API calls that arrived without a valid company ──
-        # Only applies to requests that provided a Bearer token (i.e., authenticated
-        # API clients). Unauthenticated requests will get a 401 from DRF instead.
-        if not company and auth_header.startswith('Bearer '):
+        # Applies to requests that provided a Bearer token or cookie.
+        if not company and token_str:
             excluded_paths = [
                 '/api/auth/',
                 '/api/company/create',
+                '/api/booking/',
+                '/api/feedback/',
             ]
-            if request.path.startswith('/api/') and not any(
-                request.path.startswith(p) for p in excluded_paths
+            path = request.path
+            prefix = getattr(settings, "FORCE_SCRIPT_NAME", "") or ""
+            if prefix and path.startswith(prefix):
+                path = path[len(prefix):]
+            if path.startswith('/api/') and not any(
+                path.startswith(p) for p in excluded_paths
             ):
                 return JsonResponse(
                     {"error": "No company associated with this account."},
