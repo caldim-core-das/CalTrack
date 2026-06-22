@@ -128,7 +128,7 @@ function HoloCard({ card, index, onSelect }) {
       }}
       whileTap={{ scale: 0.96 }}
     >
-      <div className="w-full h-full rounded-2xl overflow-hidden bg-slate-950/40 backdrop-blur-md border border-cyan-500/15 group-hover:border-cyan-400/50 shadow-[0_4px_30px_rgba(0,0,0,0.4)] group-hover:shadow-[0_0_30px_rgba(6,182,212,0.25)] transition-all duration-300 relative flex items-center justify-center p-1">
+      <div className="w-full h-full rounded-2xl overflow-hidden bg-white/70 backdrop-blur-md border border-indigo-200/60 group-hover:border-indigo-400/70 shadow-[0_4px_20px_rgba(99,102,241,0.08)] group-hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] transition-all duration-300 relative flex items-center justify-center p-1">
         <img
           src={card.src}
           alt=""
@@ -137,8 +137,8 @@ function HoloCard({ card, index, onSelect }) {
           className="w-full h-full object-cover rounded-xl select-none pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity duration-300"
         />
         <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/5 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-2.5 left-3.5 text-[8px] font-mono text-cyan-400/60 group-hover:text-cyan-400 tracking-widest uppercase transition-colors">SYS // 0{card.id}</div>
-        <div className="absolute bottom-2.5 right-3.5 text-[8px] font-mono text-cyan-500/50 group-hover:text-cyan-400/80 transition-colors">COORD-{12 + card.id}</div>
+        <div className="absolute top-2.5 left-3.5 text-[8px] font-mono text-indigo-400/60 group-hover:text-indigo-500 tracking-widest uppercase transition-colors">SYS // 0{card.id}</div>
+        <div className="absolute bottom-2.5 right-3.5 text-[8px] font-mono text-indigo-400/50 group-hover:text-indigo-500/80 transition-colors">COORD-{12 + card.id}</div>
       </div>
     </motion.div>
   )
@@ -413,14 +413,14 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#03050d] text-slate-100 font-body overflow-hidden relative w-full">
+    <div className="flex min-h-screen bg-white text-slate-800 font-body overflow-hidden relative w-full">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         .font-display { font-family: 'Outfit', sans-serif; }
         .font-body { font-family: 'Plus Jakarta Sans', sans-serif; }
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 99px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
       `}</style>
 
       {/* ═══════════════════ LEFT PANEL — 60 % ═══════════════════ */}
@@ -495,7 +495,7 @@ export function LoginPage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
-                className="absolute inset-0 z-[1999] bg-slate-950/60 backdrop-blur-xl"
+                className="absolute inset-0 z-[1999] bg-white/70 backdrop-blur-xl"
                 onClick={() => setSelected(null)}
               />
 
@@ -506,7 +506,7 @@ export function LoginPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute inset-0 z-[2000] flex flex-col bg-slate-950 border border-slate-900 shadow-2xl"
+                className="absolute inset-0 z-[2000] flex flex-col bg-white border border-slate-200 shadow-2xl"
                 onClick={() => setSelected(null)}
               >
                 {/* Title bar */}
@@ -534,8 +534,8 @@ export function LoginPage() {
                   <h3 className="text-cyan-400 text-[9px] font-mono uppercase tracking-[0.2em] mb-3">Workflow Systems</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
                     {selected.desc.split("\n").map((line, i) => (
-                      <p key={i} className="flex gap-2 text-slate-300 text-[11px] leading-tight font-medium">
-                        <span className="text-cyan-400 font-bold shrink-0">{line.split('. ')[0]}.</span>
+                      <p key={i} className="flex gap-2 text-slate-600 text-[11px] leading-tight font-medium">
+                        <span className="text-indigo-500 font-bold shrink-0">{line.split('. ')[0]}.</span>
                         <span>{line.split('. ').slice(1).join('. ')}</span>
                       </p>
                     ))}
@@ -548,7 +548,7 @@ export function LoginPage() {
       </div>
 
       {/* ═══════════════════ RIGHT PANEL — 40 % ═══════════════════ */}
-      <div className="flex-1 flex flex-col justify-center items-center p-8 lg:p-12 bg-slate-50 overflow-y-auto relative">
+      <div className="flex-1 flex flex-col justify-center items-center p-8 lg:p-12 bg-white overflow-y-auto relative border-l border-slate-100">
         <div className="absolute w-[450px] h-[450px] rounded-full bg-indigo-500/5 blur-[90px] pointer-events-none" />
 
         <div className="w-full max-w-[420px] bg-white border border-slate-200/80 p-8 sm:p-10 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.04)] relative z-10 text-slate-800">

@@ -106,7 +106,7 @@ def push_task_notification(user, title, body, task=None, notif_type="info"):
     """
     task_info = f" [Job #{task.id}: {task.title}]" if task else ""
     print(
-        f"[NOTIFICATION → {user.username}] [{notif_type.upper()}]{task_info} "
+        f"[NOTIFICATION -> {user.username}] [{notif_type.upper()}]{task_info} "
         f"{title} — {body}"
     )
 

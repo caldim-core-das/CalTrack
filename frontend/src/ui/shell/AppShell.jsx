@@ -31,7 +31,7 @@ const ALL_NAV_ITEMS = [
   { label: "Dashboard", to: routes.dashboard, icon: <Home size={20} />, color: "#10B981" },
   { label: "Service Requests", to: routes.admin_service_requests, icon: <Wrench size={20} />, color: "#6366F1", adminOnly: true },
   { label: "Feedback Logs", to: routes.admin_feedback, icon: <MessageSquare size={20} />, color: "#F59E0B", adminOnly: true },
-  { label: "Service Jobs", to: routes.employee_jobs, icon: <Wrench size={20} />, color: "#14B8A6", employeeOnly: true },
+  { label: "Feedback", to: routes.employee_jobs, icon: <MessageSquare size={20} />, color: "#14B8A6", employeeOnly: true },
   { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1", employeeOnly: true },
   { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6", adminOnly: true },
   { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444", adminOnly: true },
@@ -564,14 +564,6 @@ export function AppShell() {
                     >
                       {item.label}
                     </span>
-
-                    {active && (
-                      <motion.div
-                        layoutId="active-indicator-main"
-                        className="absolute -right-0 w-1 h-10 rounded-full"
-                        style={{ backgroundColor: color }}
-                      />
-                    )}
 
                     {/* Hover Glow */}
                     <div

@@ -172,8 +172,14 @@ class AdminAssignSerializer(serializers.Serializer):
     employee_id = serializers.IntegerField()
 
     def validate_employee_id(self, value):
-        if not Employee.objects.filter(id=value).exists():
+        try:
+            employee = Employee.objects.select_related("user").get(id=value)
+        except Employee.DoesNotExist:
             raise serializers.ValidationError("Employee not found.")
+            
+        if employee.user.role != "admin":
+            if not employee.hourly_rate or employee.hourly_rate <= 0:
+                raise serializers.ValidationError("This employee has not configured their hourly rate yet. Jobs cannot be assigned until a rate is set.")
         return value
 
 
@@ -182,23 +188,28 @@ class AdminAssignSerializer(serializers.Serializer):
 class ServiceFeedbackAdminSerializer(serializers.ModelSerializer):
     request_id       = serializers.CharField(source="service_request.request_id", read_only=True)
     customer_name    = serializers.CharField(source="service_request.customer_name", read_only=True)
+    issue_title      = serializers.CharField(source="service_request.issue_title", read_only=True)
     service_category = serializers.CharField(source="service_request.get_service_category_display", read_only=True)
     employee_name    = serializers.SerializerMethodField()
 
     class Meta:
         model = ServiceFeedback
         fields = (
-            "id", "request_id", "customer_name", "service_category",
+            "id", "request_id", "customer_name", "issue_title", "service_category",
             "employee_name", "rating", "employee_behaviour", "work_quality",
             "issue_resolved", "comment", "submitted_at",
         )
 
     def get_employee_name(self, obj):
         try:
-            emp = obj.service_request.employee_job.employee
+            sr = obj.service_request
+            if sr.assigned_employee:
+                return sr.assigned_employee.user.get_full_name() or sr.assigned_employee.user.username
+            emp = sr.employee_job.employee
             return emp.user.get_full_name() or emp.user.username
         except Exception:
             return ""
+
 
 
 # ── Employee ───────────────────────────────────────────────────────────────────
@@ -259,8 +270,9 @@ class EmployeeJobNotesSerializer(serializers.Serializer):
 # ── Performance ────────────────────────────────────────────────────────────────
 
 class EmployeePerformanceSerializer(serializers.ModelSerializer):
-    employee_name = serializers.SerializerMethodField()
-    feedback_list = serializers.SerializerMethodField()
+    employee_name   = serializers.SerializerMethodField()
+    recent_feedback = serializers.SerializerMethodField()
+    feedback_list   = serializers.SerializerMethodField()
 
     class Meta:
         model = EmployeePerformance
@@ -268,16 +280,19 @@ class EmployeePerformanceSerializer(serializers.ModelSerializer):
             "employee_name",
             "jobs_completed_count", "average_rating", "feedback_count",
             "completion_rate", "customer_satisfaction_score", "last_updated",
-            "feedback_list",
+            "recent_feedback", "feedback_list",
         )
 
     def get_employee_name(self, obj):
         return obj.employee.user.get_full_name() or obj.employee.user.username
 
-    def get_feedback_list(self, obj):
+    def get_recent_feedback(self, obj):
+        from django.db.models import Q
         feedbacks = ServiceFeedback.objects.filter(
-            is_submitted=True,
-            service_request__employee_job__employee=obj.employee,
+            is_submitted=True
+        ).filter(
+            Q(service_request__assigned_employee=obj.employee) |
+            Q(service_request__employee_job__employee=obj.employee)
         ).select_related("service_request").order_by("-submitted_at")[:20]
         return [
             {
@@ -291,3 +306,6 @@ class EmployeePerformanceSerializer(serializers.ModelSerializer):
             }
             for f in feedbacks
         ]
+
+    def get_feedback_list(self, obj):
+        return self.get_recent_feedback(obj)

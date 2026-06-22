@@ -233,48 +233,78 @@ class GoogleLoginView(APIView):
             user = User.objects.filter(email__iexact=email_clean).first()
 
         if not user:
-            # Auto-create the user if they don't exist yet
-            username = email.split("@")[0]
-            base_username = username
-            counter = 1
-            while User.objects.filter(username=username).exists():
-                username = f"{base_username}{counter}"
-                counter += 1
-
-            from companies.models import Company
-            # Assign to the demo company or first available company as fallback
-            company = Company.objects.filter(schema_name='demo').first() or Company.objects.first()
-
-            user = User.objects.create(
-                username=username,
-                email=email,
-                first_name=user_info.get("given_name", ""),
-                last_name=user_info.get("family_name", ""),
-                company=company
-            )
-            user.set_unusable_password()
-            user.save()
-
-            if company:
-                from employees.models import Employee
-                from employees.utils import generate_next_employee_id
-                from django_tenants.utils import schema_context
-                try:
-                    with schema_context(company.schema_name):
-                        Employee.objects.get_or_create(
-                            user=user,
-                            company=company,
-                            defaults={
-                                "employee_id": generate_next_employee_id(company),
-                                "title": "Employee",
-                                "hourly_rate": 0
-                            }
-                        )
-                except Exception as e:
-                    print(f"Failed to create employee profile for Google auto-created user: {e}")
+            return Response({"detail": "Google login is restricted to pre-approved employee email accounts. Please contact your administrator to register."}, status=status.HTTP_400_BAD_REQUEST)
 
         if not getattr(user, 'is_active', True):
-            return Response({"detail": "This account is deactivated."}, status=status.HTTP_400_BAD_REQUEST)
+            # Check if they are approved but pending activation in the dossier json
+            import json
+            import os
+            from django.conf import settings
+            file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+            dossier_approved = False
+            dossier = None
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        dossier = json.load(f)
+                    reg_form = dossier.get("regForm", {})
+                    dossier_email = reg_form.get("email", "").strip()
+                    admin_clearance = dossier.get("adminClearance", {})
+                    dossier_status = admin_clearance.get("status")
+                    if dossier_email.lower() == email_clean.lower() and dossier_status == "approved":
+                        dossier_approved = True
+                except Exception as e:
+                    print(f"Error loading dossier in GoogleLoginView: {e}")
+            
+            if dossier_approved and dossier:
+                from django.utils import timezone
+                from employees.models import Employee
+                from django_tenants.utils import schema_context
+                
+                # Activate User
+                user.is_active = True
+                user.save()
+                
+                # Activate Employee
+                company = getattr(user, 'company', None)
+                if company:
+                    try:
+                        from django.db import connection
+                        if hasattr(connection, "tenant"):
+                            from django_tenants.utils import schema_context
+                            with schema_context(company.schema_name):
+                                employee = Employee.objects.filter(user=user).first()
+                                if employee:
+                                    employee.is_active = True
+                                    employee.save()
+                        else:
+                            employee = Employee.objects.filter(user=user).first()
+                            if employee:
+                                employee.is_active = True
+                                employee.save()
+                    except Exception as e:
+                        print(f"Error activating employee in GoogleLoginView: {e}")
+                
+                # Update dossier status
+                admin_clearance = dossier.get("adminClearance", {})
+                admin_clearance["status"] = "activated"
+                admin_clearance["invitationStatus"] = "Activated"
+                if "auditLogs" not in admin_clearance:
+                    admin_clearance["auditLogs"] = []
+                admin_clearance["auditLogs"].append({
+                    "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                    "action": "Google Auth Activation",
+                    "details": f"Technician successfully activated account via Google Login. System access granted."
+                })
+                dossier["adminClearance"] = admin_clearance
+                
+                try:
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        json.dump(dossier, f, indent=4, ensure_ascii=False)
+                except Exception as e:
+                    print(f"Error saving dossier in GoogleLoginView: {e}")
+            else:
+                return Response({"detail": "This account is deactivated."}, status=status.HTTP_400_BAD_REQUEST)
 
         refresh = CustomTokenObtainPairSerializer.get_token(user)
         response = Response({"success": True, "message": "Google login successful."})
@@ -954,7 +984,7 @@ class RegistrationDossierApproveView(APIView):
                     employee_id=reg_form.get("employee_id") or generate_next_employee_id(company),
                     phone=phone,
                     title="Field Operations Tech (L2)",
-                    hourly_rate=18.50,
+                    hourly_rate=0.00,
                     country=region,
                     is_active=False
                 )
@@ -1591,3 +1621,56 @@ class VerifyOTPView(APIView):
                     {"detail": f"Invalid verification code. {remaining} attempts remaining."}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
+
+
+class ApprovedEmployeesListView(APIView):
+    """
+    GET /api/auth/approved-employees/
+    Returns all employees who have been approved (and are now in the DB),
+    either inactive (invitation sent, not yet activated) or active (activated/logged in).
+    Used by the Admin Approval Center to populate the Approved Employees tab.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from employees.models import Employee
+        from django.utils import timezone as tz
+
+        User = get_user_model()
+        company = getattr(request, "company", None) or getattr(request.user, "company", None)
+
+        # Fetch employees with role=EMPLOYEE from the DB
+        employee_qs = Employee.objects.select_related("user").filter(
+            user__role=User.Role.EMPLOYEE
+        )
+        if company:
+            employee_qs = employee_qs.filter(company=company)
+
+        result = []
+        for emp in employee_qs:
+            user = emp.user
+            # Determine activation status
+            if user.is_active:
+                activation_status = "activated"
+                status_label = "Activated"
+            else:
+                activation_status = "approved"
+                status_label = "Invitation Sent"
+
+            result.append({
+                "id": emp.id,
+                "employee_id": emp.employee_id,
+                "full_name": user.get_full_name() or user.username,
+                "email": user.email,
+                "phone": emp.phone or "—",
+                "title": emp.title or "Field Operations Tech",
+                "is_active": user.is_active,
+                "activation_status": activation_status,
+                "status_label": status_label,
+                "hourly_rate": float(emp.hourly_rate) if emp.hourly_rate is not None else 0.0,
+                "date_joined": user.date_joined.strftime("%d %b %Y") if user.date_joined else "—",
+                "country": emp.country or "—",
+                "department": emp.department or "Operations",
+            })
+
+        return Response({"success": True, "data": result})

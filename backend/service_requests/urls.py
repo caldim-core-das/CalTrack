@@ -15,7 +15,9 @@ from .views import (
     AdminSRVerifyView,
     AdminSRReworkView,
     AdminSRCloseView,
+    AdminSRResendFeedbackView,
     AdminEmployeeListView,
+
     # Admin — Feedback
     AdminFeedbackListView,
     AdminFeedbackMetricsView,
@@ -46,6 +48,8 @@ urlpatterns = [
     path("admin/service-requests/<int:pk>/verify/",       AdminSRVerifyView.as_view(),   name="sr-admin-verify"),
     path("admin/service-requests/<int:pk>/request-rework/", AdminSRReworkView.as_view(), name="sr-admin-rework"),
     path("admin/service-requests/<int:pk>/close/",        AdminSRCloseView.as_view(),    name="sr-admin-close"),
+    path("admin/service-requests/<int:pk>/resend-feedback/", AdminSRResendFeedbackView.as_view(), name="sr-admin-resend-feedback"),
+
 
     # ── Admin — Feedback ──────────────────────────────────────────────────
     path("admin/feedback/",                  AdminFeedbackListView.as_view(),   name="sr-admin-feedback-list"),

@@ -85,6 +85,15 @@ class BookingCreateView(APIView):
             )
         company = _get_company(request)
         sr = serializer.save(company=company)
+        
+        # Send booking confirmation email
+        try:
+            from .notifications import send_booking_confirmation
+            send_booking_confirmation(sr)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to send booking confirmation email: {e}")
+
         return _success(
             data={"request_id": sr.request_id, "id": sr.id},
             message="Your service request has been submitted successfully.",
@@ -346,6 +355,31 @@ class AdminSRReworkView(APIView):
         )
 
 
+class AdminSRResendFeedbackView(APIView):
+    """POST /api/admin/service-requests/<id>/resend-feedback/ → send or resend feedback link"""
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        try:
+            sr = _sr_qs(request).get(pk=pk)
+        except ServiceRequest.DoesNotExist:
+            return _error("Not found.", 404)
+
+        if sr.status != ServiceRequest.Status.FEEDBACK_PENDING:
+            return _error("Service request is not in Feedback Pending status.", 400)
+
+        # Create or get ServiceFeedback record
+        feedback, _ = ServiceFeedback.objects.get_or_create(service_request=sr)
+
+        # Send feedback link
+        from .notifications import send_feedback_link
+        try:
+            send_feedback_link(sr, str(feedback.feedback_token))
+            return _success(message="Feedback link email sent successfully.")
+        except Exception as e:
+            return _error(f"Failed to send feedback email: {e}", 500)
+
+
 class AdminSRCloseView(APIView):
     """PATCH /api/admin/service-requests/<id>/close/ → Feedback Received → Closed"""
     permission_classes = [permissions.IsAuthenticated, IsAdminRole]
@@ -365,9 +399,12 @@ class AdminFeedbackListView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminRole]
 
     def get(self, request):
+        from django.db.models import Q
         company = _get_company(request)
         qs = ServiceFeedback.objects.filter(is_submitted=True).select_related(
-            "service_request", "service_request__employee_job__employee__user"
+            "service_request",
+            "service_request__employee_job__employee__user",
+            "service_request__assigned_employee__user"
         ).order_by("-submitted_at")
 
         if company:
@@ -382,7 +419,10 @@ class AdminFeedbackListView(APIView):
         if rating:
             qs = qs.filter(rating=rating)
         if emp_id:
-            qs = qs.filter(service_request__employee_job__employee_id=emp_id)
+            qs = qs.filter(
+                Q(service_request__assigned_employee_id=emp_id) |
+                Q(service_request__employee_job__employee_id=emp_id)
+            )
         if date_from:
             qs = qs.filter(submitted_at__date__gte=date_from)
         if date_to:
@@ -402,6 +442,24 @@ class AdminFeedbackMetricsView(APIView):
         qs = ServiceFeedback.objects.filter(is_submitted=True)
         if company:
             qs = qs.filter(service_request__company=company)
+
+        # Filters
+        rating = request.query_params.get("rating")
+        emp_id = request.query_params.get("employee_id")
+        date_from = request.query_params.get("date_from")
+        date_to   = request.query_params.get("date_to")
+
+        if rating:
+            qs = qs.filter(rating=rating)
+        if emp_id:
+            qs = qs.filter(
+                Q(service_request__assigned_employee_id=emp_id) |
+                Q(service_request__employee_job__employee_id=emp_id)
+            )
+        if date_from:
+            qs = qs.filter(submitted_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(submitted_at__date__lte=date_to)
 
         agg = qs.aggregate(
             total=Count("id"),
@@ -434,6 +492,7 @@ class AdminEmployeeListView(APIView):
                 "full_name": e.user.get_full_name() or e.user.username,
                 "title": e.title,
                 "email": e.user.email,
+                "hourly_rate": float(e.hourly_rate) if e.hourly_rate is not None else 0.0,
             }
             for e in qs
         ]
@@ -570,13 +629,30 @@ class EmployeeJobCompleteView(APIView):
             )
 
         with transaction.atomic():
-            apply_transition(job.service_request, ServiceRequest.Status.COMPLETED)
-            job.service_request.save(update_fields=["status", "updated_at"])
+            sr = job.service_request
+            # Step sequentially to satisfy state machine validation rules
+            apply_transition(sr, ServiceRequest.Status.COMPLETED)
+            apply_transition(sr, ServiceRequest.Status.AWAITING_VERIFICATION)
+            apply_transition(sr, ServiceRequest.Status.VERIFIED)
+            apply_transition(sr, ServiceRequest.Status.FEEDBACK_PENDING)
+            sr.save(update_fields=["status", "updated_at"])
+
             job.status = EmployeeJob.Status.COMPLETED
             job.completed_date = timezone.now()
             job.save(update_fields=["status", "completed_date"])
 
-        return _success(message="Work marked as Complete.")
+            # Create feedback model record (generates token)
+            feedback, _ = ServiceFeedback.objects.get_or_create(service_request=sr)
+
+        # Dispatch the feedback email link outside the transaction block
+        try:
+            from .notifications import send_feedback_link
+            send_feedback_link(sr, str(feedback.feedback_token))
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Failed to auto-send feedback link: {e}")
+
+        return _success(message="Work marked as Complete. Feedback request sent to customer.")
 
 
 class EmployeeJobProofView(APIView):
@@ -623,6 +699,8 @@ class EmployeePerformanceView(APIView):
         if not employee:
             return _error("Employee profile not found.", 404)
 
-        perf, _ = EmployeePerformance.objects.get_or_create(employee=employee)
+        from .signals import recalculate_employee_performance
+        perf = recalculate_employee_performance(employee)
+
         serializer = EmployeePerformanceSerializer(perf)
         return _success(data=serializer.data)

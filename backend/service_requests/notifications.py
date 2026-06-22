@@ -61,3 +61,40 @@ def send_feedback_link(service_request, feedback_token: str) -> None:
             service_request.request_id,
             exc,
         )
+
+
+def send_booking_confirmation(service_request) -> None:
+    """
+    Send a booking confirmation email to the customer.
+    """
+    subject = f"Booking Confirmation [{service_request.request_id}]"
+    body = (
+        f"Dear {service_request.customer_name},\n\n"
+        f"Thank you for submitting a service booking request with us.\n\n"
+        f"Booking Details:\n"
+        f"- Request ID: {service_request.request_id}\n"
+        f"- Service Category: {service_request.service_category.replace('_', ' ').capitalize()}\n"
+        f"- Issue Title: {service_request.issue_title}\n"
+        f"- Preferred Date: {service_request.preferred_date}\n\n"
+        f"We will review your request and assign a technician shortly.\n\n"
+        f"Best regards,\n"
+        f"The Service Team\n"
+    )
+
+    recipient = service_request.email
+    if not recipient:
+        logger.info("[ServiceRequests] No email for %s — booking confirmation skipped.", service_request.request_id)
+        return
+
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[recipient],
+            fail_silently=False,
+        )
+        logger.info("[ServiceRequests] Booking confirmation sent to %s for %s", recipient, service_request.request_id)
+    except Exception as exc:
+        logger.error("[ServiceRequests] Failed to send booking confirmation email for %s: %s", service_request.request_id, exc)
+

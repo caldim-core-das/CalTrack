@@ -132,7 +132,13 @@ function EmployeeDashboard() {
   const navigate = useNavigate()
   const [tasks, setTasks] = useState([])
   const [leaves, setLeaves] = useState([])
+  const [employeeProfile, setEmployeeProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  
+  const [rateInput, setRateInput] = useState("")
+  const [rateSubmitting, setRateSubmitting] = useState(false)
+  const [rateError, setRateError] = useState("")
+
   const hour = new Date().getHours()
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
   const greetingEmoji = hour < 12 ? "☀️" : hour < 17 ? "👋" : "🌙"
@@ -141,12 +147,14 @@ function EmployeeDashboard() {
     async function load() {
       setLoading(true)
       try {
-        const [t, l] = await Promise.all([
+        const [t, l, emp] = await Promise.all([
           apiRequest("/tasks/my/").catch(() => []),
           apiRequest("/leaves/").catch(() => []),
+          apiRequest("/employees/me/").catch(() => null),
         ])
         setTasks(Array.isArray(t) ? t : unwrapResults(t))
         setLeaves(Array.isArray(l) ? l : unwrapResults(l))
+        setEmployeeProfile(emp)
       } finally {
         setLoading(false)
       }
@@ -365,6 +373,136 @@ function EmployeeDashboard() {
         </div>
       ) : (
         <>
+          {/* ── Hourly Rate Alert Banner ──────────────── */}
+          {(!employeeProfile || !employeeProfile.hourly_rate || parseFloat(employeeProfile.hourly_rate) <= 0) && (
+            <div
+              className="bg-amber-500/10 dark:bg-amber-500/5 backdrop-blur-md border border-amber-500/30 rounded-3xl"
+              style={{
+                padding: "24px 32px",
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 20,
+                boxShadow: "0 12px 32px rgba(245,158,11,0.1)",
+                marginBottom: 10,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 16, flex: 1, minWidth: 280 }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: 16,
+                  background: "linear-gradient(135deg, #f59e0b 20%, #d97706 100%)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: "#fff", boxShadow: "0 4px 14px rgba(245,158,11,0.4)"
+                }}>
+                  <DollarSign size={24} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "var(--fg)", marginBottom: 4 }}>
+                    Set Your Hourly Rate Required
+                  </div>
+                  <div style={{ fontSize: 13, color: "var(--muted)", fontWeight: 500, lineHeight: 1.4 }}>
+                    To assign service requests and tasks to your profile, the system requires a configured billing rate. Please specify your hourly charge below.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 260 }}>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!rateInput || parseFloat(rateInput) <= 0) {
+                      setRateError("Please enter a positive billing rate.");
+                      return;
+                    }
+                    setRateSubmitting(true);
+                    setRateError("");
+                    try {
+                      const res = await apiRequest("/employees/update-hourly-rate/", {
+                        method: "PATCH",
+                        json: { hourly_rate: parseFloat(rateInput) }
+                      });
+                      if (res && res.success) {
+                        setEmployeeProfile(prev => ({
+                          ...prev,
+                          hourly_rate: parseFloat(rateInput)
+                        }));
+                      } else {
+                        setRateError("Failed to update rate. Please try again.");
+                      }
+                    } catch (err) {
+                      setRateError(err?.body?.detail || "Network error occurred.");
+                    } finally {
+                      setRateSubmitting(false);
+                    }
+                  }}
+                  style={{ display: "flex", alignItems: "center", gap: 10 }}
+                >
+                  <div style={{ position: "relative", flex: 1 }}>
+                    <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--muted)", fontWeight: 800, fontSize: 14 }}>$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder="0.00"
+                      value={rateInput}
+                      onChange={(e) => setRateInput(e.target.value)}
+                      disabled={rateSubmitting}
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px 10px 24px",
+                        borderRadius: 12,
+                        border: "1.5px solid var(--stroke)",
+                        background: "var(--surface)",
+                        color: "var(--fg)",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        outline: "none",
+                        transition: "border-color 0.2s"
+                      }}
+                      onFocus={(e) => e.target.style.borderColor = "#f59e0b"}
+                      onBlur={(e) => e.target.style.borderColor = "var(--stroke)"}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={rateSubmitting}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: 12,
+                      background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                      color: "#fff",
+                      border: "none",
+                      fontSize: 13,
+                      fontWeight: 800,
+                      cursor: rateSubmitting ? "not-allowed" : "pointer",
+                      boxShadow: "0 4px 14px rgba(245,158,11,0.25)",
+                      transition: "transform 0.15s, opacity 0.15s",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6
+                    }}
+                    onMouseEnter={(e) => { if (!rateSubmitting) e.currentTarget.style.transform = "scale(1.03)" }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = "none" }}
+                  >
+                    {rateSubmitting ? (
+                      <>
+                        <Loader2 size={14} style={{ animation: "spin 0.7s linear infinite" }} />
+                        Saving...
+                      </>
+                    ) : "Save Rate"}
+                  </button>
+                </form>
+                {rateError && (
+                  <span style={{ fontSize: 11, color: "#ef4444", fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
+                    <AlertCircle size={12} /> {rateError}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ── Productivity Banner ───────────────────── */}
           <div style={{
             background: "linear-gradient(135deg, #312e81 0%, #4338ca 50%, #6d28d9 100%)",

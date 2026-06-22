@@ -150,6 +150,16 @@ class TaskSerializer(serializers.ModelSerializer):
             "inventory_status", "blocking_reason", "required_items",
         )
 
+    def validate_assigned_to(self, value):
+        if value:
+            from employees.models import Employee
+            employee = Employee.objects.filter(user=value).first()
+            if employee:
+                if value.role != "admin":
+                    if not employee.hourly_rate or employee.hourly_rate <= 0:
+                        raise serializers.ValidationError("This employee must configure their hourly rate before tasks can be assigned to them.")
+        return value
+
     def get_assigned_by_name(self, obj):
         if obj.assigned_by:
             return obj.assigned_by.get_full_name() or obj.assigned_by.username

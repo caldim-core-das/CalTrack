@@ -579,23 +579,36 @@ export function ServiceRequestsPage() {
                   )}
 
                   {/* Showing feedback token link if feedback is pending */}
-                  {detail.status === "feedback_pending" && detail.feedback && (
-                    <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl space-y-2 w-full text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-sm">
-                      <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest block">Customer Feedback URL (Token active)</span>
-                      <div className="flex items-center gap-2 bg-white dark:bg-slate-950 p-2 border border-slate-200 dark:border-slate-800 rounded-xl">
-                        <span className="text-[11px] text-slate-600 dark:text-slate-400 font-mono select-all flex-1 truncate">
-                          {`${window.location.origin}/feedback/${detail.feedback.feedback_token}`}
-                        </span>
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(`${window.location.origin}/feedback/${detail.feedback.feedback_token}`)
-                            alert("Copied to clipboard!")
-                          }}
-                          className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-colors"
-                        >
-                          Copy
-                        </button>
-                      </div>
+                  {detail.status === "feedback_pending" && (
+                    <div className="flex flex-col gap-4 w-full">
+                      {detail.feedback && (
+                        <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl space-y-2 w-full text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-sm">
+                          <span className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest block">Customer Feedback URL (Token active)</span>
+                          <div className="flex items-center gap-2 bg-white dark:bg-slate-950 p-2 border border-slate-200 dark:border-slate-800 rounded-xl">
+                            <span className="text-[11px] text-slate-600 dark:text-slate-400 font-mono select-all flex-1 truncate">
+                              {`${window.location.origin}/feedback/${detail.feedback.feedback_token}`}
+                            </span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/feedback/${detail.feedback.feedback_token}`)
+                                alert("Copied to clipboard!")
+                              }}
+                              className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-colors"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={() => handleAction("resend-feedback/", "POST")}
+                        disabled={actionLoading}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-[10px] uppercase tracking-wider py-3.5 px-6 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2 w-full sm:w-auto"
+                      >
+                        <Mail size={14} />
+                        {detail.feedback ? "Resend Feedback Email" : "Send Feedback Email"}
+                      </button>
                     </div>
                   )}
 

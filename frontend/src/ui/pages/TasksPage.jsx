@@ -3458,6 +3458,9 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
                 const userId = emp.user?.id || emp.id
                 const name = `${emp.first_name || emp.user?.first_name || emp.user?.username || "?"} ${emp.last_name || emp.user?.last_name || ""}`.trim()
 
+                const hourlyRate = emp.hourly_rate !== undefined ? parseFloat(emp.hourly_rate) : 0
+                const isRateMissing = (emp.role !== "admin" && emp.user?.role !== "admin" && (!emp.title || !emp.title.toLowerCase().includes("admin"))) && hourlyRate <= 0
+
                 let displayLabel = `[${cfg.label.toUpperCase()}] ${name}`;
                 if (emp.isOnline) {
                   if (emp.nearbyDetail) {
@@ -3471,8 +3474,12 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
                   displayLabel = `🔴 [OFFLINE] ${name}`;
                 }
 
+                if (isRateMissing) {
+                  displayLabel += " [RATE NOT SET - CANNOT ASSIGN]"
+                }
+
                 return (
-                  <option key={emp.id} value={userId}>
+                  <option key={emp.id} value={userId} disabled={isRateMissing}>
                     {displayLabel}
                   </option>
                 )

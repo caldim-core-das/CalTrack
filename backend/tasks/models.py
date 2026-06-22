@@ -243,7 +243,7 @@ class Task(models.Model):
         ordering = ["due_date", "-priority", "created_at"]
 
     def __str__(self):
-        return f"{self.title} → {self.assigned_to.username}"
+        return f"{self.title} -> {self.assigned_to.username}"
 
     @property
     def actual_hours(self):
