@@ -126,7 +126,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 if not user:
                     user = User.objects.filter(email__iexact=resolved_username).first()
                 
-                if user and not getattr(user, "company", None):
+                if user and not getattr(user, "company", None) and user.role != "admin":
                     from companies.models import Company
                     company = Company.objects.filter(schema_name="demo_v2").first() or Company.objects.filter(schema_name="demo").first() or Company.objects.first()
                     if company:
@@ -232,6 +232,65 @@ class GoogleLoginView(APIView):
             # Fallback to any account with this email
             user = User.objects.filter(email__iexact=email_clean).first()
 
+        # Check if there is a pending team invitation for this email across all companies
+        invite = None
+        for company in Company.objects.exclude(schema_name="public"):
+            with schema_context(company.schema_name):
+                invite = TeamInvite.objects.filter(email__iexact=email_clean, status="pending").first()
+                if invite:
+                    break
+
+        if invite:
+            if not user:
+                username = email_clean.split("@")[0]
+                base_username = username
+                counter = 1
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}{counter}"
+                    counter += 1
+
+                user = User.objects.create_user(
+                    username=username,
+                    email=email_clean,
+                    password=uuid.uuid4().hex,
+                    first_name=user_info.get("given_name", ""),
+                    last_name=user_info.get("family_name", ""),
+                    role=invite.role,
+                )
+                user.company = invite.company
+                user.is_active = True
+                user.save()
+            else:
+                user.is_active = True
+                user.role = invite.role
+                if not user.company:
+                    user.company = invite.company
+                user.save()
+
+            # Accept the invitation
+            with schema_context(invite.company.schema_name):
+                invite.status = "accepted"
+                from django.utils import timezone
+                invite.accepted_at = timezone.now()
+                invite.save(update_fields=["status", "accepted_at"])
+
+            # Create/Activate Employee profile under the tenant schema
+            from employees.models import Employee
+            with schema_context(invite.company.schema_name):
+                employee, created = Employee.objects.get_or_create(
+                    user=user,
+                    company=invite.company,
+                    defaults={
+                        "employee_id": generate_next_employee_id(invite.company),
+                        "title": invite.role.title(),
+                        "hourly_rate": 0.00,
+                        "is_active": True
+                    }
+                )
+                if not created:
+                    employee.is_active = True
+                    employee.save()
+
         if not user:
             return Response({"detail": "Google login is restricted to pre-approved employee email accounts. Please contact your administrator to register."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -259,7 +318,6 @@ class GoogleLoginView(APIView):
             if dossier_approved and dossier:
                 from django.utils import timezone
                 from employees.models import Employee
-                from django_tenants.utils import schema_context
                 
                 # Activate User
                 user.is_active = True
@@ -271,7 +329,6 @@ class GoogleLoginView(APIView):
                     try:
                         from django.db import connection
                         if hasattr(connection, "tenant"):
-                            from django_tenants.utils import schema_context
                             with schema_context(company.schema_name):
                                 employee = Employee.objects.filter(user=user).first()
                                 if employee:
@@ -451,7 +508,7 @@ class MeView(APIView):
 
     def get(self, request):
         user = request.user
-        if user and not getattr(user, "company", None):
+        if user and not getattr(user, "company", None) and user.role != "admin":
             from companies.models import Company
             company = Company.objects.filter(schema_name="demo_v2").first() or Company.objects.filter(schema_name="demo").first() or Company.objects.first()
             if company:
@@ -590,28 +647,47 @@ class AcceptInviteView(APIView):
                 if company:
                     connection.set_tenant(company)
         
-        invite = TeamInvite.objects.filter(token=token, status="pending").first()
+        invite = None
+        if connection.schema_name != "public":
+            try:
+                invite = TeamInvite.objects.filter(token=token).first()
+            except Exception:
+                pass
         
         # Fallback: if not found in current schema, search all schemas
         if not invite:
             from django_tenants.utils import schema_context
             from companies.models import Company
-            for company in Company.objects.all():
+            for company in Company.objects.exclude(schema_name="public"):
                 with schema_context(company.schema_name):
-                    invite = TeamInvite.objects.filter(token=token, status="pending").first()
-                    if invite:
-                        # Once found, set the tenant for the rest of the transaction
-                        if hasattr(connection, 'set_tenant'):
-                            connection.set_tenant(company)
-                        break
+                    try:
+                        invite = TeamInvite.objects.filter(token=token).first()
+                        if invite:
+                            # Once found, set the tenant for the rest of the transaction
+                            if hasattr(connection, 'set_tenant'):
+                                connection.set_tenant(company)
+                            break
+                    except Exception:
+                        pass
 
         if not invite:
             return Response({"detail": "Invalid or expired invitation token."}, status=status.HTTP_400_BAD_REQUEST)
         
-        if invite.is_expired:
-            invite.status = "expired"
-            invite.save(update_fields=["status"])
-            return Response({"detail": "Invitation has expired."}, status=status.HTTP_400_BAD_REQUEST)
+        if invite.status == "accepted":
+            User = get_user_model()
+            if User.objects.filter(email__iexact=invite.email).exists():
+                return Response({"detail": "This invitation has already been accepted. Please log in to your account."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "This invitation has already been used."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if invite.status == "revoked":
+            return Response({"detail": "This invitation has been revoked by the administrator."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if invite.status == "expired" or invite.is_expired:
+            if invite.status != "expired":
+                with schema_context(invite.company.schema_name):
+                    invite.status = "expired"
+                    invite.save(update_fields=["status"])
+            return Response({"detail": "This invitation has expired."}, status=status.HTTP_400_BAD_REQUEST)
 
         User = get_user_model()
         if User.objects.filter(email__iexact=invite.email).exists():
@@ -637,27 +713,26 @@ class AcceptInviteView(APIView):
                 user.company = invite.company
                 user.save()
 
-                invite.status = "accepted"
-                from django.utils import timezone
-                invite.accepted_at = timezone.now()
-                invite.save(update_fields=["status", "accepted_at"])
-
-            if hasattr(connection, 'set_tenant'):
-                connection.set_tenant(invite.company)
+                with schema_context(invite.company.schema_name):
+                    invite.status = "accepted"
+                    from django.utils import timezone
+                    invite.accepted_at = timezone.now()
+                    invite.save(update_fields=["status", "accepted_at"])
 
             from employees.models import Employee
-            Employee.objects.get_or_create(
-                user=user,
-                company=invite.company,
-                defaults={
-                    "employee_id": generate_next_employee_id(invite.company),
-                    "title": invite.role.title(),
-                    "hourly_rate": 0,
-                }
-            )
-
-            if hasattr(connection, 'set_schema_to_public'):
-                connection.set_schema_to_public()
+            with schema_context(invite.company.schema_name):
+                employee, created = Employee.objects.get_or_create(
+                    user=user,
+                    company=invite.company,
+                    defaults={
+                        "employee_id": generate_next_employee_id(invite.company),
+                        "title": invite.role.title(),
+                        "hourly_rate": 0,
+                    }
+                )
+                if not created:
+                    employee.is_active = True
+                    employee.save(update_fields=["is_active"])
 
         except Exception as e:
             traceback.print_exc()
@@ -683,11 +758,10 @@ class PasswordResetRequestView(APIView):
         User = get_user_model()
         user = User.objects.filter(email__iexact=email).first()
         
-        # If no user exists with the requested email, fallback to the first user in the DB
-        # to allow testing password reset link delivery with any email address
-        if not user:
-            user = User.objects.first()
-            
+        # ── Security: only proceed if the email matches a real account. ──────
+        # We do NOT fall back to User.objects.first() or any other user object.
+        # Sending a reset link to an unrelated account would be a privilege
+        # escalation / account takeover vulnerability.
         reset_url = None
         if user:
             token_generator = PasswordResetTokenGenerator()

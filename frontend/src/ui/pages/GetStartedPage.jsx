@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { routes } from "../routes.js"
+import { apiRequest } from "../../api/client.js"
 
 /* ── Design System ───────────────────────────────────────────── */
 const COLORS = {
@@ -41,7 +42,7 @@ const STEPS = [
     title: "Define rules for time tracking",
     desc: "Take control of how your team members clock in and out.",
     est: "5 min",
-    to: routes.time,
+    to: routes.settings_timetracking,
     color: "#f59e0b",
     bg: "#fffbeb",
   },
@@ -85,6 +86,74 @@ export function GetStartedPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [completedSteps, setCompletedSteps] = useState(new Set())
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function checkOnboardingStatus() {
+      try {
+        const completed = new Set()
+
+        // 1. Check Schedule (shifts)
+        try {
+          const shifts = await apiRequest("/scheduling/shifts/")
+          if (shifts && shifts.length > 0) {
+            completed.add("schedule")
+          }
+        } catch (e) {
+          console.error("Error checking schedules:", e)
+        }
+
+        // 2. Check Tasks / Activities
+        try {
+          const tasks = await apiRequest("/tasks/admin/")
+          if (tasks && tasks.length > 0) {
+            completed.add("activities")
+          }
+        } catch (e) {
+          console.error("Error checking tasks:", e)
+        }
+
+        // 3. Check Locations
+        try {
+          const locations = await apiRequest("/time/locations/")
+          if (locations && locations.length > 0) {
+            completed.add("locations")
+          }
+        } catch (e) {
+          console.error("Error checking locations:", e)
+        }
+
+        // 4. Check Team Invites and Members
+        try {
+          const invites = await apiRequest("/settings/team/invites/")
+          const members = await apiRequest("/settings/team/members/")
+          if ((invites && invites.length > 0) || (members && members.length > 1)) {
+            completed.add("employees")
+          }
+        } catch (e) {
+          console.error("Error checking team status:", e)
+        }
+
+        // 5. Check Rules (Time tracking rules)
+        try {
+          const companyRes = await apiRequest("/company/me/")
+          if (companyRes && (companyRes.shift_enforcement_mode !== "warn" || localStorage.getItem("caltrack.onboarding.rules.completed") === "true")) {
+            completed.add("rules")
+          }
+        } catch (e) {
+          console.error("Error checking company settings:", e)
+        }
+
+        setCompletedSteps(completed)
+      } catch (err) {
+        console.error("Error checking onboarding status:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkOnboardingStatus()
+  }, [])
 
   const displayName = user?.username ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : "Rohit"
   const totalSteps = STEPS.length
@@ -126,12 +195,6 @@ export function GetStartedPage() {
           <p className="text-base font-medium text-slate-500 dark:text-slate-400 m-0 max-w-[380px] leading-relaxed">
             Your enterprise portal is ready. Let's finish the setup and start managing your workspace.
           </p>
-          <button
-            onClick={() => navigate(routes.locations)}
-            className="bg-orange-600 dark:bg-orange-500 hover:bg-orange-700 dark:hover:bg-orange-600 text-white border-none rounded-2xl px-8 py-4 text-base font-black tracking-wide cursor-pointer w-fit mt-4 transition-all hover:scale-[1.02] shadow-lg shadow-orange-600/20 active:scale-95"
-          >
-            Start onboarding
-          </button>
         </motion.div>
 
         {/* Progress Card (Right) */}

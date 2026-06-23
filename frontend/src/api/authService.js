@@ -116,10 +116,14 @@ export async function apiRegisterAdmin(payload) {
 /**
  * Google OAuth — server exchanges the Google access token, then sets cookies.
  */
-export async function apiGoogleLogin(googleAccessToken) {
+export async function apiGoogleLogin(googleAccessToken, inviteToken = null) {
+  const payload = { access_token: googleAccessToken }
+  if (inviteToken) {
+    payload.invite_token = inviteToken
+  }
   return fetchJSON("/auth/google/", {
     method: "POST",
-    body: JSON.stringify({ access_token: googleAccessToken }),
+    body: JSON.stringify(payload),
   })
 }
 

@@ -10,8 +10,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if "test" not in "".join(sys.argv) and not os.getenv("DJANGO_TESTING"):
     load_dotenv(BASE_DIR / ".env", override=True)
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-secret-key-change-me")
-DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
+_SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not _SECRET_KEY:
+    import sys
+    sys.exit(
+        "FATAL: DJANGO_SECRET_KEY environment variable is not set. "
+        "Set it in your .env file (for local dev) or as a system environment variable (for production). "
+        "Do NOT hard-code a secret key in settings."
+    )
+SECRET_KEY = _SECRET_KEY
+
+# DEBUG is OFF by default. Must be explicitly set to "1" or "True" in the environment.
+DEBUG = os.getenv("DJANGO_DEBUG", "0").strip().lower() in ("1", "true", "yes")
 
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 
