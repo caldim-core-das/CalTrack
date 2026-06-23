@@ -110,8 +110,10 @@ export function AcceptInvitePage() {
       <div className="hidden lg:flex flex-col w-[60%] bg-[#FDFDFF] relative border-r border-[#F1F5F9] overflow-hidden">
         <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "radial-gradient(125% 125% at 50% 10%, #ffffff 40%, #fbbf24 100%)" }} />
 
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="relative z-50 flex justify-center pt-14">
-          <CalTrackLogo size="lg" showTagline={false} />
+        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="absolute top-8 left-8 z-50 pointer-events-none">
+          <div className="pointer-events-auto">
+            <CalTrackLogo size="md" showTagline={false} />
+          </div>
         </motion.div>
 
         <div className="relative flex-1" style={{ perspective: "2500px", transformStyle: "preserve-3d" }}>

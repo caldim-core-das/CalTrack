@@ -1,0 +1,35 @@
+
+==================================================
+VERIFYING WORKFLOW DB STATES
+==================================================
+ServiceRequest ID: SR-0006
+  - Customer Name: Integration Test Customer
+  - Status:        feedback_pending
+  - Assignee:      employee
+  - Linked Tasks:  1
+    * Task Title:  Service Request: Programmatic HVAC Issue
+    * Task Status: completed
+    * Acceptance:  accepted
+  - Feedback Token:0b4505da-6823-48aa-996a-255069f7799e
+  - Is Submitted:  False
+ServiceRequest ID: SR-0005
+  - Customer Name: Integration Test Customer
+  - Status:        feedback_pending
+  - Assignee:      employee
+  - Linked Tasks:  1
+    * Task Title:  Service Request: Programmatic HVAC Issue
+    * Task Status: completed
+    * Acceptance:  accepted
+  - Feedback Token:5c792835-ee63-4335-8b2b-f239be26f31d
+  - Is Submitted:  False
+ServiceRequest ID: SR-0004
+  - Customer Name: Integration Test Customer
+  - Status:        feedback_pending
+  - Assignee:      employee
+  - Linked Tasks:  1
+    * Task Title:  Service Request: Programmatic HVAC Issue
+    * Task Status: completed
+    * Acceptance:  accepted
+  - Feedback Token:5272852e-aa3f-498c-a657-6a6548127956
+  - Is Submitted:  False
+==================================================

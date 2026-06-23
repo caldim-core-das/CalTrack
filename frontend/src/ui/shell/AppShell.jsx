@@ -22,12 +22,16 @@ import {
   Home, Clock, CheckSquare, CalendarDays, Banknote, CalendarRange,
   Users, BarChart3, MapPin, Settings, Search, LogOut,
   ChevronLeft, ChevronRight, Rocket, ShieldAlert, Globe, Package, Award,
-  FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Car, X
+  FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Car, X,
+  Wrench, MessageSquare
 } from "lucide-react"
 
 const ALL_NAV_ITEMS = [
   { label: "Get Started", to: routes.get_started, icon: <Rocket size={20} />, color: "#0EA5E9", adminOnly: true },
   { label: "Dashboard", to: routes.dashboard, icon: <Home size={20} />, color: "#10B981" },
+  { label: "Service Requests", to: routes.admin_service_requests, icon: <Wrench size={20} />, color: "#6366F1", adminOnly: true },
+  { label: "Feedback Logs", to: routes.admin_feedback, icon: <MessageSquare size={20} />, color: "#F59E0B", adminOnly: true },
+  { label: "Feedback", to: routes.employee_jobs, icon: <MessageSquare size={20} />, color: "#14B8A6", employeeOnly: true },
   { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1", employeeOnly: true },
   { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6", adminOnly: true },
   { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444", adminOnly: true },
@@ -142,6 +146,7 @@ function SidebarTooltip({ tooltip }) {
 function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user, onClose }) {
   if (!flyout) return null
   const isBottom = flyout.bottom !== null
+  const isAdmin = user?.role === "admin" || user?.role === "manager"
   return (
     <div
       className="fixed z-[999998] bg-transparent pl-5 pointer-events-auto"
@@ -559,14 +564,6 @@ export function AppShell() {
                     >
                       {item.label}
                     </span>
-
-                    {active && (
-                      <motion.div
-                        layoutId="active-indicator-main"
-                        className="absolute -right-0 w-1 h-10 rounded-full"
-                        style={{ backgroundColor: color }}
-                      />
-                    )}
 
                     {/* Hover Glow */}
                     <div

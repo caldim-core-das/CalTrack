@@ -63,6 +63,137 @@ def _broadcast_travel_status(task, actor, travel_event):
         print(f"[_broadcast_travel_status] WS push failed: {exc}")
 
 
+
+def sync_task_lifecycle_to_service_request(task, actor=None):
+    """
+    Synchronizes the state of a Task to its linked ServiceRequest and EmployeeJob.
+    Used during task transitions (accept, decline, start, complete, cancel, etc.).
+    """
+    if not getattr(task, "service_request", None):
+        return
+
+    try:
+        from django.db import transaction
+        from django.utils import timezone
+        from service_requests.models import ServiceRequest, ServiceFeedback, EmployeeJob
+        from service_requests.state_machine import apply_transition
+        from employees.models import Employee
+
+        sr = task.service_request
+        employee = None
+        if task.assigned_to:
+            employee = Employee.objects.filter(user=task.assigned_to).first()
+
+        def _get_or_create_job():
+            if not employee:
+                return None
+            job, _ = EmployeeJob.objects.update_or_create(
+                service_request=sr,
+                defaults={
+                    "employee": employee,
+                    "assigned_by": actor or task.assigned_by,
+                }
+            )
+            return job
+
+        with transaction.atomic():
+            # 1. DECLINED task
+            if task.acceptance_status == Task.AcceptanceStatus.DECLINED:
+                sr.status = ServiceRequest.Status.REVIEWED
+                sr.assigned_employee = None
+                sr.save(update_fields=["status", "assigned_employee", "updated_at"])
+                
+                job = _get_or_create_job()
+                if job:
+                    job.status = EmployeeJob.Status.REJECTED
+                    job.save(update_fields=["status"])
+
+            # 2. CANCELLED task
+            elif task.status == Task.Status.CANCELLED:
+                sr.status = ServiceRequest.Status.REVIEWED
+                sr.assigned_employee = None
+                sr.save(update_fields=["status", "assigned_employee", "updated_at"])
+                
+                job = _get_or_create_job()
+                if job:
+                    job.status = EmployeeJob.Status.REJECTED
+                    job.save(update_fields=["status"])
+
+            # 3. COMPLETED task
+            elif task.status == Task.Status.COMPLETED:
+                if sr.status != ServiceRequest.Status.FEEDBACK_PENDING:
+                    # Move sequentially through state machine transitions
+                    current_status = sr.status
+                    if current_status == ServiceRequest.Status.ASSIGNED:
+                        apply_transition(sr, ServiceRequest.Status.ACCEPTED)
+                        current_status = ServiceRequest.Status.ACCEPTED
+                    if current_status == ServiceRequest.Status.ACCEPTED:
+                        apply_transition(sr, ServiceRequest.Status.IN_PROGRESS)
+                        current_status = ServiceRequest.Status.IN_PROGRESS
+                    if current_status == ServiceRequest.Status.IN_PROGRESS:
+                        apply_transition(sr, ServiceRequest.Status.COMPLETED)
+                        current_status = ServiceRequest.Status.COMPLETED
+                    if current_status == ServiceRequest.Status.COMPLETED:
+                        apply_transition(sr, ServiceRequest.Status.AWAITING_VERIFICATION)
+                        current_status = ServiceRequest.Status.AWAITING_VERIFICATION
+                    if current_status == ServiceRequest.Status.AWAITING_VERIFICATION:
+                        apply_transition(sr, ServiceRequest.Status.VERIFIED)
+                        current_status = ServiceRequest.Status.VERIFIED
+                    if current_status == ServiceRequest.Status.VERIFIED:
+                        apply_transition(sr, ServiceRequest.Status.FEEDBACK_PENDING)
+                    
+                    sr.save(update_fields=["status", "updated_at"])
+                    
+                job = _get_or_create_job()
+                if job:
+                    job.status = EmployeeJob.Status.COMPLETED
+                    if not job.completed_date:
+                        job.completed_date = timezone.now()
+                    job.save(update_fields=["status", "completed_date"])
+
+                feedback, _ = ServiceFeedback.objects.get_or_create(service_request=sr)
+                transaction.on_commit(lambda: _send_feedback_link_safe(sr, str(feedback.feedback_token)))
+
+            # 4. IN_PROGRESS task
+            elif task.status == Task.Status.IN_PROGRESS:
+                if sr.status == ServiceRequest.Status.ACCEPTED:
+                    apply_transition(sr, ServiceRequest.Status.IN_PROGRESS)
+                    sr.save(update_fields=["status", "updated_at"])
+                
+                job = _get_or_create_job()
+                if job:
+                    job.status = EmployeeJob.Status.IN_PROGRESS
+                    if not job.started_date:
+                        job.started_date = timezone.now()
+                    job.save(update_fields=["status", "started_date"])
+
+            # 5. ACCEPTED task
+            elif task.acceptance_status == Task.AcceptanceStatus.ACCEPTED:
+                if sr.status == ServiceRequest.Status.ASSIGNED:
+                    apply_transition(sr, ServiceRequest.Status.ACCEPTED)
+                    sr.save(update_fields=["status", "updated_at"])
+                
+                job = _get_or_create_job()
+                if job:
+                    job.status = EmployeeJob.Status.ACCEPTED
+                    if not job.accepted_date:
+                        job.accepted_date = timezone.now()
+                    job.save(update_fields=["status", "accepted_date"])
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"[sync_task_lifecycle_to_service_request] Error: {e}", exc_info=True)
+
+
+def _send_feedback_link_safe(sr, token_str):
+    try:
+        from service_requests.notifications import send_feedback_link
+        send_feedback_link(sr, token_str)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to auto-send feedback link: {exc}")
+
+
 class IsAdmin(IsAuthenticated):
     """Allows access for admin and manager roles."""
     _ADMIN_ROLES = {"admin", "manager"}
@@ -119,6 +250,34 @@ class AdminTaskListCreateView(GenericAPIView):
             company=request.company,
             acceptance_status=Task.AcceptanceStatus.PENDING_ACCEPTANCE,
         )
+        
+        # Update ServiceRequest status & assigned employee if linked
+        if task.service_request:
+            from django.db import transaction
+            from service_requests.models import ServiceRequest, EmployeeJob
+            from service_requests.state_machine import apply_transition
+            from employees.models import Employee
+
+            sr = task.service_request
+            employee = Employee.objects.filter(user=task.assigned_to).first()
+            with transaction.atomic():
+                sr.assigned_employee = employee
+                if sr.status == ServiceRequest.Status.REVIEWED:
+                    apply_transition(sr, ServiceRequest.Status.ASSIGNED)
+                sr.save(update_fields=["status", "assigned_employee", "updated_at"])
+                
+                # Bridge Tasks and Employee Jobs alignment
+                if employee:
+                    EmployeeJob.objects.update_or_create(
+                        service_request=sr,
+                        defaults={
+                            "employee": employee,
+                            "assigned_by": request.user,
+                            "status": EmployeeJob.Status.ASSIGNED,
+                            "assigned_date": timezone.now(),
+                        }
+                    )
+
         # Notify assigned employee
         if task.assigned_to:
             push_task_notification(
@@ -178,6 +337,26 @@ class AdminTaskDetailView(APIView):
             saved_task.save(update_fields=[
                 "acceptance_status", "decline_reason", "declined_at", "declined_by"
             ])
+            
+            # Re-sync ServiceRequest assignee
+            if saved_task.service_request:
+                from employees.models import Employee
+                from service_requests.models import EmployeeJob
+                employee = Employee.objects.filter(user=saved_task.assigned_to).first()
+                sr = saved_task.service_request
+                sr.assigned_employee = employee
+                sr.save(update_fields=["assigned_employee", "updated_at"])
+                if employee:
+                    EmployeeJob.objects.update_or_create(
+                        service_request=sr,
+                        defaults={
+                            "employee": employee,
+                            "assigned_by": request.user,
+                            "status": EmployeeJob.Status.ASSIGNED,
+                            "assigned_date": timezone.now(),
+                        }
+                    )
+
             # Notify new assignee
             if saved_task.assigned_to:
                 push_task_notification(
@@ -197,6 +376,18 @@ class AdminTaskDetailView(APIView):
         task = self.get_object(pk, request.company)
         if not task:
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Sync ServiceRequest and EmployeeJob on delete
+        if getattr(task, "service_request", None):
+            from django.db import transaction
+            from service_requests.models import ServiceRequest, EmployeeJob
+            sr = task.service_request
+            with transaction.atomic():
+                sr.status = ServiceRequest.Status.REVIEWED
+                sr.assigned_employee = None
+                sr.save(update_fields=["status", "assigned_employee", "updated_at"])
+                EmployeeJob.objects.filter(service_request=sr).delete()
+
         task.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -698,6 +889,9 @@ class EmployeeTaskActionView(APIView):
         else:
             return Response({"detail": f"Unknown action: {action}"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Synchronize linked ServiceRequest status
+        sync_task_lifecycle_to_service_request(task, actor=request.user)
+
         return Response(TaskSerializer(task).data)
 
 
@@ -731,6 +925,10 @@ class AdminTaskCancelView(APIView):
             f"[CANCELLED] {reason}" if reason else "[CANCELLED by admin]"
         )
         task.save(update_fields=["status", "admin_notes", "updated_at"])
+
+        # Reset linked ServiceRequest and EmployeeJob
+        sync_task_lifecycle_to_service_request(task, actor=request.user)
+
 
         # Clock out open timelog if any
         if task.time_log and task.time_log.clock_out is None:
@@ -799,6 +997,9 @@ class AdminTaskCompleteView(APIView):
             task.time_log.clock_out = now
             task.time_log.clock_out_notes = "Completed by admin override."
             task.time_log.save(update_fields=["clock_out", "clock_out_notes"])
+
+        # Sync ServiceRequest and EmployeeJob, send feedback email
+        sync_task_lifecycle_to_service_request(task, actor=request.user)
 
         # Notify employee
         if task.assigned_to:

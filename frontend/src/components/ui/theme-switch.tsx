@@ -4,7 +4,7 @@ import { loadPrefs, savePrefs, applyTheme } from "../../ui/theme.js"
 
 function isDarkResolved() {
   const prefs = loadPrefs()
-  const theme = prefs.theme || "system"
+  const theme = prefs.theme || "light"
   if (theme === "dark") return true
   if (theme === "light") return false
   return window.matchMedia("(prefers-color-scheme: dark)").matches
