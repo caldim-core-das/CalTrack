@@ -460,6 +460,8 @@ class AdminAvailableEmployeesView(APIView):
             .filter(company=request.company, is_active=True)
             .select_related("user", "assigned_job_site")
         )
+        if request.user.role in ("admin", "manager") and not request.user.is_superuser:
+            employees = employees.filter(invited_by=request.user)
         ser = EmployeeSerializer(employees, many=True, context={"request": request})
         return Response(ser.data)
 

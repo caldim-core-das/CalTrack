@@ -15,7 +15,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if not hasattr(self.request, 'company'):
             return Employee.objects.none()
-        return Employee.objects.select_related("user").filter(company=self.request.company).order_by("employee_id")
+        qs = Employee.objects.select_related("user").filter(company=self.request.company)
+        if self.request.user.role in ("admin", "manager") and not self.request.user.is_superuser:
+            qs = qs.filter(invited_by=self.request.user)
+        return qs.order_by("employee_id")
 
     def get_permissions(self):
         if self.action in {"list", "create", "update", "partial_update", "destroy"}:
@@ -40,26 +43,6 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Employee profile not found."}, status=404)
         return Response(EmployeeSerializer(employee).data)
 
-    @action(detail=False, methods=["patch"], url_path="update-hourly-rate")
-    def update_hourly_rate(self, request):
-        employee = Employee.objects.filter(user=request.user).first()
-        if not employee:
-            return Response({"detail": "Employee profile not found."}, status=status.HTTP_404_NOT_FOUND)
-        
-        hourly_rate = request.data.get("hourly_rate")
-        if hourly_rate is None:
-            return Response({"detail": "hourly_rate is required."}, status=status.HTTP_400_BAD_REQUEST)
-            
-        try:
-            rate_val = float(hourly_rate)
-            if rate_val <= 0:
-                raise ValueError()
-        except (ValueError, TypeError):
-            return Response({"detail": "hourly_rate must be a positive number."}, status=status.HTTP_400_BAD_REQUEST)
-            
-        employee.hourly_rate = rate_val
-        employee.save(update_fields=["hourly_rate"])
-        return Response({"success": True, "hourly_rate": employee.hourly_rate})
 
     @action(detail=True, methods=["get"], url_path="history")
     def history(self, request, pk=None):

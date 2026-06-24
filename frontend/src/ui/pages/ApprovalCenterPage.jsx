@@ -131,7 +131,7 @@ function ApprovedEmployeeDetailModal({ emp, onClose }) {
               {emp.hourly_rate > 0 ? `$${emp.hourly_rate}/hr` : "Not Configured"}
             </span>
             {emp.hourly_rate === 0 && (
-              <p className="text-[10px] text-amber-600 mt-1">Employee must configure their billing rate before they can be assigned to tasks.</p>
+              <p className="text-[10px] text-amber-600 mt-1">Inviting admin must configure their billing rate before they can be assigned to tasks.</p>
             )}
           </div>
         </div>

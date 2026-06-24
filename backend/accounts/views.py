@@ -824,11 +824,13 @@ class AcceptInviteView(APIView):
                         "employee_id": generate_next_employee_id(invite.company),
                         "title": invite.role.title(),
                         "hourly_rate": 0,
+                        "invited_by": invite.invited_by,
                     }
                 )
                 if not created:
                     employee.is_active = True
-                    employee.save(update_fields=["is_active"])
+                    employee.invited_by = invite.invited_by
+                    employee.save(update_fields=["is_active", "invited_by"])
 
         except Exception as e:
             traceback.print_exc()
@@ -1146,6 +1148,7 @@ class RegistrationDossierApproveView(APIView):
                 employee.phone = phone
                 employee.country = region
                 employee.is_active = False
+                employee.invited_by = request.user
                 employee.save()
             else:
                 employee = Employee.objects.create(
@@ -1156,7 +1159,8 @@ class RegistrationDossierApproveView(APIView):
                     title="Field Operations Tech (L2)",
                     hourly_rate=0.00,
                     country=region,
-                    is_active=False
+                    is_active=False,
+                    invited_by=request.user
                 )
 
             # Send simulated invitation email
