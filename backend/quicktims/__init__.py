@@ -1,4 +1,3 @@
-# PostgreSQL backend (Supabase) — no MySQL adapter needed
 
 # Make Celery app available at module level so Django's auto-reload
 # and management commands pick it up correctly.

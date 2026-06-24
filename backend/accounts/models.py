@@ -32,7 +32,7 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser):
     """
-    Custom user model for QuickTIMS using MongoDB ObjectId as primary key.
+    Custom user model for QuickTIMS.
     Extends AbstractBaseUser to avoid the Django auth permission/group system
     which requires contenttypes and complex M2M tables not needed in a JWT API.
     """

@@ -200,27 +200,6 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
-# Use syncdb for all apps — avoids migration dependency issues with MongoDB
-# (MongoDB doesn't benefit from SQL migration approach; collections are created on first use)
-# MIGRATION_MODULES = {
-#     "auth": None,
-#     "contenttypes": None,
-#     "sessions": None,
-#     "accounts": None,
-#     "employees": None,
-#     "time_tracking": None,
-#     "leaves": None,
-#     "payroll": None,
-#     "scheduling": None,
-#     "reports": None,
-#     "tasks": None,
-#     "live_locations": None,
-#     "companies": None,
-# }
-
-# Silence mongodb.E001 for Django's own built-in models (auth, sessions) whose
-# id field is inherited BigAutoField. Our custom models all use ObjectIdAutoField.
-SILENCED_SYSTEM_CHECKS = []
 
 # ── Caching ───────────────────────────────────────────────────────────────────
 # Production: swap the backend for Redis using the CACHE_URL env var.

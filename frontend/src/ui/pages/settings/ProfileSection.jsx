@@ -62,13 +62,38 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
     markDirty()
   }
 
-  const handleAvatarChange = e => {
+  const handleAvatarChange = async e => {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 5 * 1024 * 1024) { showToast("Avatar must be under 5 MB.", "error"); return }
     setAvatarFile(file)
     setAvatarPreview(URL.createObjectURL(file))
-    markDirty()
+    
+    // Upload immediately
+    try {
+      const body = new FormData()
+      body.append("avatar", file)
+      await apiRequest("/auth/profile/", { method: "PATCH", body })
+      if (refreshMe) await refreshMe()
+      showToast("Profile picture updated successfully.")
+    } catch (err) {
+      showToast(err?.body?.message || "Failed to save profile picture.", "error")
+    }
+  }
+
+  const handleRemoveAvatar = async () => {
+    try {
+      await apiRequest("/auth/profile/", { 
+        method: "PATCH", 
+        json: { avatar: null } 
+      })
+      setAvatarPreview(null)
+      setAvatarFile(null)
+      if (refreshMe) await refreshMe()
+      showToast("Profile picture removed successfully.")
+    } catch (err) {
+      showToast(err?.body?.message || "Failed to remove profile picture.", "error")
+    }
   }
 
   const handleSave = async () => {
@@ -129,9 +154,9 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
             >
               Change photo
             </button>
-            {avatarPreview && avatarPreview !== user?.avatar_url && (
+            {user?.avatar_url && (
               <button
-                onClick={() => { setAvatarPreview(user?.avatar_url || null); setAvatarFile(null) }}
+                onClick={handleRemoveAvatar}
                 style={{ marginTop: 8, marginLeft: 12, fontSize: 12, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
               >
                 Remove
@@ -191,20 +216,19 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
             style={!isEditing ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
           />
           <Input
-            label="Email"
-            value={form.email}
-            placeholder="Email address"
-            onChange={e => handleChange("email", e.target.value)}
-            readOnly={!isEditing}
-            style={!isEditing ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
-          />
-          <Input
             label="Phone number"
             value={form.phone}
             placeholder="+1 (555) 000-0000"
             onChange={e => handleChange("phone", e.target.value)}
             readOnly={!isEditing}
             style={!isEditing ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
+          />
+          <Input
+            label="Email address"
+            value={user?.email || ""}
+            readOnly
+            style={{ opacity: 0.6 }}
+            title="To change your email, go to Account & Security"
           />
         </div>
         {isEditing && (

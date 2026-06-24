@@ -72,7 +72,7 @@ class TaskSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        # Ensure MongoDB ObjectIds are cast to strings for JSON
+        # Ensure UUIDs are cast to strings for JSON
         if ret.get('id'): ret['id'] = str(ret['id'])
         if ret.get('assigned_to'): ret['assigned_to'] = str(ret['assigned_to'])
         if ret.get('assigned_by'): ret['assigned_by'] = str(ret['assigned_by'])

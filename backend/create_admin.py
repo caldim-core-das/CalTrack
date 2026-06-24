@@ -2,7 +2,7 @@
 Run with:
   python manage.py shell < create_admin.py
 
-Creates (or resets) an admin user and a demo employee user in MongoDB,
+Creates (or resets) an admin user and a demo employee user in the database,
 including a linked Employee profile record for the employee user.
 """
 import django

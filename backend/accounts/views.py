@@ -112,6 +112,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             username = username.strip()
             attrs[self.username_field] = username
 
+            # If the provided username looks like an email, try to resolve it to a username
+            if "@" in username:
+                User = get_user_model()
+                user = User.objects.filter(email__iexact=username).first()
+                if user:
+                    attrs[self.username_field] = user.username
+
         if (not username) and isinstance(email, str) and email.strip():
             User = get_user_model()
             user = User.objects.filter(email__iexact=email.strip()).first()
