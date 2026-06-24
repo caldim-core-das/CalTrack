@@ -1,1 +1,0 @@
-# PostgreSQL backend (Supabase) — no MySQL adapter needed

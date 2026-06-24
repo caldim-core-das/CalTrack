@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion"
 import {
   MapPin, Clock, CalendarRange,
   CheckCircle2, ArrowRight, X,
@@ -95,8 +95,9 @@ export function GetStartedPage() {
 
         // 1. Check Schedule (shifts)
         try {
-          const shifts = await apiRequest("/scheduling/shifts/")
-          if (shifts && shifts.length > 0) {
+          const res = await apiRequest("/scheduling/shifts/")
+          const shifts = res?.data || res?.results || res || []
+          if (shifts.length > 0) {
             completed.add("schedule")
           }
         } catch (e) {
@@ -105,8 +106,9 @@ export function GetStartedPage() {
 
         // 2. Check Tasks / Activities
         try {
-          const tasks = await apiRequest("/tasks/admin/")
-          if (tasks && tasks.length > 0) {
+          const res = await apiRequest("/tasks/admin/")
+          const tasks = res?.data || res?.results || res || []
+          if (tasks.length > 0) {
             completed.add("activities")
           }
         } catch (e) {
@@ -115,8 +117,9 @@ export function GetStartedPage() {
 
         // 3. Check Locations
         try {
-          const locations = await apiRequest("/time/locations/")
-          if (locations && locations.length > 0) {
+          const res = await apiRequest("/time/locations/")
+          const locations = res?.data || res?.results || res || []
+          if (locations.length > 0) {
             completed.add("locations")
           }
         } catch (e) {
@@ -125,9 +128,11 @@ export function GetStartedPage() {
 
         // 4. Check Team Invites and Members
         try {
-          const invites = await apiRequest("/settings/team/invites/")
-          const members = await apiRequest("/settings/team/members/")
-          if ((invites && invites.length > 0) || (members && members.length > 1)) {
+          const invRes = await apiRequest("/settings/team/invites/")
+          const memRes = await apiRequest("/settings/team/members/")
+          const invites = invRes?.data || invRes?.results || invRes || []
+          const members = memRes?.data || memRes?.results || memRes || []
+          if (invites.length > 0 || members.length > 1) {
             completed.add("employees")
           }
         } catch (e) {
@@ -136,8 +141,9 @@ export function GetStartedPage() {
 
         // 5. Check Rules (Time tracking rules)
         try {
-          const companyRes = await apiRequest("/company/me/")
-          if (companyRes && (companyRes.shift_enforcement_mode !== "warn" || localStorage.getItem("caltrack.onboarding.rules.completed") === "true")) {
+          const res = await apiRequest("/company/me/")
+          const companyRes = res?.data || res || {}
+          if (companyRes.shift_enforcement_mode && companyRes.shift_enforcement_mode !== "warn" || localStorage.getItem("caltrack.onboarding.rules.completed") === "true") {
             completed.add("rules")
           }
         } catch (e) {
@@ -158,7 +164,17 @@ export function GetStartedPage() {
   const displayName = user?.username ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : "Rohit"
   const totalSteps = STEPS.length
   const doneCount = completedSteps.size
-  const percentage = Math.round((doneCount / totalSteps) * 100)
+  
+  let profileScore = 0
+  if (user?.firstName) profileScore++
+  if (user?.lastName) profileScore++
+  if (user?.phone) profileScore++
+  if (user?.avatar_url) profileScore++
+
+  // Profile completion contributes 20%, Setup steps contribute 80%
+  const percentage = Math.round(
+    (profileScore / 4) * 20 + (doneCount / totalSteps) * 80
+  )
 
   const handleDismiss = () => {
     localStorage.setItem(STORAGE_KEY, "true")
@@ -309,6 +325,14 @@ const ProgressCircle = ({ percentage }) => {
   const circumference = 2 * Math.PI * radius
   const offset = circumference - (percentage / 100) * circumference
 
+  const count = useMotionValue(0)
+  const rounded = useTransform(count, Math.round)
+
+  useEffect(() => {
+    const controls = animate(count, percentage, { duration: 1, ease: "easeOut" })
+    return controls.stop
+  }, [percentage, count])
+
   return (
     <div className="relative w-20 h-20 flex-shrink-0">
       <svg className="w-full h-full" viewBox="0 0 84 84">
@@ -329,7 +353,7 @@ const ProgressCircle = ({ percentage }) => {
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center text-lg font-black text-slate-900 dark:text-white">
-        {percentage}%
+        <motion.span>{rounded}</motion.span>%
       </div>
     </div>
   )

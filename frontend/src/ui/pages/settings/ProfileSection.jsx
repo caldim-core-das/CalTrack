@@ -31,6 +31,7 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
   const fileRef = useRef(null)
 
   const [saving, setSaving] = useState(false)
+  const [isEditingPersonalInfo, setIsEditingPersonalInfo] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [avatarFile, setAvatarFile] = useState(null)
   const [form, setForm] = useState({
@@ -61,13 +62,38 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
     markDirty()
   }
 
-  const handleAvatarChange = e => {
+  const handleAvatarChange = async e => {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 5 * 1024 * 1024) { showToast("Avatar must be under 5 MB.", "error"); return }
     setAvatarFile(file)
     setAvatarPreview(URL.createObjectURL(file))
-    markDirty()
+    
+    // Upload immediately
+    try {
+      const body = new FormData()
+      body.append("avatar", file)
+      await apiRequest("/auth/profile/", { method: "PATCH", body })
+      if (refreshMe) await refreshMe()
+      showToast("Profile picture updated successfully.")
+    } catch (err) {
+      showToast(err?.body?.message || "Failed to save profile picture.", "error")
+    }
+  }
+
+  const handleRemoveAvatar = async () => {
+    try {
+      await apiRequest("/auth/profile/", { 
+        method: "PATCH", 
+        json: { avatar: null } 
+      })
+      setAvatarPreview(null)
+      setAvatarFile(null)
+      if (refreshMe) await refreshMe()
+      showToast("Profile picture removed successfully.")
+    } catch (err) {
+      showToast(err?.body?.message || "Failed to remove profile picture.", "error")
+    }
   }
 
   const handleSave = async () => {
@@ -127,9 +153,9 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
             >
               Change photo
             </button>
-            {avatarPreview && avatarPreview !== user?.avatar_url && (
+            {user?.avatar_url && (
               <button
-                onClick={() => { setAvatarPreview(user?.avatar_url || null); setAvatarFile(null) }}
+                onClick={handleRemoveAvatar}
                 style={{ marginTop: 8, marginLeft: 12, fontSize: 12, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
               >
                 Remove
@@ -147,40 +173,49 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
             label="First name"
             value={form.first_name}
             placeholder="First name"
+            readOnly={!isEditingPersonalInfo}
             onChange={e => handleChange("first_name", e.target.value)}
           />
           <Input
             label="Last name"
             value={form.last_name}
             placeholder="Last name"
+            readOnly={!isEditingPersonalInfo}
             onChange={e => handleChange("last_name", e.target.value)}
           />
           <Input
             label="Phone number"
             value={form.phone}
             placeholder="+1 (555) 000-0000"
+            readOnly={!isEditingPersonalInfo}
             onChange={e => handleChange("phone", e.target.value)}
           />
           <Input
-            label="Profile link"
-            value={`quicktims.com/u/${user?.username || ""}`}
+            label="Email address"
+            value={user?.email || ""}
             readOnly
             style={{ opacity: 0.6 }}
+            title="To change your email, go to Account & Security"
           />
-          <div className="col-span-full">
-            <TextArea
-              label="Bio"
-              value={form.bio}
-              placeholder="A short bio about yourself..."
-              onChange={e => handleChange("bio", e.target.value)}
-            />
-          </div>
+
+
         </div>
         <div className="stCardActions">
-          <button className="stPrimaryBtn" onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} /> : <Save size={13} />}
-            {saving ? "Saving..." : "Save profile"}
-          </button>
+          {!isEditingPersonalInfo ? (
+            <button className="stGhostBtn" onClick={() => setIsEditingPersonalInfo(true)}>
+              Edit details
+            </button>
+          ) : (
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button className="stGhostBtn" onClick={() => setIsEditingPersonalInfo(false)}>
+                Cancel
+              </button>
+              <button className="stPrimaryBtn" onClick={() => { handleSave(); setIsEditingPersonalInfo(false); }} disabled={saving}>
+                {saving ? <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} /> : <Save size={13} />}
+                {saving ? "Saving..." : "Save profile"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 

@@ -9,7 +9,7 @@ class AccountsConfig(AppConfig):
         # Disconnect the django.contrib.contenttypes post_migrate signal.
         # That signal tries to create ContentType objects using integer PKs and
         # hashing of unsaved model instances, which is incompatible with
-        # MongoDB ObjectId primary keys and causes:
+        # UUID primary keys and causes:
         #   TypeError: Model instances without primary key value are unhashable
         try:
             from django.contrib.contenttypes.management import update_contenttypes

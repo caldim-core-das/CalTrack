@@ -12,7 +12,7 @@ class PayrollPeriod(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def clean(self):
-        # Enforce uniqueness at the application level (MongoDB doesn't support DB-level constraints)
+        # Enforce uniqueness at the application level
         filters = {"start_date": self.start_date, "end_date": self.end_date}
         if self.company_id:
             filters["company"] = self.company

@@ -464,7 +464,11 @@ export function AppShell() {
               onClick={() => setProfileOpen(v => !v)}
             >
               <div className="relative w-10 h-10 flex items-center justify-center rounded-xl bg-blue-600 dark:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
-                {initials(user.username)}
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt="avatar" className="w-full h-full object-cover rounded-xl" />
+                ) : (
+                  initials(user.username)
+                )}
                 <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-4 border-white dark:border-slate-950 rounded-full shadow-sm"></div>
               </div>
               {!sidebarCollapsed && (
@@ -489,7 +493,13 @@ export function AppShell() {
                 <div className="absolute top-full right-0 mt-3 w-80 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-[99999] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
                   <div className="p-6 bg-slate-50/80 dark:bg-slate-800/50 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-700/60">
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 dark:bg-blue-500 text-white text-xl font-bold shadow-xl shadow-blue-500/20">{initials(user.username)}</div>
+                      <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 dark:bg-blue-500 text-white text-xl font-bold shadow-xl shadow-blue-500/20">
+                        {user.avatar_url ? (
+                          <img src={user.avatar_url} alt="avatar" className="w-full h-full object-cover rounded-2xl" />
+                        ) : (
+                          initials(user.username)
+                        )}
+                      </div>
                       <div>
                         <div className="font-bold text-slate-900 dark:text-white text-lg">{displayName(user.username)}</div>
                         <div className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[180px] font-medium">{email}</div>

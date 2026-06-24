@@ -43,6 +43,7 @@ export function AuthProvider({ children }) {
         lastName:  me.last_name  ?? "",
         role:      me.role,
         companyId: me.company,
+        avatar_url: me.avatar_url,
       }
       setUser(u)
       if (me.company_name) {
