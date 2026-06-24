@@ -491,7 +491,7 @@ class AdminMapConsumer(AsyncWebsocketConsumer):
         try:
             _set_tenant(self.company)
             from .views import build_live_snapshot
-            return build_live_snapshot(self.company)
+            return build_live_snapshot(self.company, user=self.user)
         finally:
             close_old_connections()
 

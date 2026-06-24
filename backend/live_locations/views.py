@@ -41,7 +41,7 @@ def _haversine_meters(lat1, lon1, lat2, lon2):
 
 # ── Snapshot helper (called by AdminMapConsumer on connect) ───────────────────
 
-def build_live_snapshot(company):
+def build_live_snapshot(company, user=None):
     """
     Return a JSON-serialisable dict with:
       employees  – one entry per clocked-in employee or employee with accepted travel task with latest ping/position
@@ -52,6 +52,10 @@ def build_live_snapshot(company):
         TimeLog.objects.filter(clock_out__isnull=True)
         .select_related("employee", "employee__user", "employee__assigned_job_site", "location")
     )
+    if user and user.role in ("admin", "manager") and not user.is_superuser:
+        from django.db.models import Q
+        open_logs = open_logs.filter(Q(employee__invited_by=user) | Q(employee__invited_by__isnull=True))
+
     if os.getenv("DB_NAME") or os.getenv("DB_HOST"):
         open_logs = open_logs.order_by("employee", "-clock_in").distinct("employee")
     else:
@@ -143,6 +147,13 @@ def build_live_snapshot(company):
         assigned_to__isnull=False
     ).select_related("assigned_to", "assigned_to__employee_profile")
 
+    if user and user.role in ("admin", "manager") and not user.is_superuser:
+        from django.db.models import Q
+        accepted_tasks = accepted_tasks.filter(
+            Q(assigned_to__employee_profile__invited_by=user) | 
+            Q(assigned_to__employee_profile__invited_by__isnull=True)
+        )
+
     for task in accepted_tasks:
         user = task.assigned_to
         if not hasattr(user, "employee_profile"):
@@ -208,7 +219,11 @@ def build_live_snapshot(company):
 
     # Active SOS alerts
     sos_list = []
-    for sos in SOSAlert.objects.filter(status="active").select_related("employee", "employee__user"):
+    sos_qs = SOSAlert.objects.filter(status="active").select_related("employee", "employee__user")
+    if user and user.role in ("admin", "manager") and not user.is_superuser:
+        from django.db.models import Q
+        sos_qs = sos_qs.filter(Q(employee__invited_by=user) | Q(employee__invited_by__isnull=True))
+    for sos in sos_qs:
         sos_list.append({
             "id": str(sos.id),
             "employee_id": str(sos.employee.id),
@@ -297,6 +312,9 @@ class CurrentLocationsListView(APIView):
             .annotate(latest_location_id=Subquery(latest_loc_id_subquery))
             .select_related("employee", "employee__user", "employee__assigned_job_site")
         )
+        if request.user.role in ("admin", "manager") and not request.user.is_superuser:
+            from django.db.models import Q
+            open_logs = open_logs.filter(Q(employee__invited_by=request.user) | Q(employee__invited_by__isnull=True))
 
         loc_ids = [l.latest_location_id for l in open_logs if l.latest_location_id]
         locations_dict = {
@@ -348,6 +366,10 @@ class EmployeeLocationHistoryView(APIView):
     def get(self, request, employee_id):
         time_log_id = request.query_params.get("time_log_id")
         company = getattr(request, "company", None)
+        if request.user.role in ("admin", "manager") and not request.user.is_superuser:
+            employee = Employee.objects.filter(id=employee_id, company=company).first()
+            if not employee or not (employee.invited_by == request.user or employee.invited_by is None):
+                return Response({"detail": "Permission denied."}, status=status.HTTP_403_FORBIDDEN)
         qs = EmployeeLocation.objects.filter(
             employee_id=employee_id, employee__company=company
         )
@@ -366,11 +388,11 @@ class EmployeeLiveSessionDetailView(APIView):
 
     def get(self, request, time_log_id):
         company = getattr(request, "company", None)
-        log = (
-            TimeLog.objects.filter(id=time_log_id, employee__company=company)
-            .select_related("employee", "employee__user")
-            .first()
-        )
+        log_qs = TimeLog.objects.filter(id=time_log_id, employee__company=company)
+        if request.user.role in ("admin", "manager") and not request.user.is_superuser:
+            from django.db.models import Q
+            log_qs = log_qs.filter(Q(employee__invited_by=request.user) | Q(employee__invited_by__isnull=True))
+        log = log_qs.select_related("employee", "employee__user").first()
         if not log:
             return Response({"detail": "Time log not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -438,6 +460,10 @@ class SOSView(APIView):
         qs = SOSAlert.objects.filter(
             employee__company=company
         ).select_related("employee", "employee__user", "acknowledged_by")
+
+        if request.user.role in ("admin", "manager") and not request.user.is_superuser:
+            from django.db.models import Q
+            qs = qs.filter(Q(employee__invited_by=request.user) | Q(employee__invited_by__isnull=True))
 
         if alert_status != "all":
             qs = qs.filter(status=alert_status)
@@ -559,13 +585,13 @@ class GeofenceBreachListView(APIView):
         since_hours = int(request.query_params.get("hours", 24))
         since = timezone.now() - timezone.timedelta(hours=since_hours)
 
-        qs = (
-            GeofenceBreach.objects.filter(
-                employee__company=company, timestamp__gte=since
-            )
-            .select_related("employee", "employee__user")
-            .order_by("-timestamp")[:100]
+        qs = GeofenceBreach.objects.filter(
+            employee__company=company, timestamp__gte=since
         )
+        if request.user.role in ("admin", "manager") and not request.user.is_superuser:
+            from django.db.models import Q
+            qs = qs.filter(Q(employee__invited_by=request.user) | Q(employee__invited_by__isnull=True))
+        qs = qs.select_related("employee", "employee__user").order_by("-timestamp")[:100]
 
         data = [
             {
@@ -597,13 +623,14 @@ class LiveHeatmapView(APIView):
         company = getattr(request, "company", None)
         today = timezone.localdate()
 
-        pings = (
-            EmployeeLocation.objects.filter(
-                employee__company=company,
-                timestamp__date=today,
-            )
-            .values_list("lat", "lng")
+        pings = EmployeeLocation.objects.filter(
+            employee__company=company,
+            timestamp__date=today,
         )
+        if request.user.role in ("admin", "manager") and not request.user.is_superuser:
+            from django.db.models import Q
+            pings = pings.filter(Q(employee__invited_by=request.user) | Q(employee__invited_by__isnull=True))
+        pings = pings.values_list("lat", "lng")
 
         # Group by rounded position to reduce payload
         from collections import Counter
@@ -641,10 +668,11 @@ class ETAPredictionView(APIView):
         company = getattr(request, "company", None)
         now = timezone.now()
 
-        open_logs = (
-            TimeLog.objects.filter(clock_out__isnull=True)
-            .select_related("employee", "employee__user")
-        )
+        open_logs = TimeLog.objects.filter(clock_out__isnull=True)
+        if request.user.role in ("admin", "manager") and not request.user.is_superuser:
+            from django.db.models import Q
+            open_logs = open_logs.filter(Q(employee__invited_by=request.user) | Q(employee__invited_by__isnull=True))
+        open_logs = open_logs.select_related("employee", "employee__user")
 
         results = []
         for log in open_logs:

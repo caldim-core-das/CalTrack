@@ -17,7 +17,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             return Employee.objects.none()
         qs = Employee.objects.select_related("user").filter(company=self.request.company)
         if self.request.user.role in ("admin", "manager") and not self.request.user.is_superuser:
-            qs = qs.filter(invited_by=self.request.user)
+            from django.db.models import Q
+            qs = qs.filter(Q(invited_by=self.request.user) | Q(invited_by__isnull=True))
         return qs.order_by("employee_id")
 
     def get_permissions(self):

@@ -461,7 +461,8 @@ class AdminAvailableEmployeesView(APIView):
             .select_related("user", "assigned_job_site")
         )
         if request.user.role in ("admin", "manager") and not request.user.is_superuser:
-            employees = employees.filter(invited_by=request.user)
+            from django.db.models import Q
+            employees = employees.filter(Q(invited_by=request.user) | Q(invited_by__isnull=True))
         ser = EmployeeSerializer(employees, many=True, context={"request": request})
         return Response(ser.data)
 

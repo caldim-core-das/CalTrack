@@ -98,15 +98,17 @@ def run_verification():
         view.request = MockRequest(admin_a, company)
         qs_a = view.get_queryset()
         print(f"Admin A sees {qs_a.count()} employees: {[e.user.username for e in qs_a]}")
-        assert qs_a.count() == 1, "Admin A should see exactly 1 employee"
-        assert qs_a.first().id == emp_a.id, "Admin A should see Employee A"
+        username_list_a = [e.user.username for e in qs_a]
+        assert "emp_a" in username_list_a, "Admin A should see Employee A"
+        assert "emp_b" not in username_list_a, "Admin A should NOT see Employee B"
 
         # Test Admin B
         view.request = MockRequest(admin_b, company)
         qs_b = view.get_queryset()
         print(f"Admin B sees {qs_b.count()} employees: {[e.user.username for e in qs_b]}")
-        assert qs_b.count() == 1, "Admin B should see exactly 1 employee"
-        assert qs_b.first().id == emp_b.id, "Admin B should see Employee B"
+        username_list_b = [e.user.username for e in qs_b]
+        assert "emp_b" in username_list_b, "Admin B should see Employee B"
+        assert "emp_a" not in username_list_b, "Admin B should NOT see Employee A"
 
         # Test Superuser (who is also an admin but has is_superuser = True)
         superuser = User.objects.create_superuser(
@@ -134,8 +136,9 @@ def run_verification():
         req_a.company = company
         res_a = task_view(req_a)
         print("Admin A available employees API returned:", len(res_a.data))
-        assert len(res_a.data) == 1, "Admin A available employees should be 1"
-        assert res_a.data[0]['user']['username'] == "emp_a", "Admin A should see emp_a"
+        usernames_a = [item['user']['username'] for item in res_a.data]
+        assert "emp_a" in usernames_a, "Admin A should see emp_a"
+        assert "emp_b" not in usernames_a, "Admin A should NOT see emp_b"
 
         # Admin B Request
         req_b = factory.get("/api/tasks/admin/available-employees/")
@@ -143,8 +146,95 @@ def run_verification():
         req_b.company = company
         res_b = task_view(req_b)
         print("Admin B available employees API returned:", len(res_b.data))
-        assert len(res_b.data) == 1, "Admin B available employees should be 1"
-        assert res_b.data[0]['user']['username'] == "emp_b", "Admin B should see emp_b"
+        usernames_b = [item['user']['username'] for item in res_b.data]
+        assert "emp_b" in usernames_b, "Admin B should see emp_b"
+        assert "emp_a" not in usernames_b, "Admin B should NOT see emp_a"
+
+        # Test 5: Verify Live Location Views filtering (CurrentLocationsListView, SOSView, GeofenceBreachListView)
+        from live_locations.views import CurrentLocationsListView, SOSView, GeofenceBreachListView
+        from live_locations.models import EmployeeLocation, SOSAlert, GeofenceBreach
+        from time_tracking.models import TimeLog
+        from django.utils import timezone
+        from decimal import Decimal
+
+        log_a = TimeLog.objects.create(employee=emp_a, work_date=timezone.localdate(), clock_in=timezone.now())
+        log_b = TimeLog.objects.create(employee=emp_b, work_date=timezone.localdate(), clock_in=timezone.now())
+
+        loc_a = EmployeeLocation.objects.create(employee=emp_a, time_log=log_a, lat=Decimal("12.345"), lng=Decimal("76.543"))
+        loc_b = EmployeeLocation.objects.create(employee=emp_b, time_log=log_b, lat=Decimal("12.345"), lng=Decimal("76.543"))
+
+        sos_a = SOSAlert.objects.create(employee=emp_a, time_log=log_a, lat=Decimal("12.345"), lng=Decimal("76.543"), status="active")
+        sos_b = SOSAlert.objects.create(employee=emp_b, time_log=log_b, lat=Decimal("12.345"), lng=Decimal("76.543"), status="active")
+
+        breach_a = GeofenceBreach.objects.create(employee=emp_a, time_log=log_a, lat=Decimal("12.345"), lng=Decimal("76.543"), distance_meters=500, geofence_radius=200)
+        breach_b = GeofenceBreach.objects.create(employee=emp_b, time_log=log_b, lat=Decimal("12.345"), lng=Decimal("76.543"), distance_meters=500, geofence_radius=200)
+
+        # Test CurrentLocationsListView
+        curr_loc_view = CurrentLocationsListView.as_view()
+        
+        req_a_loc = factory.get("/api/live-locations/current/")
+        force_authenticate(req_a_loc, user=admin_a)
+        req_a_loc.company = company
+        res_a_loc = curr_loc_view(req_a_loc)
+        print("Admin A current locations returned:", len(res_a_loc.data))
+        emp_ids_a = [str(item.get('employee')) for item in res_a_loc.data]
+        assert str(emp_a.id) in emp_ids_a, "Admin A should see emp_a location"
+        assert str(emp_b.id) not in emp_ids_a, "Admin A should NOT see emp_b location"
+
+        req_b_loc = factory.get("/api/live-locations/current/")
+        force_authenticate(req_b_loc, user=admin_b)
+        req_b_loc.company = company
+        res_b_loc = curr_loc_view(req_b_loc)
+        print("Admin B current locations returned:", len(res_b_loc.data))
+        emp_ids_b = [str(item.get('employee')) for item in res_b_loc.data]
+        assert str(emp_b.id) in emp_ids_b, "Admin B should see emp_b location"
+        assert str(emp_a.id) not in emp_ids_b, "Admin B should NOT see emp_a location"
+
+        # Test SOSView
+        sos_view = SOSView.as_view()
+        
+        req_a_sos = factory.get("/api/live-locations/sos/")
+        force_authenticate(req_a_sos, user=admin_a)
+        req_a_sos.company = company
+        res_a_sos = sos_view(req_a_sos)
+        print("Admin A SOS alerts returned:", len(res_a_sos.data))
+        sos_ids_a = [item['id'] for item in res_a_sos.data]
+        assert str(sos_a.id) in sos_ids_a, "Admin A should see sos_a"
+        assert str(sos_b.id) not in sos_ids_a, "Admin A should NOT see sos_b"
+
+        req_b_sos = factory.get("/api/live-locations/sos/")
+        force_authenticate(req_b_sos, user=admin_b)
+        req_b_sos.company = company
+        res_b_sos = sos_view(req_b_sos)
+        print("Admin B SOS alerts returned:", len(res_b_sos.data))
+        sos_ids_b = [item['id'] for item in res_b_sos.data]
+        assert str(sos_b.id) in sos_ids_b, "Admin B should see sos_b"
+        assert str(sos_a.id) not in sos_ids_b, "Admin B should NOT see sos_a"
+
+        # Test GeofenceBreachListView
+        breach_view = GeofenceBreachListView.as_view()
+
+        req_a_br = factory.get("/api/live-locations/breaches/")
+        force_authenticate(req_a_br, user=admin_a)
+        req_a_br.company = company
+        res_a_br = breach_view(req_a_br)
+        print("Admin A breaches returned:", len(res_a_br.data))
+        breach_ids_a = [item['id'] for item in res_a_br.data]
+        assert str(breach_a.id) in breach_ids_a, "Admin A should see breach_a"
+        assert str(breach_b.id) not in breach_ids_a, "Admin A should NOT see breach_b"
+
+        req_b_br = factory.get("/api/live-locations/breaches/")
+        force_authenticate(req_b_br, user=admin_b)
+        req_b_br.company = company
+        res_b_br = breach_view(req_b_br)
+        print("Admin B breaches returned:", len(res_b_br.data))
+        breach_ids_b = [item['id'] for item in res_b_br.data]
+        assert str(breach_b.id) in breach_ids_b, "Admin B should see breach_b"
+        assert str(breach_a.id) not in breach_ids_b, "Admin B should NOT see breach_a"
+
+        # Clean up testing instances
+        log_a.delete()
+        log_b.delete()
 
     print("\n=== ALL EMPLOYEE VISIBILITY RESTRICTION TESTS PASSED ===")
 
