@@ -245,15 +245,6 @@ export function BookingPage() {
       {/* ── HEADER ── */}
       <header className="fixed top-0 w-full bg-white border-b border-slate-100 px-8 py-4 flex items-center justify-between z-50 transition-all">
         <CalTrackLogo size="sm" showTagline={false} theme="light" />
-        
-        <div>
-          <a 
-            href="/login" 
-            className="text-xs font-bold uppercase tracking-wider text-slate-650 hover:text-slate-900 transition-colors flex items-center gap-2 bg-slate-50 hover:bg-slate-100 px-5 py-3 rounded-xl border border-slate-200"
-          >
-            <User className="w-4 h-4 text-slate-500" /> Employee Portal
-          </a>
-        </div>
       </header>
 
       {/* ── TWO COLUMN LAYOUT ── */}

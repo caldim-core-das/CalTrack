@@ -21,8 +21,13 @@ env/
 media/
 staticfiles/
 
-# Environment Variables
+# Environment Variables — never commit real secrets
 .env
+backend/.env
+frontend/.env
+# Allow example/template files
+!backend/.env.example
+!frontend/.env.example
 
 # VS Code
 .vscode/

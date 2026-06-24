@@ -3167,6 +3167,38 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
 
     // Trigger address input for geocoding
     setAddressInput(selected.address)
+    setShowMore(true) // Automatically expand advanced details
+
+    // Auto-confirm location and geocode the address
+    if (selected.address) {
+      setWorkflowLoading(true)
+      setErr("")
+      apiRequest("/tasks/admin/smart-address-workflow/", {
+        method: "POST",
+        json: {
+          address: selected.address
+        }
+      })
+      .then(res => {
+        setWorkflowData(res)
+        setLocationConfirmed(true)
+        if (res.geocoded) {
+          set("location_lat", String(parseFloat(res.geocoded.lat).toFixed(6)))
+          set("location_lon", String(parseFloat(res.geocoded.lon).toFixed(6)))
+          set("area", res.geocoded.area || "")
+          set("city", res.geocoded.city || "")
+          set("state", res.geocoded.state || "")
+          set("pincode", res.geocoded.pincode || "")
+          set("location", res.geocoded.zone || "")
+        }
+      })
+      .catch(err => {
+        console.error("Auto-geocoding failed:", err)
+      })
+      .finally(() => {
+        setWorkflowLoading(false)
+      })
+    }
   }
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }

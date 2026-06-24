@@ -281,42 +281,8 @@ export function SettingsPage({ section: sectionProp }) {
           </motion.div>
         </AnimatePresence>
 
-        {/* Save bar */}
-        <AnimatePresence>
-          {dirty && (
-            <motion.div
-              initial={{ y: 80, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 80, opacity: 0 }}
-              className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50"
-            >
-              <div className="flex items-center gap-6 px-6 py-4 bg-surface dark:bg-slate-900 border border-stroke dark:border-slate-800 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
-                  <span className="text-sm font-bold text-slate-900 dark:text-white">You have unsaved changes</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setDirty(false)}
-                    className="px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-                  >
-                    Discard
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-6 py-2 bg-indigo-600 dark:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all disabled:opacity-50"
-                  >
-                    {saving ? <RefreshCcw size={14} className="animate-spin" /> : <Save size={14} />}
-                    {saving ? "Saving..." : "Save Changes"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {toast && <Toast key={toast.id} message={toast.msg} type={toast.type} onDismiss={() => setToast(null)} />}
+
       </main>
     </div>
   )

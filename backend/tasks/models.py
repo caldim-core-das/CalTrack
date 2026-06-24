@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from utils.validators import validate_upload
 
 
 class Task(models.Model):
@@ -218,8 +219,8 @@ class Task(models.Model):
     )
 
     # Face Verification Fields
-    start_photo = models.ImageField(blank=True, null=True, upload_to='tasks/start_photos/')
-    end_photo = models.ImageField(blank=True, null=True, upload_to='tasks/end_photos/')
+    start_photo = models.ImageField(blank=True, null=True, upload_to='tasks/start_photos/', validators=[validate_upload])
+    end_photo = models.ImageField(blank=True, null=True, upload_to='tasks/end_photos/', validators=[validate_upload])
     face_match_percentage = models.FloatField(blank=True, null=True)
     face_match_status = models.CharField(
         max_length=20,
@@ -297,7 +298,7 @@ class Task(models.Model):
 class TaskAttachment(models.Model):
 
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="attachments")
-    file = models.FileField(upload_to="tasks/attachments/")
+    file = models.FileField(upload_to="tasks/attachments/", validators=[validate_upload])
     original_name = models.CharField(max_length=255, blank=True)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

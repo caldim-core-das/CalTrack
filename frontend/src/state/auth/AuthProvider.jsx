@@ -43,6 +43,12 @@ export function AuthProvider({ children }) {
         lastName:  me.last_name  ?? "",
         role:      me.role,
         companyId: me.company,
+        bio:       me.bio        ?? "",
+        phone:     me.phone      ?? "",
+        timezone:  me.timezone   ?? "UTC",
+        language:  me.language   ?? "en",
+        avatar_url:me.avatar_url ?? null,
+        two_fa_enabled: me.two_fa_enabled ?? false,
       }
       setUser(u)
       if (me.company_name) {

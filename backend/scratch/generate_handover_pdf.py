@@ -250,9 +250,45 @@ def build_pdf(md_path, pdf_path):
 
     flowables = []
     
-    # Read Markdown file
+    # Read and preprocess Markdown file to handle blockquotes and alerts nicely
     with open(md_path, 'r', encoding='utf-8') as f:
-        lines = f.readlines()
+        content = f.read()
+
+    raw_lines = content.splitlines()
+    lines = []
+    current_bq = []
+    bq_type = None
+
+    for line in raw_lines:
+        stripped = line.strip()
+        if stripped.startswith('>'):
+            bq_content = stripped.lstrip('>').strip()
+            alert_match = re.match(r'^\[!(IMPORTANT|TIP|NOTE|WARNING|CAUTION)\]', bq_content, re.IGNORECASE)
+            if alert_match:
+                bq_type = alert_match.group(1).upper()
+            else:
+                current_bq.append(bq_content)
+        else:
+            if current_bq or bq_type:
+                bq_text = " ".join(current_bq)
+                if bq_type:
+                    lines.append(f"**{bq_type}:** {bq_text}")
+                else:
+                    lines.append(f"*{bq_text}*")
+                lines.append("")
+                current_bq = []
+                bq_type = None
+            lines.append(line)
+
+    if current_bq or bq_type:
+        bq_text = " ".join(current_bq)
+        if bq_type:
+            lines.append(f"**{bq_type}:** {bq_text}")
+        else:
+            lines.append(f"*{bq_text}*")
+
+    # Add back trailing newlines for the parser loop
+    lines = [l + "\n" for l in lines]
 
     current_paragraph = []
     in_table = False

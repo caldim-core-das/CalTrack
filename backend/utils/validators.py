@@ -2,7 +2,13 @@
 backend/utils/validators.py
 Reusable validators shared across the entire backend.
 """
-import magic
+try:
+    import magic as _magic
+    _MAGIC_AVAILABLE = True
+except ImportError:
+    _magic = None
+    _MAGIC_AVAILABLE = False
+
 from django.core.exceptions import ValidationError
 
 # ── File upload ────────────────────────────────────────────────────────────────
@@ -36,20 +42,27 @@ def validate_upload(file):
             f"File size {size // (1024 * 1024):.1f} MB exceeds the 5 MB limit."
         )
 
-    # MIME-type check using python-magic (reads first bytes; does not trust
-    # the Content-Type header or file extension).
-    try:
-        file.seek(0)
-        header = file.read(2048)
-        file.seek(0)
-        detected = magic.from_buffer(header, mime=True)
-    except Exception:
-        # If libmagic is unavailable fall back to extension-only check.
+    # MIME-type check. Uses python-magic when available (reads actual bytes;
+    # does not trust the Content-Type header or file extension).
+    # Falls back to an extension-only map when libmagic is not installed.
+    detected = None
+    if _MAGIC_AVAILABLE:
+        try:
+            file.seek(0)
+            header = file.read(2048)
+            file.seek(0)
+            detected = _magic.from_buffer(header, mime=True)
+        except Exception:
+            detected = None
+
+    if detected is None:
+        # Extension-only fallback (less secure but always available)
         name = getattr(file, "name", "") or ""
         ext = name.rsplit(".", 1)[-1].lower()
         ext_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg",
                    "png": "image/png", "pdf": "application/pdf"}
         detected = ext_map.get(ext, "application/octet-stream")
+
 
     if detected not in ALLOWED_MIME_TYPES:
         raise ValidationError(

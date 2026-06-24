@@ -16,11 +16,35 @@ class AssignedToSerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     assigned_to = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
+        # NOTE: queryset is overridden in __init__ to scope by request.company
+        # to enforce tenant isolation (CRITICAL 5).
+        queryset=User.objects.none(),  # safe default — overridden below
         required=False,
         allow_null=True,
         pk_field=serializers.CharField()
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        company = None
+        if request:
+            company = getattr(request, "company", None) or getattr(
+                getattr(request, "user", None), "company", None
+            )
+        if company:
+            # Scope assigned_to choices to users belonging to this company only
+            self.fields["assigned_to"].queryset = User.objects.filter(company=company)
+        else:
+            # Fallback: allow all users but log a warning (should not happen in production)
+            import logging
+            logging.getLogger(__name__).warning(
+                "TaskSerializer: could not determine company from request context. "
+                "assigned_to field is unscoped — check view for missing company context."
+            )
+            self.fields["assigned_to"].queryset = User.objects.all()
+
+
     assigned_by = serializers.PrimaryKeyRelatedField(
         read_only=True,
         pk_field=serializers.CharField()

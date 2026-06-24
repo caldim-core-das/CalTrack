@@ -122,9 +122,19 @@ class ClockInView(APIView):
         if not employee:
             return Response({"detail": "Employee profile not found."}, status=404)
 
-        open_log = TimeLog.objects.filter(employee=employee, clock_out__isnull=True).first()
-        if open_log:
-            return Response({"detail": "Already clocked in."}, status=400)
+        # MEDIUM 3 — Race-condition lock: acquire a DB-level row lock on any
+        # existing open log for this employee before checking/creating, preventing
+        # two concurrent clock-in requests from both passing the guard at once.
+        from django.db import transaction as db_transaction
+        with db_transaction.atomic():
+            open_log = (
+                TimeLog.objects
+                .select_for_update()
+                .filter(employee=employee, clock_out__isnull=True)
+                .first()
+            )
+            if open_log:
+                return Response({"detail": "Already clocked in."}, status=400)
 
         now = timezone.now()
         lat = request.data.get("lat")

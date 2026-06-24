@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.db import connection, transaction
 from django.db.models import Q
 from companies.models import Company
+from settings_hub.models import TeamInvite
 
 try:
     from django_tenants.utils import schema_context
@@ -158,8 +159,33 @@ class LoginView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
         if response.status_code == 200:
-            access  = response.data.get("access")
+            # ── HIGH 3: 2FA enforcement ──────────────────────────────────────
+            # Extract the access token to identify the user, then check 2FA.
+            # If 2FA is required, store user ID in session and return a challenge
+            # signal WITHOUT setting auth cookies — JWT is withheld until TOTP verify.
+            access = response.data.get("access")
             refresh = response.data.get("refresh")
+
+            # Decode token to identify user without DB round-trip
+            try:
+                from rest_framework_simplejwt.tokens import AccessToken
+                token_obj = AccessToken(access)
+                user_id = token_obj.get("user_id")
+                User = get_user_model()
+                user = User.objects.filter(pk=user_id).first()
+            except Exception:
+                user = None
+
+            if user and getattr(user, "two_fa_enabled", False):
+                # Store pending user in session — don't issue cookies yet
+                request.session["pending_2fa_user"] = str(user.pk)
+                request.session.save()
+                return Response(
+                    {"success": True, "requires_2fa": True, "message": "2FA verification required."},
+                    status=200,
+                )
+
+            # No 2FA — proceed with cookie issuance as normal
             _set_auth_cookies(response, access, refresh)
             # Strip tokens from the body — they live in httpOnly cookies now
             response.data = {"success": True, "message": "Login successful."}
@@ -206,6 +232,58 @@ class LogoutView(APIView):
         return response
 
 
+class TwoFAChallengeView(APIView):
+    """
+    HIGH 3 — 2FA challenge endpoint.
+
+    After a successful password login where two_fa_enabled=True, the LoginView
+    stores the user PK in session["pending_2fa_user"] and returns requires_2fa=True
+    without issuing cookies.  The frontend must immediately POST the TOTP code here.
+    Only on successful TOTP verification are the JWT cookies issued.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            import pyotp
+        except ImportError:
+            return Response({"success": False, "message": "2FA library not installed."}, status=500)
+
+        pending_id = request.session.get("pending_2fa_user")
+        if not pending_id:
+            return Response(
+                {"success": False, "message": "No 2FA session in progress. Please log in again."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        code = (request.data.get("code") or "").strip()
+        if not code:
+            return Response({"success": False, "message": "TOTP code is required."}, status=400)
+
+        User = get_user_model()
+        try:
+            user = User.objects.get(pk=pending_id)
+        except User.DoesNotExist:
+            del request.session["pending_2fa_user"]
+            return Response({"success": False, "message": "Invalid session. Please log in again."}, status=400)
+
+        if not getattr(user, "totp_secret", None):
+            return Response({"success": False, "message": "2FA is not configured for this account."}, status=400)
+
+        totp = pyotp.TOTP(user.totp_secret)
+        if not totp.verify(code, valid_window=1):
+            return Response({"success": False, "message": "Invalid or expired 2FA code."}, status=400)
+
+        # ── TOTP verified — issue JWT cookies and clear session flag ──────
+        del request.session["pending_2fa_user"]
+        request.session.save()
+
+        refresh = CustomTokenObtainPairSerializer.get_token(user)
+        response = Response({"success": True, "message": "Login successful."})
+        _set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        return response
+
+
 class GoogleLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -240,7 +318,18 @@ class GoogleLoginView(APIView):
                 if invite:
                     break
 
+        # ── HIGH 2: Invite Gate ──────────────────────────────────────────────
+        # Block account creation for unknown emails that have no pending invite.
+        # Existing users (already in the DB) may continue to log in via Google
+        # even without an active invite (their account was created another way).
+        if not user and not invite:
+            return Response(
+                {"detail": "No invitation found for this email. Please contact your administrator to receive an invitation."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         if invite:
+
             if not user:
                 username = email_clean.split("@")[0]
                 base_username = username
@@ -272,7 +361,7 @@ class GoogleLoginView(APIView):
                 invite.status = "accepted"
                 from django.utils import timezone
                 invite.accepted_at = timezone.now()
-                invite.save(update_fields=["status", "accepted_at"])
+                invite.save()
 
             # Create/Activate Employee profile under the tenant schema
             from employees.models import Employee
@@ -686,7 +775,7 @@ class AcceptInviteView(APIView):
             if invite.status != "expired":
                 with schema_context(invite.company.schema_name):
                     invite.status = "expired"
-                    invite.save(update_fields=["status"])
+                    invite.save()
             return Response({"detail": "This invitation has expired."}, status=status.HTTP_400_BAD_REQUEST)
 
         User = get_user_model()
@@ -717,7 +806,7 @@ class AcceptInviteView(APIView):
                     invite.status = "accepted"
                     from django.utils import timezone
                     invite.accepted_at = timezone.now()
-                    invite.save(update_fields=["status", "accepted_at"])
+                    invite.save()
 
             from employees.models import Employee
             with schema_context(invite.company.schema_name):
