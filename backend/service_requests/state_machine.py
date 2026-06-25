@@ -13,17 +13,17 @@ S = ServiceRequest.Status
 
 # Map: current_status → set of allowed next statuses
 ALLOWED_TRANSITIONS = {
-    S.NEW_REQUEST:            {S.REVIEWED, S.REJECTED},
-    S.REVIEWED:               {S.ASSIGNED, S.REJECTED},
-    S.ASSIGNED:               {S.ACCEPTED, S.REJECTED},          # employee accept/reject
-    S.ACCEPTED:               {S.IN_PROGRESS},
-    S.IN_PROGRESS:            {S.COMPLETED},
-    S.COMPLETED:              {S.AWAITING_VERIFICATION},
-    S.AWAITING_VERIFICATION:  {S.VERIFIED, S.REWORK_REQUESTED},
-    S.VERIFIED:               {S.FEEDBACK_PENDING},
+    S.NEW_REQUEST:            {S.REVIEWED, S.REJECTED, S.FEEDBACK_RECEIVED},
+    S.REVIEWED:               {S.ASSIGNED, S.REJECTED, S.FEEDBACK_RECEIVED},
+    S.ASSIGNED:               {S.ACCEPTED, S.REJECTED, S.FEEDBACK_RECEIVED},          # employee accept/reject
+    S.ACCEPTED:               {S.IN_PROGRESS, S.FEEDBACK_RECEIVED},
+    S.IN_PROGRESS:            {S.COMPLETED, S.FEEDBACK_RECEIVED},
+    S.COMPLETED:              {S.AWAITING_VERIFICATION, S.FEEDBACK_RECEIVED},
+    S.AWAITING_VERIFICATION:  {S.VERIFIED, S.REWORK_REQUESTED, S.FEEDBACK_RECEIVED},
+    S.VERIFIED:               {S.FEEDBACK_PENDING, S.FEEDBACK_RECEIVED},
     S.FEEDBACK_PENDING:       {S.FEEDBACK_RECEIVED},
     S.FEEDBACK_RECEIVED:      {S.CLOSED},
-    S.REWORK_REQUESTED:       {S.IN_PROGRESS},
+    S.REWORK_REQUESTED:       {S.IN_PROGRESS, S.FEEDBACK_RECEIVED},
     # Terminal states — no further transitions
     S.CLOSED:                 set(),
     S.REJECTED:               set(),

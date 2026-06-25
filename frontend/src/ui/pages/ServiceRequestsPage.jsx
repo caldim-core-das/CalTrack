@@ -578,8 +578,8 @@ export function ServiceRequestsPage() {
                     </button>
                   )}
 
-                  {/* Showing feedback token link if feedback is pending */}
-                  {detail.status === "feedback_pending" && (
+                  {/* Showing feedback token link if request is active and feedback is not yet submitted */}
+                  {!["closed", "rejected", "feedback_received"].includes(detail.status) && (
                     <div className="flex flex-col gap-4 w-full">
                       {detail.feedback && (
                         <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl space-y-2 w-full text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-sm">

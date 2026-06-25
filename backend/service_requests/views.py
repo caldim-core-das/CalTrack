@@ -365,8 +365,13 @@ class AdminSRResendFeedbackView(APIView):
         except ServiceRequest.DoesNotExist:
             return _error("Not found.", 404)
 
-        if sr.status != ServiceRequest.Status.FEEDBACK_PENDING:
-            return _error("Service request is not in Feedback Pending status.", 400)
+        exclude_statuses = [
+            ServiceRequest.Status.CLOSED,
+            ServiceRequest.Status.REJECTED,
+            ServiceRequest.Status.FEEDBACK_RECEIVED
+        ]
+        if sr.status in exclude_statuses:
+            return _error("Cannot send feedback link for closed, rejected, or feedback-submitted requests.", 400)
 
         # Create or get ServiceFeedback record
         feedback, _ = ServiceFeedback.objects.get_or_create(service_request=sr)
@@ -644,13 +649,20 @@ class EmployeeJobCompleteView(APIView):
             # Create feedback model record (generates token)
             feedback, _ = ServiceFeedback.objects.get_or_create(service_request=sr)
 
-        # Dispatch the feedback email link outside the transaction block
+        # Dispatch notifications outside the transaction block
+        import logging
+        logger = logging.getLogger(__name__)
+        try:
+            from .notifications import send_work_completion_email
+            send_work_completion_email(sr)
+        except Exception as e:
+            logger.error(f"Failed to auto-send work completion email: {e}")
+
         try:
             from .notifications import send_feedback_link
             send_feedback_link(sr, str(feedback.feedback_token))
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).error(f"Failed to auto-send feedback link: {e}")
+            logger.error(f"Failed to auto-send feedback link: {e}")
 
         return _success(message="Work marked as Complete. Feedback request sent to customer.")
 

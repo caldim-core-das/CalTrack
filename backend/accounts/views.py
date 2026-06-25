@@ -359,8 +359,7 @@ class GoogleLoginView(APIView):
             else:
                 user.is_active = True
                 user.role = invite.role
-                if not user.company:
-                    user.company = invite.company
+                user.company = invite.company
                 user.save()
 
             # Accept the invitation
@@ -380,12 +379,14 @@ class GoogleLoginView(APIView):
                         "employee_id": generate_next_employee_id(invite.company),
                         "title": invite.role.title(),
                         "hourly_rate": 0.00,
-                        "is_active": True
+                        "is_active": True,
+                        "invited_by": invite.invited_by
                     }
                 )
                 if not created:
                     employee.is_active = True
-                    employee.save()
+                    employee.invited_by = invite.invited_by
+                    employee.save(update_fields=["is_active", "invited_by"])
 
         if not user:
             return Response({"detail": "Google login is restricted to pre-approved employee email accounts. Please contact your administrator to register."}, status=status.HTTP_400_BAD_REQUEST)
@@ -786,27 +787,35 @@ class AcceptInviteView(APIView):
             return Response({"detail": "This invitation has expired."}, status=status.HTTP_400_BAD_REQUEST)
 
         User = get_user_model()
-        if User.objects.filter(email__iexact=invite.email).exists():
-            return Response({"detail": "User with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
             with transaction.atomic():
-                username = invite.email.split("@")[0]
-                base_username = username
-                counter = 1
-                while User.objects.filter(username=username).exists():
-                    username = f"{base_username}{counter}"
-                    counter += 1
+                user = User.objects.filter(email__iexact=invite.email).first()
+                if not user:
+                    username = invite.email.split("@")[0]
+                    base_username = username
+                    counter = 1
+                    while User.objects.filter(username=username).exists():
+                        username = f"{base_username}{counter}"
+                        counter += 1
 
-                user = User.objects.create_user(
-                    username=username,
-                    password=password,
-                    email=invite.email,
-                    first_name=first_name,
-                    last_name=last_name,
-                    role=invite.role,
-                )
+                    user = User.objects.create_user(
+                        username=username,
+                        password=password,
+                        email=invite.email,
+                        first_name=first_name,
+                        last_name=last_name,
+                        role=invite.role,
+                    )
+                else:
+                    user.set_password(password)
+                    user.role = invite.role
+                    if first_name:
+                        user.first_name = first_name
+                    if last_name:
+                        user.last_name = last_name
+
                 user.company = invite.company
+                user.is_active = True
                 user.save()
 
                 with schema_context(invite.company.schema_name):
@@ -1414,10 +1423,13 @@ class RegistrationDossierActivateView(APIView):
         user.is_active = True
         user.save()
 
-        employee = Employee.objects.filter(user=user).first()
-        if employee:
-            employee.is_active = True
-            employee.save()
+        from django_tenants.utils import schema_context
+        if user.company:
+            with schema_context(user.company.schema_name):
+                employee = Employee.objects.filter(user=user).first()
+                if employee:
+                    employee.is_active = True
+                    employee.save()
 
         # Update dossier status
         admin_clearance["status"] = "activated"

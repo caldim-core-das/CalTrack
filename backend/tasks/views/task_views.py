@@ -186,12 +186,19 @@ def sync_task_lifecycle_to_service_request(task, actor=None):
 
 
 def _send_feedback_link_safe(sr, token_str):
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        from service_requests.notifications import send_work_completion_email
+        send_work_completion_email(sr)
+    except Exception as exc:
+        logger.error(f"Failed to auto-send work completion email: {exc}")
+
     try:
         from service_requests.notifications import send_feedback_link
         send_feedback_link(sr, token_str)
     except Exception as exc:
-        import logging
-        logging.getLogger(__name__).error(f"Failed to auto-send feedback link: {exc}")
+        logger.error(f"Failed to auto-send feedback link: {exc}")
 
 
 class IsAdmin(IsAuthenticated):

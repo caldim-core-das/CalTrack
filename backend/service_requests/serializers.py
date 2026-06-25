@@ -117,6 +117,16 @@ class ServiceRequestListSerializer(serializers.ModelSerializer):
         )
 
 
+class ServiceFeedbackNestedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceFeedback
+        fields = (
+            "rating", "employee_behaviour", "work_quality",
+            "issue_resolved", "comment", "submitted_at",
+            "is_submitted", "feedback_token"
+        )
+
+
 class ServiceRequestDetailSerializer(serializers.ModelSerializer):
     """Full detail — includes photo URL + allowed next transitions."""
     service_category_display = serializers.CharField(
@@ -129,6 +139,7 @@ class ServiceRequestDetailSerializer(serializers.ModelSerializer):
     allowed_transitions = serializers.SerializerMethodField()
     has_feedback      = serializers.SerializerMethodField()
     feedback_token    = serializers.SerializerMethodField()
+    feedback          = ServiceFeedbackNestedSerializer(read_only=True, allow_null=True)
 
     class Meta:
         model = ServiceRequest
@@ -138,7 +149,7 @@ class ServiceRequestDetailSerializer(serializers.ModelSerializer):
             "issue_title", "description", "address", "preferred_date",
             "photo_url", "status", "status_display", "priority", "priority_display",
             "assigned_employee", "allowed_transitions",
-            "has_feedback", "feedback_token",
+            "has_feedback", "feedback_token", "feedback",
             "created_at", "updated_at",
         )
 
