@@ -35,6 +35,8 @@ def _set_tenant(company):
     from django.db import connection
     if company and hasattr(connection, "set_tenant"):
         connection.set_tenant(company)
+        with connection.cursor() as cursor:
+            cursor.execute(f'SET search_path = "{company.schema_name}"')
 
 
 def _get_active_task_travel_status(user, company):

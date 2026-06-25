@@ -22,3 +22,33 @@ class IsEmployeeRole(BasePermission):
     def has_permission(self, request, view):
         user = getattr(request, "user", None)
         return bool(user and user.is_authenticated and getattr(user, "role", None) == "employee")
+
+
+def RequireModuleAccess(module_name: str, required_action: str):
+    """
+    Factory function that returns a BasePermission class configured
+    for a specific module and action.
+    """
+    class _RequireModuleAccess(BasePermission):
+        def has_permission(self, request, view):
+            user = getattr(request, "user", None)
+            if not user or not user.is_authenticated:
+                return False
+                
+            company = getattr(request, "company", getattr(user, "company", None))
+            if not company:
+                return False
+                
+            user_role = getattr(user, "role", "employee")
+            
+            # Superusers bypass
+            if user.is_superuser:
+                return True
+                
+            perms = company.module_permissions or {}
+            module_perms = perms.get(module_name) or {}
+            role_actions = module_perms.get(user_role) or []
+            
+            return required_action in role_actions
+
+    return _RequireModuleAccess
