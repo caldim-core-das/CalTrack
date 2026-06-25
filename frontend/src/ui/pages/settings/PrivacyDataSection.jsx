@@ -6,46 +6,15 @@ import {
 import { apiRequest } from "../../../api/client.js"
 import { useAuth } from "../../../state/auth/useAuth.js"
 
-const COOKIE_PREFS = [
-  { key: "essential", label: "Essential cookies", desc: "Required for the application to function. Cannot be disabled.", locked: true, default: true },
-  { key: "analytics", label: "Analytics cookies", desc: "Help us understand how you use the product to improve your experience.", locked: false, default: false },
-  { key: "marketing", label: "Marketing cookies", desc: "Used to personalize product updates and communications.", locked: false, default: false },
-  { key: "preferences", label: "Preference cookies", desc: "Remember your settings and preferences across sessions.", locked: false, default: true },
-]
-
-const COOKIE_KEY = "quicktims.cookie_prefs"
-
-function loadCookiePrefs() {
-  try { return JSON.parse(localStorage.getItem(COOKIE_KEY) || "{}") } catch { return {} }
-}
-
-function Toggle({ checked, onChange, disabled }) {
-  return (
-    <div
-      className={`stToggle ${checked ? "on" : ""} ${disabled ? "" : ""}`}
-      onClick={() => !disabled && onChange(!checked)}
-      style={{ cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.6 : 1 }}
-    >
-      <div className="stToggleKnob" />
-    </div>
-  )
-}
 
 export default function PrivacyDataSection({ showToast, SectionHeader }) {
   const { user } = useAuth()
   const isAdmin = user?.role === "admin" || user?.role === "manager"
 
-  const [exporting, setExporting] = useState(false)
-  const [exportRequested, setExportRequested] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState("")
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  const [cookiePrefs, setCookiePrefs] = useState(() => {
-    const saved = loadCookiePrefs()
-    return COOKIE_PREFS.reduce((acc, c) => ({ ...acc, [c.key]: saved[c.key] ?? c.default }), {})
-  })
-  const [cookieSaving, setCookieSaving] = useState(false)
 
   const [auditLog, setAuditLog] = useState([])
   const [auditLoading, setAuditLoading] = useState(true)
@@ -64,19 +33,6 @@ export default function PrivacyDataSection({ showToast, SectionHeader }) {
     }
   }, [isAdmin])
 
-  const handleExport = async () => {
-    setExporting(true)
-    try {
-      await apiRequest("/settings/data/export/", { method: "POST" })
-      setExportRequested(true)
-      showToast("Data export requested. You'll receive an email within 24 hours.")
-    } catch (err) {
-      showToast(err?.body?.message || "Failed to request export.", "error")
-    } finally {
-      setExporting(false)
-    }
-  }
-
   const handleDeleteAccount = async () => {
     if (deleteConfirm !== user?.username) { showToast("Username does not match.", "error"); return }
     setDeleting(true)
@@ -93,11 +49,6 @@ export default function PrivacyDataSection({ showToast, SectionHeader }) {
     }
   }
 
-  const handleSaveCookies = () => {
-    setCookieSaving(true)
-    localStorage.setItem(COOKIE_KEY, JSON.stringify(cookiePrefs))
-    setTimeout(() => { setCookieSaving(false); showToast("Cookie preferences saved.") }, 500)
-  }
 
   const filteredAudit = auditLog.filter(entry => {
     if (!auditSearch) return true
@@ -113,65 +64,6 @@ export default function PrivacyDataSection({ showToast, SectionHeader }) {
     <div className="stPanel">
       <SectionHeader title="Privacy & Data" subtitle="Control your data, export records, and manage cookie preferences." />
 
-      {/* Data Export */}
-      <div className="stCard">
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <Download size={15} style={{ color: "#1A56DB" }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: "var(--fg)" }}>Export your data (GDPR)</span>
-            </div>
-            <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6, margin: 0, maxWidth: 460 }}>
-              Download a complete archive of your personal data including profile, time logs, leave records, and activity history. Delivered by email within 24 hours.
-            </p>
-          </div>
-          <button
-            className={exportRequested ? "stGhostBtn" : "stPrimaryBtn"}
-            onClick={handleExport}
-            disabled={exporting || exportRequested}
-          >
-            {exporting ? <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} /> : <Download size={13} />}
-            {exportRequested ? "Export requested" : "Request data export"}
-          </button>
-        </div>
-        {exportRequested && (
-          <div style={{ marginTop: 14, padding: 12, background: "#ECFDF5", borderRadius: 8, fontSize: 12, color: "#059669", border: "1px solid #A7F3D0" }}>
-            ✓ Export requested. Check your email ({user?.email}) within 24 hours for a download link.
-          </div>
-        )}
-      </div>
-
-      {/* Cookie Preferences */}
-      <div className="stCard">
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 20 }}>
-          <Cookie size={15} style={{ color: "#D97706" }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: "var(--fg)" }}>Cookie preferences</span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {COOKIE_PREFS.map(cookie => (
-            <div key={cookie.key} className="stToggleRow">
-              <div style={{ flex: 1 }}>
-                <div className="stToggleLabel" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {cookie.label}
-                  {cookie.locked && <span style={{ fontSize: 10, background: "var(--bg2)", color: "var(--muted)", padding: "1px 6px", borderRadius: 10, fontWeight: 700 }}>Required</span>}
-                </div>
-                <div className="stToggleDesc">{cookie.desc}</div>
-              </div>
-              <Toggle
-                checked={cookiePrefs[cookie.key] ?? cookie.default}
-                disabled={cookie.locked}
-                onChange={val => setCookiePrefs(prev => ({ ...prev, [cookie.key]: val }))}
-              />
-            </div>
-          ))}
-        </div>
-        <div className="stCardActions">
-          <button className="stPrimaryBtn" onClick={handleSaveCookies} disabled={cookieSaving}>
-            {cookieSaving ? <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} /> : null}
-            Save cookie preferences
-          </button>
-        </div>
-      </div>
 
       {/* Audit Log (Admin only) */}
       {isAdmin && (

@@ -29,6 +29,7 @@ class RegionSerializer(serializers.ModelSerializer):
 
 class CompanySerializer(serializers.ModelSerializer):
     region_detail = RegionSerializer(source="region", read_only=True)
+    logo_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Company
@@ -37,6 +38,13 @@ class CompanySerializer(serializers.ModelSerializer):
             "company_name",
             "display_id",
             "schema_name",
+            "industry",
+            "website",
+            "timezone",
+            "data_region",
+            "address",
+            "logo",
+            "logo_url",
             "primary_country",
             "region",
             "region_detail",
@@ -46,11 +54,20 @@ class CompanySerializer(serializers.ModelSerializer):
             "allowed_countries",
             "team_size",
             "selected_modules",
+            "module_permissions",
             "is_active",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "display_id", "schema_name", "region_detail", "created_at", "updated_at"]
+        read_only_fields = ["id", "display_id", "schema_name", "region_detail", "created_at", "updated_at", "logo_url"]
+
+    def get_logo_url(self, obj):
+        if obj.logo:
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(obj.logo.url)
+            return obj.logo.url
+        return None
 
     def validate(self, data):
         primary_country = data.get("primary_country", getattr(self.instance, "primary_country", None))

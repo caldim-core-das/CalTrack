@@ -22,7 +22,7 @@ from rest_framework import permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdminRole
+from accounts.permissions import IsAdminRole, RequireModuleAccess
 from employees.models import Employee
 from time_tracking.models import TimeLog
 from .models import EmployeeLocation, GeofenceBreach, SOSAlert
@@ -294,7 +294,7 @@ class LiveLocationUpdateView(APIView):
 
 class CurrentLocationsListView(APIView):
     """Returns the latest location for all currently clocked-in employees."""
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("live_location", "view")]
 
     def get(self, request):
         from django.db.models import OuterRef, Subquery

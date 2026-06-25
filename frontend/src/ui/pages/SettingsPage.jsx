@@ -24,7 +24,6 @@ const MembersSettingsSection = lazy(() =>
 )
 const TeamMembersSection    = lazy(() => import("./settings/TeamMembersSection.jsx"))
 const InvoicesSection       = lazy(() => import("./settings/InvoicesSection.jsx"))
-const IntegrationsApiSection = lazy(() => import("./settings/IntegrationsApiSection.jsx"))
 const WorkspaceSection      = lazy(() => import("./settings/WorkspaceSection.jsx"))
 const PrivacyDataSection    = lazy(() => import("./settings/PrivacyDataSection.jsx"))
 const DangerZoneSection     = lazy(() => import("./settings/DangerZoneSection.jsx"))
@@ -132,14 +131,7 @@ const TABS = [
     adminOnly: true,
     to: routes.settings_invoices,
   },
-  {
-    id: "integrations",
-    label: "Integrations & API",
-    subtitle: "API keys, webhook endpoints, and connected OAuth apps.",
-    icon: <Plug size={15} />,
-    adminOnly: true,
-    to: routes.settings_integrations,
-  },
+
   {
     id: "organization",
     label: "Workspace",
@@ -272,7 +264,6 @@ export function SettingsPage({ section: sectionProp }) {
               {activeSection === "team"          && <TeamMembersSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "schedules"     && <WorkSchedulesSettingsSection />}
               {activeSection === "invoices"      && <InvoicesSection />}
-              {activeSection === "integrations"  && <IntegrationsApiSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "organization"  && <WorkspaceSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "data"          && <PrivacyDataSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "rbac"          && <AccessControlSection />}

@@ -52,6 +52,15 @@ class Region(models.Model):
     def __str__(self):
         return f"{self.code} — {self.name}"
 
+def default_module_permissions():
+    return {
+        "live_location": { "admin": ["view", "modify"], "manager": ["view", "modify"], "employee": ["view"] },
+        "locations": { "admin": ["view", "modify"], "manager": ["view", "modify"], "employee": [] },
+        "attendance": { "admin": ["view", "modify"], "manager": ["view", "modify"], "employee": ["view", "modify"] },
+        "payroll": { "admin": ["view", "modify"], "manager": ["view", "modify"], "employee": [] },
+        "reports": { "admin": ["view"], "manager": ["view"], "employee": [] },
+    }
+
 
 class Company(TenantMixin):
     company_name = models.CharField(max_length=255)
@@ -77,6 +86,13 @@ class Company(TenantMixin):
     )
 
     default_state = models.CharField(max_length=100, blank=True, null=True)
+    
+    industry = models.CharField(max_length=100, blank=True, null=True)
+    website = models.URLField(max_length=255, blank=True, null=True)
+    timezone = models.CharField(max_length=50, default="UTC")
+    data_region = models.CharField(max_length=50, default="us-east")
+    address = models.TextField(blank=True, null=True)
+    logo = models.ImageField(upload_to="company_logos/", blank=True, null=True)
 
     # Geofence Config
     geofence_enabled = models.BooleanField(default=True)
@@ -108,6 +124,7 @@ class Company(TenantMixin):
     allowed_countries = models.JSONField(default=list, blank=True)
     team_size = models.CharField(max_length=100, blank=True, null=True)
     selected_modules = models.JSONField(default=list, blank=True)
+    module_permissions = models.JSONField(default=default_module_permissions, blank=True)
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
