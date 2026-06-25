@@ -1322,6 +1322,14 @@ function EmployeeTimePage() {
     ? user.username.charAt(0).toUpperCase() + user.username.slice(1)
     : "Employee"
 
+  const canModify = useMemo(() => {
+    const perms = user?.companyPermissions?.attendance;
+    if (!perms) return true;
+    const role = user.role === "manager" ? "admin" : user.role;
+    const actions = perms[role] || [];
+    return actions.includes("modify");
+  }, [user]);
+
   const [logs, setLogs] = useState([])
   const [assignedTasks, setAssignedTasks] = useState([])
   const [selectedTaskId, setSelectedTaskId] = useState(urlTaskId)
@@ -1878,25 +1886,25 @@ return (
                     <>
                       <div style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.07)", borderRadius: 10, padding: "4px 8px", border: "1px solid rgba(255,255,255,0.1)" }}>
                         <Coffee size={12} style={{ color: "#94a3b8" }} />
-                        <select value={breakType} onChange={(e) => setBreakType(e.target.value)} style={{ background: "transparent", color: "#e2e8f0", fontSize: 11, fontWeight: 700, border: "none", outline: "none", cursor: "pointer", padding: "2px 0" }}>
+                        <select value={breakType} onChange={(e) => setBreakType(e.target.value)} disabled={busy || !canModify} style={{ background: "transparent", color: "#e2e8f0", fontSize: 11, fontWeight: 700, border: "none", outline: "none", cursor: (busy || !canModify) ? "not-allowed" : "pointer", padding: "2px 0" }}>
                           <option value="tea" style={{ background: "#1e293b" }}>☕ Tea</option>
                           <option value="lunch" style={{ background: "#1e293b" }}>🍱 Lunch</option>
                           <option value="other" style={{ background: "#1e293b" }}>💤 Other</option>
                         </select>
                       </div>
-                      <button onClick={() => action("/time/break/start/")} title="Start Break" style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Coffee size={15} /></button>
-                      <button onClick={() => setPanelOpen(true)} title="Job Photo" style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Camera size={15} /></button>
-                      <button onClick={handleClockOut} title="Clock Out" style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}><Square size={13} fill="currentColor" /></button>
-                      <button onClick={handleSOS} disabled={sosSending} title="SOS" style={{ padding: "6px 10px", borderRadius: 10, background: sosConfirmed ? "#059669" : "#E94560", color: "white", border: "none", fontWeight: 900, fontSize: 10, cursor: "pointer", letterSpacing: "0.06em", opacity: sosSending ? 0.7 : 1, boxShadow: sosConfirmed ? "none" : "0 0 0 3px rgba(233,69,96,0.3)", animation: !sosConfirmed && !sosSending ? "sosPulse 2s infinite" : "none" }}>{sosConfirmed ? "✓ SENT" : sosSending ? "…" : "SOS"}</button>
+                      <button onClick={() => action("/time/break/start/")} disabled={busy || !canModify} title="Start Break" style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", display: "flex", alignItems: "center", justifycontent: "center", cursor: (busy || !canModify) ? "not-allowed" : "pointer", opacity: (busy || !canModify) ? 0.5 : 1 }}><Coffee size={15} /></button>
+                      <button onClick={() => setPanelOpen(true)} title="Job Photo" style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", display: "flex", alignItems: "center", justifycontent: "center", cursor: "pointer" }}><Camera size={15} /></button>
+                      <button onClick={handleClockOut} disabled={busy || !canModify} title="Clock Out" style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", display: "flex", alignItems: "center", justifycontent: "center", cursor: (busy || !canModify) ? "not-allowed" : "pointer", opacity: (busy || !canModify) ? 0.5 : 1 }}><Square size={13} fill="currentColor" /></button>
+                      <button onClick={handleSOS} disabled={sosSending || !canModify} title="SOS" style={{ padding: "6px 10px", borderRadius: 10, background: sosConfirmed ? "#059669" : "#E94560", color: "white", border: "none", fontWeight: 900, fontSize: 10, cursor: (sosSending || !canModify) ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: (sosSending || !canModify) ? 0.5 : 1, boxShadow: sosConfirmed ? "none" : "0 0 0 3px rgba(233,69,96,0.3)", animation: !sosConfirmed && !sosSending && canModify ? "sosPulse 2s infinite" : "none" }}>{sosConfirmed ? "✓ SENT" : sosSending ? "…" : "SOS"}</button>
                     </>
                   ) : (
-                    <button onClick={() => action("/time/break/end/")} style={{ padding: "8px 16px", borderRadius: 10, background: "linear-gradient(135deg, #10b981, #059669)", color: "white", border: "none", fontSize: 11, fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 10px rgba(16,185,129,0.4)" }}><Play size={13} /> RESUME</button>
+                    <button onClick={() => action("/time/break/end/")} disabled={busy || !canModify} style={{ padding: "8px 16px", borderRadius: 10, background: "linear-gradient(135deg, #10b981, #059669)", color: "white", border: "none", fontSize: 11, fontWeight: 900, cursor: (busy || !canModify) ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 10px rgba(16,185,129,0.4)", opacity: (busy || !canModify) ? 0.5 : 1 }}><Play size={13} /> RESUME</button>
                   )}
                 </div>
               </div>
             )}
             {!openLog && (
-              <button onClick={() => setPanelOpen(true)} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 22px", borderRadius: 14, background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "white", border: "none", fontSize: 13, fontWeight: 900, cursor: "pointer", boxShadow: "0 4px 18px rgba(99,102,241,0.4)", transition: "all 0.2s", opacity: busy ? 0.6 : 1, letterSpacing: "0.02em" }}><Clock size={18} /> START SHIFT</button>
+              <button onClick={() => setPanelOpen(true)} disabled={busy || !canModify} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 22px", borderRadius: 14, background: (busy || !canModify) ? "var(--tp-suspense-color)" : "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "white", border: "none", fontSize: 13, fontWeight: 900, cursor: (busy || !canModify) ? "not-allowed" : "pointer", boxShadow: (busy || !canModify) ? "none" : "0 4px 18px rgba(99,102,241,0.4)", transition: "all 0.2s", opacity: (busy || !canModify) ? 0.6 : 1, letterSpacing: "0.02em" }}><Clock size={18} /> START SHIFT</button>
             )}
           </div>
         </div>
@@ -1905,6 +1913,12 @@ return (
         <div style={{ flex: 1, overflowY: "auto", padding: "28px 32px", display: "flex", flexDirection: "column", gap: 24 }}>
 
           {/* Status banners */}
+          {!canModify && (
+            <div style={{ padding: "14px 18px", borderRadius: 14, background: "var(--tp-banner-err-bg)", border: "1px solid var(--tp-banner-err-border)", display: "flex", alignItems: "center", gap: 10, color: "var(--tp-banner-err-color)", fontSize: 13, fontWeight: 700 }}>
+              <AlertCircle size={18} style={{ flexShrink: 0 }} />
+              <span>⚠️ Read-Only Access: Your profile does not have modification rights for timesheets. Clock-in/out, breaks, and submissions are disabled.</span>
+            </div>
+          )}
           {error && <div style={{ padding: "14px 18px", borderRadius: 14, background: "var(--tp-banner-err-bg)", border: "1px solid var(--tp-banner-err-border)", display: "flex", alignItems: "center", gap: 10, color: "var(--tp-banner-err-color)", fontSize: 13, fontWeight: 700 }}><AlertCircle size={18} style={{ flexShrink: 0 }} /> {error}</div>}
           {faceVerifyStatus === 'verifying' && <div style={{ padding: "12px 18px", borderRadius: 14, background: "var(--tp-banner-info-bg)", border: "1px solid var(--tp-banner-info-border)", display: "flex", alignItems: "center", gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: "50%", background: "var(--tp-banner-info-icon-bg)", border: "1px solid var(--tp-banner-info-border)", display: "flex", alignItems: "center", justifyContent: "center" }}><Loader2 size={16} className="animate-spin" style={{ color: "#6366f1" }} /></div><span style={{ fontSize: 13, fontWeight: 700, color: "var(--tp-banner-info-color)" }}>Authenticating identity models...</span></div>}
           {faceVerifyStatus === 'mismatch' && <div style={{ padding: "12px 18px", borderRadius: 14, background: "var(--tp-banner-err-bg)", border: "1px solid var(--tp-banner-err-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><AlertCircle size={18} style={{ color: "#ef4444", flexShrink: 0 }} /><span style={{ fontSize: 13, fontWeight: 700, color: "var(--tp-banner-err-color)" }}>Identity verification anomaly detected.</span></div><button onClick={() => { setFaceVerifyStatus(null); setError(''); setShowSelfie(true) }} style={{ padding: "5px 12px", borderRadius: 8, background: "#ef4444", color: "white", border: "none", fontSize: 10, fontWeight: 900, cursor: "pointer", textTransform: "uppercase" }}>Re-verify</button></div>}
@@ -1976,7 +1990,7 @@ return (
               </div>
             </div>
             <Suspense fallback={<div style={{ padding: "60px 40px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, color: "var(--tp-suspense-color)" }}><Loader2 size={36} className="animate-spin" /><div style={{ fontSize: 11, fontWeight: 900, textTransform: "uppercase", letterSpacing: "0.06em" }}>Synchronizing Ledger...</div></div>}>
-              <AuditLedger logs={logs} loading={loading} elapsed={elapsed} downloadLogPdf={downloadLogPdf} submitLog={submitLog} formatDuration={formatDuration} />
+              <AuditLedger logs={logs} loading={loading} elapsed={elapsed} downloadLogPdf={downloadLogPdf} submitLog={submitLog} formatDuration={formatDuration} canModify={canModify} />
             </Suspense>
           </div>
         </div>
@@ -2004,7 +2018,7 @@ return (
                   <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Select Assigned Task (Optional)</label>
                   <div className="relative group">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 group-focus-within:text-indigo-500 transition-colors"><CheckSquare size={18} /></div>
-                    <select value={selectedTaskId} onChange={e => setSelectedTaskId(e.target.value)} className="w-full bg-bg dark:bg-slate-950 border border-stroke dark:border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none appearance-none transition-all shadow-sm">
+                    <select value={selectedTaskId} onChange={e => setSelectedTaskId(e.target.value)} disabled={busy || !canModify} className="w-full bg-bg dark:bg-slate-950 border border-stroke dark:border-slate-800 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none appearance-none transition-all shadow-sm">
                       <option value="">— No specific task —</option>
                       {assignedTasks.filter(t => (t.status === 'pending' || t.status === 'in_progress') && t.acceptance_status === 'accepted').map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
                     </select>
@@ -2060,7 +2074,7 @@ return (
               {!openLog && (
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Identity Verification</label>
-                  <button onClick={() => setShowSelfie(true)} className={`w-full h-40 rounded-3xl border-2 border-dashed transition-all overflow-hidden relative ${selfiePreview ? 'border-indigo-600 dark:border-indigo-500' : 'border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600 bg-bg dark:bg-slate-950 shadow-sm'}`}>
+                  <button onClick={() => setShowSelfie(true)} disabled={busy || !canModify} className={`w-full h-40 rounded-3xl border-2 border-dashed transition-all overflow-hidden relative ${selfiePreview ? 'border-indigo-600 dark:border-indigo-500' : 'border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600 bg-bg dark:bg-slate-950 shadow-sm'}`}>
                     {selfiePreview ? <img src={selfiePreview} className="w-full h-full object-cover" /> : <div className="flex flex-col items-center gap-3"><Camera size={32} className="text-slate-300 dark:text-slate-700" /><span className="text-xs font-black text-slate-400 dark:text-slate-600">TAP TO CAPTURE SELFIE</span></div>}
                   </button>
                   {selfiePreview && <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase"><Check size={12} strokeWidth={3} /> Verification Locked</div>}
@@ -2068,7 +2082,7 @@ return (
               )}
               <div className="space-y-3">
                 <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Operation Notes</label>
-                <textarea value={sessionNotes} onChange={e => setSessionNotes(e.target.value)} placeholder={openLog ? "Summary of completed tasks..." : "Briefly describe your objectives..."} className="w-full bg-bg dark:bg-slate-950 border border-stroke dark:border-slate-800 rounded-2xl p-4 text-sm font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all shadow-sm" rows={4} />
+                <textarea value={sessionNotes} onChange={e => setSessionNotes(e.target.value)} disabled={busy || !canModify} placeholder={openLog ? "Summary of completed tasks..." : "Briefly describe your objectives..."} className="w-full bg-bg dark:bg-slate-950 border border-stroke dark:border-slate-800 rounded-2xl p-4 text-sm font-bold text-slate-900 dark:text-white focus:border-indigo-500 outline-none transition-all shadow-sm" rows={4} />
               </div>
               {openLog && openLog.task && (
                 <div className="p-6 bg-slate-900 rounded-3xl space-y-6">
@@ -2092,14 +2106,14 @@ return (
                   <div className="flex items-center justify-between"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Coffee size={14} className="text-amber-500" /> Break Management System</label>{openBreak && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[9px] font-black rounded-lg animate-pulse uppercase">Active Session</span>}</div>
                   {!openBreak ? (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-3 gap-3">{["tea", "lunch", "personal"].map(t => <button key={t} disabled={busy} onClick={() => setBreakType(t)} className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center gap-2 ${breakType === t ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 shadow-lg shadow-indigo-100 dark:shadow-none' : 'border-bg dark:border-slate-800 bg-surface dark:bg-slate-900 text-slate-400 dark:text-slate-500 hover:border-slate-200 dark:hover:border-slate-700'}`}>{t === 'tea' && <Coffee size={16} />}{t === 'lunch' && <Clock size={16} />}{t === 'personal' && <Users size={16} />}{t}</button>)}</div>
-                      <button onClick={() => action("/time/break/start/")} disabled={busy} className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-sm font-black shadow-xl shadow-amber-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50">{busy ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />} START {breakType.toUpperCase()} BREAK</button>
+                      <div className="grid grid-cols-3 gap-3">{["tea", "lunch", "personal"].map(t => <button key={t} disabled={busy || !canModify} onClick={() => setBreakType(t)} className={`py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center gap-2 ${breakType === t ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 shadow-lg shadow-indigo-100 dark:shadow-none' : 'border-bg dark:border-slate-800 bg-surface dark:bg-slate-900 text-slate-400 dark:text-slate-500 hover:border-slate-200 dark:hover:border-slate-700'}`}>{t === 'tea' && <Coffee size={16} />}{t === 'lunch' && <Clock size={16} />}{t === 'personal' && <Users size={16} />}{t}</button>)}</div>
+                      <button onClick={() => action("/time/break/start/")} disabled={busy || !canModify} className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-sm font-black shadow-xl shadow-amber-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50">{busy ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />} START {breakType.toUpperCase()} BREAK</button>
                     </div>
                   ) : (
                     <div className="bg-surface dark:bg-slate-950 rounded-3xl border-2 border-amber-100 dark:border-amber-900/30 p-6 shadow-xl shadow-amber-50 dark:shadow-none space-y-6 animate-in zoom-in duration-300">
                       <div className="flex items-center justify-between"><div className="flex items-center gap-3"><div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-100 dark:shadow-none"><Coffee size={24} className="animate-bounce" /></div><div><div className="text-lg font-black text-slate-900 dark:text-white">{openBreak.break_type?.toUpperCase()} BREAK</div><div className="text-[10px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest">In Progress</div></div></div><div className="text-right"><div className="text-2xl font-black text-slate-900 dark:text-white tabular-nums leading-none">{formatDuration(breakElapsed)}</div><div className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-1">Live Timer</div></div></div>
                       <div className="grid grid-cols-2 gap-4 py-4 border-y border-stroke dark:border-slate-800"><div className="space-y-1"><div className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase">Started At</div><div className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatDateTime(openBreak.break_start).split(",")[1]}</div></div><div className="space-y-1"><div className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase">Current Status</div><div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500 font-bold text-xs"><div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> ON BREAK</div></div></div>
-                      <button onClick={() => action("/time/break/end/")} disabled={busy} className="w-full py-4 bg-slate-900 hover:bg-black text-white rounded-2xl text-sm font-black shadow-xl shadow-slate-200 flex items-center justify-center gap-2 transition-all disabled:opacity-50">{busy ? <Loader2 size={18} className="animate-spin" /> : <Square size={14} fill="currentColor" />} END BREAK SESSION</button>
+                      <button onClick={() => action("/time/break/end/")} disabled={busy || !canModify} className="w-full py-4 bg-slate-900 hover:bg-black text-white rounded-2xl text-sm font-black shadow-xl shadow-slate-200 flex items-center justify-center gap-2 transition-all disabled:opacity-50">{busy ? <Loader2 size={18} className="animate-spin" /> : <Square size={14} fill="currentColor" />} END BREAK SESSION</button>
                     </div>
                   )}
                   {completedBreaks.length > 0 && <div className="space-y-3"><div className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Recent Sessions</div><div className="space-y-2">{completedBreaks.slice(-2).reverse().map(b => <div key={b.id} className="p-3 bg-bg dark:bg-slate-950 rounded-xl border border-stroke dark:border-slate-800 flex items-center justify-between shadow-sm"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-surface dark:bg-slate-900 border border-stroke dark:border-slate-800 flex items-center justify-center text-slate-400 dark:text-slate-600"><Coffee size={14} /></div><div><div className="text-xs font-bold text-slate-700 dark:text-slate-300">{b.break_type?.toUpperCase()}</div><div className="text-[9px] font-medium text-slate-400 dark:text-slate-500">{formatDateTime(b.break_start).split(",")[1]} - {formatDateTime(b.break_end).split(",")[1]}</div></div></div><div className="text-right"><div className="text-xs font-black text-slate-900 dark:text-white">{Math.round(b.duration_seconds / 60)}m</div><div className="text-[9px] font-black text-emerald-600 dark:text-emerald-500 uppercase">Done</div></div></div>)}</div></div>}
@@ -2118,23 +2132,24 @@ return (
               <button onClick={() => setPanelOpen(false)} className="flex-1 py-4 rounded-2xl text-sm font-black text-slate-600 dark:text-slate-400 bg-surface dark:bg-slate-800 border border-stroke dark:border-slate-700 hover:bg-bg dark:hover:bg-slate-950/40 transition-all">Cancel</button>
               {openLog ? (
                 openLog.task ? (
-                  <button onClick={handleClockOut} disabled={busy} className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-red-500 hover:bg-red-600 shadow-xl shadow-red-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50">{busy ? <Loader2 size={18} className="animate-spin" /> : <Square size={14} fill="currentColor" />} COMPLETE &amp; EXIT</button>
+                  <button onClick={handleClockOut} disabled={busy || !canModify} className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-red-500 hover:bg-red-600 shadow-xl shadow-red-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50">{busy ? <Loader2 size={18} className="animate-spin" /> : <Square size={14} fill="currentColor" />} COMPLETE &amp; EXIT</button>
                 ) : selectedTaskId ? (
-                  <button onClick={() => { setPanelOpen(false); action(`/tasks/my/${selectedTaskId}/start/`) }} disabled={busy} className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50">{busy ? <Loader2 size={18} className="animate-spin" /> : <Play size={14} />} START TASK</button>
+                  <button onClick={() => { setPanelOpen(false); action(`/tasks/my/${selectedTaskId}/start/`) }} disabled={busy || !canModify} className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-emerald-500 hover:bg-emerald-600 shadow-xl shadow-emerald-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50">{busy ? <Loader2 size={18} className="animate-spin" /> : <Play size={14} />} START TASK</button>
                 ) : (
-                  <button onClick={handleClockOut} disabled={busy} className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-red-500 hover:bg-red-600 shadow-xl shadow-red-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50">{busy ? <Loader2 size={18} className="animate-spin" /> : <Square size={14} fill="currentColor" />} CLOCK OUT</button>
+                  <button onClick={handleClockOut} disabled={busy || !canModify} className="flex-[2] py-4 rounded-2xl text-sm font-black text-white bg-red-500 hover:bg-red-600 shadow-xl shadow-red-100 flex items-center justify-center gap-2 transition-all disabled:opacity-50">{busy ? <Loader2 size={18} className="animate-spin" /> : <Square size={14} fill="currentColor" />} CLOCK OUT</button>
                 )
               ) : (
                 <button
                   onClick={() => { setPanelOpen(false); action("/time/clock-in/") }}
                   disabled={
                     busy
+                    || !canModify
                     || (!resolvedAddr && gpsStatus !== "error")
                     || !selfieFile
                     || (!geofencePassed && geofenceStatus?.geofence_enabled && geofenceStatus?.strict_mode)
                     || (preflight && preflight.allowed === false)
                   }
-                  className={`flex-[2] py-4 rounded-2xl text-sm font-black text-white flex items-center justify-center gap-2 transition-all shadow-xl ${(!selfieFile || (!resolvedAddr && gpsStatus !== "error")) ? 'bg-slate-400' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-100'}`}
+                  className={`flex-[2] py-4 rounded-2xl text-sm font-black text-white flex items-center justify-center gap-2 transition-all shadow-xl ${(!selfieFile || !canModify || (!resolvedAddr && gpsStatus !== "error")) ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-100'}`}
                 >
                   {busy ? <Loader2 size={18} className="animate-spin" /> : <Clock size={18} />}
                   SAVE SESSION

@@ -8,11 +8,12 @@ import { useAuth } from "../../../state/auth/useAuth.js"
 
 
 export default function PrivacyDataSection({ showToast, SectionHeader }) {
-  const { user } = useAuth()
+  const { user, logout } = useAuth()
   const isAdmin = user?.role === "admin" || user?.role === "manager"
 
   const [deleting, setDeleting] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState("")
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("")
+  const [deleteConfirmPassword, setDeleteConfirmPassword] = useState("")
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
 
@@ -34,14 +35,34 @@ export default function PrivacyDataSection({ showToast, SectionHeader }) {
   }, [isAdmin])
 
   const handleDeleteAccount = async () => {
-    if (deleteConfirm !== user?.username) { showToast("Username does not match.", "error"); return }
+    if (!deleteConfirmEmail || !deleteConfirmPassword) {
+      showToast("Email and password are required.", "error")
+      return
+    }
     setDeleting(true)
     try {
-      const password = prompt("Enter your password to confirm account deletion:")
-      if (!password) { setDeleting(false); return }
-      await apiRequest("/settings/data/delete-account/", { method: "POST", json: { password } })
-      showToast("Account scheduled for deletion. You'll be signed out shortly.")
-      setTimeout(() => window.location.href = import.meta.env.BASE_URL || "/", 3000)
+      await apiRequest("/auth/delete-account/", {
+        method: "POST",
+        json: {
+          email: deleteConfirmEmail,
+          password: deleteConfirmPassword
+        }
+      })
+
+      const isSelfDelete = deleteConfirmEmail.toLowerCase() === user?.email?.toLowerCase()
+
+      if (isSelfDelete) {
+        showToast("Your account has been deleted. Logging out...")
+        await logout()
+        setTimeout(() => {
+          window.location.href = "/login"
+        }, 1500)
+      } else {
+        showToast("Employee account successfully deleted.")
+        setDeleteConfirmEmail("")
+        setDeleteConfirmPassword("")
+        setShowDeleteConfirm(false)
+      }
     } catch (err) {
       showToast(err?.body?.message || "Failed to delete account.", "error")
     } finally {
@@ -124,54 +145,127 @@ export default function PrivacyDataSection({ showToast, SectionHeader }) {
         </div>
       )}
 
-      {/* Account Deletion */}
-      <div className="stCard" style={{ border: "1px solid rgba(220,38,38,.2)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-          <AlertTriangle size={15} style={{ color: "#DC2626" }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#DC2626" }}>Delete my account</span>
-        </div>
-        <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6, marginBottom: 16 }}>
-          Permanently delete your account and all associated data. This action cannot be undone. Your work data will remain in the workspace but your personal account will be removed.
-        </p>
-        {!showDeleteConfirm ? (
-          <button
-            className="stDangerBtn"
-            style={{ fontSize: 13, padding: "8px 16px" }}
-            onClick={() => setShowDeleteConfirm(true)}
-          >
-            Delete my account
-          </button>
-        ) : (
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#DC2626", marginBottom: 8 }}>
-              Type your username <strong>{user?.username}</strong> to confirm:
-            </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <input
-                className="stInput"
-                placeholder={user?.username}
-                value={deleteConfirm}
-                onChange={e => setDeleteConfirm(e.target.value)}
-                style={{ maxWidth: 240, borderColor: "rgba(220,38,38,.4)" }}
-              />
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleting || deleteConfirm !== user?.username}
-                style={{
-                  padding: "9px 16px", background: "#DC2626", color: "#fff", border: "none",
-                  borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer",
-                  opacity: deleteConfirm !== user?.username ? 0.5 : 1,
-                  display: "flex", alignItems: "center", gap: 6,
-                }}
-              >
-                {deleting && <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} />}
-                Delete permanently
-              </button>
-              <button className="stGhostBtn" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirm("") }}>Cancel</button>
-            </div>
+      {/* Account Deletion for Employee */}
+      {user?.role === "employee" && (
+        <div className="stCard" style={{ border: "1px solid rgba(220,38,38,.2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <AlertTriangle size={15} style={{ color: "#DC2626" }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#DC2626" }}>Delete my account</span>
           </div>
-        )}
-      </div>
+          <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6, marginBottom: 16 }}>
+            Permanently delete your account and all associated data. This action cannot be undone. Your work data will remain in the workspace but your personal account will be removed.
+          </p>
+          {!showDeleteConfirm ? (
+            <button
+              className="stDangerBtn"
+              style={{ fontSize: 13, padding: "8px 16px" }}
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              Delete my account
+            </button>
+          ) : (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#DC2626", marginBottom: 12 }}>
+                Confirm account deletion by entering your registered email and password:
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 320 }}>
+                <input
+                  className="stInput"
+                  placeholder="Enter your registered email"
+                  value={deleteConfirmEmail}
+                  onChange={e => setDeleteConfirmEmail(e.target.value)}
+                  style={{ borderColor: "rgba(220,38,38,.4)" }}
+                />
+                <input
+                  type="password"
+                  className="stInput"
+                  placeholder="Enter your password"
+                  value={deleteConfirmPassword}
+                  onChange={e => setDeleteConfirmPassword(e.target.value)}
+                  style={{ borderColor: "rgba(220,38,38,.4)" }}
+                />
+                <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleting || !deleteConfirmEmail || !deleteConfirmPassword}
+                    style={{
+                      padding: "9px 16px", background: "#DC2626", color: "#fff", border: "none",
+                      borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                      opacity: (!deleteConfirmEmail || !deleteConfirmPassword) ? 0.5 : 1,
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    {deleting && <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} />}
+                    Delete permanently
+                  </button>
+                  <button className="stGhostBtn" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmEmail(""); setDeleteConfirmPassword("") }}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Account Deletion for Admin/Manager */}
+      {(user?.role === "admin" || user?.role === "manager") && (
+        <div className="stCard" style={{ border: "1px solid rgba(220,38,38,.2)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <AlertTriangle size={15} style={{ color: "#DC2626" }} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#DC2626" }}>Delete employee account</span>
+          </div>
+          <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6, marginBottom: 16 }}>
+            Permanently delete an employee's account and all associated data. Enter the target employee's email and password to confirm. This action is irreversible.
+          </p>
+          {!showDeleteConfirm ? (
+            <button
+              className="stDangerBtn"
+              style={{ fontSize: 13, padding: "8px 16px" }}
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              Delete employee account
+            </button>
+          ) : (
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#DC2626", marginBottom: 12 }}>
+                Confirm employee account deletion by entering their email and password:
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, maxWidth: 320 }}>
+                <input
+                  className="stInput"
+                  placeholder="Enter employee email"
+                  value={deleteConfirmEmail}
+                  onChange={e => setDeleteConfirmEmail(e.target.value)}
+                  style={{ borderColor: "rgba(220,38,38,.4)" }}
+                />
+                <input
+                  type="password"
+                  className="stInput"
+                  placeholder="Enter employee password"
+                  value={deleteConfirmPassword}
+                  onChange={e => setDeleteConfirmPassword(e.target.value)}
+                  style={{ borderColor: "rgba(220,38,38,.4)" }}
+                />
+                <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleting || !deleteConfirmEmail || !deleteConfirmPassword}
+                    style={{
+                      padding: "9px 16px", background: "#DC2626", color: "#fff", border: "none",
+                      borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                      opacity: (!deleteConfirmEmail || !deleteConfirmPassword) ? 0.5 : 1,
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    {deleting && <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} />}
+                    Delete permanently
+                  </button>
+                  <button className="stGhostBtn" onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmEmail(""); setDeleteConfirmPassword("") }}>Cancel</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

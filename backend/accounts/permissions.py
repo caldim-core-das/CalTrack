@@ -26,7 +26,7 @@ class IsEmployeeRole(BasePermission):
 
 def RequireModuleAccess(module_name: str, required_action: str):
     """
-    Factory function that returns a BasePermission class configured
+    Factory function that returns a BasePermission instance configured
     for a specific module and action.
     """
     class _RequireModuleAccess(BasePermission):
@@ -46,9 +46,23 @@ def RequireModuleAccess(module_name: str, required_action: str):
                 return True
                 
             perms = company.module_permissions or {}
+            if not perms or module_name not in perms:
+                try:
+                    from companies.models import default_module_permissions
+                    perms = default_module_permissions()
+                except Exception:
+                    perms = {}
+            
             module_perms = perms.get(module_name) or {}
-            role_actions = module_perms.get(user_role) or []
+            
+            if user_role == "manager" and "manager" not in module_perms:
+                role_actions = module_perms.get("admin") or []
+            else:
+                role_actions = module_perms.get(user_role) or []
             
             return required_action in role_actions
 
-    return _RequireModuleAccess
+        def __call__(self):
+            return self
+
+    return _RequireModuleAccess()

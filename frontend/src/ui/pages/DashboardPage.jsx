@@ -865,7 +865,7 @@ function AdminDashboard() {
       setError("")
       try {
         const [data, empData] = await Promise.all([
-          apiRequest("/reports/dashboard-analytics/"),
+          apiRequest("/reports/dashboard-analytics/").catch(() => null),
           apiRequest("/employees/").catch(() => []),
         ])
         if (!cancelled) {

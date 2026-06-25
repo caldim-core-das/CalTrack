@@ -9,7 +9,7 @@ from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdminRole
+from accounts.permissions import IsAdminRole, RequireModuleAccess
 from employees.models import Employee
 from leaves.models import LeaveRequest
 from payroll.models import PayrollRecord, PayrollPeriod
@@ -25,7 +25,7 @@ def _parse_date(value: str | None):
 
 
 class AdminOverviewReportView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("reports", "view")]
 
     def get(self, request):
         start = _parse_date(request.query_params.get("start")) or (timezone.localdate() - timedelta(days=30))
@@ -62,7 +62,7 @@ class DashboardAnalyticsView(APIView):
     Comprehensive dashboard analytics endpoint.
     Returns aggregated data for charts and KPI cards.
     """
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("reports", "view")]
 
     def get(self, request):
         company = getattr(request, 'company', None)

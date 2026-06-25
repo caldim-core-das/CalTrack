@@ -43,6 +43,7 @@ export function AuthProvider({ children }) {
         lastName:  me.last_name  ?? "",
         role:      me.role,
         companyId: me.company,
+        companyPermissions: me.company_permissions ?? null,
         bio:       me.bio        ?? "",
         phone:     me.phone      ?? "",
         timezone:  me.timezone   ?? "UTC",

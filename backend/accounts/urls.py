@@ -10,7 +10,7 @@ from .views import (
     SendOTPView, VerifyOTPView,
     RegistrationDossierApproveView, RegistrationDossierRejectView,
     RegistrationDossierVerifyTokenView, RegistrationDossierActivateView,
-    ApprovedEmployeesListView
+    ApprovedEmployeesListView, DeleteAccountView, SendEmailOTPView, PasswordResetWithOTPView
 )
 
 urlpatterns = [
@@ -37,6 +37,9 @@ urlpatterns = [
     path("registration-dossier/activate/", RegistrationDossierActivateView.as_view(), name="registration-dossier-activate"),
     path("send-otp/",       SendOTPView.as_view(),                name="send-otp"),
     path("verify-otp/",     VerifyOTPView.as_view(),              name="verify-otp"),
+    path("send-email-otp/", SendEmailOTPView.as_view(),           name="send-email-otp"),
+    path("password/reset-with-otp/", PasswordResetWithOTPView.as_view(), name="password-reset-with-otp"),
     path("approved-employees/", ApprovedEmployeesListView.as_view(), name="approved-employees"),
+    path("delete-account/", DeleteAccountView.as_view(), name="delete-account"),
 ]
 

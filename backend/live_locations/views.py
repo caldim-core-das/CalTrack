@@ -241,7 +241,7 @@ def build_live_snapshot(company, user=None):
 
 class LiveLocationUpdateView(APIView):
     """Employee reports their live location (REST polling fallback)."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("live_location", "view")]
 
     def post(self, request):
         try:
@@ -361,7 +361,7 @@ class CurrentLocationsListView(APIView):
 
 class EmployeeLocationHistoryView(APIView):
     """Location history for a specific employee."""
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("live_location", "view")]
 
     def get(self, request, employee_id):
         time_log_id = request.query_params.get("time_log_id")
@@ -384,7 +384,7 @@ class EmployeeLocationHistoryView(APIView):
 
 class EmployeeLiveSessionDetailView(APIView):
     """Full details for a specific live session (TimeLog)."""
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("live_location", "view")]
 
     def get(self, request, time_log_id):
         company = getattr(request, "company", None)
@@ -449,7 +449,10 @@ class SOSView(APIView):
     GET  – admin lists active/all SOS alerts
     POST – employee sends SOS (REST fallback when WebSocket is unavailable)
     """
-    permission_classes = [permissions.IsAuthenticated]
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated(), IsAdminRole(), RequireModuleAccess("live_location", "view")]
+        return [permissions.IsAuthenticated(), RequireModuleAccess("live_location", "view")]
 
     def get(self, request):
         if request.user.role not in ("admin", "manager"):
@@ -554,7 +557,7 @@ class SOSView(APIView):
 
 class SOSDetailView(APIView):
     """PATCH to acknowledge or resolve a specific SOS alert."""
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("live_location", "modify")]
 
     def patch(self, request, sos_id):
         company = getattr(request, "company", None)
@@ -578,7 +581,7 @@ class SOSDetailView(APIView):
 
 class GeofenceBreachListView(APIView):
     """Admin: recent geofence breach log."""
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("live_location", "view")]
 
     def get(self, request):
         company = getattr(request, "company", None)
@@ -617,7 +620,7 @@ class LiveHeatmapView(APIView):
     Admin: aggregated GPS ping positions for today.
     Returns an array of [lat, lng, weight] tuples for Leaflet.heat.
     """
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("live_location", "view")]
 
     def get(self, request):
         company = getattr(request, "company", None)
@@ -654,7 +657,7 @@ class ETAPredictionView(APIView):
       lat  – target latitude
       lng  – target longitude
     """
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("live_location", "view")]
 
     AVG_SPEED_KMH = 25  # conservative urban travel speed
 

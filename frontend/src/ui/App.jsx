@@ -176,6 +176,28 @@ function RequireAdminSettings() {
   return <Outlet />
 }
 
+/**
+ * RequireModulePermission — protects routes based on company module permissions.
+ * Redirects unauthorized users back to the dashboard.
+ */
+function RequireModulePermission({ module, action = "view" }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to={routes.login} replace />
+  
+  const perms = user.companyPermissions
+  if (perms) {
+    const modulePerms = perms[module]
+    if (modulePerms) {
+      const checkRole = user.role === "manager" ? "admin" : user.role
+      const actions = modulePerms[checkRole] || []
+      if (!actions.includes(action)) {
+        return <Navigate to={routes.dashboard} replace />
+      }
+    }
+  }
+  return <Outlet />
+}
+
 const ONBOARDING_DISMISSED_KEY = "caltrack.onboarding.dismissed"
 
 export function App() {
@@ -318,7 +340,9 @@ export function App() {
               path={routes.analysis}
               element={isAdmin ? <Navigate to={routes.dashboard} replace /> : <AnalysisPage />}
             />
-            <Route path={routes.time} element={<TimePage />} />
+            <Route element={<RequireModulePermission module="attendance" action="view" />}>
+              <Route path={routes.time} element={<TimePage />} />
+            </Route>
             <Route path={routes.tasks} element={<TasksPage />} />
             <Route path={routes.leaves} element={<LeavesPage />} />
             <Route path={routes.inventory} element={<InventoryPage />} />
@@ -330,16 +354,26 @@ export function App() {
             <Route path={routes.settings_profile} element={<SettingsPage section="profile" />} />
             <Route path={routes.settings_notifications} element={<SettingsPage section="notifications" />} />
             <Route path={routes.settings_preferences} element={<SettingsPage section="preferences" />} />
+            <Route path={routes.settings_security} element={<SettingsPage section="security" />} />
+            <Route path={routes.settings_data} element={<SettingsPage section="data" />} />
 
             {/* ── Admin-only routes ── */}
             <Route element={<RequireAdmin />}>
               <Route path={routes.get_started} element={<GetStartedPage />} />
-              <Route path={routes.locations} element={<LocationsPage />} />
-              <Route path={routes.live_locations} element={<LiveLocationsPage />} />
-              <Route path={routes.payroll} element={<PayrollPage />} />
+              <Route element={<RequireModulePermission module="locations" action="view" />}>
+                <Route path={routes.locations} element={<LocationsPage />} />
+              </Route>
+              <Route element={<RequireModulePermission module="live_location" action="view" />}>
+                <Route path={routes.live_locations} element={<LiveLocationsPage />} />
+              </Route>
+              <Route element={<RequireModulePermission module="payroll" action="view" />}>
+                <Route path={routes.payroll} element={<PayrollPage />} />
+              </Route>
               <Route path={routes.scheduling} element={<SchedulingPage />} />
               <Route path={routes.employees} element={<EmployeesPage />} />
-              <Route path={routes.reports} element={<ReportsPage />} />
+              <Route element={<RequireModulePermission module="reports" action="view" />}>
+                <Route path={routes.reports} element={<ReportsPage />} />
+              </Route>
               <Route path={routes.compliance} element={<CompliancePage />} />
               <Route path={routes.approvals} element={<ApprovalCenterPage />} />
               <Route path={routes.employees_dashboard} element={<EmployeesDashboardPage />} />
@@ -366,7 +400,6 @@ export function App() {
               <Route path={routes.settings_workflows} element={<SettingsPage section="workflows" />} />
               <Route path={routes.settings_productivity} element={<SettingsPage section="productivity" />} />
               <Route path={routes.settings_reports} element={<SettingsPage section="reports" />} />
-              <Route path={routes.settings_security} element={<SettingsPage section="security" />} />
               <Route path={routes.settings_rbac} element={<SettingsPage section="rbac" />} />
               <Route path={routes.settings_audit} element={<SettingsPage section="audit" />} />
               <Route path={routes.settings_devices} element={<SettingsPage section="devices" />} />
@@ -377,7 +410,6 @@ export function App() {
               <Route path={routes.settings_developer} element={<SettingsPage section="developer" />} />
               <Route path={routes.settings_billing} element={<SettingsPage section="billing" />} />
               <Route path={routes.settings_invoices} element={<SettingsPage section="invoices" />} />
-              <Route path={routes.settings_data} element={<SettingsPage section="data" />} />
             </Route>
           </Route>
 

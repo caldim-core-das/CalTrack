@@ -1860,3 +1860,372 @@ class ApprovedEmployeesListView(APIView):
             })
 
         return Response({"success": True, "data": result})
+
+
+class DeleteAccountView(APIView):
+    """
+    POST /api/auth/delete-account/
+    Securely deletes an employee account using email and password verification.
+    This workflow is restricted to employee accounts only (admins/managers cannot be deleted this way).
+    Supports:
+    - Employee self-deletion (deletes logged-in user, clears cookies)
+    - Admin/Manager deletion (deletes employee user, does not clear admin cookies)
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip()
+        password = request.data.get("password", "")
+
+        if not email or not password:
+            return Response(
+                {"success": False, "message": "Both email and password are required to confirm account deletion."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        User = get_user_model()
+        target_user = User.objects.filter(email__iexact=email).first()
+
+        if not target_user:
+            return Response(
+                {"success": False, "message": "No account found with the provided email address."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check target user's role is employee
+        if target_user.role != "employee":
+            return Response(
+                {"success": False, "message": "Only employee accounts can be deleted via this workflow."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Check password
+        if not target_user.check_password(password):
+            return Response(
+                {"success": False, "message": "Incorrect password. Account deletion aborted."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Clean up all foreign key references to target_user in tenant schemas to prevent database IntegrityError
+        from django_tenants.utils import schema_context
+        from companies.models import Company
+        from django.apps import apps
+
+        companies = Company.objects.exclude(schema_name="public")
+        for comp in companies:
+            with schema_context(comp.schema_name):
+                # 1. Clean up employees
+                if apps.is_installed("employees"):
+                    from employees.models import Employee
+                    Employee.objects.filter(user=target_user).delete()
+                    Employee.objects.filter(invited_by=target_user).update(invited_by=None)
+                
+                # 2. Clean up settings_hub
+                if apps.is_installed("settings_hub"):
+                    from settings_hub.models import TeamInvite, APIKey, Webhook
+                    TeamInvite.objects.filter(invited_by=target_user).update(invited_by=None)
+                    APIKey.objects.filter(created_by=target_user).update(created_by=None)
+                    Webhook.objects.filter(created_by=target_user).update(created_by=None)
+
+                # 3. Clean up time logs
+                if apps.is_installed("time_tracking"):
+                    from time_tracking.models import TimeLog
+                    TimeLog.objects.filter(approved_by=target_user).update(approved_by=None)
+
+                # 4. Clean up mileage
+                if apps.is_installed("mileage"):
+                    try:
+                        from mileage.models import MileageTrip
+                        MileageTrip.objects.filter(approved_by=target_user).update(approved_by=None)
+                    except Exception:
+                        pass
+
+                # 5. Clean up payroll
+                if apps.is_installed("payroll"):
+                    try:
+                        from payroll.models import PayrollRecord
+                        PayrollRecord.objects.filter(generated_by=target_user).update(generated_by=None)
+                    except Exception:
+                        pass
+
+                # 6. Clean up leaves
+                if apps.is_installed("leaves"):
+                    try:
+                        from leaves.models import LeaveRequest
+                        LeaveRequest.objects.filter(approved_by=target_user).update(approved_by=None)
+                    except Exception:
+                        pass
+
+                # 7. Clean up tasks
+                if apps.is_installed("tasks"):
+                    try:
+                        from tasks.models import Task, TaskAttachment, TaskActivityLog
+                        Task.objects.filter(assigned_by=target_user).update(assigned_by=None)
+                        Task.objects.filter(assigned_to=target_user).delete()
+                        TaskAttachment.objects.filter(uploaded_by=target_user).update(uploaded_by=None)
+                        TaskActivityLog.objects.filter(actor=target_user).update(actor=None)
+                    except Exception:
+                        pass
+
+                # 8. Clean up service requests
+                if apps.is_installed("service_requests"):
+                    try:
+                        from service_requests.models import ServiceRequest
+                        ServiceRequest.objects.filter(assigned_by=target_user).update(assigned_by=None)
+                    except Exception:
+                        pass
+
+                # 9. Clean up inventory
+                if apps.is_installed("inventory"):
+                    try:
+                        from inventory.models import InventoryIssuance, InventoryTransfer
+                        InventoryIssuance.objects.filter(issued_by=target_user).update(issued_by=None)
+                        InventoryTransfer.objects.filter(requested_by=target_user).delete()
+                    except Exception:
+                        pass
+
+        # Delete target user inside their company schema context
+        schema_name = "public"
+        if getattr(target_user, "company", None):
+            schema_name = target_user.company.schema_name
+        elif getattr(request.user, "company", None):
+            schema_name = request.user.company.schema_name
+
+        with schema_context(schema_name):
+            target_user.delete()
+
+        response_data = {"success": True, "message": "Account successfully deleted."}
+
+        # Clear cookies/session if the logged-in user deleted their own account
+        if target_user == request.user:
+            response = Response(response_data)
+            _clear_auth_cookies(response)
+            return response
+
+        return Response(response_data)
+
+
+class SendEmailOTPView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        import random
+        import time
+        import hashlib
+        from django.core.cache import cache
+        from django.core.mail import send_mail
+        from django.conf import settings
+        from accounts.models import OTPAuditLog
+
+        user = request.user
+        email = user.email
+        if not email:
+            return Response({"success": False, "message": "Your account does not have a registered email address."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ip = get_client_ip(request)
+        
+        # Rate limit by IP (max 5 requests per IP per minute)
+        ip_cache_key = f"email_otp_rate_ip_{ip}"
+        ip_count = cache.get(ip_cache_key, 0)
+        if ip_count >= 5:
+            return Response(
+                {"success": False, "message": "Too many request from this IP. Please wait a minute."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        # Rate limit by email (max 5 requests per email per hour)
+        email_cache_key = f"email_otp_rate_email_{email.lower()}"
+        email_count = cache.get(email_cache_key, 0)
+        if email_count >= 5:
+            return Response(
+                {"success": False, "message": "Too many password reset requests. Please try again in an hour."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        # Cooldown (30 seconds)
+        cache_key = f"email_otp_{email.lower()}"
+        existing_otp = cache.get(cache_key)
+        if existing_otp and isinstance(existing_otp, dict):
+            last_sent_at = existing_otp.get("last_sent_at", 0)
+            elapsed = time.time() - last_sent_at
+            if elapsed < 30:
+                wait_time = int(30 - elapsed)
+                return Response(
+                    {"success": False, "message": f"Please wait {wait_time} seconds before requesting a new code."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Generate 6-digit code
+        code = str(random.randint(100000, 999999))
+        hashed_code = hashlib.sha256(f"{settings.SECRET_KEY}:{code}".encode()).hexdigest()
+
+        # Store in cache for 5 minutes
+        otp_data = {
+            "hashed_code": hashed_code,
+            "expires_at": time.time() + 300,
+            "attempts": 0,
+            "last_sent_at": time.time()
+        }
+        cache.set(cache_key, otp_data, timeout=300)
+
+        # Update rate limiting counters
+        cache.set(ip_cache_key, ip_count + 1, timeout=60)
+        cache.set(email_cache_key, email_count + 1, timeout=3600)
+
+        # Premium HTML Email Content
+        subject = "CALtrack Verification Code"
+        body_text = (
+            "━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "CALTRACK SECURITY HUB\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"Hello {user.first_name or user.username},\n\n"
+            "Your CALtrack security verification code is:\n\n"
+            f"{code}\n\n"
+            "This code is valid for 5 minutes.\n"
+            "If you did not request this code, please change your password immediately.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "CALtrack Security Intelligence\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━"
+        )
+        
+        html_message = f"""
+        <div style="background-color: #03050d; color: #f1f5f9; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 20px; max-width: 600px; margin: 0 auto; border: 1px solid #1e293b; border-radius: 24px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);">
+            <div style="text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 20px; margin-bottom: 25px;">
+                <div style="color: #6366f1; font-weight: 900; font-size: 20px; letter-spacing: 0.25em; text-transform: uppercase;">
+                    CALTRACK SECURITY HUB
+                </div>
+            </div>
+            <div style="padding: 0 10px;">
+                <p style="font-size: 15px; line-height: 1.6; color: #cbd5e1; margin-bottom: 20px;">
+                    Hello {user.first_name or user.username},
+                </p>
+                <p style="font-size: 14px; line-height: 1.6; color: #94a3b8; margin-bottom: 25px;">
+                    A verification code has been requested to change your password:
+                </p>
+                
+                <div style="background-color: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 30px;">
+                    <span style="font-family: monospace; font-size: 11px; text-transform: uppercase; color: #818cf8; display: block; margin-bottom: 8px;">Verification Code</span>
+                    <span style="font-family: monospace; font-size: 32px; font-weight: bold; color: #f1f5f9; letter-spacing: 4px;">{code}</span>
+                </div>
+                
+                <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin-bottom: 25px;">
+                    This security token will expire in 5 minutes. If you did not initiate this action, please secure your account immediately.
+                </p>
+            </div>
+            <div style="text-align: center; border-top: 2px solid #1e293b; padding-top: 20px; margin-top: 35px; color: #475569; font-size: 10px; font-family: monospace; letter-spacing: 0.15em; text-transform: uppercase;">
+                CALtrack Security Intelligence
+            </div>
+        </div>
+        """
+
+        try:
+            send_mail(
+                subject,
+                body_text,
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=False,
+                html_message=html_message
+            )
+            # Log audit
+            OTPAuditLog.objects.create(
+                phone="",
+                ip_address=ip,
+                action="email_otp_sent",
+                details=f"Email OTP sent to {email}. Expiry in 5 mins."
+            )
+        except Exception as e:
+            print(f"Failed to send email OTP: {e}")
+            return Response({"success": False, "message": "Failed to send verification email. Please try again."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        response_data = {
+            "success": True,
+            "message": "Verification code sent to your email successfully."
+        }
+        if settings.DEBUG:
+            response_data["code"] = code
+
+        return Response(response_data)
+
+
+class PasswordResetWithOTPView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        import time
+        import hashlib
+        from django.core.cache import cache
+        from django.conf import settings
+        from accounts.models import OTPAuditLog
+
+        otp_code = request.data.get("otp_code")
+        new_password = request.data.get("new_password")
+        confirm_password = request.data.get("confirm_password")
+
+        if not otp_code or not new_password or not confirm_password:
+            return Response({"success": False, "message": "Verification code and new passwords are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_password != confirm_password:
+            return Response({"success": False, "message": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(new_password) < 8:
+            return Response({"success": False, "message": "Password must be at least 8 characters."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        email = user.email
+        if not email:
+            return Response({"success": False, "message": "User email address not found."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ip = get_client_ip(request)
+        cache_key = f"email_otp_{email.lower()}"
+        otp_data = cache.get(cache_key)
+
+        if not otp_data or not isinstance(otp_data, dict):
+            return Response({"success": False, "message": "Verification code expired or not found. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check maximum attempts
+        attempts = otp_data.get("attempts", 0)
+        if attempts >= 5:
+            cache.delete(cache_key)
+            return Response({"success": False, "message": "Maximum verification attempts exceeded. Please request a new code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check expiry
+        if time.time() > otp_data.get("expires_at", 0):
+            cache.delete(cache_key)
+            return Response({"success": False, "message": "Verification code has expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Hash verification
+        hashed_input = hashlib.sha256(f"{settings.SECRET_KEY}:{str(otp_code).strip()}".encode()).hexdigest()
+
+        if otp_data.get("hashed_code") == hashed_input:
+            # Success: reset password
+            user.set_password(new_password)
+            user.save(update_fields=["password"])
+            cache.delete(cache_key)
+
+            # Log audit
+            OTPAuditLog.objects.create(
+                phone="",
+                ip_address=ip,
+                action="email_otp_reset_success",
+                details=f"Password successfully reset via email OTP for {email}."
+            )
+            return Response({"success": True, "message": "Password updated successfully."})
+        else:
+            # Increment attempts
+            attempts += 1
+            otp_data["attempts"] = attempts
+            remaining = 5 - attempts
+            
+            if remaining <= 0:
+                cache.delete(cache_key)
+                return Response({"success": False, "message": "Maximum verification attempts exceeded. Please request a new code."}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                remaining_time = int(otp_data.get("expires_at", 0) - time.time())
+                if remaining_time > 0:
+                    cache.set(cache_key, otp_data, timeout=remaining_time)
+                else:
+                    cache.delete(cache_key)
+                return Response({"success": False, "message": f"Invalid verification code. {remaining} attempts remaining."}, status=status.HTTP_400_BAD_REQUEST)
+
+

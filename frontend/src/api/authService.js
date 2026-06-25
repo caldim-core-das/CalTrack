@@ -303,5 +303,25 @@ export async function apiActivateDossierAccount(token, password) {
   })
 }
 
+/**
+ * Send email OTP to the currently authenticated user
+ */
+export async function apiSendEmailOTP() {
+  return fetchJSON("/auth/send-email-otp/", {
+    method: "POST"
+  })
+}
+
+/**
+ * Reset password using email OTP
+ */
+export async function apiResetPasswordWithOTP(payload) {
+  return fetchJSON("/auth/password/reset-with-otp/", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  })
+}
+
+
 
 

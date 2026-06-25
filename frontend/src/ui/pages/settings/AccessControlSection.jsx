@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { useAuth } from "../../../state/auth/useAuth.js"
 import { apiRequest } from "../../../api/client.js"
 import { ShieldCheck, Lock, Eye, Edit3, Check, RefreshCcw, Info, Globe, MapPin, Activity, Users, CreditCard, BarChart3 } from "lucide-react"
 import { Button, Card, Pill } from "../../components/kit.jsx"
@@ -12,6 +13,7 @@ const MODULES = [
 ]
 
 export default function AccessControlSection() {
+  const { refreshMe } = useAuth()
   const [permissions, setPermissions] = useState({
     live_location: { admin: ["view", "modify"], employee: ["view"] },
     locations: { admin: ["view", "modify"], employee: [] },
@@ -26,7 +28,7 @@ export default function AccessControlSection() {
   useEffect(() => {
     async function loadPermissions() {
       try {
-        const res = await apiRequest("GET", "/api/company/me/")
+        const res = await apiRequest("/company/me")
         if (res.module_permissions) {
           setPermissions(res.module_permissions)
         }
@@ -54,9 +56,13 @@ export default function AccessControlSection() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await apiRequest("PUT", "/api/company/update/", {
-        module_permissions: permissions
+      await apiRequest("/company/update", {
+        method: "PUT",
+        json: {
+          module_permissions: permissions
+        }
       })
+      await refreshMe()
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
     } catch (err) {

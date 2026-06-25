@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from "react"
 import { useLocation } from "react-router-dom"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { routes } from "../routes.js"
 import { Button } from "../components/kit.jsx"
@@ -8,6 +9,7 @@ import {
   User, Shield, Palette, Bell, CreditCard, Users2, Plug,
   Building2, Database, AlertTriangle, ShieldCheck, RefreshCcw,
   CheckCircle2, X, Save, ChevronRight, FileText, Calendar,
+  Info, XCircle,
 } from "lucide-react"
 
 /* ── Lazy section imports ─────────────────────────────────────── */
@@ -32,11 +34,25 @@ const AccessControlSection  = lazy(() => import("./settings/AccessControlSection
 /* ── Helpers ─────────────────────────────────────────────────── */
 function Toast({ message, type = "success", onDismiss }) {
   useEffect(() => { const t = setTimeout(onDismiss, 3500); return () => clearTimeout(t) }, [onDismiss])
+  const getIcon = () => {
+    switch (type) {
+      case "success":
+        return <CheckCircle2 size={15} />
+      case "error":
+        return <XCircle size={15} />
+      case "warn":
+      case "warning":
+        return <AlertTriangle size={15} />
+      case "info":
+      default:
+        return <Info size={15} />
+    }
+  }
   return (
-    <div className="stToast" data-type={type}>
-      {type === "success" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
+    <div className="settingsToast" data-type={type}>
+      {getIcon()}
       <span>{message}</span>
-      <button onClick={onDismiss} className="stToastClose"><X size={13} /></button>
+      <button onClick={onDismiss} className="settingsToastClose"><X size={13} /></button>
     </div>
   )
 }
@@ -272,7 +288,10 @@ export function SettingsPage({ section: sectionProp }) {
           </motion.div>
         </AnimatePresence>
 
-        {toast && <Toast key={toast.id} message={toast.msg} type={toast.type} onDismiss={() => setToast(null)} />}
+        {toast && createPortal(
+          <Toast key={toast.id} message={toast.msg} type={toast.type} onDismiss={() => setToast(null)} />,
+          document.body
+        )}
 
       </main>
     </div>

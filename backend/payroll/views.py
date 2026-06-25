@@ -16,7 +16,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdminRole, is_admin_role
+from accounts.permissions import IsAdminRole, is_admin_role, RequireModuleAccess
 from employees.models import Employee
 from leaves.models import LeaveRequest
 from time_tracking.models import TimeLog
@@ -173,7 +173,11 @@ def _calc_uk_paye(gross_period, period_days, employee):
 
 class PayrollRecordViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PayrollRecordSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_permissions(self):
+        if self.action == "send_invoice_email":
+            return [permissions.IsAuthenticated(), RequireModuleAccess("payroll", "modify")]
+        return [permissions.IsAuthenticated(), RequireModuleAccess("payroll", "view")]
 
     def get_queryset(self):
         if not hasattr(self.request, "company"):
@@ -329,7 +333,7 @@ class PayrollRecordViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class PayrollGenerateView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("payroll", "modify")]
 
     @transaction.atomic
     def post(self, request):
@@ -480,7 +484,11 @@ from .serializers import CurrencyMasterSerializer, PayrollRuleSerializer, Payrol
 
 class CurrencyMasterViewSet(viewsets.ModelViewSet):
     serializer_class = CurrencyMasterSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [permissions.IsAuthenticated(), RequireModuleAccess("payroll", "view")]
+        return [IsAdminRole(), RequireModuleAccess("payroll", "modify")]
 
     def get_queryset(self):
         if not hasattr(self.request, "company"):
@@ -492,7 +500,11 @@ class CurrencyMasterViewSet(viewsets.ModelViewSet):
 
 class PayrollRuleViewSet(viewsets.ModelViewSet):
     serializer_class = PayrollRuleSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [permissions.IsAuthenticated(), RequireModuleAccess("payroll", "view")]
+        return [IsAdminRole(), RequireModuleAccess("payroll", "modify")]
 
     def get_queryset(self):
         if not hasattr(self.request, "company"):
@@ -503,7 +515,10 @@ class PayrollRuleViewSet(viewsets.ModelViewSet):
         serializer.save(company=self.request.company)
 
 class DynamicPayrollGenerateView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.IsAuthenticated(), IsAdminRole(), RequireModuleAccess("payroll", "view")]
+        return [permissions.IsAuthenticated(), IsAdminRole(), RequireModuleAccess("payroll", "modify")]
 
     def get(self, request):
         month = request.query_params.get("month")
@@ -603,7 +618,7 @@ class DynamicPayrollGenerateView(APIView):
 
 
 class PayslipView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("payroll", "view")]
 
     def get(self, request, employee_id):
         employee = Employee.objects.filter(employee_id=employee_id, company=request.company).first()

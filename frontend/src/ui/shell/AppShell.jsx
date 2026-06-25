@@ -33,8 +33,8 @@ const ALL_NAV_ITEMS = [
   { label: "Feedback Logs", to: routes.admin_feedback, icon: <MessageSquare size={20} />, color: "#F59E0B", adminOnly: true },
   { label: "Feedback", to: routes.employee_jobs, icon: <MessageSquare size={20} />, color: "#14B8A6", employeeOnly: true },
   { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1", employeeOnly: true },
-  { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6", adminOnly: true },
-  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444", adminOnly: true },
+  { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6", adminOnly: true, module: "locations" },
+  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444", adminOnly: true, module: "live_location" },
   {
     label: "Employees",
     to: routes.employees,
@@ -54,12 +54,12 @@ const ALL_NAV_ITEMS = [
   },
   { label: "Jobs", to: routes.tasks, icon: <CheckSquare size={20} />, color: "#14B8A6" },
   { label: "Leaves", to: routes.leaves, icon: <CalendarDays size={20} />, color: "#EC4899" },
-  { label: "Payroll", to: routes.payroll, icon: <Banknote size={20} />, color: "#6366F1", adminOnly: true },
+  { label: "Payroll", to: routes.payroll, icon: <Banknote size={20} />, color: "#6366F1", adminOnly: true, module: "payroll" },
   { label: "Scheduling", to: routes.scheduling, icon: <CalendarRange size={20} />, color: "#38BDF8", adminOnly: true },
-  { label: "Time", to: routes.time, icon: <Clock size={20} />, color: "#F59E0B" },
+  { label: "Time", to: routes.time, icon: <Clock size={20} />, color: "#F59E0B", module: "attendance" },
   { label: "Mileage", to: routes.mileage, icon: <Car size={20} />, color: "#EF4444" },
   { label: "Inventory", to: routes.inventory, icon: <Package size={20} />, color: "#10B981", adminOnly: true },
-  { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, color: "#FACC15", adminOnly: true },
+  { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, color: "#FACC15", adminOnly: true, module: "reports" },
   { label: "Compliance", to: routes.compliance, icon: <ShieldAlert size={20} />, color: "#2563EB", adminOnly: true },
   { label: "Settings", to: routes.settings, icon: <Settings size={20} />, color: "#64748B" },
 ]
@@ -93,6 +93,17 @@ function displayName(username) {
   const s = String(username || "").trim()
   if (!s) return ""
   return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+function hasModuleAccess(user, item) {
+  if (!item.module) return true
+  const perms = user?.companyPermissions
+  if (!perms) return true
+  const modulePerms = perms[item.module]
+  if (!modulePerms) return false
+  const checkRole = user.role === "manager" ? "admin" : user.role
+  const actions = modulePerms[checkRole] || []
+  return actions.includes("view")
 }
 
 function playCriticalAlert() {
@@ -163,7 +174,7 @@ function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user, onClose }) {
           {flyout.label}
         </div>
         {flyout.children
-          .filter(child => !child.adminOnly || isAdmin)
+          .filter(child => (!child.adminOnly || isAdmin) && hasModuleAccess(user, child))
           .map((child) => (
             <NavLink
               key={child.to}
@@ -251,7 +262,7 @@ export function AppShell() {
     return ALL_NAV_ITEMS.filter(item => {
       if (item.adminOnly && !isAdminUser) return false
       if (item.employeeOnly && isAdminUser) return false
-      return true
+      return hasModuleAccess(user, item)
     })
   }, [user])
 
@@ -606,7 +617,7 @@ export function AppShell() {
 
                 <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col gap-1">
                   {drillDownParent.children
-                    .filter(child => !child.adminOnly || isAdmin)
+                    .filter(child => (!child.adminOnly || isAdmin) && hasModuleAccess(user, child))
                     .map((child) => {
                       const active = location.pathname === child.to || (child.to !== '/settings' && child.to !== '/employees' && location.pathname.startsWith(child.to));
                       const color = child.color || drillDownParent.color || "#3b82f6";
