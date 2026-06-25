@@ -161,7 +161,18 @@ export function GetStartedPage() {
     checkOnboardingStatus()
   }, [])
 
-  const displayName = user?.username ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : "Rohit"
+  const getGreetingName = () => {
+    if (user?.firstName) {
+      return user.firstName.charAt(0).toUpperCase() + user.firstName.slice(1)
+    }
+    const baseName = user?.username || "Rohit"
+    if (baseName.includes("@")) {
+      const parts = baseName.split("@")
+      return parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
+    }
+    return baseName.charAt(0).toUpperCase() + baseName.slice(1)
+  }
+  const displayName = getGreetingName()
   const totalSteps = STEPS.length
   const doneCount = completedSteps.size
   
@@ -205,7 +216,7 @@ export function GetStartedPage() {
           <div className="w-16 h-16 rounded-2xl bg-orange-100 dark:bg-orange-500/10 text-orange-600 dark:text-orange-500 flex items-center justify-center mb-2">
             <LayoutGrid size={32} />
           </div>
-          <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight m-0">
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight m-0" style={{ overflowWrap: "break-word", wordBreak: "break-word" }}>
             Hi {displayName}! 👋 <br/>Welcome to CalTrack
           </h1>
           <p className="text-base font-medium text-slate-500 dark:text-slate-400 m-0 max-w-[380px] leading-relaxed">

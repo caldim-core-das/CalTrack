@@ -2510,15 +2510,21 @@ function AdminDashboard() {
               <div className="grid grid-cols-2 gap-y-3.5 gap-x-6 text-xs font-semibold mt-2">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Registration</span>
-                  <span className="font-bold text-emerald-500">✅ Complete</span>
+                  <span className={`font-bold ${verificationCenterCandidate.registration === "Complete" ? "text-emerald-500" : "text-amber-500"}`}>
+                    {verificationCenterCandidate.registration === "Complete" ? "✅ Complete" : "🟡 Pending"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Documents</span>
-                  <span className="font-bold text-emerald-500">✅ Verified</span>
+                  <span className={`font-bold ${verificationCenterCandidate.documents === "Verified" ? "text-emerald-500" : "text-amber-500"}`}>
+                    {verificationCenterCandidate.documents === "Verified" ? "✅ Verified" : "🟡 Pending"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Training</span>
-                  <span className="font-bold text-emerald-500">✅ Completed</span>
+                  <span className={`font-bold ${verificationCenterCandidate.training === "Completed" ? "text-emerald-500" : "text-amber-500"}`}>
+                    {verificationCenterCandidate.training === "Completed" ? "✅ Completed" : "🟡 Pending"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Interview</span>
@@ -2566,11 +2572,15 @@ function AdminDashboard() {
               <div className="flex flex-col gap-2 text-xs font-semibold mt-2">
                 <div className="flex justify-between items-center py-1">
                   <span className="text-slate-500">Identity Status</span>
-                  <span className="font-bold text-slate-900 dark:text-white">{approvalCenterReview.identity}</span>
+                  <span className={`font-bold ${approvalCenterReview.identity === "Verified" ? "text-emerald-500" : "text-amber-500"}`}>
+                    {approvalCenterReview.identity}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center py-1">
                   <span className="text-slate-500">Training Status</span>
-                  <span className="font-bold text-slate-900 dark:text-white">{approvalCenterReview.training}</span>
+                  <span className={`font-bold ${approvalCenterReview.training === "Completed" ? "text-emerald-500" : "text-amber-500"}`}>
+                    {approvalCenterReview.training}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center py-1">
                   <span className="text-slate-500">Interview Status</span>

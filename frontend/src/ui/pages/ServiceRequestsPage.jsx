@@ -1,7 +1,37 @@
 import React, { useState, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { Search, Filter, Wrench, ShieldAlert, AlertCircle, Clock, CheckCircle2, User, Phone, Mail, MapPin, Calendar, FileText, ArrowRight, CornerDownLeft, Eye, RefreshCw, Star, HelpCircle } from "lucide-react"
+import {
+  Search, Filter, Wrench, ShieldAlert, AlertCircle, Clock, CheckCircle2,
+  User, Phone, Mail, MapPin, Calendar, FileText, ArrowRight, CornerDownLeft,
+  Eye, RefreshCw, Star, HelpCircle, X, Info, XCircle, AlertTriangle
+} from "lucide-react"
 import { apiRequest } from "../../api/client.js"
+
+function Toast({ message, type = "success", onDismiss }) {
+  useEffect(() => { const t = setTimeout(onDismiss, 3500); return () => clearTimeout(t) }, [onDismiss])
+  const getIcon = () => {
+    switch (type) {
+      case "success":
+        return <CheckCircle2 size={15} />
+      case "error":
+        return <XCircle size={15} />
+      case "warn":
+      case "warning":
+        return <AlertTriangle size={15} />
+      case "info":
+      default:
+        return <Info size={15} />
+    }
+  }
+  return (
+    <div className="settingsToast" data-type={type}>
+      {getIcon()}
+      <span>{message}</span>
+      <button onClick={onDismiss} className="settingsToastClose"><X size={13} /></button>
+    </div>
+  )
+}
 
 const STATUS_BADGES = {
   new_request: { bg: "bg-blue-500/10 text-blue-400 border-blue-500/20", name: "New Request" },
@@ -36,6 +66,8 @@ export function ServiceRequestsPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [error, setError] = useState(null)
   const [actionSuccess, setActionSuccess] = useState(null)
+  const [toast, setToast] = useState(null)
+  const showToast = (msg, type = "success") => setToast({ msg, type, id: Date.now() })
 
   // Filters
   const [search, setSearch] = useState("")
@@ -110,18 +142,20 @@ export function ServiceRequestsPage() {
         json: payload,
       })
       if (response?.success) {
-        setActionSuccess(response.message || "Operation completed successfully.")
+        const msg = response.message || "Operation completed successfully."
+        setActionSuccess(msg)
+        showToast(msg, "success")
         // Refresh details & list
         const detailRes = await apiRequest(`/admin/service-requests/${selectedId}/`)
         if (detailRes?.success) setDetail(detailRes.data)
         const listRes = await apiRequest("/admin/service-requests/")
         if (listRes?.success) setRequests(Array.isArray(listRes.data) ? listRes.data : [])
       } else {
-        alert(response?.message || "Operation failed.")
+        showToast(response?.message || "Operation failed.", "error")
       }
     } catch (err) {
       console.error(err)
-      alert(err?.body?.message || err?.body?.detail || "An error occurred.")
+      showToast(err?.body?.message || err?.body?.detail || "An error occurred.", "error")
     } finally {
       setActionLoading(false)
     }
@@ -136,7 +170,9 @@ export function ServiceRequestsPage() {
         json: { priority: newPriority },
       })
       if (response?.success) {
-        setActionSuccess("Priority updated successfully.")
+        const msg = "Priority updated successfully."
+        setActionSuccess(msg)
+        showToast(msg, "success")
         // Refresh details & list
         const detailRes = await apiRequest(`/admin/service-requests/${selectedId}/`)
         if (detailRes?.success) setDetail(detailRes.data)
@@ -591,7 +627,7 @@ export function ServiceRequestsPage() {
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(`${window.location.origin}/feedback/${detail.feedback.feedback_token}`)
-                                alert("Copied to clipboard!")
+                                showToast("Copied to clipboard!", "success")
                               }}
                               className="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-colors"
                             >
@@ -633,6 +669,11 @@ export function ServiceRequestsPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {toast && createPortal(
+        <Toast key={toast.id} message={toast.msg} type={toast.type} onDismiss={() => setToast(null)} />,
+        document.body
+      )}
     </div>
   )
 }
