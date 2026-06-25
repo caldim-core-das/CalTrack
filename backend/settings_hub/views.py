@@ -356,7 +356,17 @@ class BillingSubscriptionView(APIView):
         if not _is_admin(request.user):
             return Response({"success": False, "message": "Admins only."}, status=403)
         company = request.user.company
-        plan_key = getattr(company, "plan", "free")
+        
+        from trial_management.models import TrialPlan
+        try:
+            trial = company.trial_plan
+            if trial.status == TrialPlan.Status.CONVERTED or trial.status == TrialPlan.Status.CONVERTED_TO_PAID:
+                plan_key = trial.subscription_plan or "pro"
+            else:
+                plan_key = "free"
+        except TrialPlan.DoesNotExist:
+            plan_key = getattr(company, "plan", "free")
+            
         plan = PLANS.get(plan_key, PLANS["free"])
 
         from django.contrib.auth import get_user_model
@@ -379,6 +389,41 @@ class BillingSubscriptionView(APIView):
                 },
                 "payment_method": None,
                 "invoices": [],
+            }
+        })
+
+    def post(self, request):
+        if not _is_admin(request.user):
+            return Response({"success": False, "message": "Admins only."}, status=403)
+        company = request.user.company
+        plan_key = request.data.get("plan")
+        if plan_key not in PLANS:
+            return Response({"success": False, "message": "Invalid plan selected."}, status=400)
+
+        from trial_management.models import TrialPlan
+        from trial_management.services import record_subscription_purchased
+
+        try:
+            trial = company.trial_plan
+            record_subscription_purchased(trial, plan_key, actor_id=request.user.id)
+        except TrialPlan.DoesNotExist:
+            trial = TrialPlan.objects.create(
+                company=company,
+                status=TrialPlan.Status.CONVERTED,
+                subscription_plan=plan_key,
+                upgraded_at=timezone.now()
+            )
+
+        if hasattr(company, "plan"):
+            company.plan = plan_key
+            company.save(update_fields=["plan"])
+
+        return Response({
+            "success": True,
+            "message": f"Successfully upgraded to {plan_key.upper()} plan.",
+            "data": {
+                "plan": plan_key,
+                "status": trial.status
             }
         })
 

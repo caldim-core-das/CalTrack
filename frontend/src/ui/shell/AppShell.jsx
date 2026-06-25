@@ -17,6 +17,7 @@ import { useDispatch } from "react-redux"
 import { addSosAlert, addGeofenceBreach } from "../../store/liveLocationSlice.js"
 import { fetchTrialStatus, fetchTrialNotifications } from "../../store/trialSlice.js"
 import { TrialBanner } from "../components/TrialBanner.jsx"
+import { TrialExpiredModal } from "../components/TrialExpiredModal.jsx"
 
 import {
   Home, Clock, CheckSquare, CalendarDays, Banknote, CalendarRange,
@@ -417,6 +418,7 @@ export function AppShell() {
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-bg text-fg font-body">
       <TrialBanner />
+      <TrialExpiredModal />
       <CommandPalette open={cmdOpen} setOpen={setCmdOpen} />
 
       {/* ── Topbar ───────────────────────────── */}
