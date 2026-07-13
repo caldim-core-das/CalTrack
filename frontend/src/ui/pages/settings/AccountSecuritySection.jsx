@@ -59,6 +59,14 @@ export default function AccountSecuritySection({ markDirty, showToast, Field, Se
   const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false })
   const [pwSaving, setPwSaving] = useState(false)
 
+  // OTP Password Recovery state
+  const [otpMode, setOtpMode] = useState(false)
+  const [otpStep, setOtpStep] = useState("request") // "request" | "verify"
+  const [otpForm, setOtpForm] = useState({ otp_code: "", new_password: "", confirm_password: "" })
+  const [otpSending, setOtpSending] = useState(false)
+  const [otpSaving, setOtpSaving] = useState(false)
+  const [showOtpPw, setShowOtpPw] = useState({ new: false, confirm: false })
+
   // 2FA state
   const [twofa, setTwofa] = useState({ enabled: false, qrCode: null, secret: null, verifyCode: "", backupCodes: null, step: "idle" })
   const [tfaSaving, setTfaSaving] = useState(false)
@@ -113,6 +121,46 @@ export default function AccountSecuritySection({ markDirty, showToast, Field, Se
     } catch (err) {
       showToast(err?.body?.message || "Failed to change password.", "error")
     } finally { setPwSaving(false) }
+  }
+
+  // OTP handlers
+  const handleSendEmailOTP = async () => {
+    setOtpSending(true)
+    try {
+      const res = await apiRequest("/auth/send-email-otp/", { method: "POST" })
+      showToast(res?.message || "Verification code sent to your email.")
+      setOtpStep("verify")
+    } catch (err) {
+      showToast(err?.body?.message || "Failed to send verification code.", "error")
+    } finally {
+      setOtpSending(false)
+    }
+  }
+
+  const handleVerifyAndResetPassword = async () => {
+    if (!otpForm.otp_code || !otpForm.new_password) {
+      showToast("All fields are required.", "error")
+      return
+    }
+    if (otpForm.new_password !== otpForm.confirm_password) {
+      showToast("Passwords do not match.", "error")
+      return
+    }
+    if (otpForm.new_password.length < 8) {
+      showToast("Password must be at least 8 characters.", "error")
+      return
+    }
+    setOtpSaving(true)
+    try {
+      await apiRequest("/auth/password/reset-with-otp/", { method: "POST", json: otpForm })
+      showToast("Password updated successfully.")
+      setOtpForm({ otp_code: "", new_password: "", confirm_password: "" })
+      setOtpMode(false)
+    } catch (err) {
+      showToast(err?.body?.message || "Failed to reset password.", "error")
+    } finally {
+      setOtpSaving(false)
+    }
   }
 
   // 2FA
@@ -193,13 +241,41 @@ export default function AccountSecuritySection({ markDirty, showToast, Field, Se
             value={emailForm.new_email} 
             onChange={e => setEmailForm(p => ({ ...p, new_email: e.target.value }))} 
           />
-          <Input 
-            label="Confirm with password" 
-            type="password" 
-            placeholder="Current password" 
-            value={emailForm.password} 
-            onChange={e => setEmailForm(p => ({ ...p, password: e.target.value }))} 
-          />
+          <div style={{ position: "relative" }}>
+            <Input 
+              label="Confirm with password" 
+              type="password" 
+              placeholder="Current password" 
+              value={emailForm.password} 
+              onChange={e => setEmailForm(p => ({ ...p, password: e.target.value }))} 
+            />
+            <div style={{ textAlign: "right", marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setOtpMode(true)
+                  setOtpStep("request")
+                  setOtpForm({ otp_code: "", new_password: "", confirm_password: "" })
+                  const element = document.getElementById("change-password-card");
+                  if (element) {
+                    element.scrollIntoView({ behavior: "smooth" });
+                  }
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#1A56DB",
+                  fontSize: "11px",
+                  cursor: "pointer",
+                  padding: 0,
+                  fontWeight: 600,
+                  textDecoration: "underline"
+                }}
+              >
+                Forgot password?
+              </button>
+            </div>
+          </div>
         </div>
         <div className="stCardActions">
           <button className="stPrimaryBtn" onClick={handleEmailChange} disabled={emailSaving}>
@@ -210,57 +286,199 @@ export default function AccountSecuritySection({ markDirty, showToast, Field, Se
       </div>
 
       {/* Password Change */}
-      <div className="stCard">
+      <div className="stCard" id="change-password-card">
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
           <Lock size={15} style={{ color: "#1A56DB" }} />
           <span style={{ fontSize: 13, fontWeight: 700, color: "var(--fg)" }}>Change Password</span>
-        </div>
-        <div className="stFormGrid">
-          {[
-            { label: "Current password", key: "current_password", showKey: "current" },
-            { label: "New password", key: "new_password", showKey: "new" },
-            { label: "Confirm new password", key: "confirm_password", showKey: "confirm" },
-          ].map(({ label, key, showKey }) => (
-            <div key={key} style={{ position: "relative" }}>
-              <Input 
-                label={label} 
-                type={showPw[showKey] ? "text" : "password"} 
-                placeholder={label} 
-                value={pwForm[key]} 
-                onChange={e => setPwForm(p => ({ ...p, [key]: e.target.value }))} 
-              />
-              <button
-                onClick={() => setShowPw(p => ({ ...p, [showKey]: !p[showKey] }))}
-                style={{ position: "absolute", right: 10, top: 40, background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 0 }}
-              >
-                {showPw[showKey] ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
-            </div>
-          ))}
-          {pwForm.new_password && (
-            <div style={{ gridColumn: "1 / -1" }}>
-              <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Password strength</div>
-              <div style={{ display: "flex", gap: 4 }}>
-                {[8, 12, 16].map(len => (
-                  <div key={len} style={{
-                    flex: 1, height: 4, borderRadius: 2,
-                    background: pwForm.new_password.length >= len ? "#059669" : "var(--stroke2)",
-                    transition: "background .2s",
-                  }} />
-                ))}
-              </div>
-              <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
-                {pwForm.new_password.length < 8 ? "Too short" : pwForm.new_password.length < 12 ? "Moderate" : "Strong"}
-              </div>
-            </div>
+          {otpMode && (
+            <span style={{ fontSize: 11, background: "#E0F2FE", color: "#0369A1", padding: "2px 8px", borderRadius: 20, fontWeight: 700 }}>OTP Recovery</span>
           )}
         </div>
-        <div className="stCardActions">
-          <button className="stPrimaryBtn" onClick={handlePasswordChange} disabled={pwSaving}>
-            {pwSaving ? <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} /> : <Lock size={13} />}
-            Update password
-          </button>
-        </div>
+
+        {otpMode ? (
+          otpStep === "request" ? (
+            <div>
+              <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6, marginBottom: 16 }}>
+                Forgot your password? We will send a secure 6-digit verification code to your email address: <strong style={{ color: "var(--fg)" }}>{user?.email || "your registered email"}</strong>
+              </p>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button 
+                  className="stPrimaryBtn" 
+                  onClick={handleSendEmailOTP} 
+                  disabled={otpSending}
+                >
+                  {otpSending ? <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} /> : null}
+                  Send verification code
+                </button>
+                <button className="stGhostBtn" onClick={() => setOtpMode(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6, marginBottom: 16 }}>
+                A verification code was sent to <strong style={{ color: "var(--fg)" }}>{user?.email}</strong>. Enter the code and your new password below.
+              </p>
+              <div className="stFormGrid" style={{ marginBottom: 16 }}>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <Input 
+                    label="Verification Code" 
+                    placeholder="Enter 6-digit code" 
+                    maxLength={6} 
+                    value={otpForm.otp_code} 
+                    onChange={e => setOtpForm(p => ({ ...p, otp_code: e.target.value.replace(/\D/g, "") }))} 
+                    style={{ letterSpacing: 4, fontSize: 16, fontWeight: 700 }}
+                  />
+                </div>
+                
+                <div style={{ position: "relative" }}>
+                  <Input 
+                    label="New password" 
+                    type={showOtpPw.new ? "text" : "password"} 
+                    placeholder="New password" 
+                    value={otpForm.new_password} 
+                    onChange={e => setOtpForm(p => ({ ...p, new_password: e.target.value }))} 
+                  />
+                  <button
+                    onClick={() => setShowOtpPw(p => ({ ...p, new: !p.new }))}
+                    style={{ position: "absolute", right: 10, top: 40, background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 0 }}
+                  >
+                    {showOtpPw.new ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+
+                <div style={{ position: "relative" }}>
+                  <Input 
+                    label="Confirm new password" 
+                    type={showOtpPw.confirm ? "text" : "password"} 
+                    placeholder="Confirm new password" 
+                    value={otpForm.confirm_password} 
+                    onChange={e => setOtpForm(p => ({ ...p, confirm_password: e.target.value }))} 
+                  />
+                  <button
+                    onClick={() => setShowOtpPw(p => ({ ...p, confirm: !p.confirm }))}
+                    style={{ position: "absolute", right: 10, top: 40, background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 0 }}
+                  >
+                    {showOtpPw.confirm ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+
+                {otpForm.new_password && (
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Password strength</div>
+                    <div style={{ display: "flex", gap: 4 }}>
+                      {[8, 12, 16].map(len => (
+                        <div key={len} style={{
+                          flex: 1, height: 4, borderRadius: 2,
+                          background: otpForm.new_password.length >= len ? "#059669" : "var(--stroke2)",
+                          transition: "background .2s",
+                        }} />
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+                      {otpForm.new_password.length < 8 ? "Too short" : otpForm.new_password.length < 12 ? "Moderate" : "Strong"}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div style={{ display: "flex", gap: 10 }}>
+                <button 
+                  className="stPrimaryBtn" 
+                  onClick={handleVerifyAndResetPassword} 
+                  disabled={otpSaving || !otpForm.otp_code || !otpForm.new_password || !otpForm.confirm_password}
+                >
+                  {otpSaving ? <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} /> : <Lock size={13} />}
+                  Verify & Update Password
+                </button>
+                <button 
+                  className="stGhostBtn" 
+                  onClick={() => {
+                    setOtpStep("request")
+                    setOtpForm({ otp_code: "", new_password: "", confirm_password: "" })
+                  }}
+                  disabled={otpSaving}
+                >
+                  Back
+                </button>
+              </div>
+            </div>
+          )
+        ) : (
+          <div>
+            <div className="stFormGrid">
+              {[
+                { label: "Current password", key: "current_password", showKey: "current" },
+                { label: "New password", key: "new_password", showKey: "new" },
+                { label: "Confirm new password", key: "confirm_password", showKey: "confirm" },
+              ].map(({ label, key, showKey }) => (
+                <div key={key} style={{ position: "relative" }}>
+                  <Input 
+                    label={label} 
+                    type={showPw[showKey] ? "text" : "password"} 
+                    placeholder={label} 
+                    value={pwForm[key]} 
+                    onChange={e => setPwForm(p => ({ ...p, [key]: e.target.value }))} 
+                  />
+                  <button
+                    onClick={() => setShowPw(p => ({ ...p, [showKey]: !p[showKey] }))}
+                    style={{ position: "absolute", right: 10, top: 40, background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 0 }}
+                  >
+                    {showPw[showKey] ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                  {key === "current_password" && (
+                    <div style={{ textAlign: "right", marginTop: 4 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOtpMode(true)
+                          setOtpStep("request")
+                          setOtpForm({ otp_code: "", new_password: "", confirm_password: "" })
+                        }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#1A56DB",
+                          fontSize: "11px",
+                          cursor: "pointer",
+                          padding: 0,
+                          fontWeight: 600,
+                          textDecoration: "underline"
+                        }}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {pwForm.new_password && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 6 }}>Password strength</div>
+                  <div style={{ display: "flex", gap: 4 }}>
+                    {[8, 12, 16].map(len => (
+                      <div key={len} style={{
+                        flex: 1, height: 4, borderRadius: 2,
+                        background: pwForm.new_password.length >= len ? "#059669" : "var(--stroke2)",
+                        transition: "background .2s",
+                      }} />
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4 }}>
+                    {pwForm.new_password.length < 8 ? "Too short" : pwForm.new_password.length < 12 ? "Moderate" : "Strong"}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="stCardActions">
+              <button className="stPrimaryBtn" onClick={handlePasswordChange} disabled={pwSaving}>
+                {pwSaving ? <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} /> : <Lock size={13} />}
+                Update password
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 2FA */}

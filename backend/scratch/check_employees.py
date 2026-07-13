@@ -1,22 +1,24 @@
 import os
 import django
-from django.db import connection
+import sys
 
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "quicktims.settings")
 django.setup()
 
-from companies.models import Company
+from django.contrib.auth import get_user_model
 from employees.models import Employee
+from companies.models import Company
 
-print("--- Employee Records ---")
-for company in Company.objects.all():
-    if company.schema_name == 'public':
-        continue
-    connection.set_tenant(company)
-    print(f"\nSchema: {company.schema_name} (Company: {company.company_name})")
-    employees = Employee.objects.all()
-    if not employees.exists():
-        print("  (No employees)")
-    for emp in employees:
-        user = emp.user
-        print(f"  - ID: {emp.id}, Emp ID: {emp.employee_id}, Name: {user.first_name if user else 'None'} {user.last_name if user else 'None'}, Username: {user.username if user else 'None'}, Email: {user.email if user else 'None'}, Role: {user.role if user else 'None'}")
+def check():
+    User = get_user_model()
+    print("=== USERS ===")
+    for u in User.objects.all():
+        print(f"ID: {u.id}, Username: {u.username}, Email: {u.email}, Active: {u.is_active}, Role: {u.role}, Company: {u.company}")
+        
+    print("\n=== EMPLOYEES ===")
+    for e in Employee.objects.all():
+        print(f"ID: {e.id}, EmpId: {e.employee_id}, User: {e.user.username if e.user else 'None'}, Active: {e.is_active}, Rate: {e.hourly_rate}, Title: {e.title}, Company: {e.company}")
+
+if __name__ == "__main__":
+    check()

@@ -2,6 +2,8 @@ from rest_framework import serializers
 
 from accounts.models import User
 from tasks.models import Task, TaskAttachment, TaskActivityLog
+from service_requests.models import ServiceRequest
+
 
 
 class AssignedToSerializer(serializers.ModelSerializer):
@@ -14,11 +16,35 @@ class AssignedToSerializer(serializers.ModelSerializer):
 class TaskSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     assigned_to = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all(),
+        # NOTE: queryset is overridden in __init__ to scope by request.company
+        # to enforce tenant isolation (CRITICAL 5).
+        queryset=User.objects.none(),  # safe default — overridden below
         required=False,
         allow_null=True,
         pk_field=serializers.CharField()
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        company = None
+        if request:
+            company = getattr(request, "company", None) or getattr(
+                getattr(request, "user", None), "company", None
+            )
+        if company:
+            # Scope assigned_to choices to users belonging to this company only
+            self.fields["assigned_to"].queryset = User.objects.filter(company=company)
+        else:
+            # Fallback: allow all users but log a warning (should not happen in production)
+            import logging
+            logging.getLogger(__name__).warning(
+                "TaskSerializer: could not determine company from request context. "
+                "assigned_to field is unscoped — check view for missing company context."
+            )
+            self.fields["assigned_to"].queryset = User.objects.all()
+
+
     assigned_by = serializers.PrimaryKeyRelatedField(
         read_only=True,
         pk_field=serializers.CharField()
@@ -26,6 +52,12 @@ class TaskSerializer(serializers.ModelSerializer):
     
     assigned_to_detail = AssignedToSerializer(source="assigned_to", read_only=True)
     assigned_by_name = serializers.SerializerMethodField()
+    service_request = serializers.PrimaryKeyRelatedField(
+        queryset=ServiceRequest.objects.all(),
+        required=False,
+        allow_null=True,
+        pk_field=serializers.CharField()
+    )
     job_site_name = serializers.SlugRelatedField(
         source='job_site',
         read_only=True,
@@ -40,12 +72,13 @@ class TaskSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        # Ensure MongoDB ObjectIds are cast to strings for JSON
+        # Ensure UUIDs are cast to strings for JSON
         if ret.get('id'): ret['id'] = str(ret['id'])
         if ret.get('assigned_to'): ret['assigned_to'] = str(ret['assigned_to'])
         if ret.get('assigned_by'): ret['assigned_by'] = str(ret['assigned_by'])
         if ret.get('job_site'): ret['job_site'] = str(ret['job_site'])
         if ret.get('time_log'): ret['time_log'] = str(ret['time_log'])
+        if ret.get('service_request'): ret['service_request'] = str(ret['service_request'])
         return ret
 
     class Meta:
@@ -102,6 +135,7 @@ class TaskSerializer(serializers.ModelSerializer):
             "time_log",
             "employee_notes",
             "admin_notes",
+            "service_request",
             "started_at",
             "completed_at",
             "created_at",
@@ -139,6 +173,16 @@ class TaskSerializer(serializers.ModelSerializer):
             "start_photo", "end_photo", "face_match_percentage", "face_match_status", "submission_time",
             "inventory_status", "blocking_reason", "required_items",
         )
+
+    def validate_assigned_to(self, value):
+        if value:
+            from employees.models import Employee
+            employee = Employee.objects.filter(user=value).first()
+            if employee:
+                if value.role != "admin":
+                    if not employee.hourly_rate or employee.hourly_rate <= 0:
+                        raise serializers.ValidationError("This employee must configure their hourly rate before tasks can be assigned to them.")
+        return value
 
     def get_assigned_by_name(self, obj):
         if obj.assigned_by:

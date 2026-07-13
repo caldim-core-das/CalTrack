@@ -8,12 +8,20 @@ import { SessionToast } from "./components/SessionToast.jsx"
 import { LoginPage } from "./pages/LoginPage.jsx"
 
 // Lazy-loaded Pages
+const OrganizationSignupPage = lazy(() =>
+  import("./pages/OrganizationSignupPage.jsx").then(m => ({ default: m.OrganizationSignupPage }))
+)
+
 const AcceptInvitePage = lazy(() =>
   import("./pages/AcceptInvitePage.jsx").then(m => ({ default: m.AcceptInvitePage }))
 )
 
 const ActivationJourneyPage = lazy(() =>
   import("./pages/ActivationJourneyPage.jsx").then(m => ({ default: m.ActivationJourneyPage }))
+)
+
+const CreatePasswordPage = lazy(() =>
+  import("./pages/CreatePasswordPage.jsx").then(m => ({ default: m.CreatePasswordPage }))
 )
 
 
@@ -129,6 +137,22 @@ const TrainingRecordsPage = lazy(() =>
   import("./pages/EmployeeSubPages.jsx").then(m => ({ default: m.TrainingRecordsPage }))
 )
 
+const BookingPage = lazy(() =>
+  import("./pages/BookingPage.jsx").then(m => ({ default: m.BookingPage }))
+)
+const FeedbackPage = lazy(() =>
+  import("./pages/FeedbackPage.jsx").then(m => ({ default: m.FeedbackPage }))
+)
+const ServiceRequestsPage = lazy(() =>
+  import("./pages/ServiceRequestsPage.jsx").then(m => ({ default: m.ServiceRequestsPage }))
+)
+const FeedbackManagementPage = lazy(() =>
+  import("./pages/FeedbackManagementPage.jsx").then(m => ({ default: m.FeedbackManagementPage }))
+)
+const EmployeeJobsPage = lazy(() =>
+  import("./pages/EmployeeJobsPage.jsx").then(m => ({ default: m.EmployeeJobsPage }))
+)
+
 // ─── Route Guards ────────────────────────────────────────────
 
 /**
@@ -149,6 +173,28 @@ function RequireAdmin() {
 function RequireAdminSettings() {
   const { isAdmin } = useRole()
   if (!isAdmin) return <Navigate to={routes.settings_profile} replace />
+  return <Outlet />
+}
+
+/**
+ * RequireModulePermission — protects routes based on company module permissions.
+ * Redirects unauthorized users back to the dashboard.
+ */
+function RequireModulePermission({ module, action = "view" }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to={routes.login} replace />
+  
+  const perms = user.companyPermissions
+  if (perms) {
+    const modulePerms = perms[module]
+    if (modulePerms) {
+      const checkRole = user.role === "manager" ? "admin" : user.role
+      const actions = modulePerms[checkRole] || []
+      if (!actions.includes(action)) {
+        return <Navigate to={routes.dashboard} replace />
+      }
+    }
+  }
   return <Outlet />
 }
 
@@ -217,6 +263,21 @@ export function App() {
           />
 
           <Route
+            path={routes.organization_signup}
+            element={
+              user ? (
+                user.companyId ? (
+                  <Navigate to={isAdmin ? adminDefaultRoute() : routes.dashboard} replace />
+                ) : (
+                  <Navigate to={routes.onboarding} replace />
+                )
+              ) : (
+                <OrganizationSignupPage />
+              )
+            }
+          />
+
+          <Route
             path={routes.onboarding}
             element={
               !user ? (
@@ -232,6 +293,11 @@ export function App() {
           <Route
             path={routes.activation_journey}
             element={<ActivationJourneyPage />}
+          />
+
+          <Route
+            path={routes.create_password}
+            element={<CreatePasswordPage />}
           />
 
           <Route
@@ -251,6 +317,9 @@ export function App() {
               )
             }
           />
+
+          <Route path={routes.booking} element={<BookingPage />} />
+          <Route path={routes.feedback} element={<FeedbackPage />} />
 
           {/* ── Authenticated shell ── */}
           <Route
@@ -272,27 +341,40 @@ export function App() {
               path={routes.analysis}
               element={isAdmin ? <Navigate to={routes.dashboard} replace /> : <AnalysisPage />}
             />
-            <Route path={routes.time} element={<TimePage />} />
+            <Route element={<RequireModulePermission module="attendance" action="view" />}>
+              <Route path={routes.time} element={<TimePage />} />
+            </Route>
             <Route path={routes.tasks} element={<TasksPage />} />
             <Route path={routes.leaves} element={<LeavesPage />} />
             <Route path={routes.inventory} element={<InventoryPage />} />
             <Route path={routes.mileage} element={<MileagePage />} />
+            <Route path={routes.employee_jobs} element={<EmployeeJobsPage />} />
 
             {/* Employee profile settings — accessible to everyone */}
             <Route path={routes.settings} element={<SettingsPage />} />
             <Route path={routes.settings_profile} element={<SettingsPage section="profile" />} />
             <Route path={routes.settings_notifications} element={<SettingsPage section="notifications" />} />
             <Route path={routes.settings_preferences} element={<SettingsPage section="preferences" />} />
+            <Route path={routes.settings_security} element={<SettingsPage section="security" />} />
+            <Route path={routes.settings_data} element={<SettingsPage section="data" />} />
 
             {/* ── Admin-only routes ── */}
             <Route element={<RequireAdmin />}>
               <Route path={routes.get_started} element={<GetStartedPage />} />
-              <Route path={routes.locations} element={<LocationsPage />} />
-              <Route path={routes.live_locations} element={<LiveLocationsPage />} />
-              <Route path={routes.payroll} element={<PayrollPage />} />
+              <Route element={<RequireModulePermission module="locations" action="view" />}>
+                <Route path={routes.locations} element={<LocationsPage />} />
+              </Route>
+              <Route element={<RequireModulePermission module="live_location" action="view" />}>
+                <Route path={routes.live_locations} element={<LiveLocationsPage />} />
+              </Route>
+              <Route element={<RequireModulePermission module="payroll" action="view" />}>
+                <Route path={routes.payroll} element={<PayrollPage />} />
+              </Route>
               <Route path={routes.scheduling} element={<SchedulingPage />} />
               <Route path={routes.employees} element={<EmployeesPage />} />
-              <Route path={routes.reports} element={<ReportsPage />} />
+              <Route element={<RequireModulePermission module="reports" action="view" />}>
+                <Route path={routes.reports} element={<ReportsPage />} />
+              </Route>
               <Route path={routes.compliance} element={<CompliancePage />} />
               <Route path={routes.approvals} element={<ApprovalCenterPage />} />
               <Route path={routes.employees_dashboard} element={<EmployeesDashboardPage />} />
@@ -301,6 +383,8 @@ export function App() {
               <Route path={routes.employees_rejected} element={<RejectedEmployeesPage />} />
               <Route path={routes.employees_documents} element={<DocumentVaultPage />} />
               <Route path={routes.employees_training} element={<TrainingRecordsPage />} />
+              <Route path={routes.admin_service_requests} element={<ServiceRequestsPage />} />
+              <Route path={routes.admin_feedback} element={<FeedbackManagementPage />} />
             </Route>
 
             {/* ── Admin-only settings (employees redirected to /settings/profile) ── */}
@@ -317,7 +401,6 @@ export function App() {
               <Route path={routes.settings_workflows} element={<SettingsPage section="workflows" />} />
               <Route path={routes.settings_productivity} element={<SettingsPage section="productivity" />} />
               <Route path={routes.settings_reports} element={<SettingsPage section="reports" />} />
-              <Route path={routes.settings_security} element={<SettingsPage section="security" />} />
               <Route path={routes.settings_rbac} element={<SettingsPage section="rbac" />} />
               <Route path={routes.settings_audit} element={<SettingsPage section="audit" />} />
               <Route path={routes.settings_devices} element={<SettingsPage section="devices" />} />
@@ -328,7 +411,6 @@ export function App() {
               <Route path={routes.settings_developer} element={<SettingsPage section="developer" />} />
               <Route path={routes.settings_billing} element={<SettingsPage section="billing" />} />
               <Route path={routes.settings_invoices} element={<SettingsPage section="invoices" />} />
-              <Route path={routes.settings_data} element={<SettingsPage section="data" />} />
             </Route>
           </Route>
 

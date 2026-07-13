@@ -29,15 +29,12 @@ Every piece of data is strictly isolated by organization — no exceptions.
 ### Backend
 - Python 3.13 — Django 5.2
 - Django REST Framework (DRF) — all APIs
-- MongoDB via official django-mongodb-backend
 - JWT Authentication — djangorestframework-simplejwt
 - Bearer token in Authorization header
 - Pillow — image handling (photo verification on clock-in)
 - NO Pydantic — use DRF Serializers for all validation
 
 ### Database
-- MongoDB via django-mongodb-backend
-- No raw PyMongo — always use Django ORM with mongodb backend
 
 ---
 
@@ -194,7 +191,6 @@ quicktims/
 
 ---
 
-## MongoDB Collections (Django Models)
 
 | App            | Model          | Collection Purpose                        |
 |----------------|----------------|-------------------------------------------|
@@ -271,9 +267,7 @@ quicktims/
 
 ---
 
-## MongoDB / Django ORM Rules
 
-- Always use Django ORM — never raw PyMongo queries
 - Every queryset must be scoped to org or user — no unscoped queries
 - Passwords: Django built-in hashing — never plain text
 - Images: stored via Pillow + Django FileField — never base64 in DB
@@ -282,10 +276,8 @@ quicktims/
 
 ## Hard Rules — Never Violate These
 
-- No raw PyMongo — always Django ORM with mongodb backend
 - No unscoped queries — always filter by org/user
 - No plain text passwords
-- No base64 images stored in MongoDB — use Pillow + FileField
 - No class components in React — functional only
 - No prop drilling — use Redux Toolkit for shared state
 - No hardcoded route strings in pages — always import from routes.js

@@ -5,7 +5,7 @@ from rest_framework import permissions, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdminRole, is_admin_role, ADMIN_ROLES
+from accounts.permissions import IsAdminRole, is_admin_role, ADMIN_ROLES, RequireModuleAccess
 from employees.models import Employee
 
 from .models import Break, TimeLog, JobSite, TimeLogPhoto, Location, LocationZone, EmployeeLocation
@@ -23,8 +23,8 @@ class JobSiteViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
-            return [permissions.IsAuthenticated()]
-        return [IsAdminRole()]
+            return [permissions.IsAuthenticated(), RequireModuleAccess("locations", "view")]
+        return [IsAdminRole(), RequireModuleAccess("locations", "modify")]
 
     def get_queryset(self):
         if not hasattr(self.request, 'company'):
@@ -62,7 +62,7 @@ def _get_employee_for_request(request, employee_id: str | None) -> Employee | No
 
 class TimeLogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = TimeLogSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "view")]
 
     @action(detail=True, methods=['get'])
     def download_pdf(self, request, pk=None):
@@ -112,7 +112,7 @@ class ClockInView(APIView):
     frontends (TimePage, mobile) keep parsing distance/radius/message
     unchanged. New clients can opt into the additional ``reason`` field.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "modify")]
 
     def post(self, request):
         from time_tracking.geo import evaluate, TenantMismatch
@@ -122,9 +122,19 @@ class ClockInView(APIView):
         if not employee:
             return Response({"detail": "Employee profile not found."}, status=404)
 
-        open_log = TimeLog.objects.filter(employee=employee, clock_out__isnull=True).first()
-        if open_log:
-            return Response({"detail": "Already clocked in."}, status=400)
+        # MEDIUM 3 — Race-condition lock: acquire a DB-level row lock on any
+        # existing open log for this employee before checking/creating, preventing
+        # two concurrent clock-in requests from both passing the guard at once.
+        from django.db import transaction as db_transaction
+        with db_transaction.atomic():
+            open_log = (
+                TimeLog.objects
+                .select_for_update()
+                .filter(employee=employee, clock_out__isnull=True)
+                .first()
+            )
+            if open_log:
+                return Response({"detail": "Already clocked in."}, status=400)
 
         now = timezone.now()
         lat = request.data.get("lat")
@@ -252,7 +262,7 @@ def _unwrap_location(loc):
 
 
 class ClockOutView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "modify")]
 
     def post(self, request):
         company = getattr(request, 'company', None)
@@ -325,7 +335,7 @@ class ClockOutView(APIView):
 
 
 class BreakStartView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "modify")]
 
     def post(self, request):
         company = getattr(request, 'company', None)
@@ -348,7 +358,7 @@ class BreakStartView(APIView):
 
 
 class BreakEndView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "modify")]
 
     def post(self, request):
         company = getattr(request, 'company', None)
@@ -368,7 +378,7 @@ class BreakEndView(APIView):
 
 
 class TimesheetView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "view")]
 
     def get(self, request):
         return self._handle_get(request)
@@ -474,7 +484,7 @@ class TimesheetView(APIView):
 
 
 class AdminEmployeeTimeLogsView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("attendance", "view")]
 
     def get(self, request, employee_id: str):
         company = getattr(request, 'company', None)
@@ -486,7 +496,7 @@ class AdminEmployeeTimeLogsView(APIView):
 
 
 class TimeGeofenceStatusView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "view")]
 
     def get(self, request):
         company = getattr(request, 'company', None)
@@ -518,7 +528,7 @@ class TimeGeofenceStatusView(APIView):
 
 
 class UploadJobPhotoView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "modify")]
 
     def post(self, request):
         company = getattr(request, 'company', None)
@@ -548,7 +558,7 @@ class UploadJobPhotoView(APIView):
 
 
 class JobSitePhotosView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "view")]
 
     def get(self, request):
         # Admins see all, employees see their own (or all if needed, but let's stick to related logs)
@@ -574,7 +584,7 @@ class JobSitePhotosView(APIView):
             })
         return Response(data)
 class TimeLogSubmitView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "modify")]
 
     def post(self, request, pk: str):
         company = getattr(request, 'company', None)
@@ -600,7 +610,7 @@ class TimeLogSubmitView(APIView):
 
 
 class TimeLogApprovalView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("attendance", "modify")]
 
     def post(self, request, pk: str):
         action = request.data.get("action") # "approve", "reject", "edit"
@@ -650,7 +660,7 @@ class TimeLogApprovalView(APIView):
 
 class CurrentSessionView(APIView):
     """Returns the currently active time log for the logged-in user."""
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "view")]
 
     def get(self, request):
         company = getattr(request, 'company', None)
@@ -680,8 +690,8 @@ class LocationViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
-            return [permissions.IsAuthenticated()]
-        return [IsAdminRole()]
+            return [permissions.IsAuthenticated(), RequireModuleAccess("locations", "view")]
+        return [IsAdminRole(), RequireModuleAccess("locations", "modify")]
 
     def get_queryset(self):
         company = getattr(self.request, 'company', None)
@@ -712,8 +722,8 @@ class LocationZoneViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
-            return [permissions.IsAuthenticated()]
-        return [IsAdminRole()]
+            return [permissions.IsAuthenticated(), RequireModuleAccess("locations", "view")]
+        return [IsAdminRole(), RequireModuleAccess("locations", "modify")]
 
     def get_queryset(self):
         company = getattr(self.request, 'company', None)
@@ -728,7 +738,11 @@ class LocationZoneViewSet(viewsets.ModelViewSet):
 class EmployeeLocationViewSet(viewsets.ModelViewSet):
     """Manage which locations an employee is permitted to clock in at."""
     serializer_class = EmployeeLocationSerializer
-    permission_classes = [IsAdminRole]
+    
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [IsAdminRole(), RequireModuleAccess("locations", "view")]
+        return [IsAdminRole(), RequireModuleAccess("locations", "modify")]
 
     def get_queryset(self):
         company = getattr(self.request, 'company', None)
@@ -747,21 +761,7 @@ class EmployeeLocationViewSet(viewsets.ModelViewSet):
 
 
 class LocationOverviewView(APIView):
-    """
-    Admin map overview — each location with live employee-on-site count.
-    Used by the admin map to show colour-coded markers.
-
-    Phase 3 enrichment: every location now also carries `violation_count`,
-    `late_arrival_count`, `capacity`, `status`, and `geofence_type` so the
-    frontend can paint the marker without a second round-trip.
-
-    Phase 7 caching: response is memoised per tenant for the duration of
-    `OVERVIEW_CACHE_SECONDS`. The frontend polls every 30s, so a 30s cache
-    means each tenant sees at most one DB read per polling window even when
-    50 admins have the dashboard open simultaneously. Cache is busted by
-    a query-string param (`?fresh=1`), used by the manual Refresh button.
-    """
-    permission_classes = [IsAdminRole]
+    permission_classes = [IsAdminRole, RequireModuleAccess("locations", "view")]
 
     # Status colours the dashboard expects.
     STATUS_INACTIVE = "inactive"

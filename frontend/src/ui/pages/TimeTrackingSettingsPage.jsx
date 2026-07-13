@@ -32,6 +32,7 @@ export function TimeTrackingSettingsPage() {
             try {
                 await saveSettings({}) // Actually pass policy data here
                 setSuccess(card)
+                localStorage.setItem("caltrack.onboarding.rules.completed", "true")
                 setTimeout(() => setSuccess(null), 3000)
                 setEditingCard(null)
             } catch (err) {

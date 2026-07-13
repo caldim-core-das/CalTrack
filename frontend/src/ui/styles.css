@@ -4732,7 +4732,7 @@ h6 {
   position: fixed;
   top: 80px;
   right: 24px;
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--stroke2);
   border-radius: 12px;
   padding: 14px 18px;
@@ -4775,6 +4775,22 @@ h6 {
 
 .settingsToast[data-type="warn"] svg {
   color: #D97706;
+}
+
+.settingsToast[data-type="error"] {
+  border-left: 4px solid #ef4444;
+}
+
+.settingsToast[data-type="error"] svg {
+  color: #ef4444;
+}
+
+.settingsToast[data-type="info"] {
+  border-left: 4px solid #3B82F6;
+}
+
+.settingsToast[data-type="info"] svg {
+  color: #3B82F6;
 }
 
 .settingsToastClose {
@@ -13095,3 +13111,10 @@ body,
     color: hsl(var(--foreground));
   }
 }
+
+:root {
+  --background: 0 0% 3.9%; /* #0a0a0a */
+  --foreground: 0 0% 92.9%; /* #ededed */
+  --background-hex: #0a0a0a;
+  --foreground-hex: #ededed;
+}

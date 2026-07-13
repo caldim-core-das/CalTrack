@@ -20,6 +20,15 @@ import { ClipboardList, Clock, CheckCircle2, AlertCircle, MapPin, Calendar as Ca
 import { SelfieCapture, getPosition } from "./TimePage.jsx"
 import { verifyFaces } from "../../utils/faceVerify.js"
 
+const BACKEND_HTTP_HOST = import.meta.env.PROD
+  ? `${window.location.origin}/Caltrack`
+  : `${window.location.protocol}//${window.location.hostname}:8000`
+
+const BACKEND_WS_HOST = import.meta.env.PROD
+  ? `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/Caltrack`
+  : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.hostname}:8000`
+
+
 // Custom hook to detect if dark mode is active
 function useDarkMode() {
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"))
@@ -118,6 +127,7 @@ function SlaBadge({ slaStatus, slaMinutes }) {
 }
 
 const EMPTY_FORM = {
+  service_request: "",
   title: "", description: "", category: "other", priority: "medium",
   status: "pending",
   assigned_to: "", due_date: new Date().toISOString().slice(0, 10),
@@ -800,7 +810,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     // Connect to employee tracking WebSocket
     const WS_BASE =
       (typeof import.meta !== "undefined" && import.meta.env?.VITE_WS_BASE_URL) ||
-      "ws://localhost:8000"
+      BACKEND_WS_HOST
 
     try {
       const ws = new WebSocket(`${WS_BASE}/ws/live/employee/`)
@@ -1009,7 +1019,8 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     
     let startPhotoUrl = task.start_photo
     if (startPhotoUrl && startPhotoUrl.startsWith('/')) {
-      const host = "http://localhost:8000"
+      const host = BACKEND_HTTP_HOST
+
       startPhotoUrl = `${host}${startPhotoUrl}`;
     }
 
@@ -2708,7 +2719,8 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                               <span className="text-[9px] font-black text-slate-400 uppercase">Start Photo</span>
                               <div className="w-full h-32 rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
                                 {task.start_photo ? (
-                                  <img src={`http://localhost:8000${task.start_photo}`} className="w-full h-full object-contain" />
+                                  <img src={`${BACKEND_HTTP_HOST}${task.start_photo}`} className="w-full h-full object-contain" />
+
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-400 font-bold uppercase">No Start Photo</div>
                                 )}
@@ -3098,6 +3110,97 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
   const [hoveredEmpId, setHoveredEmpId] = useState(null)
   const addressInputRef = useRef(null)
 
+  // ── Service Requests Import State ─────────────────────────────
+  const [reviewedRequests, setReviewedRequests] = useState([])
+  useEffect(() => {
+    apiRequest("/admin/service-requests/?status=reviewed")
+      .then((res) => {
+        if (res?.success && Array.isArray(res.data)) {
+          setReviewedRequests(res.data)
+        }
+      })
+      .catch((err) => console.error("Error loading reviewed requests:", err))
+  }, [])
+
+  function handleSelectServiceRequest(srId) {
+    if (!srId) {
+      set("service_request", "")
+      return
+    }
+    const selected = reviewedRequests.find((r) => String(r.id) === String(srId))
+    if (!selected) return
+
+    set("service_request", selected.id)
+    set("title", `Service Request: ${selected.issue_title}`)
+    set("description", selected.description)
+
+    // Map service category to task category
+    const catMap = {
+      plumbing: "plumber",
+      electrical: "electrician",
+      carpentry: "carpenter",
+      hvac: "hvac",
+      cleaning: "cleaning",
+      pest_control: "other",
+      painting: "repair",
+      appliance_repair: "repair",
+      security: "other",
+      general: "maintenance",
+    }
+    set("category", catMap[selected.service_category] || "other")
+
+    // Map priority
+    const priorityMap = {
+      low: "low",
+      normal: "medium",
+      high: "high",
+      urgent: "urgent",
+    }
+    set("priority", priorityMap[selected.priority] || "medium")
+
+    // Map client details
+    set("client_name", selected.customer_name)
+    set("client_contact_number", selected.phone)
+    set("client_email", selected.email || "")
+    set("job_address", selected.address)
+    set("due_date", selected.preferred_date)
+
+    // Trigger address input for geocoding
+    setAddressInput(selected.address)
+    setShowMore(true) // Automatically expand advanced details
+
+    // Auto-confirm location and geocode the address
+    if (selected.address) {
+      setWorkflowLoading(true)
+      setErr("")
+      apiRequest("/tasks/admin/smart-address-workflow/", {
+        method: "POST",
+        json: {
+          address: selected.address
+        }
+      })
+      .then(res => {
+        setWorkflowData(res)
+        setLocationConfirmed(true)
+        if (res.geocoded) {
+          set("location_lat", String(parseFloat(res.geocoded.lat).toFixed(6)))
+          set("location_lon", String(parseFloat(res.geocoded.lon).toFixed(6)))
+          set("area", res.geocoded.area || "")
+          set("city", res.geocoded.city || "")
+          set("state", res.geocoded.state || "")
+          set("pincode", res.geocoded.pincode || "")
+          set("location", res.geocoded.zone || "")
+        }
+      })
+      .catch(err => {
+        console.error("Auto-geocoding failed:", err)
+      })
+      .finally(() => {
+        setWorkflowLoading(false)
+      })
+    }
+  }
+
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
   // Sort employees by availability + GPS distance priority (Urban Company / Swiggy flow)
@@ -3318,6 +3421,37 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
         </div>
 
         <div>
+          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5 block">
+            Import from Reviewed Service Request (Optional)
+          </label>
+          <select
+            value={form.service_request || ""}
+            onChange={(e) => handleSelectServiceRequest(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: 12,
+              border: "1.5px solid #cbd5e1",
+              background: "#fff",
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#334155",
+              outline: "none",
+              cursor: "pointer",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+            }}
+            className="dark:bg-slate-950 dark:border-slate-800 dark:text-slate-300"
+          >
+            <option value="">— Select Reviewed Booking —</option>
+            {reviewedRequests.map((sr) => (
+              <option key={sr.id} value={sr.id}>
+                {sr.request_id} — {sr.customer_name} ({sr.issue_title})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
           <Input
             value={form.title}
             onChange={e => set("title", e.target.value)}
@@ -3356,6 +3490,9 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
                 const userId = emp.user?.id || emp.id
                 const name = `${emp.first_name || emp.user?.first_name || emp.user?.username || "?"} ${emp.last_name || emp.user?.last_name || ""}`.trim()
 
+                const hourlyRate = emp.hourly_rate !== undefined ? parseFloat(emp.hourly_rate) : 0
+                const isRateMissing = (emp.role !== "admin" && emp.user?.role !== "admin" && (!emp.title || !emp.title.toLowerCase().includes("admin"))) && hourlyRate <= 0
+
                 let displayLabel = `[${cfg.label.toUpperCase()}] ${name}`;
                 if (emp.isOnline) {
                   if (emp.nearbyDetail) {
@@ -3369,8 +3506,12 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
                   displayLabel = `🔴 [OFFLINE] ${name}`;
                 }
 
+                if (isRateMissing) {
+                  displayLabel += " [RATE NOT SET - CANNOT ASSIGN]"
+                }
+
                 return (
-                  <option key={emp.id} value={userId}>
+                  <option key={emp.id} value={userId} disabled={isRateMissing}>
                     {displayLabel}
                   </option>
                 )

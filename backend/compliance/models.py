@@ -15,6 +15,7 @@ from django.db import models
 from django.utils import timezone
 
 from employees.models import Employee
+from utils.validators import validate_upload
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +184,7 @@ class RightToWork(models.Model):
     )
     document_type = models.CharField(max_length=30, choices=DocumentType.choices)
     document_number = models.CharField(max_length=100, blank=True)
-    document_file = models.FileField(upload_to="rtw_documents/", null=True, blank=True)
+    document_file = models.FileField(upload_to="rtw_documents/", null=True, blank=True, validators=[validate_upload])
 
     issue_date = models.DateField(null=True, blank=True)
     expiry_date = models.DateField(null=True, blank=True)  # None = indefinite right to work
@@ -244,7 +245,7 @@ class WTROptOut(models.Model):
     employee = models.ForeignKey(
         Employee, on_delete=models.CASCADE, related_name="wtr_opt_outs"
     )
-    agreement_file = models.FileField(upload_to="wtr_optouts/", null=True, blank=True)
+    agreement_file = models.FileField(upload_to="wtr_optouts/", null=True, blank=True, validators=[validate_upload])
     signed_on = models.DateField()
     is_active = models.BooleanField(default=True)
     withdrawn_on = models.DateField(null=True, blank=True)

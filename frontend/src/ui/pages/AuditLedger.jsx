@@ -79,7 +79,7 @@ function TimelineNode({ label, time, active }) {
   )
 }
 
-export default function AuditLedger({ logs, loading, elapsed, downloadLogPdf, submitLog, formatDuration }) {
+export default function AuditLedger({ logs, loading, elapsed, downloadLogPdf, submitLog, formatDuration, canModify = true }) {
   const host = API_BASE_URL.replace('/api', '')
   const getUrl = (p) => (p && p.startsWith('/') ? `${host}${p}` : p)
 
@@ -319,7 +319,7 @@ export default function AuditLedger({ logs, loading, elapsed, downloadLogPdf, su
                     )}
                   </div>
 
-                  {l.status === "draft" && l.clock_out && (
+                  {l.status === "draft" && l.clock_out && canModify && (
                     <button
                       onClick={() => submitLog(l.id)}
                       style={{

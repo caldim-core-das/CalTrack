@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo, lazy, Suspense } from "react"
 import { useLocation } from "react-router-dom"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { routes } from "../routes.js"
 import { Button } from "../components/kit.jsx"
@@ -8,6 +9,7 @@ import {
   User, Shield, Palette, Bell, CreditCard, Users2, Plug,
   Building2, Database, AlertTriangle, ShieldCheck, RefreshCcw,
   CheckCircle2, X, Save, ChevronRight, FileText, Calendar,
+  Info, XCircle,
 } from "lucide-react"
 
 /* ── Lazy section imports ─────────────────────────────────────── */
@@ -24,7 +26,6 @@ const MembersSettingsSection = lazy(() =>
 )
 const TeamMembersSection    = lazy(() => import("./settings/TeamMembersSection.jsx"))
 const InvoicesSection       = lazy(() => import("./settings/InvoicesSection.jsx"))
-const IntegrationsApiSection = lazy(() => import("./settings/IntegrationsApiSection.jsx"))
 const WorkspaceSection      = lazy(() => import("./settings/WorkspaceSection.jsx"))
 const PrivacyDataSection    = lazy(() => import("./settings/PrivacyDataSection.jsx"))
 const DangerZoneSection     = lazy(() => import("./settings/DangerZoneSection.jsx"))
@@ -33,11 +34,25 @@ const AccessControlSection  = lazy(() => import("./settings/AccessControlSection
 /* ── Helpers ─────────────────────────────────────────────────── */
 function Toast({ message, type = "success", onDismiss }) {
   useEffect(() => { const t = setTimeout(onDismiss, 3500); return () => clearTimeout(t) }, [onDismiss])
+  const getIcon = () => {
+    switch (type) {
+      case "success":
+        return <CheckCircle2 size={15} />
+      case "error":
+        return <XCircle size={15} />
+      case "warn":
+      case "warning":
+        return <AlertTriangle size={15} />
+      case "info":
+      default:
+        return <Info size={15} />
+    }
+  }
   return (
-    <div className="stToast" data-type={type}>
-      {type === "success" ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
+    <div className="settingsToast" data-type={type}>
+      {getIcon()}
       <span>{message}</span>
-      <button onClick={onDismiss} className="stToastClose"><X size={13} /></button>
+      <button onClick={onDismiss} className="settingsToastClose"><X size={13} /></button>
     </div>
   )
 }
@@ -132,14 +147,7 @@ const TABS = [
     adminOnly: true,
     to: routes.settings_invoices,
   },
-  {
-    id: "integrations",
-    label: "Integrations & API",
-    subtitle: "API keys, webhook endpoints, and connected OAuth apps.",
-    icon: <Plug size={15} />,
-    adminOnly: true,
-    to: routes.settings_integrations,
-  },
+
   {
     id: "organization",
     label: "Workspace",
@@ -272,7 +280,6 @@ export function SettingsPage({ section: sectionProp }) {
               {activeSection === "team"          && <TeamMembersSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "schedules"     && <WorkSchedulesSettingsSection />}
               {activeSection === "invoices"      && <InvoicesSection />}
-              {activeSection === "integrations"  && <IntegrationsApiSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "organization"  && <WorkspaceSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "data"          && <PrivacyDataSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "rbac"          && <AccessControlSection />}
@@ -281,42 +288,11 @@ export function SettingsPage({ section: sectionProp }) {
           </motion.div>
         </AnimatePresence>
 
-        {/* Save bar */}
-        <AnimatePresence>
-          {dirty && (
-            <motion.div
-              initial={{ y: 80, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 80, opacity: 0 }}
-              className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50"
-            >
-              <div className="flex items-center gap-6 px-6 py-4 bg-surface dark:bg-slate-900 border border-stroke dark:border-slate-800 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
-                  <span className="text-sm font-bold text-slate-900 dark:text-white">You have unsaved changes</span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setDirty(false)}
-                    className="px-4 py-2 text-xs font-black uppercase tracking-widest text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-                  >
-                    Discard
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex items-center gap-2 px-6 py-2 bg-indigo-600 dark:bg-indigo-500 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all disabled:opacity-50"
-                  >
-                    {saving ? <RefreshCcw size={14} className="animate-spin" /> : <Save size={14} />}
-                    {saving ? "Saving..." : "Save Changes"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {toast && createPortal(
+          <Toast key={toast.id} message={toast.msg} type={toast.type} onDismiss={() => setToast(null)} />,
+          document.body
+        )}
 
-        {toast && <Toast key={toast.id} message={toast.msg} type={toast.type} onDismiss={() => setToast(null)} />}
       </main>
     </div>
   )

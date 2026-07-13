@@ -66,6 +66,12 @@ export function ReportsPage() {
     setError("")
     try {
       const res = await apiRequest(`/reports/dashboard-analytics/`)
+  const load = async (force = false) => {
+    setLoading(true)
+    setError("")
+    try {
+      const url = force ? `/reports/dashboard-analytics/?refresh=true` : `/reports/dashboard-analytics/`
+      const res = await apiRequest(url)
       setData(res)
     } catch (err) {
       setError(err?.body?.detail || "Failed to load comprehensive reports.")
@@ -178,6 +184,7 @@ export function ReportsPage() {
         </div>
         <div>
           <Button variant="secondary" onClick={load} disabled={loading}>
+          <Button variant="secondary" onClick={() => load(true)} disabled={loading}>
             <Activity size={14} className={loading ? "animate-spin mr-2" : "mr-2"} /> 
             {loading ? "Syncing..." : "Refresh Data"}
           </Button>

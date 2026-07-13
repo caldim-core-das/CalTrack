@@ -53,7 +53,7 @@ export function validateFullName(value) {
  * Returns the first error string, or null if all valid.
  */
 export function validateLoginForm({ identifier, password }) {
-  if (!identifier?.trim()) return "Username or email is required."
+  if (!identifier?.trim()) return "Employee ID is required."
   if (!password) return "Password is required."
   return null
 }

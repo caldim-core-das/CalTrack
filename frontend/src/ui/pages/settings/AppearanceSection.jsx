@@ -35,7 +35,7 @@ const FONT_SIZES = [
 
 export default function AppearanceSection({ showToast, SectionHeader }) {
   const [prefs, setPrefs] = useState(() => ({
-    theme: "system",
+    theme: "light",
     accent: "indigo",
     density: "comfortable",
     fontSize: "md",

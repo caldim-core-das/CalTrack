@@ -69,6 +69,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "last_logout_at",
             "last_activity_at",
             "current_availability",
+            "is_active",
             "created_at",
             "updated_at",
         )
@@ -136,6 +137,28 @@ class EmployeeSerializer(serializers.ModelSerializer):
         # If not clocked in but online, employee is available
         return "available"
 
+    def validate_hourly_rate(self, value):
+        request = self.context.get("request")
+        if not request or not request.user:
+            return value
+
+        # If updating an existing instance
+        if self.instance:
+            from decimal import Decimal
+            try:
+                old_rate = Decimal(str(self.instance.hourly_rate))
+                new_rate = Decimal(str(value))
+            except (ValueError, TypeError):
+                return value
+
+            if old_rate != new_rate:
+                is_superuser = request.user.is_superuser
+                is_inviting_admin = (self.instance.invited_by == request.user)
+                if not (is_superuser or is_inviting_admin):
+                    raise serializers.ValidationError(
+                        "Only the admin who invited/approved this employee can assign or modify their hourly rate."
+                    )
+        return value
 
     def update(self, instance, validated_data):
         user_data = validated_data.pop('user', {})
@@ -217,24 +240,71 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
         if not company:
             raise serializers.ValidationError({"detail": "You must be associated with a company to add members."})
 
-        if User.objects.filter(username__iexact=username).exists():
-            raise serializers.ValidationError({"detail": f"The username '{username}' is already taken by another user in the system. Usernames must be globally unique."})
+        from django.db.models import Q
+        user = User.objects.filter(Q(username__iexact=username) | Q(email__iexact=email)).first()
 
         try:
-            user = User.objects.create_user(
-                username=username,
-                password=password,
-                email=email,
-                first_name=first_name,
-                last_name=last_name,
-                role=role,
-                company=company
-            )
+            if user:
+                # If they are associated with public or None, associate with the new company
+                if not user.company or user.company.schema_name == 'public':
+                    user.company = company
+                if first_name:
+                    user.first_name = first_name
+                if last_name:
+                    user.last_name = last_name
+                user.save()
+            else:
+                user = User.objects.create_user(
+                    username=username,
+                    password=password,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    role=role,
+                    company=company
+                )
             
             if not validated_data.get("employee_id"):
                 validated_data["employee_id"] = generate_next_employee_id(company)
                 
-            return Employee.objects.create(user=user, company=company, **validated_data)
+            # Set/validate invited_by and hourly_rate for existing/new employee
+            employee = Employee.objects.filter(user=user, company=company).first()
+            if employee:
+                # Existing employee: check if hourly_rate is being modified
+                new_rate = validated_data.get("hourly_rate")
+                if new_rate is not None:
+                    from decimal import Decimal
+                    try:
+                        old_rate = Decimal(str(employee.hourly_rate))
+                        new_rate_dec = Decimal(str(new_rate))
+                        if old_rate != new_rate_dec:
+                            is_superuser = request.user.is_superuser if request and request.user else False
+                            is_inviting_admin = (employee.invited_by == request.user) if request and request.user else False
+                            if not (is_superuser or is_inviting_admin):
+                                raise serializers.ValidationError(
+                                    {"hourly_rate": "Only the admin who invited/approved this employee can assign or modify their hourly rate."}
+                                )
+                    except (ValueError, TypeError):
+                        pass
+                if not employee.invited_by and request and request.user and request.user.is_authenticated:
+                    employee.invited_by = request.user
+                    employee.save(update_fields=["invited_by"])
+            else:
+                # New employee: set invited_by to the requesting user
+                if request and request.user and request.user.is_authenticated:
+                    validated_data["invited_by"] = request.user
+
+            employee, created = Employee.objects.get_or_create(
+                user=user,
+                company=company,
+                defaults=validated_data
+            )
+            if not created:
+                for attr, value in validated_data.items():
+                    setattr(employee, attr, value)
+                employee.save()
+                
+            return employee
         except Exception as e:
             # Handle potential integrity errors (duplicate username, etc)
             raise serializers.ValidationError({"detail": str(e)})

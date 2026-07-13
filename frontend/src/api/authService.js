@@ -7,7 +7,12 @@
  * the browser automatically attaches and receives cookies.
  */
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api"
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (
+  import.meta.env.PROD
+    ? `${window.location.origin}/Caltrack/api`
+    : `${window.location.protocol}//${window.location.hostname}:8000/api`
+)
+
 
 async function fetchJSON(path, options = {}) {
   const url = `${API_BASE_URL}${path}`
@@ -64,6 +69,15 @@ export async function apiFetchMe() {
     return data
   } catch {
     clearTimeout(timeoutId)
+    if (!res.ok) {
+      console.warn("apiFetchMe failed with status:", res.status, text)
+      return null
+    }
+    const data = JSON.parse(text)
+    return data
+  } catch (err) {
+    clearTimeout(timeoutId)
+    console.error("apiFetchMe exception:", err)
     return null
   }
 }
@@ -94,12 +108,28 @@ export async function apiRegister(payload) {
 }
 
 /**
+ * Register an initial admin user without an organization.
+ * Server sets auth cookies in the response.
+ * User is automatically routed to onboarding upon successful login.
+ */
+export async function apiRegisterAdmin(payload) {
+  return fetchJSON("/auth/register-admin/", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
+/**
  * Google OAuth — server exchanges the Google access token, then sets cookies.
  */
-export async function apiGoogleLogin(googleAccessToken) {
+export async function apiGoogleLogin(googleAccessToken, inviteToken = null) {
+  const payload = { access_token: googleAccessToken }
+  if (inviteToken) {
+    payload.invite_token = inviteToken
+  }
   return fetchJSON("/auth/google/", {
     method: "POST",
-    body: JSON.stringify({ access_token: googleAccessToken }),
+    body: JSON.stringify(payload),
   })
 }
 
@@ -199,4 +229,105 @@ export async function apiDeleteRegistrationDossier() {
     console.error("Delete dossier API error", err)
   }
 }
+
+/**
+ * Send OTP via backend
+ */
+export async function apiSendOTP(phone) {
+  return fetchJSON("/auth/send-otp/", {
+    method: "POST",
+    body: JSON.stringify({ phone })
+  })
+}
+
+/**
+ * Verify OTP via backend
+ */
+export async function apiVerifyOTP(phone, code) {
+  return fetchJSON("/auth/verify-otp/", {
+    method: "POST",
+    body: JSON.stringify({ phone, code })
+  })
+}
+
+/**
+ * Send technician invitation email with password reset token
+ */
+export async function apiSendTechnicianInvite(payload) {
+  return fetchJSON("/auth/send-invite/", {
+    method: "POST",
+    body: JSON.stringify(payload) // { email, name }
+  })
+}
+
+/**
+ * Configure bcrypt password for the technician and establish logged-in session
+ */
+export async function apiTechSetPassword(payload) {
+  return fetchJSON("/auth/set-password/", {
+    method: "POST",
+    body: JSON.stringify(payload) // { uid, token, password }
+  })
+}
+
+/**
+ * Approve registration request dossier (generates invitation token)
+ */
+export async function apiApproveRegistrationDossier() {
+  return fetchJSON("/auth/registration-dossier/approve/", {
+    method: "POST"
+  })
+}
+
+/**
+ * Reject registration request dossier
+ */
+export async function apiRejectRegistrationDossier(payload) {
+  return fetchJSON("/auth/registration-dossier/reject/", {
+    method: "POST",
+    body: JSON.stringify(payload) // { remarks, reasonCategory }
+  })
+}
+
+/**
+ * Verify invitation token
+ */
+export async function apiVerifyActivationToken(token) {
+  return fetchJSON("/auth/registration-dossier/verify-token/", {
+    method: "POST",
+    body: JSON.stringify({ token })
+  })
+}
+
+/**
+ * Activate employee account and set security password
+ */
+export async function apiActivateDossierAccount(token, password) {
+  return fetchJSON("/auth/registration-dossier/activate/", {
+    method: "POST",
+    body: JSON.stringify({ token, password })
+  })
+}
+
+/**
+ * Send email OTP to the currently authenticated user
+ */
+export async function apiSendEmailOTP() {
+  return fetchJSON("/auth/send-email-otp/", {
+    method: "POST"
+  })
+}
+
+/**
+ * Reset password using email OTP
+ */
+export async function apiResetPasswordWithOTP(payload) {
+  return fetchJSON("/auth/password/reset-with-otp/", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  })
+}
+
+
+
 

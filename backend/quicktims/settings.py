@@ -10,10 +10,27 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 if "test" not in "".join(sys.argv) and not os.getenv("DJANGO_TESTING"):
     load_dotenv(BASE_DIR / ".env", override=True)
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-secret-key-change-me")
-DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
+_SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not _SECRET_KEY:
+    import sys
+    sys.exit(
+        "FATAL: DJANGO_SECRET_KEY environment variable is not set. "
+        "Set it in your .env file (for local dev) or as a system environment variable (for production). "
+        "Do NOT hard-code a secret key in settings."
+    )
+SECRET_KEY = _SECRET_KEY
+
+# DEBUG is OFF by default. Must be explicitly set to "1" or "True" in the environment.
+DEBUG = os.getenv("DJANGO_DEBUG", "0").strip().lower() in ("1", "true", "yes")
 
 ALLOWED_HOSTS = [h for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
+
+# ── Subpath / Reverse-proxy settings ─────────────────────────────────────────
+# Required when Django is served under a subpath (e.g. /Caltrack/) behind Nginx.
+# Set FORCE_SCRIPT_NAME=/Caltrack in production .env
+FORCE_SCRIPT_NAME = os.getenv("FORCE_SCRIPT_NAME", "")
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 SHARED_APPS = [
     "daphne",
@@ -22,12 +39,15 @@ SHARED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
+    "django.contrib.staticfiles",
     "accounts",
     "corsheaders",
     "rest_framework",
     "channels",
     "django_celery_beat",
+    "trial_management",
 ]
+
 
 TENANT_APPS = [
     "django.contrib.contenttypes",
@@ -43,6 +63,7 @@ TENANT_APPS = [
     "settings_hub",
     "inventory",
     "mileage",
+    "service_requests",
 ]
 
 # Preserve order and ensure daphne is at the very beginning for ASGI/WebSocket support
@@ -82,21 +103,27 @@ USE_POSTGRES = os.getenv("DB_NAME") or os.getenv("DB_HOST")
 
 if USE_POSTGRES:
     DATABASE_ROUTERS = ('django_tenants.routers.TenantSyncRouter',)
+
+    # Build OPTIONS dynamically — sslmode is opt-in via DB_SSLMODE env var.
+    # Docker local PostgreSQL: leave DB_SSLMODE unset (no SSL).
+    # Supabase / any remote TLS host: set DB_SSLMODE=require in .env.
+    _db_options = {}
+    _sslmode = os.getenv("DB_SSLMODE", "")
+    if _sslmode:
+        _db_options["sslmode"] = _sslmode
+    _stmt_timeout = os.getenv("DB_STATEMENT_TIMEOUT", "")
+    if _stmt_timeout:
+        _db_options["options"] = f"-c statement_timeout={_stmt_timeout}"
+
     DATABASES = {
         "default": {
             "ENGINE": "django_tenants.postgresql_backend",
-            "NAME": os.getenv("DB_NAME", "postgres"),
-            "USER": os.getenv("DB_USER", "postgres"),
+            "NAME": os.getenv("DB_NAME", "caltrack"),
+            "USER": os.getenv("DB_USER", "caltrack_user"),
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "localhost"),
             "PORT": os.getenv("DB_PORT", "5432"),
-            "OPTIONS": {
-                "sslmode": "require",
-                # Keep prepared statements off with pgBouncer (transaction pooling)
-                "options": "-c statement_timeout=30000",
-            },
-            # Set to 0 to immediately release connections and avoid EMAXCONNSESSION
-            # since Supabase free tier has a 15 connection limit
+            "OPTIONS": _db_options,
             "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "0")),
             "CONN_HEALTH_CHECKS": True,
         }
@@ -173,27 +200,6 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
-# Use syncdb for all apps — avoids migration dependency issues with MongoDB
-# (MongoDB doesn't benefit from SQL migration approach; collections are created on first use)
-# MIGRATION_MODULES = {
-#     "auth": None,
-#     "contenttypes": None,
-#     "sessions": None,
-#     "accounts": None,
-#     "employees": None,
-#     "time_tracking": None,
-#     "leaves": None,
-#     "payroll": None,
-#     "scheduling": None,
-#     "reports": None,
-#     "tasks": None,
-#     "live_locations": None,
-#     "companies": None,
-# }
-
-# Silence mongodb.E001 for Django's own built-in models (auth, sessions) whose
-# id field is inherited BigAutoField. Our custom models all use ObjectIdAutoField.
-SILENCED_SYSTEM_CHECKS = []
 
 # ── Caching ───────────────────────────────────────────────────────────────────
 # Production: swap the backend for Redis using the CACHE_URL env var.
@@ -259,17 +265,24 @@ AUTH_COOKIE_SECURE   = not DEBUG           # HTTPS-only in production; False in 
 # "Lax" is required for cross-origin dev (frontend:5173 → backend:8000).
 # In production with same domain, change back to "Strict" via env var.
 AUTH_COOKIE_SAMESITE = os.getenv("AUTH_COOKIE_SAMESITE", "Lax" if DEBUG else "Strict")
+AUTH_COOKIE_DOMAIN = os.getenv("AUTH_COOKIE_DOMAIN", ".localhost" if DEBUG else None)
 
 # ── CORS — must name origins explicitly when credentials=True ────────────────
 # CORS_ALLOW_ALL_ORIGINS + CORS_ALLOW_CREDENTIALS together are rejected by browsers.
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
+    # Local development
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
     "http://localhost:5175",
     "http://127.0.0.1:5175",
+    # Production VPS
+    "https://caldimproducts.com",
+    "http://caldimproducts.com",
+    "https://www.caldimproducts.com",
+    "http://www.caldimproducts.com",
 ]
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://.*\.localhost:517[3-5]$",
@@ -277,6 +290,7 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
+    # Local development
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:5174",
@@ -289,11 +303,18 @@ CSRF_TRUSTED_ORIGINS = [
     "http://*.127.0.0.1:5173",
     "http://*.127.0.0.1:5174",
     "http://*.127.0.0.1:5175",
+    # Production VPS
+    "https://caldimproducts.com",
+    "http://caldimproducts.com",
+    "https://www.caldimproducts.com",
+    "http://www.caldimproducts.com",
 ]
 
 
-MEDIA_URL = "/media/"
+MEDIA_URL = os.getenv("MEDIA_URL", "/media/")
 MEDIA_ROOT = BASE_DIR / "media"
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # ── Django Channels ──────────────────────────────────────────────────────────
 if DEBUG:
@@ -336,3 +357,5 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "True") == "True"
+

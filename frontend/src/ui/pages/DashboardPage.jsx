@@ -132,7 +132,13 @@ function EmployeeDashboard() {
   const navigate = useNavigate()
   const [tasks, setTasks] = useState([])
   const [leaves, setLeaves] = useState([])
+  const [employeeProfile, setEmployeeProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  
+  const [rateInput, setRateInput] = useState("")
+  const [rateSubmitting, setRateSubmitting] = useState(false)
+  const [rateError, setRateError] = useState("")
+
   const hour = new Date().getHours()
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
   const greetingEmoji = hour < 12 ? "☀️" : hour < 17 ? "👋" : "🌙"
@@ -141,12 +147,14 @@ function EmployeeDashboard() {
     async function load() {
       setLoading(true)
       try {
-        const [t, l] = await Promise.all([
+        const [t, l, emp] = await Promise.all([
           apiRequest("/tasks/my/").catch(() => []),
           apiRequest("/leaves/").catch(() => []),
+          apiRequest("/employees/me/").catch(() => null),
         ])
         setTasks(Array.isArray(t) ? t : unwrapResults(t))
         setLeaves(Array.isArray(l) ? l : unwrapResults(l))
+        setEmployeeProfile(emp)
       } finally {
         setLoading(false)
       }
@@ -154,17 +162,103 @@ function EmployeeDashboard() {
     load()
   }, [])
 
-  const pendingAcceptance = tasks.filter(t => t.acceptance_status === "pending_acceptance").length
-  const inProgress = tasks.filter(t => t.status === "in_progress").length
-  const completedToday = tasks.filter(t => {
-    if (t.status !== "completed" || !t.completed_at) return false
-    return new Date(t.completed_at).toDateString() === new Date().toDateString()
-  }).length
-  const activeTasks = tasks.filter(t => t.status !== "completed" && t.status !== "cancelled").length
+  const [dateFilter, setDateFilter] = useState("all") // "all", "today", "week", "month", "custom"
+  const [customDate, setCustomDate] = useState(new Date().toISOString().split("T")[0])
+  const [taskStatusTab, setTaskStatusTab] = useState("all") // "all", "pending", "in_progress", "completed", "declined"
+  const [leaveStatusTab, setLeaveStatusTab] = useState("all") // "all", "pending", "approved", "rejected"
 
-  const pendingLeaves = leaves.filter(l => l.status === "pending").length
-  const approvedLeaves = leaves.filter(l => l.status === "approved").length
-  const recentLeaves = leaves.slice(0, 3)
+  const getDateRange = useMemo(() => {
+    if (dateFilter === "all") return null;
+    
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+
+    if (dateFilter === "today") {
+      return [start, end];
+    } else if (dateFilter === "week") {
+      const day = start.getDay();
+      start.setDate(start.getDate() - day);
+      end.setDate(start.getDate() + 6);
+      return [start, end];
+    } else if (dateFilter === "month") {
+      start.setDate(1);
+      end.setMonth(start.getMonth() + 1);
+      end.setDate(0);
+      return [start, end];
+    } else if (dateFilter === "custom") {
+      const custom = new Date(customDate);
+      custom.setHours(0, 0, 0, 0);
+      const customEnd = new Date(customDate);
+      customEnd.setHours(23, 59, 59, 999);
+      return [custom, customEnd];
+    }
+    return null;
+  }, [dateFilter, customDate]);
+
+  const filteredTasksByDate = useMemo(() => {
+    if (!getDateRange) return tasks;
+    const [start, end] = getDateRange;
+    return tasks.filter(t => {
+      if (!t.due_date) return false;
+      const tDate = new Date(t.due_date);
+      return tDate >= start && tDate <= end;
+    });
+  }, [tasks, getDateRange]);
+
+  const filteredLeavesByDate = useMemo(() => {
+    if (!getDateRange) return leaves;
+    const [start, end] = getDateRange;
+    return leaves.filter(l => {
+      if (!l.start_date) return false;
+      const lStart = new Date(l.start_date);
+      const lEnd = l.end_date ? new Date(l.end_date) : lStart;
+      lStart.setHours(0, 0, 0, 0);
+      lEnd.setHours(23, 59, 59, 999);
+      return lStart <= end && lEnd >= start;
+    });
+  }, [leaves, getDateRange]);
+
+  const filteredTasksByStatus = useMemo(() => {
+    if (taskStatusTab === "all") return filteredTasksByDate;
+    if (taskStatusTab === "pending") {
+      return filteredTasksByDate.filter(t => t.acceptance_status === "pending_acceptance" || t.status === "pending");
+    }
+    if (taskStatusTab === "in_progress") {
+      return filteredTasksByDate.filter(t => t.status === "in_progress");
+    }
+    if (taskStatusTab === "completed") {
+      return filteredTasksByDate.filter(t => t.status === "completed");
+    }
+    if (taskStatusTab === "declined") {
+      return filteredTasksByDate.filter(t => t.acceptance_status === "declined");
+    }
+    return filteredTasksByDate;
+  }, [filteredTasksByDate, taskStatusTab]);
+
+  const filteredLeavesByStatus = useMemo(() => {
+    if (leaveStatusTab === "all") return filteredLeavesByDate;
+    if (leaveStatusTab === "pending") {
+      return filteredLeavesByDate.filter(l => l.status === "pending");
+    }
+    if (leaveStatusTab === "approved") {
+      return filteredLeavesByDate.filter(l => l.status === "approved");
+    }
+    if (leaveStatusTab === "rejected") {
+      return filteredLeavesByDate.filter(l => l.status === "rejected" || l.status === "cancelled");
+    }
+    return filteredLeavesByDate;
+  }, [filteredLeavesByDate, leaveStatusTab]);
+
+  const pendingAcceptance = filteredTasksByDate.filter(t => t.acceptance_status === "pending_acceptance").length
+  const inProgress = filteredTasksByDate.filter(t => t.status === "in_progress").length
+  const completedToday = filteredTasksByDate.filter(t => t.status === "completed").length
+  const activeTasks = filteredTasksByDate.filter(t => t.status !== "completed" && t.status !== "cancelled").length
+
+  const pendingLeaves = filteredLeavesByDate.filter(l => l.status === "pending").length
+  const approvedLeaves = filteredLeavesByDate.filter(l => l.status === "approved").length
+  const recentLeaves = filteredLeavesByDate.slice(0, 3)
 
   const firstName = user?.firstName || user?.first_name || user?.username || "there"
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })
@@ -196,21 +290,6 @@ function EmployeeDashboard() {
             <p style={{ color: "rgba(255,255,255,0.65)", fontSize: 14, fontWeight: 500, marginTop: 8, marginBottom: 0 }}>
               Here's your personal workspace for today.
             </p>
-          </div>
-
-          {/* Live clock widget */}
-          <div style={{
-            background: "rgba(255,255,255,0.1)", backdropFilter: "blur(20px)",
-            WebkitBackdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.2)",
-            borderRadius: 20, padding: "16px 24px", textAlign: "center",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
-          }}>
-            <div style={{ fontSize: 28, fontWeight: 900, color: "#fff", letterSpacing: "0.04em", fontVariantNumeric: "tabular-nums" }}>
-              <LiveClock />
-            </div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 4 }}>
-              Local Time
-            </div>
           </div>
         </div>
 
@@ -294,168 +373,7 @@ function EmployeeDashboard() {
         </div>
       ) : (
         <>
-          {/* ── Stats Row ─────────────────────────────── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatPill
-              icon={<ClipboardList size={20} />}
-              label="Active Tasks"
-              value={activeTasks}
-              color="#4f46e5"
-              onClick={() => navigate(routes.tasks)}
-            />
-            <StatPill
-              icon={<UserCheck size={20} />}
-              label="Needs Response"
-              value={pendingAcceptance}
-              color={pendingAcceptance > 0 ? "#ef4444" : "#10b981"}
-              onClick={pendingAcceptance > 0 ? () => navigate(routes.tasks) : null}
-            />
-            <StatPill
-              icon={<CalendarDays size={20} />}
-              label="My Leaves"
-              value={leaves.length}
-              color="#ec4899"
-              onClick={() => navigate(routes.leaves)}
-            />
-            <StatPill
-              icon={<CheckCircle2 size={20} />}
-              label="Completed Today"
-              value={completedToday}
-              color="#10b981"
-            />
-          </div>
 
-          {/* ── Two-column area ───────────────────────── */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-
-            {/* Task Summary */}
-            <div
-              className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 shadow-sm"
-              style={{
-                borderRadius: 24, padding: "24px 28px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 12, background: "linear-gradient(135deg, #4f46e540, #4f46e515)", display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #4f46e520" }}>
-                    <ClipboardList size={18} style={{ color: "#4f46e5" }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 900, color: "var(--fg)" }}>My Tasks</div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>{tasks.length} total assigned</div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => navigate(routes.tasks)}
-                  style={{ fontSize: 11, fontWeight: 800, color: "#4f46e5", background: "linear-gradient(135deg, #ede9fe, #e0e7ff)", border: "1px solid #c7d2fe", borderRadius: 10, padding: "5px 12px", cursor: "pointer" }}
-                >
-                  View All →
-                </button>
-              </div>
-
-              {tasks.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "28px 0" }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
-                  <div style={{ color: "var(--muted)", fontSize: 13, fontWeight: 600 }}>All clear! No tasks assigned yet.</div>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {[
-                    { label: "Awaiting Acceptance", count: pendingAcceptance, color: "#ef4444", icon: "🔴" },
-                    { label: "In Progress", count: inProgress, color: "#2563eb", icon: "🔵" },
-                    { label: "Completed Today", count: completedToday, color: "#10b981", icon: "🟢" },
-                    { label: "Total Active", count: activeTasks - completedToday, color: "#6366f1", icon: "🟣" },
-                  ].filter(x => x.count > 0).map(item => (
-                    <div key={item.label} style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "10px 16px", borderRadius: 14,
-                      background: `${item.color}08`, border: `1px solid ${item.color}20`,
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontSize: 13 }}>{item.icon}</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: "var(--fg2)" }}>{item.label}</span>
-                      </div>
-                      <span style={{ fontSize: 15, fontWeight: 900, color: item.color }}>{item.count}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Leave Summary */}
-            <div
-              className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 shadow-sm"
-              style={{
-                borderRadius: 24, padding: "24px 28px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ width: 38, height: 38, borderRadius: 12, background: "linear-gradient(135deg, #ec489940, #ec489915)", display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #ec489920" }}>
-                    <CalendarDays size={18} style={{ color: "#ec4899" }} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 900, color: "var(--fg)" }}>My Leaves</div>
-                    <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>{leaves.length} total requests</div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => navigate(routes.leaves)}
-                  style={{ fontSize: 11, fontWeight: 800, color: "#ec4899", background: "linear-gradient(135deg, #fdf2f8, #fce7f3)", border: "1px solid #fbcfe8", borderRadius: 10, padding: "5px 12px", cursor: "pointer" }}
-                >
-                  Request Leave →
-                </button>
-              </div>
-
-              {/* Leave status summary pills */}
-              <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-                {[
-                  { label: "Pending", count: pendingLeaves, bg: "var(--warn-bg)", color: "var(--warn-text)" },
-                  { label: "Approved", count: approvedLeaves, bg: "var(--good-bg)", color: "var(--good-text)" },
-                  { label: "Rejected", count: leaves.filter(l => l.status === "rejected").length, bg: "var(--bad-bg)", color: "var(--bad-text)" },
-                ].map(s => (
-                  <div key={s.label} style={{
-                    flex: 1, textAlign: "center", padding: "10px 8px",
-                    background: s.bg, borderRadius: 14,
-                  }}>
-                    <div style={{ fontSize: 18, fontWeight: 900, color: s.color }}>{s.count}</div>
-                    <div style={{ fontSize: 10, fontWeight: 800, color: s.color, opacity: 0.8, textTransform: "uppercase", letterSpacing: "0.05em" }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Recent leaves */}
-              {recentLeaves.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Recent Requests</div>
-                  {recentLeaves.map((lv, i) => (
-                    <div key={lv.id || i}
-                      className="bg-surface2 dark:bg-slate-950/40 border border-stroke dark:border-slate-800"
-                      style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "10px 14px", borderRadius: 12,
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--fg)" }}>
-                          {lv.leave_type_name || lv.type || "Leave Request"}
-                        </div>
-                        <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, marginTop: 2 }}>
-                          {lv.start_date} → {lv.end_date || "TBD"}
-                        </div>
-                      </div>
-                      <LeaveStatusBadge status={lv.status} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: "center", padding: "20px 0" }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>🏖️</div>
-                  <div style={{ color: "var(--muted)", fontSize: 13, fontWeight: 600 }}>No leave requests yet.</div>
-                </div>
-              )}
-            </div>
-          </div>
 
           {/* ── Productivity Banner ───────────────────── */}
           <div style={{
@@ -465,6 +383,7 @@ function EmployeeDashboard() {
             flexWrap: "wrap", gap: 16,
             boxShadow: "0 8px 32px rgba(79,70,229,0.25)",
             position: "relative", overflow: "hidden",
+            marginBottom: 20,
           }}>
             <div style={{ position: "absolute", right: -30, top: -30, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,0.04)", pointerEvents: "none" }} />
             <div style={{ position: "relative", zIndex: 1 }}>
@@ -490,6 +409,308 @@ function EmployeeDashboard() {
               Open Tasks →
             </button>
           </div>
+
+          {/* ── Global Date Filter Bar ─────────────────────── */}
+          <div style={{
+            display: "flex", alignItems: "center",
+            flexWrap: "wrap", gap: 20, padding: "8px 16px",
+            background: "var(--surface)", border: "1px solid var(--stroke)",
+            borderRadius: 8,
+            marginTop: 8,
+            marginBottom: 16,
+            width: "fit-content",
+            marginLeft: "auto",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Calendar size={18} style={{ color: "#4f46e5" }} />
+              <span style={{ fontSize: 13, fontWeight: 800, color: "var(--fg)" }}>Date Scope</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              {["all", "today", "week", "month", "custom"].map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setDateFilter(mode)}
+                  style={{
+                    padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                    border: "1px solid",
+                    borderColor: dateFilter === mode ? "#4f46e5" : "var(--stroke)",
+                    background: dateFilter === mode ? "#4f46e5" : "transparent",
+                    color: dateFilter === mode ? "#fff" : "var(--muted)",
+                    cursor: "pointer", transition: "all 0.2s ease",
+                  }}
+                >
+                  {mode === "all" ? "All Time" : mode === "today" ? "Today" : mode === "week" ? "This Week" : mode === "month" ? "This Month" : "Custom"}
+                </button>
+              ))}
+              {dateFilter === "custom" && (
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={e => setCustomDate(e.target.value)}
+                  style={{
+                    padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                    border: "1px solid var(--stroke)", background: "var(--surface)",
+                    color: "var(--fg)", outline: "none", cursor: "pointer",
+                  }}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* ── Stats Row ─────────────────────────────── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatPill
+              icon={<ClipboardList size={20} />}
+              label="Active Tasks"
+              value={activeTasks}
+              color="#4f46e5"
+              onClick={() => navigate(routes.tasks)}
+            />
+            <StatPill
+              icon={<UserCheck size={20} />}
+              label="Needs Response"
+              value={pendingAcceptance}
+              color={pendingAcceptance > 0 ? "#ef4444" : "#10b981"}
+              onClick={pendingAcceptance > 0 ? () => navigate(routes.tasks) : null}
+            />
+            <StatPill
+              icon={<CalendarDays size={20} />}
+              label="My Leaves"
+              value={filteredLeavesByDate.length}
+              color="#ec4899"
+              onClick={() => navigate(routes.leaves)}
+            />
+            <StatPill
+              icon={<CheckCircle2 size={20} />}
+              label={dateFilter === "all" ? "Completed Tasks" : dateFilter === "today" ? "Completed Today" : "Completed in Range"}
+              value={completedToday}
+              color="#10b981"
+            />
+          </div>
+
+          {/* ── Two-column area ───────────────────────── */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+            {/* Task Summary */}
+            <div
+              className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 shadow-sm"
+              style={{
+                borderRadius: 24, padding: "24px 28px", display: "flex", flexDirection: "column", gap: 18, minHeight: 460
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 12, background: "linear-gradient(135deg, #4f46e540, #4f46e515)", display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #4f46e520" }}>
+                    <ClipboardList size={18} style={{ color: "#4f46e5" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 900, color: "var(--fg)" }}>My Tasks</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>{filteredTasksByDate.length} tasks in range</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate(routes.tasks)}
+                  style={{ fontSize: 11, fontWeight: 800, color: "#4f46e5", background: "linear-gradient(135deg, #ede9fe, #e0e7ff)", border: "1px solid #c7d2fe", borderRadius: 10, padding: "5px 12px", cursor: "pointer" }}
+                >
+                  View All →
+                </button>
+              </div>
+
+              {/* Status filter tabs for tasks */}
+              <div style={{ display: "flex", gap: 6, borderBottom: "1px solid var(--stroke)", paddingBottom: 8, overflowX: "auto" }}>
+                {[
+                  { id: "all", label: "All" },
+                  { id: "pending", label: "Pending" },
+                  { id: "in_progress", label: "In Progress" },
+                  { id: "completed", label: "Completed" },
+                  { id: "declined", label: "Declined" },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setTaskStatusTab(tab.id)}
+                    style={{
+                      padding: "6px 12px", border: "none", background: "transparent",
+                      color: taskStatusTab === tab.id ? "#4f46e5" : "var(--muted)",
+                      fontSize: 12, fontWeight: taskStatusTab === tab.id ? 800 : 600,
+                      borderBottom: taskStatusTab === tab.id ? "2.5px solid #4f46e5" : "none",
+                      cursor: "pointer", transition: "all 0.15s ease", paddingBottom: 6,
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tasks List */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", maxHeight: 320, paddingRight: 4 }}>
+                {filteredTasksByStatus.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "40px 0", margin: "auto" }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+                    <div style={{ color: "var(--muted)", fontSize: 13, fontWeight: 600 }}>No tasks match this filter.</div>
+                  </div>
+                ) : (
+                  filteredTasksByStatus.map(task => {
+                    const statusConfig = {
+                      pending: { bg: "#fef3c7", color: "#d97706", label: "Pending" },
+                      in_progress: { bg: "#dbeafe", color: "#2563eb", label: "In Progress" },
+                      completed: { bg: "#d1fae5", color: "#059669", label: "Completed" },
+                      cancelled: { bg: "#f3f4f6", color: "#4b5563", label: "Cancelled" },
+                      suspended: { bg: "#f3e8ff", color: "#7c3aed", label: "Suspended" }
+                    }[task.status] || { bg: "#f3f4f6", color: "#4b5563", label: task.status };
+
+                    if (task.acceptance_status === "declined") {
+                      statusConfig.bg = "#ffe4e6";
+                      statusConfig.color = "#e11d48";
+                      statusConfig.label = "Declined";
+                    } else if (task.acceptance_status === "pending_acceptance") {
+                      statusConfig.bg = "#fee2e2";
+                      statusConfig.color = "#dc2626";
+                      statusConfig.label = "Awaiting Accept";
+                    }
+
+                    const priorityConfig = {
+                      low: { bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.2)", color: "#10b981" },
+                      medium: { bg: "rgba(245,158,11,0.08)", border: "rgba(245,158,11,0.2)", color: "#f59e0b" },
+                      high: { bg: "rgba(249,115,22,0.08)", border: "rgba(249,115,22,0.2)", color: "#f97316" },
+                      urgent: { bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.2)", color: "#ef4444" }
+                    }[task.priority] || { bg: "var(--bg)", border: "var(--stroke)", color: "var(--muted)" };
+
+                    return (
+                      <div
+                        key={task.id}
+                        className="bg-surface2 dark:bg-slate-950/40 border border-stroke dark:border-slate-800 hover:border-indigo-500/30"
+                        style={{
+                          display: "flex", flexDirection: "column", gap: 10,
+                          padding: "14px 18px", borderRadius: 16, cursor: "pointer",
+                          transition: "all 0.2s ease",
+                        }}
+                        onClick={() => navigate(routes.tasks)}
+                      >
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                          <div style={{ fontWeight: 800, fontSize: 13, color: "var(--fg)", flex: 1 }}>
+                            {task.title}
+                          </div>
+                          <span style={{
+                            padding: "3px 8px", borderRadius: 8, fontSize: 10, fontWeight: 800,
+                            background: statusConfig.bg, color: statusConfig.color, textTransform: "uppercase", letterSpacing: "0.04em"
+                          }}>
+                            {statusConfig.label}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>
+                            <Calendar size={12} />
+                            <span>Due: {task.due_date}</span>
+                            {task.category && (
+                              <>
+                                <span>•</span>
+                                <span style={{ textTransform: "capitalize" }}>{task.category}</span>
+                              </>
+                            )}
+                          </div>
+                          <span style={{
+                            padding: "2px 8px", borderRadius: 8, fontSize: 9, fontWeight: 800,
+                            background: priorityConfig.bg, border: `1px solid ${priorityConfig.border}`, color: priorityConfig.color,
+                            textTransform: "uppercase", letterSpacing: "0.04em"
+                          }}>
+                            {task.priority}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Leave Summary */}
+            <div
+              className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 shadow-sm"
+              style={{
+                borderRadius: 24, padding: "24px 28px", display: "flex", flexDirection: "column", gap: 18, minHeight: 460
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 12, background: "linear-gradient(135deg, #ec489940, #ec489915)", display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #ec489920" }}>
+                    <CalendarDays size={18} style={{ color: "#ec4899" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 900, color: "var(--fg)" }}>My Leaves</div>
+                    <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600 }}>{filteredLeavesByDate.length} requests in range</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate(routes.leaves)}
+                  style={{ fontSize: 11, fontWeight: 800, color: "#ec4899", background: "linear-gradient(135deg, #fdf2f8, #fce7f3)", border: "1px solid #fbcfe8", borderRadius: 10, padding: "5px 12px", cursor: "pointer" }}
+                >
+                  Request Leave →
+                </button>
+              </div>
+
+              {/* Status filter tabs for leaves */}
+              <div style={{ display: "flex", gap: 6, borderBottom: "1px solid var(--stroke)", paddingBottom: 8, overflowX: "auto" }}>
+                {[
+                  { id: "all", label: "All" },
+                  { id: "pending", label: "Pending" },
+                  { id: "approved", label: "Approved" },
+                  { id: "rejected", label: "Rejected" },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setLeaveStatusTab(tab.id)}
+                    style={{
+                      padding: "6px 12px", border: "none", background: "transparent",
+                      color: leaveStatusTab === tab.id ? "#ec4899" : "var(--muted)",
+                      fontSize: 12, fontWeight: leaveStatusTab === tab.id ? 800 : 600,
+                      borderBottom: leaveStatusTab === tab.id ? "2.5px solid #ec4899" : "none",
+                      cursor: "pointer", transition: "all 0.15s ease", paddingBottom: 6,
+                      whiteSpace: "nowrap"
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Leaves List */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", maxHeight: 320, paddingRight: 4 }}>
+                {filteredLeavesByStatus.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "40px 0", margin: "auto" }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>🏖️</div>
+                    <div style={{ color: "var(--muted)", fontSize: 13, fontWeight: 600 }}>No leave requests match this filter.</div>
+                  </div>
+                ) : (
+                  filteredLeavesByStatus.map((lv, i) => (
+                    <div key={lv.id || i}
+                      className="bg-surface2 dark:bg-slate-950/40 border border-stroke dark:border-slate-800"
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "14px 18px", borderRadius: 16,
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: "var(--fg)", textTransform: "capitalize" }}>
+                          {lv.leave_type_name || lv.leave_type || lv.type || "Leave Request"}
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--muted)", fontWeight: 600, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                          <Calendar size={12} />
+                          <span>{lv.start_date} → {lv.end_date || "TBD"}</span>
+                        </div>
+                      </div>
+                      <LeaveStatusBadge status={lv.status} />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+
         </>
       )}
     </div>
@@ -644,7 +865,7 @@ function AdminDashboard() {
       setError("")
       try {
         const [data, empData] = await Promise.all([
-          apiRequest("/reports/dashboard-analytics/"),
+          apiRequest("/reports/dashboard-analytics/").catch(() => null),
           apiRequest("/employees/").catch(() => []),
         ])
         if (!cancelled) {
@@ -2289,15 +2510,21 @@ function AdminDashboard() {
               <div className="grid grid-cols-2 gap-y-3.5 gap-x-6 text-xs font-semibold mt-2">
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Registration</span>
-                  <span className="font-bold text-emerald-500">✅ Complete</span>
+                  <span className={`font-bold ${verificationCenterCandidate.registration === "Complete" ? "text-emerald-500" : "text-amber-500"}`}>
+                    {verificationCenterCandidate.registration === "Complete" ? "✅ Complete" : "🟡 Pending"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Documents</span>
-                  <span className="font-bold text-emerald-500">✅ Verified</span>
+                  <span className={`font-bold ${verificationCenterCandidate.documents === "Verified" ? "text-emerald-500" : "text-amber-500"}`}>
+                    {verificationCenterCandidate.documents === "Verified" ? "✅ Verified" : "🟡 Pending"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Training</span>
-                  <span className="font-bold text-emerald-500">✅ Completed</span>
+                  <span className={`font-bold ${verificationCenterCandidate.training === "Completed" ? "text-emerald-500" : "text-amber-500"}`}>
+                    {verificationCenterCandidate.training === "Completed" ? "✅ Completed" : "🟡 Pending"}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500">Interview</span>
@@ -2345,11 +2572,15 @@ function AdminDashboard() {
               <div className="flex flex-col gap-2 text-xs font-semibold mt-2">
                 <div className="flex justify-between items-center py-1">
                   <span className="text-slate-500">Identity Status</span>
-                  <span className="font-bold text-slate-900 dark:text-white">{approvalCenterReview.identity}</span>
+                  <span className={`font-bold ${approvalCenterReview.identity === "Verified" ? "text-emerald-500" : "text-amber-500"}`}>
+                    {approvalCenterReview.identity}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center py-1">
                   <span className="text-slate-500">Training Status</span>
-                  <span className="font-bold text-slate-900 dark:text-white">{approvalCenterReview.training}</span>
+                  <span className={`font-bold ${approvalCenterReview.training === "Completed" ? "text-emerald-500" : "text-amber-500"}`}>
+                    {approvalCenterReview.training}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center py-1">
                   <span className="text-slate-500">Interview Status</span>

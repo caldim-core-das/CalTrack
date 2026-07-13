@@ -2,7 +2,7 @@
 Run with:
   python manage.py shell < create_admin.py
 
-Creates (or resets) an admin user and a demo employee user in MongoDB,
+Creates (or resets) an admin user and a demo employee user in the database,
 including a linked Employee profile record for the employee user.
 """
 import django
@@ -20,21 +20,37 @@ User = get_user_model()
 # Set tenant context to 'demo_v2' for tenant-specific models (Employee)
 try:
     tenant = Company.objects.get(schema_name='demo_v2')
-    connection.set_tenant(tenant)
-    print("Set tenant context to 'demo'")
+    if hasattr(connection, 'set_tenant'):
+        connection.set_tenant(tenant)
+        print("Set tenant context to 'demo'")
+    else:
+        print("set_tenant not supported on this database backend, continuing without tenant context setting")
 except Company.DoesNotExist:
     print("Demo tenant not found, continuing with public schema (Employee creation may fail)")
 
+from accounts.services import create_organization_admin_user
+
 # ── Admin user ────────────────────────────────────────────────
-admin, created = User.objects.get_or_create(username="admin")
-admin.set_password("admin123")
-admin.role = "admin"
-admin.is_staff = True
-admin.is_superuser = True
-admin.is_active = True
-admin.first_name = "Admin"
-admin.last_name = "User"
-admin.save()
+admin, created = create_organization_admin_user(
+    email="admin",
+    password="admin123",
+    first_name="Admin",
+    last_name="User",
+    is_superuser=True
+)
+try:
+    if 'tenant' in locals() and tenant:
+        admin.company = tenant
+        admin.save()
+        print(f"Associated admin with company: {tenant.company_name}")
+    else:
+        company = Company.objects.first()
+        if company:
+            admin.company = company
+            admin.save()
+            print(f"Associated admin with company: {company.company_name}")
+except Exception as e:
+    print(f"Could not associate admin with company: {e}")
 print(f"{'Created' if created else 'Updated'} admin  -> username: admin  / password: admin123")
 
 # ── Employee user ─────────────────────────────────────────────

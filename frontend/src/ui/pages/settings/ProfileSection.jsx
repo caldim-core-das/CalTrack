@@ -31,12 +31,13 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
   const fileRef = useRef(null)
 
   const [saving, setSaving] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const [avatarPreview, setAvatarPreview] = useState(null)
   const [avatarFile, setAvatarFile] = useState(null)
   const [form, setForm] = useState({
     first_name: "",
     last_name: "",
-    bio: "",
+    email: "",
     phone: "",
     timezone: "UTC",
     language: "en",
@@ -47,7 +48,7 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
       setForm({
         first_name: user.firstName || "",
         last_name: user.lastName || "",
-        bio: user.bio || "",
+        email: user.email || "",
         phone: user.phone || "",
         timezone: user.timezone || "UTC",
         language: user.language || "en",
@@ -61,13 +62,38 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
     markDirty()
   }
 
-  const handleAvatarChange = e => {
+  const handleAvatarChange = async e => {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 5 * 1024 * 1024) { showToast("Avatar must be under 5 MB.", "error"); return }
     setAvatarFile(file)
     setAvatarPreview(URL.createObjectURL(file))
-    markDirty()
+    
+    // Upload immediately
+    try {
+      const body = new FormData()
+      body.append("avatar", file)
+      await apiRequest("/auth/profile/", { method: "PATCH", body })
+      if (refreshMe) await refreshMe()
+      showToast("Profile picture updated successfully.")
+    } catch (err) {
+      showToast(err?.body?.message || "Failed to save profile picture.", "error")
+    }
+  }
+
+  const handleRemoveAvatar = async () => {
+    try {
+      await apiRequest("/auth/profile/", { 
+        method: "PATCH", 
+        json: { avatar: null } 
+      })
+      setAvatarPreview(null)
+      setAvatarFile(null)
+      if (refreshMe) await refreshMe()
+      showToast("Profile picture removed successfully.")
+    } catch (err) {
+      showToast(err?.body?.message || "Failed to remove profile picture.", "error")
+    }
   }
 
   const handleSave = async () => {
@@ -80,6 +106,7 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
       await apiRequest("/auth/profile/", { method: "PATCH", body })
       if (refreshMe) await refreshMe()
       showToast("Profile saved successfully.")
+      setIsEditing(false)
     } catch (err) {
       showToast(err?.body?.message || "Failed to save profile.", "error")
     } finally {
@@ -127,9 +154,9 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
             >
               Change photo
             </button>
-            {avatarPreview && avatarPreview !== user?.avatar_url && (
+            {user?.avatar_url && (
               <button
-                onClick={() => { setAvatarPreview(user?.avatar_url || null); setAvatarFile(null) }}
+                onClick={handleRemoveAvatar}
                 style={{ marginTop: 8, marginLeft: 12, fontSize: 12, color: "var(--muted)", background: "none", border: "none", cursor: "pointer", padding: 0 }}
               >
                 Remove
@@ -141,47 +168,77 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
 
       {/* Name & Basic Info */}
       <div className="stCard">
-        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--fg)", marginBottom: 16 }}>Personal Information</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "var(--fg)" }}>Personal Information</div>
+          <button 
+            type="button" 
+            onClick={() => {
+              if (isEditing) {
+                // Cancel: restore original values
+                setForm(prev => ({
+                  ...prev,
+                  first_name: user.firstName || "",
+                  last_name: user.lastName || "",
+                  email: user.email || "",
+                  phone: user.phone || "",
+                }))
+              }
+              setIsEditing(!isEditing)
+            }}
+            style={{ 
+              fontSize: 12, 
+              color: isEditing ? "#E94560" : "#5d5fef", 
+              fontWeight: 700, 
+              background: "none", 
+              border: "none", 
+              cursor: "pointer", 
+              padding: "4px 8px" 
+            }}
+          >
+            {isEditing ? "Cancel" : "Edit"}
+          </button>
+        </div>
         <div className="stFormGrid">
           <Input
             label="First name"
             value={form.first_name}
             placeholder="First name"
             onChange={e => handleChange("first_name", e.target.value)}
+            readOnly={!isEditing}
+            style={!isEditing ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
           />
           <Input
             label="Last name"
             value={form.last_name}
             placeholder="Last name"
             onChange={e => handleChange("last_name", e.target.value)}
+            readOnly={!isEditing}
+            style={!isEditing ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
           />
           <Input
             label="Phone number"
             value={form.phone}
             placeholder="+1 (555) 000-0000"
             onChange={e => handleChange("phone", e.target.value)}
+            readOnly={!isEditing}
+            style={!isEditing ? { opacity: 0.7, cursor: "not-allowed" } : undefined}
           />
           <Input
-            label="Profile link"
-            value={`quicktims.com/u/${user?.username || ""}`}
+            label="Email address"
+            value={user?.email || ""}
             readOnly
             style={{ opacity: 0.6 }}
+            title="To change your email, go to Account & Security"
           />
-          <div className="col-span-full">
-            <TextArea
-              label="Bio"
-              value={form.bio}
-              placeholder="A short bio about yourself..."
-              onChange={e => handleChange("bio", e.target.value)}
-            />
+        </div>
+        {isEditing && (
+          <div className="stCardActions">
+            <button className="stPrimaryBtn" onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} /> : <Save size={13} />}
+              {saving ? "Saving..." : "Save profile"}
+            </button>
           </div>
-        </div>
-        <div className="stCardActions">
-          <button className="stPrimaryBtn" onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 size={13} style={{ animation: "spin .7s linear infinite" }} /> : <Save size={13} />}
-            {saving ? "Saving..." : "Save profile"}
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Locale */}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useMotionValue, useTransform, animate } from "framer-motion"
 import {
   MapPin, Clock, CalendarRange,
   CheckCircle2, ArrowRight, X,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { routes } from "../routes.js"
+import { apiRequest } from "../../api/client.js"
 
 /* ── Design System ───────────────────────────────────────────── */
 const COLORS = {
@@ -41,7 +42,7 @@ const STEPS = [
     title: "Define rules for time tracking",
     desc: "Take control of how your team members clock in and out.",
     est: "5 min",
-    to: routes.time,
+    to: routes.settings_timetracking,
     color: "#f59e0b",
     bg: "#fffbeb",
   },
@@ -85,11 +86,106 @@ export function GetStartedPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [completedSteps, setCompletedSteps] = useState(new Set())
+  const [loading, setLoading] = useState(true)
 
-  const displayName = user?.username ? user.username.charAt(0).toUpperCase() + user.username.slice(1) : "Rohit"
+  useEffect(() => {
+    async function checkOnboardingStatus() {
+      try {
+        const completed = new Set()
+
+        // 1. Check Schedule (shifts)
+        try {
+          const res = await apiRequest("/scheduling/shifts/")
+          const shifts = res?.data || res?.results || res || []
+          if (shifts.length > 0) {
+            completed.add("schedule")
+          }
+        } catch (e) {
+          console.error("Error checking schedules:", e)
+        }
+
+        // 2. Check Tasks / Activities
+        try {
+          const res = await apiRequest("/tasks/admin/")
+          const tasks = res?.data || res?.results || res || []
+          if (tasks.length > 0) {
+            completed.add("activities")
+          }
+        } catch (e) {
+          console.error("Error checking tasks:", e)
+        }
+
+        // 3. Check Locations
+        try {
+          const res = await apiRequest("/time/locations/")
+          const locations = res?.data || res?.results || res || []
+          if (locations.length > 0) {
+            completed.add("locations")
+          }
+        } catch (e) {
+          console.error("Error checking locations:", e)
+        }
+
+        // 4. Check Team Invites and Members
+        try {
+          const invRes = await apiRequest("/settings/team/invites/")
+          const memRes = await apiRequest("/settings/team/members/")
+          const invites = invRes?.data || invRes?.results || invRes || []
+          const members = memRes?.data || memRes?.results || memRes || []
+          if (invites.length > 0 || members.length > 1) {
+            completed.add("employees")
+          }
+        } catch (e) {
+          console.error("Error checking team status:", e)
+        }
+
+        // 5. Check Rules (Time tracking rules)
+        try {
+          const res = await apiRequest("/company/me/")
+          const companyRes = res?.data || res || {}
+          if (companyRes.shift_enforcement_mode && companyRes.shift_enforcement_mode !== "warn" || localStorage.getItem("caltrack.onboarding.rules.completed") === "true") {
+            completed.add("rules")
+          }
+        } catch (e) {
+          console.error("Error checking company settings:", e)
+        }
+
+        setCompletedSteps(completed)
+      } catch (err) {
+        console.error("Error checking onboarding status:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    checkOnboardingStatus()
+  }, [])
+
+  const getGreetingName = () => {
+    if (user?.firstName) {
+      return user.firstName.charAt(0).toUpperCase() + user.firstName.slice(1)
+    }
+    const baseName = user?.username || "Rohit"
+    if (baseName.includes("@")) {
+      const parts = baseName.split("@")
+      return parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
+    }
+    return baseName.charAt(0).toUpperCase() + baseName.slice(1)
+  }
+  const displayName = getGreetingName()
   const totalSteps = STEPS.length
   const doneCount = completedSteps.size
-  const percentage = Math.round((doneCount / totalSteps) * 100)
+  
+  let profileScore = 0
+  if (user?.firstName) profileScore++
+  if (user?.lastName) profileScore++
+  if (user?.phone) profileScore++
+  if (user?.avatar_url) profileScore++
+
+  // Profile completion contributes 20%, Setup steps contribute 80%
+  const percentage = Math.round(
+    (profileScore / 4) * 20 + (doneCount / totalSteps) * 80
+  )
 
   const handleDismiss = () => {
     localStorage.setItem(STORAGE_KEY, "true")
@@ -120,18 +216,12 @@ export function GetStartedPage() {
           <div className="w-16 h-16 rounded-2xl bg-orange-100 dark:bg-orange-500/10 text-orange-600 dark:text-orange-500 flex items-center justify-center mb-2">
             <LayoutGrid size={32} />
           </div>
-          <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight m-0">
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight leading-tight m-0" style={{ overflowWrap: "break-word", wordBreak: "break-word" }}>
             Hi {displayName}! 👋 <br/>Welcome to CalTrack
           </h1>
           <p className="text-base font-medium text-slate-500 dark:text-slate-400 m-0 max-w-[380px] leading-relaxed">
             Your enterprise portal is ready. Let's finish the setup and start managing your workspace.
           </p>
-          <button
-            onClick={() => navigate(routes.locations)}
-            className="bg-orange-600 dark:bg-orange-500 hover:bg-orange-700 dark:hover:bg-orange-600 text-white border-none rounded-2xl px-8 py-4 text-base font-black tracking-wide cursor-pointer w-fit mt-4 transition-all hover:scale-[1.02] shadow-lg shadow-orange-600/20 active:scale-95"
-          >
-            Start onboarding
-          </button>
         </motion.div>
 
         {/* Progress Card (Right) */}
@@ -246,6 +336,14 @@ const ProgressCircle = ({ percentage }) => {
   const circumference = 2 * Math.PI * radius
   const offset = circumference - (percentage / 100) * circumference
 
+  const count = useMotionValue(0)
+  const rounded = useTransform(count, Math.round)
+
+  useEffect(() => {
+    const controls = animate(count, percentage, { duration: 1, ease: "easeOut" })
+    return controls.stop
+  }, [percentage, count])
+
   return (
     <div className="relative w-20 h-20 flex-shrink-0">
       <svg className="w-full h-full" viewBox="0 0 84 84">
@@ -266,7 +364,7 @@ const ProgressCircle = ({ percentage }) => {
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center text-lg font-black text-slate-900 dark:text-white">
-        {percentage}%
+        <motion.span>{rounded}</motion.span>%
       </div>
     </div>
   )

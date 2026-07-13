@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from utils.validators import validate_upload
 
 
 class Task(models.Model):
@@ -84,6 +85,14 @@ class Task(models.Model):
         null=True, blank=True,
         related_name="created_tasks",
     )
+    service_request  = models.ForeignKey(
+        'service_requests.ServiceRequest',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="tasks",
+        help_text="The service request this job/task was created from."
+    )
+
 
     # Scheduling
     due_date         = models.DateField(default=timezone.localdate)
@@ -210,8 +219,8 @@ class Task(models.Model):
     )
 
     # Face Verification Fields
-    start_photo = models.ImageField(blank=True, null=True, upload_to='tasks/start_photos/')
-    end_photo = models.ImageField(blank=True, null=True, upload_to='tasks/end_photos/')
+    start_photo = models.ImageField(blank=True, null=True, upload_to='tasks/start_photos/', validators=[validate_upload])
+    end_photo = models.ImageField(blank=True, null=True, upload_to='tasks/end_photos/', validators=[validate_upload])
     face_match_percentage = models.FloatField(blank=True, null=True)
     face_match_status = models.CharField(
         max_length=20,
@@ -235,7 +244,7 @@ class Task(models.Model):
         ordering = ["due_date", "-priority", "created_at"]
 
     def __str__(self):
-        return f"{self.title} → {self.assigned_to.username}"
+        return f"{self.title} -> {self.assigned_to.username}"
 
     @property
     def actual_hours(self):
@@ -274,11 +283,22 @@ class Task(models.Model):
             raw = actual_seconds / 3600
             return Decimal(str(round(raw, 2)))
 
+    def save(self, *args, **kwargs):
+        if self.status == Task.Status.COMPLETED and self.billed_hours is None:
+            est_hours = self.estimated_hours if self.estimated_hours is not None else 1.00
+            if self.started_at and self.completed_at:
+                actual_seconds = int((self.completed_at - self.started_at).total_seconds())
+                self.billed_hours = self.compute_billed_hours(est_hours, actual_seconds)
+            else:
+                self.billed_hours = est_hours
+        super().save(*args, **kwargs)
+
+
 
 class TaskAttachment(models.Model):
 
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="attachments")
-    file = models.FileField(upload_to="tasks/attachments/")
+    file = models.FileField(upload_to="tasks/attachments/", validators=[validate_upload])
     original_name = models.CharField(max_length=255, blank=True)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

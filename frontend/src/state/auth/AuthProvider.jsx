@@ -34,9 +34,11 @@ export function AuthProvider({ children }) {
       console.log("DEBUG: apiFetchMe raw response:", JSON.stringify(me))
     } catch (e) {
       console.error("DEBUG: apiFetchMe exception:", e)
+    } catch (e) {
+      // Silent error logging or handling
     }
 
-    if (me?.username && me?.role && me?.company) {
+    if (me?.username && me?.role) {
       const u = {
         username:  me.username,
         email:     me.email      ?? "",
@@ -44,6 +46,13 @@ export function AuthProvider({ children }) {
         lastName:  me.last_name  ?? "",
         role:      me.role,
         companyId: me.company,
+        companyPermissions: me.company_permissions ?? null,
+        bio:       me.bio        ?? "",
+        phone:     me.phone      ?? "",
+        timezone:  me.timezone   ?? "UTC",
+        language:  me.language   ?? "en",
+        avatar_url:me.avatar_url ?? null,
+        two_fa_enabled: me.two_fa_enabled ?? false,
       }
       setUser(u)
       if (me.company_name) {
@@ -90,6 +99,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(async () => {
     await apiLogout()                                   // server clears cookies
     localStorage.removeItem("quicktims.orgName")
+    localStorage.removeItem("caltrack_activation_dossier")
     setUser(null)
   }, [])
 
@@ -104,6 +114,7 @@ export function AuthProvider({ children }) {
     refreshMe()
       .then((u) => console.log("DEBUG: refreshMe resolved with:", u))
       .catch((e) => console.error("DEBUG: refreshMe rejected with:", e))
+      .catch(() => {})
       .finally(() => {
         clearTimeout(fallbackTimer)
         setIsReady(true)
@@ -117,6 +128,7 @@ export function AuthProvider({ children }) {
     const handle = async () => {
       await apiLogout()
       localStorage.removeItem("quicktims.orgName")
+      localStorage.removeItem("caltrack_activation_dossier")
       setUser(null)
     }
     window.addEventListener("quicktims:session-expired", handle)

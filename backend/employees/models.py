@@ -2,8 +2,34 @@ from django.conf import settings
 from django.db import models
 
 
+# ── Tenant-scoped Manager ─────────────────────────────────────────────────────
+
+class TenantManager(models.Manager):
+    """
+    Drop-in manager that adds a for_company() helper.
+    All views that handle employee data MUST call:
+        Employee.objects.for_company(company)
+    instead of Employee.objects.all() to prevent cross-tenant data leakage.
+    """
+
+    def for_company(self, company):
+        """Return a queryset scoped to a single company (tenant)."""
+        return self.get_queryset().filter(company=company)
+
+
+
 class Employee(models.Model):
+    # ── Managers ───────────────────────────────────────────────────────────────
+    objects = TenantManager()  # default manager — use .for_company(company) to scope
+
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="employee_profile")
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="invited_employees"
+    )
     employee_id = models.CharField(max_length=50)
     phone = models.CharField(max_length=30, blank=True)
     title = models.CharField(max_length=100, blank=True)

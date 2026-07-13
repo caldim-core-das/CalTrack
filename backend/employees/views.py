@@ -1,7 +1,7 @@
 from django.db.models import Avg, Count, Q, Sum
 from django.utils import timezone
 
-from rest_framework import permissions, viewsets
+from rest_framework import permissions, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -15,7 +15,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if not hasattr(self.request, 'company'):
             return Employee.objects.none()
-        return Employee.objects.select_related("user").filter(company=self.request.company).order_by("employee_id")
+        qs = Employee.objects.select_related("user").filter(company=self.request.company)
+        if self.request.user.role in ("admin", "manager") and not self.request.user.is_superuser:
+            from django.db.models import Q
+            qs = qs.filter(Q(invited_by=self.request.user) | Q(invited_by__isnull=True))
+        return qs.order_by("employee_id")
 
     def get_permissions(self):
         if self.action in {"list", "create", "update", "partial_update", "destroy"}:
@@ -39,6 +43,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if not employee:
             return Response({"detail": "Employee profile not found."}, status=404)
         return Response(EmployeeSerializer(employee).data)
+
 
     @action(detail=True, methods=["get"], url_path="history")
     def history(self, request, pk=None):
@@ -145,10 +150,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 status__in=[Task.Status.PENDING, Task.Status.IN_PROGRESS],
                 due_date__lt=today
             ).count(),
-            "total_billed_hours": float(
-                all_tasks.filter(status=Task.Status.COMPLETED)
-                .aggregate(total=Sum("billed_hours"))["total"] or 0
-            ),
+            "total_billed_hours": float(sum(
+                float(t.billed_hours if t.billed_hours is not None else t.estimated_hours)
+                for t in all_tasks.filter(status=Task.Status.COMPLETED)
+            )),
         }
 
         # ── Recent Task History (last 20) ─────────────────────────────────
@@ -165,10 +170,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                 "due_date": str(t.due_date),
                 "started_at": t.started_at.isoformat() if t.started_at else None,
                 "completed_at": t.completed_at.isoformat() if t.completed_at else None,
-                "billed_hours": float(t.billed_hours) if t.billed_hours else None,
+                "billed_hours": float(t.billed_hours if t.billed_hours is not None else t.estimated_hours) if t.status == Task.Status.COMPLETED else None,
                 "location": t.location or t.job_address,
                 "client_name": t.client_name,
             })
+
 
         # ── Performance Ratings ────────────────────────────────────────────
         # These are stored in employee.exempt_history (JSON) as performance entries

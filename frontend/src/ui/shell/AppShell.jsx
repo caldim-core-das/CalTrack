@@ -15,12 +15,16 @@ import { NotificationService } from "../../utils/notifications.js"
 import { useWebSocket } from "../../hooks/useWebSocket.js"
 import { useDispatch } from "react-redux"
 import { addSosAlert, addGeofenceBreach } from "../../store/liveLocationSlice.js"
+import { fetchTrialStatus, fetchTrialNotifications } from "../../store/trialSlice.js"
+import { TrialBanner } from "../components/TrialBanner.jsx"
+import { TrialExpiredModal } from "../components/TrialExpiredModal.jsx"
 
 import {
   Home, Clock, CheckSquare, CalendarDays, Banknote, CalendarRange,
   Users, BarChart3, MapPin, Settings, Search, LogOut,
   ChevronLeft, ChevronRight, Rocket, ShieldAlert, Globe, Package, Award,
-  FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Car, X
+  FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Car, X,
+  Wrench, MessageSquare
 } from "lucide-react"
 
 const ALL_NAV_ITEMS = [
@@ -29,6 +33,12 @@ const ALL_NAV_ITEMS = [
   { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1", employeeOnly: true },
   { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6", adminOnly: true },
   { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444", adminOnly: true },
+  { label: "Service Requests", to: routes.admin_service_requests, icon: <Wrench size={20} />, color: "#6366F1", adminOnly: true },
+  { label: "Feedback Logs", to: routes.admin_feedback, icon: <MessageSquare size={20} />, color: "#F59E0B", adminOnly: true },
+  { label: "Feedback", to: routes.employee_jobs, icon: <MessageSquare size={20} />, color: "#14B8A6", employeeOnly: true },
+  { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1", employeeOnly: true },
+  { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6", adminOnly: true, module: "locations" },
+  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444", adminOnly: true, module: "live_location" },
   {
     label: "Employees",
     to: routes.employees,
@@ -54,6 +64,12 @@ const ALL_NAV_ITEMS = [
   { label: "Mileage", to: routes.mileage, icon: <Car size={20} />, color: "#EF4444" },
   { label: "Inventory", to: routes.inventory, icon: <Package size={20} />, color: "#10B981", adminOnly: true },
   { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, color: "#FACC15", adminOnly: true },
+  { label: "Payroll", to: routes.payroll, icon: <Banknote size={20} />, color: "#6366F1", adminOnly: true, module: "payroll" },
+  { label: "Scheduling", to: routes.scheduling, icon: <CalendarRange size={20} />, color: "#38BDF8", adminOnly: true },
+  { label: "Time", to: routes.time, icon: <Clock size={20} />, color: "#F59E0B", module: "attendance" },
+  { label: "Mileage", to: routes.mileage, icon: <Car size={20} />, color: "#EF4444" },
+  { label: "Inventory", to: routes.inventory, icon: <Package size={20} />, color: "#10B981", adminOnly: true },
+  { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, color: "#FACC15", adminOnly: true, module: "reports" },
   { label: "Compliance", to: routes.compliance, icon: <ShieldAlert size={20} />, color: "#2563EB", adminOnly: true },
   { label: "Settings", to: routes.settings, icon: <Settings size={20} />, color: "#64748B" },
 ]
@@ -87,6 +103,17 @@ function displayName(username) {
   const s = String(username || "").trim()
   if (!s) return ""
   return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+function hasModuleAccess(user, item) {
+  if (!item.module) return true
+  const perms = user?.companyPermissions
+  if (!perms) return true
+  const modulePerms = perms[item.module]
+  if (!modulePerms) return false
+  const checkRole = user.role === "manager" ? "admin" : user.role
+  const actions = modulePerms[checkRole] || []
+  return actions.includes("view")
 }
 
 function playCriticalAlert() {
@@ -140,6 +167,7 @@ function SidebarTooltip({ tooltip }) {
 function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user, onClose }) {
   if (!flyout) return null
   const isBottom = flyout.bottom !== null
+  const isAdmin = user?.role === "admin" || user?.role === "manager"
   return (
     <div
       className="fixed z-[999998] bg-transparent pl-5 pointer-events-auto"
@@ -156,7 +184,7 @@ function SubmenuFlyout({ flyout, onMouseEnter, onMouseLeave, user, onClose }) {
           {flyout.label}
         </div>
         {flyout.children
-          .filter(child => !child.adminOnly || isAdmin)
+          .filter(child => (!child.adminOnly || isAdmin) && hasModuleAccess(user, child))
           .map((child) => (
             <NavLink
               key={child.to}
@@ -177,11 +205,13 @@ export function AppShell() {
   const { user, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const dispatch = useDispatch()
   const [offline, setOffline] = useState(false)
   const [cmdOpen, setCmdOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   const [profileOpen, setProfileOpen] = useState(false)
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
+  const [localTime, setLocalTime] = useState(new Date())
   const [orgName, setOrgName] = useState(() => localStorage.getItem("quicktims.orgName") || "")
   const [settingsExpanded, setSettingsExpanded] = useState(true)
   const [tooltip, setTooltip] = useState(null)
@@ -243,6 +273,7 @@ export function AppShell() {
       if (item.adminOnly && !isAdminUser) return false
       if (item.employeeOnly && isAdminUser) return false
       return true
+      return hasModuleAccess(user, item)
     })
   }, [user])
 
@@ -251,12 +282,19 @@ export function AppShell() {
   }, [sidebarCollapsed])
 
   useEffect(() => {
-    if (location.pathname.startsWith("/settings")) {
-      setDrillDownParent(null)
-      return
+    if (user) {
+      dispatch(fetchTrialStatus())
+      dispatch(fetchTrialNotifications())
     }
+  }, [user, dispatch])
+
+  useEffect(() => {
     const parent = items.find(item => item.children && location.pathname.startsWith(item.to))
-    if (parent) setDrillDownParent(parent)
+    if (parent) {
+      setDrillDownParent(parent)
+    } else {
+      setDrillDownParent(null)
+    }
   }, [location.pathname, items])
 
   const showTooltip = (label, e) => {
@@ -294,6 +332,11 @@ export function AppShell() {
   useEffect(() => {
     const t = setInterval(() => setOffline(isOffline()), 1500)
     return () => clearInterval(t)
+  }, [])
+
+  useEffect(() => {
+    const timer = setInterval(() => setLocalTime(new Date()), 1000)
+    return () => clearInterval(timer)
   }, [])
 
   useEffect(() => {
@@ -347,8 +390,6 @@ export function AppShell() {
     }
   }, [workspaceMenuOpen])
 
-  const dispatch = useDispatch()
-
   const handleGlobalWsMessage = useCallback((msg) => {
     if (msg.type === "sos_alert") {
       dispatch(addSosAlert(msg.data))
@@ -386,6 +427,8 @@ export function AppShell() {
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-bg text-fg font-body">
+      <TrialBanner />
+      <TrialExpiredModal />
       <CommandPalette open={cmdOpen} setOpen={setCmdOpen} />
 
       {/* ── Topbar ───────────────────────────── */}
@@ -416,6 +459,20 @@ export function AppShell() {
             </div>
           </button>
 
+          <div className="hidden sm:flex flex-col items-center justify-center px-4 py-1.5 bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 rounded-2xl select-none shadow-sm dark:shadow-md dark:shadow-black/20 min-w-[125px] hover:border-blue-500/30 transition-colors duration-300">
+            <span className="text-xs font-extrabold font-mono tracking-tight text-slate-800 dark:text-slate-200 tabular-nums leading-none">
+              {localTime.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hour12: true,
+              })}
+            </span>
+            <span className="text-[8px] font-black tracking-widest text-slate-400 dark:text-slate-500 uppercase leading-none mt-1.5 opacity-85">
+              Local Time
+            </span>
+          </div>
+
           <div className="flex items-center gap-3">
             <NotificationCenter />
             <ThemeSwitch />
@@ -430,7 +487,11 @@ export function AppShell() {
               onClick={() => setProfileOpen(v => !v)}
             >
               <div className="relative w-10 h-10 flex items-center justify-center rounded-xl bg-blue-600 dark:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
-                {initials(user.username)}
+                {user.avatar_url ? (
+                  <img src={user.avatar_url} alt="avatar" className="w-full h-full object-cover rounded-xl" />
+                ) : (
+                  initials(user.username)
+                )}
                 <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-4 border-white dark:border-slate-950 rounded-full shadow-sm"></div>
               </div>
               {!sidebarCollapsed && (
@@ -455,7 +516,13 @@ export function AppShell() {
                 <div className="absolute top-full right-0 mt-3 w-80 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-[99999] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
                   <div className="p-6 bg-slate-50/80 dark:bg-slate-800/50 backdrop-blur-xl border-b border-slate-200/60 dark:border-slate-700/60">
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 dark:bg-blue-500 text-white text-xl font-bold shadow-xl shadow-blue-500/20">{initials(user.username)}</div>
+                      <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 dark:bg-blue-500 text-white text-xl font-bold shadow-xl shadow-blue-500/20">
+                        {user.avatar_url ? (
+                          <img src={user.avatar_url} alt="avatar" className="w-full h-full object-cover rounded-2xl" />
+                        ) : (
+                          initials(user.username)
+                        )}
+                      </div>
                       <div>
                         <div className="font-bold text-slate-900 dark:text-white text-lg">{displayName(user.username)}</div>
                         <div className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[180px] font-medium">{email}</div>
@@ -531,14 +598,6 @@ export function AppShell() {
                       {item.label}
                     </span>
 
-                    {active && (
-                      <motion.div
-                        layoutId="active-indicator-main"
-                        className="absolute -right-0 w-1 h-10 rounded-full"
-                        style={{ backgroundColor: color }}
-                      />
-                    )}
-
                     {/* Hover Glow */}
                     <div
                       className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
@@ -570,7 +629,7 @@ export function AppShell() {
 
                 <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col gap-1">
                   {drillDownParent.children
-                    .filter(child => !child.adminOnly || isAdmin)
+                    .filter(child => (!child.adminOnly || isAdmin) && hasModuleAccess(user, child))
                     .map((child) => {
                       const active = location.pathname === child.to || (child.to !== '/settings' && child.to !== '/employees' && location.pathname.startsWith(child.to));
                       const color = child.color || drillDownParent.color || "#3b82f6";
@@ -656,7 +715,7 @@ export function AppShell() {
                     {notif.timestamp}
                   </span>
                 </div>
-                
+
                 {/* Body info */}
                 <div className="text-xs text-slate-600 dark:text-slate-300 space-y-0.5">
                   <div className="truncate">

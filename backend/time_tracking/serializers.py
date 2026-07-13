@@ -131,6 +131,28 @@ class TimeLogSerializer(serializers.ModelSerializer):
     def get_location_name(self, obj):
         return obj.location.name if obj.location else None
 
+    def validate(self, attrs):
+        """
+        CRITICAL 4 — GPS & Photo enforcement.
+        Clock-in requests MUST supply gps_latitude, gps_longitude, and a photo.
+        This check is enforced server-side regardless of what the frontend sends.
+        """
+        # Only enforce on clock-in (when clock_in is being set and clock_out is absent)
+        is_clock_in = "clock_in" in attrs and not attrs.get("clock_out")
+        if is_clock_in:
+            missing = []
+            if not attrs.get("clock_in_lat"):
+                missing.append("gps_latitude (clock_in_lat)")
+            if not attrs.get("clock_in_lon"):
+                missing.append("gps_longitude (clock_in_lon)")
+            if not attrs.get("clock_in_photo"):
+                missing.append("photo (clock_in_photo)")
+            if missing:
+                raise serializers.ValidationError(
+                    {field: "This field is required for clock-in." for field in missing}
+                )
+        return attrs
+
 
 # ── Location (with polygon support) ──────────────────────────────────────────
 

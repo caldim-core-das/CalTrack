@@ -1,5 +1,6 @@
 export const routes = {
   login: "/login",
+  organization_signup: "/organization-signup",
   dashboard: "/",
   analysis: "/analysis",
   locations: "/locations",
@@ -54,4 +55,10 @@ export const routes = {
   employees_rejected: "/employees/rejected",
   employees_documents: "/employees/documents",
   employees_training: "/employees/training",
+  create_password: "/create-password",
+  booking: "/booking",
+  feedback: "/feedback/:token",
+  admin_service_requests: "/admin/service-requests",
+  admin_feedback: "/admin/feedback",
+  employee_jobs: "/employee/jobs",
 }

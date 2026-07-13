@@ -8,19 +8,43 @@ class UserSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     company = serializers.CharField(source="company_id", read_only=True)
     company_name = serializers.SerializerMethodField()
+    company_domain = serializers.SerializerMethodField()
+    company_schema = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
+    company_permissions = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = (
             "id", "username", "email", "first_name", "last_name", "role",
-            "company", "company_name", "bio", "phone", "timezone", "language",
-            "avatar_url", "two_fa_enabled",
+            "company", "company_name", "company_domain", "company_schema", "bio", "phone", "timezone", "language",
+            "avatar_url", "two_fa_enabled", "company_permissions",
         )
+
+    def get_company_permissions(self, obj):
+        try:
+            return obj.company.module_permissions if obj.company else None
+        except Exception:
+            return None
 
     def get_company_name(self, obj):
         try:
             return obj.company.company_name if obj.company else ""
+        except Exception:
+            return ""
+
+    def get_company_domain(self, obj):
+        try:
+            if obj.company:
+                dom = obj.company.domains.first()
+                return dom.domain if dom else ""
+            return ""
+        except Exception:
+            return ""
+
+    def get_company_schema(self, obj):
+        try:
+            return obj.company.schema_name if obj.company else ""
         except Exception:
             return ""
 
@@ -36,7 +60,7 @@ class UserSerializer(serializers.ModelSerializer):
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "bio", "phone", "timezone", "language", "avatar")
+        fields = ("first_name", "last_name", "email", "bio", "phone", "timezone", "language", "avatar")
 
 
 class LoginSerializer(serializers.Serializer):

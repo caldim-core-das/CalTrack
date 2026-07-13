@@ -9,7 +9,7 @@ from rest_framework import permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdminRole
+from accounts.permissions import IsAdminRole, RequireModuleAccess
 from employees.models import Employee
 from leaves.models import LeaveRequest
 from payroll.models import PayrollRecord, PayrollPeriod
@@ -25,7 +25,7 @@ def _parse_date(value: str | None):
 
 
 class AdminOverviewReportView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("reports", "view")]
 
     def get(self, request):
         start = _parse_date(request.query_params.get("start")) or (timezone.localdate() - timedelta(days=30))
@@ -62,7 +62,7 @@ class DashboardAnalyticsView(APIView):
     Comprehensive dashboard analytics endpoint.
     Returns aggregated data for charts and KPI cards.
     """
-    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole, RequireModuleAccess("reports", "view")]
 
     def get(self, request):
         company = getattr(request, 'company', None)
@@ -71,9 +71,11 @@ class DashboardAnalyticsView(APIView):
 
         from django.core.cache import cache
         cache_key = f"dashboard_analytics_{company.id}"
-        cached_data = cache.get(cache_key)
-        if cached_data:
-            return Response(cached_data)
+        bypass_cache = request.query_params.get("refresh") == "true"
+        if not bypass_cache:
+            cached_data = cache.get(cache_key)
+            if cached_data:
+                return Response(cached_data)
 
         today = timezone.localdate()
         seven_days_ago = today - timedelta(days=7)
@@ -163,7 +165,7 @@ class DashboardAnalyticsView(APIView):
 
         daily_trend = []
         for i in range(30):
-            d = thirty_days_ago + timedelta(days=i)
+            d = today - timedelta(days=29 - i)
             key = str(d)
             daily_trend.append({
                 "date": key,
@@ -207,7 +209,7 @@ class DashboardAnalyticsView(APIView):
         # ── Clock-ins per Day (last 7 days, bar chart) ──
         attendance_daily = []
         for i in range(7):
-            d = seven_days_ago + timedelta(days=i)
+            d = today - timedelta(days=6 - i)
             count = TimeLog.objects.filter(employee__company=company, work_date=d).count()
             day_label = d.strftime("%a")
             attendance_daily.append({

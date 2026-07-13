@@ -354,150 +354,110 @@ export function AnalysisPage() {
   // 8. Earnings Analytics Data (Line Chart)
   const getEarningsTrendData = (timeframe) => {
     const hourlyRate = emp?.hourly_rate || 50
-    const scaleFactor = hourlyRate / 50
-
-    const mockEarnings = {
-      daily: [480, 600, 720, 560, 800, 1000, 880],
-      weekly: [3200, 3600, 4000, 4200],
-      monthly: [12000, 14000, 15000, 16000, 18000, 17000],
-    }
-
-    const baseData = mockEarnings[timeframe].map(val => Math.round(val * scaleFactor))
-
     const taskHistory = historyData?.task_history || []
-    const completedTasksWithBilling = taskHistory.filter(t => t.status === "completed" && t.completed_at && t.billed_hours)
     
-    if (completedTasksWithBilling.length > 0) {
-      const sortedTasks = [...completedTasksWithBilling].sort((a, b) => new Date(a.completed_at) - new Date(b.completed_at))
-      
-      if (timeframe === "daily") {
-        const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-        const data = [0, 0, 0, 0, 0, 0, 0]
-        sortedTasks.forEach(task => {
-          const date = new Date(task.completed_at)
-          const dayIndex = (date.getDay() + 6) % 7
-          data[dayIndex] += (task.billed_hours || 0) * hourlyRate
-        })
-        const hasEarnings = data.some(val => val > 0)
-        return {
-          labels,
-          datasets: [{
-            label: "Earnings ($)",
-            data: hasEarnings ? data : baseData,
-            borderColor: "#10b981",
-            backgroundColor: (ctx) => {
-              const chart = ctx.chart
-              const { ctx: context, chartArea } = chart
-              if (!chartArea) return "rgba(16, 185, 129, 0.1)"
-              const gradient = context.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
-              gradient.addColorStop(0, "rgba(16, 185, 129, 0.15)")
-              gradient.addColorStop(1, "rgba(16, 185, 129, 0.01)")
-              return gradient
-            },
-            fill: true,
-            tension: 0.4,
-            borderWidth: 3,
-            pointRadius: 5,
-            pointHoverRadius: 8,
-            pointBackgroundColor: "#10b981",
-            pointBorderColor: "#10b981",
-          }]
-        }
-      } else if (timeframe === "weekly") {
-        const labels = ["Week 1", "Week 2", "Week 3", "Week 4"]
-        const data = [0, 0, 0, 0]
-        sortedTasks.forEach((task, index) => {
-          const weekIndex = index % 4
-          data[weekIndex] += (task.billed_hours || 0) * hourlyRate
-        })
-        const hasEarnings = data.some(val => val > 0)
-        return {
-          labels,
-          datasets: [{
-            label: "Earnings ($)",
-            data: hasEarnings ? data : baseData,
-            borderColor: "#10b981",
-            backgroundColor: (ctx) => {
-              const chart = ctx.chart
-              const { ctx: context, chartArea } = chart
-              if (!chartArea) return "rgba(16, 185, 129, 0.1)"
-              const gradient = context.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
-              gradient.addColorStop(0, "rgba(16, 185, 129, 0.15)")
-              gradient.addColorStop(1, "rgba(16, 185, 129, 0.01)")
-              return gradient
-            },
-            fill: true,
-            tension: 0.4,
-            borderWidth: 3,
-            pointRadius: 5,
-            pointHoverRadius: 8,
-            pointBackgroundColor: "#10b981",
-            pointBorderColor: "#10b981",
-          }]
-        }
-      } else {
-        const labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"]
-        const data = [0, 0, 0, 0, 0, 0]
-        sortedTasks.forEach(task => {
-          const date = new Date(task.completed_at)
-          const monthIndex = date.getMonth() % 6
-          data[monthIndex] += (task.billed_hours || 0) * hourlyRate
-        })
-        const hasEarnings = data.some(val => val > 0)
-        return {
-          labels,
-          datasets: [{
-            label: "Earnings ($)",
-            data: hasEarnings ? data : baseData,
-            borderColor: "#10b981",
-            backgroundColor: (ctx) => {
-              const chart = ctx.chart
-              const { ctx: context, chartArea } = chart
-              if (!chartArea) return "rgba(16, 185, 129, 0.1)"
-              const gradient = context.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
-              gradient.addColorStop(0, "rgba(16, 185, 129, 0.15)")
-              gradient.addColorStop(1, "rgba(16, 185, 129, 0.01)")
-              return gradient
-            },
-            fill: true,
-            tension: 0.4,
-            borderWidth: 3,
-            pointRadius: 5,
-            pointHoverRadius: 8,
-            pointBackgroundColor: "#10b981",
-            pointBorderColor: "#10b981",
-          }]
-        }
-      }
+    // Filter to completed tasks
+    const completedTasks = taskHistory.filter(t => t.status === "completed" && t.completed_at)
+
+    const baseDatasetConfig = {
+      label: "Earnings ($)",
+      borderColor: "#10b981",
+      backgroundColor: (ctx) => {
+        const chart = ctx.chart
+        const { ctx: context, chartArea } = chart
+        if (!chartArea) return "rgba(16, 185, 129, 0.1)"
+        const gradient = context.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
+        gradient.addColorStop(0, "rgba(16, 185, 129, 0.15)")
+        gradient.addColorStop(1, "rgba(16, 185, 129, 0.01)")
+        return gradient
+      },
+      fill: true,
+      tension: 0.4,
+      borderWidth: 3,
+      pointRadius: 5,
+      pointHoverRadius: 8,
+      pointBackgroundColor: "#10b981",
+      pointBorderColor: "#10b981",
     }
 
-    return {
-      labels: timeframe === "daily" 
-        ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] 
-        : timeframe === "weekly" 
-          ? ["Week 1", "Week 2", "Week 3", "Week 4"] 
-          : ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-      datasets: [{
-        label: "Earnings ($)",
-        data: baseData,
-        borderColor: "#10b981",
-        backgroundColor: (ctx) => {
-          const chart = ctx.chart
-          const { ctx: context, chartArea } = chart
-          if (!chartArea) return "rgba(16, 185, 129, 0.1)"
-          const gradient = context.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
-          gradient.addColorStop(0, "rgba(16, 185, 129, 0.15)")
-          gradient.addColorStop(1, "rgba(16, 185, 129, 0.01)")
-          return gradient
-        },
-        fill: true,
-        tension: 0.4,
-        borderWidth: 3,
-        pointRadius: 5,
-        pointHoverRadius: 8,
-        pointBackgroundColor: "#10b981",
-        pointBorderColor: "#10b981",
-      }]
+    if (timeframe === "daily") {
+      const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+      const data = [0, 0, 0, 0, 0, 0, 0]
+
+      // Filter tasks completed in current week (Monday-Sunday)
+      const now = new Date()
+      const day = now.getDay()
+      const diff = now.getDate() - day + (day === 0 ? -6 : 1) // start on Monday
+      const startOfWeek = new Date(now.setDate(diff))
+      startOfWeek.setHours(0, 0, 0, 0)
+      const endOfWeek = new Date(startOfWeek)
+      endOfWeek.setDate(startOfWeek.getDate() + 7)
+
+      completedTasks.forEach(task => {
+        const date = new Date(task.completed_at)
+        if (date >= startOfWeek && date < endOfWeek) {
+          const dayIndex = (date.getDay() + 6) % 7 // Monday = 0
+          data[dayIndex] += (task.billed_hours || 0) * hourlyRate
+        }
+      })
+
+      return {
+        labels,
+        datasets: [{
+          ...baseDatasetConfig,
+          data
+        }]
+      }
+    } else if (timeframe === "weekly") {
+      const labels = ["Week 1", "Week 2", "Week 3", "Week 4"]
+      const data = [0, 0, 0, 0]
+
+      // Calculate last 4 weeks dynamically
+      const now = new Date()
+      completedTasks.forEach(task => {
+        const date = new Date(task.completed_at)
+        const diffWeeks = Math.floor((now - date) / (7 * 24 * 60 * 60 * 1000))
+        if (diffWeeks >= 0 && diffWeeks < 4) {
+          const idx = 3 - diffWeeks
+          data[idx] += (task.billed_hours || 0) * hourlyRate
+        }
+      })
+
+      return {
+        labels,
+        datasets: [{
+          ...baseDatasetConfig,
+          data
+        }]
+      }
+    } else {
+      // Monthly: last 6 months dynamic labels and values
+      const labels = []
+      const data = []
+      const now = new Date()
+
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        labels.push(d.toLocaleString("en-US", { month: "short" }))
+        data.push(0)
+      }
+
+      completedTasks.forEach(task => {
+        const date = new Date(task.completed_at)
+        const diffMonths = (now.getFullYear() - date.getFullYear()) * 12 + now.getMonth() - date.getMonth()
+        if (diffMonths >= 0 && diffMonths < 6) {
+          const idx = 5 - diffMonths
+          data[idx] += (task.billed_hours || 0) * hourlyRate
+        }
+      })
+
+      return {
+        labels,
+        datasets: [{
+          ...baseDatasetConfig,
+          data
+        }]
+      }
     }
   }
 
@@ -675,19 +635,32 @@ export function AnalysisPage() {
             </div>
           </div>
           <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl border border-stroke dark:border-slate-800">
-            {["daily", "weekly", "monthly"].map((t) => (
-              <button
-                key={t}
-                onClick={() => setPerfTimeframe(t)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                  perfTimeframe === t
-                    ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm"
-                    : "text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+            {["daily", "weekly", "monthly"].map((t) => {
+              const isActive = perfTimeframe === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setPerfTimeframe(t)}
+                  style={{ position: "relative" }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors z-10 ${
+                    isActive
+                      ? "text-slate-900 dark:text-white font-extrabold"
+                      : "text-slate-400 dark:text-slate-600 hover:text-slate-600 dark:hover:text-slate-400"
+                  }`}
+                >
+                  <span style={{ position: "relative", zIndex: 10 }}>{t}</span>
+                  {isActive && (
+                    <motion.div
+                      layoutId="perfTimeframeIndicator"
+                      className="absolute inset-0 bg-white dark:bg-slate-800 border border-slate-900 dark:border-slate-100 rounded-lg shadow-sm"
+                      style={{ zIndex: 1 }}
+                      transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="h-[280px] w-full">
@@ -841,19 +814,32 @@ export function AnalysisPage() {
             </div>
           </div>
           <div className="flex border border-slate-200 dark:border-slate-800 p-1 bg-slate-50 dark:bg-slate-950 rounded-2xl">
-            {["daily", "weekly", "monthly"].map((t) => (
-              <button
-                key={t}
-                onClick={() => setEarnTimeframe(t)}
-                className={`px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider transition-all rounded-xl ${
-                  earnTimeframe === t
-                    ? "bg-white dark:bg-slate-800 border border-slate-950 dark:border-slate-200 text-slate-950 dark:text-white shadow-sm"
-                    : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
-                }`}
-              >
-                {t}
-              </button>
-            ))}
+            {["daily", "weekly", "monthly"].map((t) => {
+              const isActive = earnTimeframe === t;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setEarnTimeframe(t)}
+                  style={{ position: "relative" }}
+                  className={`px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider transition-colors rounded-xl z-10 ${
+                    isActive
+                      ? "text-slate-950 dark:text-white"
+                      : "text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-350"
+                  }`}
+                >
+                  <span style={{ position: "relative", zIndex: 10 }}>{t}</span>
+                  {isActive && (
+                    <motion.div
+                      layoutId="earnTimeframeIndicator"
+                      className="absolute inset-0 bg-white dark:bg-slate-800 border border-slate-950 dark:border-slate-200 rounded-xl shadow-sm"
+                      style={{ zIndex: 1 }}
+                      transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="h-[280px] w-full">

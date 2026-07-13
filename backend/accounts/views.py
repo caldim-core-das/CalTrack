@@ -4,7 +4,17 @@ import traceback
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import connection, transaction
+from django.db.models import Q
 from companies.models import Company
+from settings_hub.models import TeamInvite
+
+try:
+    from django_tenants.utils import schema_context
+except ImportError:
+    from contextlib import contextmanager
+    @contextmanager
+    def schema_context(schema_name):
+        yield
 
 from rest_framework import permissions, serializers, status
 from rest_framework.response import Response
@@ -19,12 +29,18 @@ from employees.utils import generate_next_employee_id
 
 # ── Cookie helper ─────────────────────────────────────────────────────────────
 
+def _get_refresh_cookie_path():
+    """Build the refresh-cookie path, respecting FORCE_SCRIPT_NAME for subpath deployments."""
+    prefix = getattr(settings, "FORCE_SCRIPT_NAME", "") or ""
+    return f"{prefix}/api/auth/refresh/"
+
+
 def _set_auth_cookies(response, access_token, refresh_token=None):
     """
     Attach httpOnly JWT cookies to *response*.
 
     Access cookie  — sent to every path (needed for all API calls).
-    Refresh cookie — restricted to /api/auth/refresh/ so it is never
+    Refresh cookie — restricted to <prefix>/api/auth/refresh/ so it is never
                      accidentally exposed to other endpoints.
     """
     secure   = getattr(settings, "AUTH_COOKIE_SECURE", not settings.DEBUG)
@@ -50,7 +66,7 @@ def _set_auth_cookies(response, access_token, refresh_token=None):
             httponly=True,
             secure=secure,
             samesite=samesite,
-            path="/api/auth/refresh/",   # only sent to the refresh endpoint
+            path=_get_refresh_cookie_path(),
         )
     return response
 
@@ -58,7 +74,7 @@ def _set_auth_cookies(response, access_token, refresh_token=None):
 def _clear_auth_cookies(response):
     """Remove both auth cookies from the browser."""
     response.delete_cookie(settings.AUTH_COOKIE, path="/")
-    response.delete_cookie(settings.AUTH_COOKIE_REFRESH, path="/api/auth/refresh/")
+    response.delete_cookie(settings.AUTH_COOKIE_REFRESH, path=_get_refresh_cookie_path())
     return response
 import uuid
 import traceback
@@ -96,11 +112,36 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             username = username.strip()
             attrs[self.username_field] = username
 
+            # If the provided username looks like an email, try to resolve it to a username
+            if "@" in username:
+                User = get_user_model()
+                user = User.objects.filter(email__iexact=username).first()
+                if user:
+                    attrs[self.username_field] = user.username
+
         if (not username) and isinstance(email, str) and email.strip():
             User = get_user_model()
             user = User.objects.filter(email__iexact=email.strip()).first()
             if user:
                 attrs[self.username_field] = user.username
+
+        # Self-heal user company assignment if missing, before super().validate() generates tokens
+        resolved_username = attrs.get(self.username_field)
+        if resolved_username:
+            User = get_user_model()
+            try:
+                user = User.objects.filter(username__iexact=resolved_username).first()
+                if not user:
+                    user = User.objects.filter(email__iexact=resolved_username).first()
+                
+                if user and not getattr(user, "company", None) and user.role != "admin":
+                    from companies.models import Company
+                    company = Company.objects.filter(schema_name="demo_v2").first() or Company.objects.filter(schema_name="demo").first() or Company.objects.first()
+                    if company:
+                        user.company = company
+                        user.save(update_fields=["company"])
+            except Exception as e:
+                print(f"Error self-healing company during validation: {e}")
 
         return super().validate(attrs)
 
@@ -125,8 +166,33 @@ class LoginView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
         if response.status_code == 200:
-            access  = response.data.get("access")
+            # ── HIGH 3: 2FA enforcement ──────────────────────────────────────
+            # Extract the access token to identify the user, then check 2FA.
+            # If 2FA is required, store user ID in session and return a challenge
+            # signal WITHOUT setting auth cookies — JWT is withheld until TOTP verify.
+            access = response.data.get("access")
             refresh = response.data.get("refresh")
+
+            # Decode token to identify user without DB round-trip
+            try:
+                from rest_framework_simplejwt.tokens import AccessToken
+                token_obj = AccessToken(access)
+                user_id = token_obj.get("user_id")
+                User = get_user_model()
+                user = User.objects.filter(pk=user_id).first()
+            except Exception:
+                user = None
+
+            if user and getattr(user, "two_fa_enabled", False):
+                # Store pending user in session — don't issue cookies yet
+                request.session["pending_2fa_user"] = str(user.pk)
+                request.session.save()
+                return Response(
+                    {"success": True, "requires_2fa": True, "message": "2FA verification required."},
+                    status=200,
+                )
+
+            # No 2FA — proceed with cookie issuance as normal
             _set_auth_cookies(response, access, refresh)
             # Strip tokens from the body — they live in httpOnly cookies now
             response.data = {"success": True, "message": "Login successful."}
@@ -173,6 +239,58 @@ class LogoutView(APIView):
         return response
 
 
+class TwoFAChallengeView(APIView):
+    """
+    HIGH 3 — 2FA challenge endpoint.
+
+    After a successful password login where two_fa_enabled=True, the LoginView
+    stores the user PK in session["pending_2fa_user"] and returns requires_2fa=True
+    without issuing cookies.  The frontend must immediately POST the TOTP code here.
+    Only on successful TOTP verification are the JWT cookies issued.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            import pyotp
+        except ImportError:
+            return Response({"success": False, "message": "2FA library not installed."}, status=500)
+
+        pending_id = request.session.get("pending_2fa_user")
+        if not pending_id:
+            return Response(
+                {"success": False, "message": "No 2FA session in progress. Please log in again."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        code = (request.data.get("code") or "").strip()
+        if not code:
+            return Response({"success": False, "message": "TOTP code is required."}, status=400)
+
+        User = get_user_model()
+        try:
+            user = User.objects.get(pk=pending_id)
+        except User.DoesNotExist:
+            del request.session["pending_2fa_user"]
+            return Response({"success": False, "message": "Invalid session. Please log in again."}, status=400)
+
+        if not getattr(user, "totp_secret", None):
+            return Response({"success": False, "message": "2FA is not configured for this account."}, status=400)
+
+        totp = pyotp.TOTP(user.totp_secret)
+        if not totp.verify(code, valid_window=1):
+            return Response({"success": False, "message": "Invalid or expired 2FA code."}, status=400)
+
+        # ── TOTP verified — issue JWT cookies and clear session flag ──────
+        del request.session["pending_2fa_user"]
+        request.session.save()
+
+        refresh = CustomTokenObtainPairSerializer.get_token(user)
+        response = Response({"success": True, "message": "Login successful."})
+        _set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        return response
+
+
 class GoogleLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
@@ -191,28 +309,199 @@ class GoogleLoginView(APIView):
             return Response({"detail": "No email provided by Google"}, status=status.HTTP_400_BAD_REQUEST)
             
         User = get_user_model()
-        user = User.objects.filter(email=email).first()
+        email_clean = email.strip()
+        
+        # Prioritize the account that already has a company assigned
+        user = User.objects.filter(email__iexact=email_clean, company__isnull=False).first()
+        if not user:
+            # Fallback to any account with this email
+            user = User.objects.filter(email__iexact=email_clean).first()
+
+        # Check if there is a pending team invitation for this email across all companies
+        invite = None
+        for company in Company.objects.exclude(schema_name="public"):
+            with schema_context(company.schema_name):
+                invite = TeamInvite.objects.filter(email__iexact=email_clean, status="pending").first()
+                if invite:
+                    break
+
+        # ── HIGH 2: Invite Gate ──────────────────────────────────────────────
+        # Block account creation for unknown emails that have no pending invite.
+        # Existing users (already in the DB) may continue to log in via Google
+        # even without an active invite (their account was created another way).
+        if not user and not invite:
+            return Response(
+                {"detail": "No invitation found for this email. Please contact your administrator to receive an invitation."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if invite:
+
+            if not user:
+                username = email_clean.split("@")[0]
+                base_username = username
+                counter = 1
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}{counter}"
+                    counter += 1
+
+                user = User.objects.create_user(
+                    username=username,
+                    email=email_clean,
+                    password=uuid.uuid4().hex,
+                    first_name=user_info.get("given_name", ""),
+                    last_name=user_info.get("family_name", ""),
+                    role=invite.role,
+                )
+                user.company = invite.company
+                user.is_active = True
+                user.save()
+            else:
+                user.is_active = True
+                user.role = invite.role
+                user.company = invite.company
+                user.save()
+
+            # Accept the invitation
+            with schema_context(invite.company.schema_name):
+                invite.status = "accepted"
+                from django.utils import timezone
+                invite.accepted_at = timezone.now()
+                invite.save()
+
+            # Create/Activate Employee profile under the tenant schema
+            from employees.models import Employee
+            with schema_context(invite.company.schema_name):
+                employee, created = Employee.objects.get_or_create(
+                    user=user,
+                    company=invite.company,
+                    defaults={
+                        "employee_id": generate_next_employee_id(invite.company),
+                        "title": invite.role.title(),
+                        "hourly_rate": 0.00,
+                        "is_active": True,
+                        "invited_by": invite.invited_by
+                    }
+                )
+                if not created:
+                    employee.is_active = True
+                    employee.invited_by = invite.invited_by
+                    employee.save(update_fields=["is_active", "invited_by"])
 
         if not user:
-            # Auto-create the user if they don't exist yet
-            username = email.split("@")[0]
-            base_username = username
-            counter = 1
-            while User.objects.filter(username=username).exists():
-                username = f"{base_username}{counter}"
-                counter += 1
+            return Response({"detail": "Google login is restricted to pre-approved employee email accounts. Please contact your administrator to register."}, status=status.HTTP_400_BAD_REQUEST)
 
-            user = User.objects.create(
-                username=username,
-                email=email,
-                first_name=user_info.get("given_name", ""),
-                last_name=user_info.get("family_name", ""),
-            )
-            user.set_unusable_password()
-            user.save()
+        if not getattr(user, 'is_active', True):
+            # Check if they are approved but pending activation in the dossier json
+            import json
+            import os
+            from django.conf import settings
+            file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+            dossier_approved = False
+            dossier = None
+            if os.path.exists(file_path):
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        dossier = json.load(f)
+                    reg_form = dossier.get("regForm", {})
+                    dossier_email = reg_form.get("email", "").strip()
+                    admin_clearance = dossier.get("adminClearance", {})
+                    dossier_status = admin_clearance.get("status")
+                    if dossier_email.lower() == email_clean.lower() and dossier_status == "approved":
+                        dossier_approved = True
+                except Exception as e:
+                    print(f"Error loading dossier in GoogleLoginView: {e}")
+            
+            if dossier_approved and dossier:
+                from django.utils import timezone
+                from employees.models import Employee
+                
+                # Activate User
+                user.is_active = True
+                user.save()
+                
+                # Activate Employee
+                company = getattr(user, 'company', None)
+                if company:
+                    try:
+                        from django.db import connection
+                        if hasattr(connection, "tenant"):
+                            with schema_context(company.schema_name):
+                                employee = Employee.objects.filter(user=user).first()
+                                if employee:
+                                    employee.is_active = True
+                                    employee.save()
+                        else:
+                            employee = Employee.objects.filter(user=user).first()
+                            if employee:
+                                employee.is_active = True
+                                employee.save()
+                    except Exception as e:
+                        print(f"Error activating employee in GoogleLoginView: {e}")
+                
+                # Update dossier status
+                admin_clearance = dossier.get("adminClearance", {})
+                admin_clearance["status"] = "activated"
+                admin_clearance["invitationStatus"] = "Activated"
+                if "auditLogs" not in admin_clearance:
+                    admin_clearance["auditLogs"] = []
+                admin_clearance["auditLogs"].append({
+                    "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                    "action": "Google Auth Activation",
+                    "details": f"Technician successfully activated account via Google Login. System access granted."
+                })
+                dossier["adminClearance"] = admin_clearance
+                
+                try:
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        json.dump(dossier, f, indent=4, ensure_ascii=False)
+                except Exception as e:
+                    print(f"Error saving dossier in GoogleLoginView: {e}")
+            else:
+                return Response({"detail": "This account is deactivated."}, status=status.HTTP_400_BAD_REQUEST)
 
         refresh = CustomTokenObtainPairSerializer.get_token(user)
         response = Response({"success": True, "message": "Google login successful."})
+        _set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        return response
+
+
+from accounts.services import create_organization_admin_user
+
+class AdminRegistrationView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip()
+        password = request.data.get("password")
+        first_name = request.data.get("first_name", "").strip()
+        last_name = request.data.get("last_name", "").strip()
+
+        if not email or not password:
+            return Response({"detail": "Email and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        User = get_user_model()
+        if User.objects.filter(email__iexact=email).exists() or User.objects.filter(username__iexact=email).exists():
+            return Response({"detail": "Account with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user, created = create_organization_admin_user(
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name
+        )
+
+        refresh = CustomTokenObtainPairSerializer.get_token(user)
+        response = Response({
+            "success": True, 
+            "message": "Registration successful.",
+            "user": {
+                "email": user.email,
+                "role": user.role,
+                "company": None
+            }
+        }, status=status.HTTP_201_CREATED)
+        
         _set_auth_cookies(response, str(refresh.access_token), str(refresh))
         return response
 
@@ -253,11 +542,14 @@ class RegisterView(APIView):
                 if existing_company and existing_company.users.count() == 0:
                     company = existing_company
                 else:
-                    company = Company.objects.create(
+                    company = Company(
                         company_name=organization_name,
                         team_size=request.data.get("team_size"),
                         selected_modules=request.data.get("selected_modules", [])
                     )
+                    if request.data.get("start_trial") is False:
+                        company._skip_trial_activation = True
+                    company.save()
                     from companies.models import Domain
                     Domain.objects.create(
                         domain=f"{company.schema_name}.localhost",
@@ -312,7 +604,14 @@ class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        return Response(UserSerializer(request.user, context={"request": request}).data)
+        user = request.user
+        if user and not getattr(user, "company", None) and user.role != "admin":
+            from companies.models import Company
+            company = Company.objects.filter(schema_name="demo_v2").first() or Company.objects.filter(schema_name="demo").first() or Company.objects.first()
+            if company:
+                user.company = company
+                user.save(update_fields=["company"])
+        return Response(UserSerializer(user, context={"request": request}).data)
 
 
 class ProfileUpdateView(APIView):
@@ -445,86 +744,115 @@ class AcceptInviteView(APIView):
                 if company:
                     connection.set_tenant(company)
         
-        invite = TeamInvite.objects.filter(token=token, status="pending").first()
+        invite = None
+        if connection.schema_name != "public":
+            try:
+                invite = TeamInvite.objects.filter(token=token).first()
+            except Exception:
+                pass
         
         # Fallback: if not found in current schema, search all schemas
         if not invite:
             from django_tenants.utils import schema_context
             from companies.models import Company
-            for company in Company.objects.all():
+            for company in Company.objects.exclude(schema_name="public"):
                 with schema_context(company.schema_name):
-                    invite = TeamInvite.objects.filter(token=token, status="pending").first()
-                    if invite:
-                        # Once found, set the tenant for the rest of the transaction
-                        if hasattr(connection, 'set_tenant'):
-                            connection.set_tenant(company)
-                        break
+                    try:
+                        invite = TeamInvite.objects.filter(token=token).first()
+                        if invite:
+                            # Once found, set the tenant for the rest of the transaction
+                            if hasattr(connection, 'set_tenant'):
+                                connection.set_tenant(company)
+                            break
+                    except Exception:
+                        pass
 
         if not invite:
             return Response({"detail": "Invalid or expired invitation token."}, status=status.HTTP_400_BAD_REQUEST)
         
-        if invite.is_expired:
-            invite.status = "expired"
-            invite.save(update_fields=["status"])
-            return Response({"detail": "Invitation has expired."}, status=status.HTTP_400_BAD_REQUEST)
+        if invite.status == "accepted":
+            User = get_user_model()
+            if User.objects.filter(email__iexact=invite.email).exists():
+                return Response({"detail": "This invitation has already been accepted. Please log in to your account."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "This invitation has already been used."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if invite.status == "revoked":
+            return Response({"detail": "This invitation has been revoked by the administrator."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if invite.status == "expired" or invite.is_expired:
+            if invite.status != "expired":
+                with schema_context(invite.company.schema_name):
+                    invite.status = "expired"
+                    invite.save()
+            return Response({"detail": "This invitation has expired."}, status=status.HTTP_400_BAD_REQUEST)
 
         User = get_user_model()
-        if User.objects.filter(email__iexact=invite.email).exists():
-            return Response({"detail": "User with this email already exists."}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
             with transaction.atomic():
-                username = invite.email.split("@")[0]
-                base_username = username
-                counter = 1
-                while User.objects.filter(username=username).exists():
-                    username = f"{base_username}{counter}"
-                    counter += 1
+                user = User.objects.filter(email__iexact=invite.email).first()
+                if not user:
+                    username = invite.email.split("@")[0]
+                    base_username = username
+                    counter = 1
+                    while User.objects.filter(username=username).exists():
+                        username = f"{base_username}{counter}"
+                        counter += 1
 
-                user = User.objects.create_user(
-                    username=username,
-                    password=password,
-                    email=invite.email,
-                    first_name=first_name,
-                    last_name=last_name,
-                    role=invite.role,
-                )
+                    user = User.objects.create_user(
+                        username=username,
+                        password=password,
+                        email=invite.email,
+                        first_name=first_name,
+                        last_name=last_name,
+                        role=invite.role,
+                    )
+                else:
+                    user.set_password(password)
+                    user.role = invite.role
+                    if first_name:
+                        user.first_name = first_name
+                    if last_name:
+                        user.last_name = last_name
+
                 user.company = invite.company
+                user.is_active = True
                 user.save()
 
-                invite.status = "accepted"
-                from django.utils import timezone
-                invite.accepted_at = timezone.now()
-                invite.save(update_fields=["status", "accepted_at"])
-
-            if hasattr(connection, 'set_tenant'):
-                connection.set_tenant(invite.company)
+                with schema_context(invite.company.schema_name):
+                    invite.status = "accepted"
+                    from django.utils import timezone
+                    invite.accepted_at = timezone.now()
+                    invite.save()
 
             from employees.models import Employee
-            Employee.objects.get_or_create(
-                user=user,
-                company=invite.company,
-                defaults={
-                    "employee_id": generate_next_employee_id(invite.company),
-                    "title": invite.role.title(),
-                    "hourly_rate": 0,
-                }
-            )
-
-            if hasattr(connection, 'set_schema_to_public'):
-                connection.set_schema_to_public()
+            with schema_context(invite.company.schema_name):
+                employee, created = Employee.objects.get_or_create(
+                    user=user,
+                    company=invite.company,
+                    defaults={
+                        "employee_id": generate_next_employee_id(invite.company),
+                        "title": invite.role.title(),
+                        "hourly_rate": 0,
+                        "invited_by": invite.invited_by,
+                    }
+                )
+                if not created:
+                    employee.is_active = True
+                    employee.invited_by = invite.invited_by
+                    employee.save(update_fields=["is_active", "invited_by"])
 
         except Exception as e:
             traceback.print_exc()
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         refresh = CustomTokenObtainPairSerializer.get_token(user)
-        return Response({
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
+        response = Response({
+            "success": True,
             "user": UserSerializer(user).data,
             "message": "Login successfully"
         }, status=status.HTTP_201_CREATED)
+        _set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        return response
 
 class PasswordResetRequestView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -536,6 +864,12 @@ class PasswordResetRequestView(APIView):
             
         User = get_user_model()
         user = User.objects.filter(email__iexact=email).first()
+        
+        # ── Security: only proceed if the email matches a real account. ──────
+        # We do NOT fall back to User.objects.first() or any other user object.
+        # Sending a reset link to an unrelated account would be a privilege
+        # escalation / account takeover vulnerability.
+        reset_url = None
         if user:
             token_generator = PasswordResetTokenGenerator()
             token = token_generator.make_token(user)
@@ -545,19 +879,106 @@ class PasswordResetRequestView(APIView):
             frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
             reset_url = f"{frontend_url}/reset-password?uid={uid}&token={token}"
             
+            employee_id = "EMP1025"
+            first_name = "Surya"
+            if user.first_name:
+                first_name = user.first_name
+            elif user.username:
+                first_name = user.username
+                
+            if getattr(user, "company", None):
+                from django_tenants.utils import schema_context
+                try:
+                    with schema_context(user.company.schema_name):
+                        from employees.models import Employee
+                        emp = Employee.objects.filter(user=user).first()
+                        if emp:
+                            employee_id = emp.employee_id
+                except Exception as e:
+                    print(f"Error fetching employee for email reset: {e}")
+
+            subject = "CALtrack Secure Access Recovery"
+            
+            body_text = (
+                "━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "CALTRACK SECURITY HUB\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                f"Hello {first_name},\n\n"
+                "A password recovery request has been detected for:\n\n"
+                f"Employee ID: {employee_id}\n\n"
+                "If this request was initiated by you,\n"
+                "activate the secure recovery gateway below.\n\n"
+                f"ACTIVATE RECOVERY LINK:\n{reset_url}\n\n"
+                "Security Token Lifetime:\n"
+                "15 Minutes\n\n"
+                "Device Activity Logged.\n\n"
+                "If you did not request this action,\n"
+                "ignore this message.\n\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━\n"
+                "CALtrack Security Intelligence\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━"
+            )
+            
+            html_message = f"""
+            <div style="background-color: #03050d; color: #f1f5f9; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 20px; max-width: 600px; margin: 0 auto; border: 1px solid #1e293b; border-radius: 24px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);">
+                <div style="text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 20px; margin-bottom: 25px;">
+                    <div style="color: #6366f1; font-weight: 900; font-size: 20px; letter-spacing: 0.25em; text-transform: uppercase;">
+                        CALTRACK SECURITY HUB
+                    </div>
+                </div>
+                <div style="padding: 0 10px;">
+                    <p style="font-size: 15px; line-height: 1.6; color: #cbd5e1; margin-bottom: 20px;">
+                        Hello {first_name},
+                    </p>
+                    <p style="font-size: 14px; line-height: 1.6; color: #94a3b8; margin-bottom: 25px;">
+                        A password recovery request has been detected for:
+                    </p>
+                    
+                    <div style="background-color: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 16px; padding: 20px; margin-bottom: 30px;">
+                        <span style="font-family: monospace; font-size: 11px; text-transform: uppercase; color: #818cf8; display: block; margin-bottom: 5px;">Workforce Identity</span>
+                        <span style="font-family: monospace; font-size: 16px; font-weight: bold; color: #f1f5f9; letter-spacing: 1px;">{employee_id}</span>
+                    </div>
+                    
+                    <p style="font-size: 14px; line-height: 1.6; color: #94a3b8; margin-bottom: 25px;">
+                        If this request was initiated by you, activate the secure recovery gateway below.
+                    </p>
+                    
+                    <div style="text-align: center; margin-bottom: 35px; margin-top: 25px;">
+                        <a href="{reset_url}" style="background-color: #4f46e5; color: #ffffff; text-decoration: none; padding: 16px 36px; font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; border-radius: 16px; display: inline-block; box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3); transition: all 0.3s ease;">
+                            ACTIVATE RECOVERY
+                        </a>
+                    </div>
+                    
+                    <div style="border-top: 1px solid #1e293b; padding-top: 20px; margin-top: 30px; font-family: monospace; font-size: 11px; color: #64748b; line-height: 1.8;">
+                        <div style="margin-bottom: 8px;"><strong style="color: #94a3b8;">Security Token Lifetime:</strong> 15 Minutes</div>
+                        <div style="margin-bottom: 8px;"><strong style="color: #94a3b8;">Status:</strong> Device Activity Logged.</div>
+                        <div>If you did not request this action, ignore this message safely.</div>
+                    </div>
+                </div>
+                <div style="text-align: center; border-top: 2px solid #1e293b; padding-top: 20px; margin-top: 35px; color: #475569; font-size: 10px; font-family: monospace; letter-spacing: 0.15em; text-transform: uppercase;">
+                    CALtrack Security Intelligence
+                </div>
+            </div>
+            """
+
             try:
                 send_mail(
-                    "Password Reset Request",
-                    f"Click the link below to reset your password:\n\n{reset_url}\n\nIf you did not request this, please ignore this email.",
-                    "noreply@caltrack.com",
+                    subject,
+                    body_text,
+                    settings.DEFAULT_FROM_EMAIL,
                     [email],
-                    fail_silently=True,
+                    fail_silently=False,
+                    html_message=html_message
                 )
             except Exception as e:
                 print(f"Failed to send email: {e}")
         
+        response_data = {"detail": "If an account exists with that email, a password reset link has been sent."}
+        if settings.DEBUG and reset_url:
+            response_data["reset_url"] = reset_url
+            
         # Always return success to prevent email enumeration
-        return Response({"detail": "If an account exists with that email, a password reset link has been sent."})
+        return Response(response_data)
 
 class PasswordResetConfirmView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -580,7 +1001,27 @@ class PasswordResetConfirmView(APIView):
         if user is not None and PasswordResetTokenGenerator().check_token(user, token):
             user.set_password(new_password)
             user.save()
-            return Response({"detail": "Password has been reset successfully."})
+            
+            # Resolve employee ID
+            employee_id = "EMP1025"
+            if getattr(user, "company", None):
+                from django_tenants.utils import schema_context
+                try:
+                    with schema_context(user.company.schema_name):
+                        from employees.models import Employee
+                        emp = Employee.objects.filter(user=user).first()
+                        if emp:
+                            employee_id = emp.employee_id
+                except Exception as e:
+                    print(f"Error fetching employee in reset confirm: {e}")
+            else:
+                if user.first_name:
+                    employee_id = user.username
+                    
+            return Response({
+                "detail": "Password has been reset successfully.",
+                "employee_id": employee_id
+            })
         return Response({"detail": "Invalid or expired token"}, status=400)
 
 
@@ -594,11 +1035,14 @@ class RegistrationDossierView(APIView):
         file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
         if os.path.exists(file_path):
             try:
+                if os.path.getsize(file_path) == 0:
+                    return Response({})
                 with open(file_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 return Response(data)
             except Exception as e:
-                return Response({"error": str(e)}, status=500)
+                print(f"Error loading registration dossier: {e}")
+                return Response({})
         return Response({})
 
     def post(self, request):
@@ -619,4 +1063,1169 @@ class RegistrationDossierView(APIView):
             except Exception as e:
                 return Response({"error": str(e)}, status=500)
         return Response({"success": True})
+
+
+class RegistrationDossierApproveView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            from django.utils import timezone
+            from django.core.mail import send_mail
+            from employees.models import Employee
+
+            file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+            if not os.path.exists(file_path):
+                return Response({"error": "No registration request dossier found."}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    dossier = json.load(f)
+            except Exception as e:
+                return Response({"error": f"Failed to load dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            reg_form = dossier.get("regForm", {})
+            email = reg_form.get("email")
+            full_name = reg_form.get("fullName", "")
+            phone = reg_form.get("phone", "")
+            region = reg_form.get("region", "IN")
+
+            if not email:
+                return Response({"error": "Registrant email not found in dossier."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Generate token and expiration
+            token = uuid.uuid4().hex
+            expires_at = timezone.now() + timezone.timedelta(hours=24)
+
+            # Update dossier status
+            admin_clearance = dossier.get("adminClearance", {})
+            admin_clearance["status"] = "approved"
+            admin_clearance["remarks"] = "Application reviewed and approved. Invitation email sent."
+            admin_clearance["invitationStatus"] = "Sent"
+            admin_clearance["invitationToken"] = token
+            admin_clearance["invitationSentAt"] = timezone.now().isoformat()
+            admin_clearance["invitationExpiresAt"] = expires_at.isoformat()
+            
+            # Initialize audit logs if not exists
+            if "auditLogs" not in admin_clearance:
+                admin_clearance["auditLogs"] = []
+
+            admin_clearance["auditLogs"].append({
+                "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                "action": "Application Approved",
+                "details": f"Registration request approved by {request.user.get_full_name() or request.user.username}. Secure invitation dispatched."
+            })
+
+            dossier["adminClearance"] = admin_clearance
+
+            # Create/Update User & Employee as inactive
+            User = get_user_model()
+            username = email.split("@")[0] if email else f"user_{uuid.uuid4().hex[:6]}"
+            user = User.objects.filter(email__iexact=email).first()
+            company = getattr(request, "company", None) or getattr(request.user, "company", None)
+            if not company:
+                emp = Employee.objects.filter(user=request.user).first()
+                if emp:
+                    company = emp.company
+            if not company:
+                from companies.models import Company
+                company = Company.objects.exclude(schema_name="public").first() or Company.objects.first()
+
+            if not user:
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=uuid.uuid4().hex,
+                    first_name=full_name.split(" ")[0] if " " in full_name else full_name,
+                    last_name=" ".join(full_name.split(" ")[1:]) if " " in full_name else "—",
+                    role=User.Role.EMPLOYEE,
+                    company=company,
+                    is_active=False
+                )
+            else:
+                user.is_active = False
+                user.company = company
+                user.save()
+
+            employee = Employee.objects.filter(user=user).first()
+            if employee:
+                # Check if this employee_id is already taken in the target company (excluding this record itself)
+                collision = Employee.objects.filter(company=company, employee_id=employee.employee_id).exclude(id=employee.id).exists()
+                if collision or employee.employee_id == "EMP-2048":
+                    employee.employee_id = generate_next_employee_id(company)
+                employee.company = company
+                employee.phone = phone
+                employee.country = region
+                employee.is_active = False
+                employee.invited_by = request.user
+                employee.save()
+            else:
+                employee = Employee.objects.create(
+                    user=user,
+                    company=company,
+                    employee_id=reg_form.get("employee_id") or generate_next_employee_id(company),
+                    phone=phone,
+                    title="Field Operations Tech (L2)",
+                    hourly_rate=0.00,
+                    country=region,
+                    is_active=False,
+                    invited_by=request.user
+                )
+
+            # Send simulated invitation email
+            frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
+            activation_link = f"{frontend_url}/create-password?token={token}"
+            subject = "Invitation to Join Caltrack - Action Required"
+            message = f"""Dear {full_name},
+
+Congratulations! Your registration request with Caltrack has been approved.
+
+To activate your account and set up your password, please click the secure link below:
+{activation_link}
+
+This activation link will expire in 24 hours.
+
+Best regards,
+The Caltrack Team
+"""
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                    fail_silently=False
+                )
+                admin_clearance["invitationEmailStatus"] = "Delivered"
+                admin_clearance["auditLogs"].append({
+                    "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                    "action": "Email Delivered",
+                    "details": f"Invitation email successfully sent to {email}. Delivery channel: Console SMTP Simulator."
+                })
+            except Exception as e:
+                admin_clearance["invitationEmailStatus"] = "Failed"
+                admin_clearance["auditLogs"].append({
+                    "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                    "action": "Email Delivery Failed",
+                    "details": f"Failed to dispatch invitation to {email}: {str(e)}"
+                })
+
+            # Save dossier
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(dossier, f, indent=4, ensure_ascii=False)
+            except Exception as e:
+                return Response({"error": f"Failed to save dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({"success": True, "invitationStatus": "Sent"})
+        except Exception as approve_error:
+            import traceback
+            tb = traceback.format_exc()
+            try:
+                with open(os.path.join(settings.BASE_DIR, "traceback_output.txt"), "w", encoding="utf-8") as f:
+                    f.write(tb)
+            except Exception:
+                pass
+            raise approve_error
+
+
+class RegistrationDossierRejectView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from django.utils import timezone
+        from django.core.mail import send_mail
+
+        remarks = request.data.get("remarks", "Document Verification Failed")
+        reason_category = request.data.get("reasonCategory", "Other")
+
+        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+        if not os.path.exists(file_path):
+            return Response({"error": "No registration request dossier found."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                dossier = json.load(f)
+        except Exception as e:
+            return Response({"error": f"Failed to load dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        reg_form = dossier.get("regForm", {})
+        email = reg_form.get("email")
+        full_name = reg_form.get("fullName", "")
+
+        if not email:
+            return Response({"error": "Registrant email not found in dossier."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update dossier status
+        admin_clearance = dossier.get("adminClearance", {})
+        admin_clearance["status"] = "rejected"
+        admin_clearance["remarks"] = remarks
+        admin_clearance["reasonCategory"] = reason_category
+        admin_clearance["rejectedBy"] = request.user.get_full_name() or request.user.username
+        admin_clearance["rejectedOn"] = timezone.now().strftime("%d %b %Y")
+        
+        if "auditLogs" not in admin_clearance:
+            admin_clearance["auditLogs"] = []
+
+        admin_clearance["auditLogs"].append({
+            "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+            "action": "Application Rejected",
+            "details": f"Registration request rejected by {request.user.get_full_name() or request.user.username}. Reason: {remarks}"
+        })
+
+        dossier["adminClearance"] = admin_clearance
+
+        # Send simulated rejection email
+        subject = "Caltrack Registration Update"
+        message = f"""Dear {full_name},
+
+Thank you for your interest in joining Caltrack.
+
+After reviewing your registration dossier, we regret to inform you that your application could not be approved at this time for the following reason(s):
+
+{remarks}
+
+If you believe this was in error or if you need to upload corrected documents, please re-submit your registration via the portal.
+
+Best regards,
+The Caltrack Team
+"""
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=False
+            )
+            admin_clearance["rejectionEmailStatus"] = "Sent"
+            admin_clearance["auditLogs"].append({
+                "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                "action": "Rejection Dispatched",
+                "details": f"Rejection notice successfully sent to {email}."
+            })
+        except Exception as e:
+            admin_clearance["rejectionEmailStatus"] = "Failed"
+            admin_clearance["auditLogs"].append({
+                "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+                "action": "Rejection Dispatch Failed",
+                "details": f"Failed to dispatch rejection notice to {email}: {str(e)}"
+            })
+
+        # Save dossier
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(dossier, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            return Response({"error": f"Failed to save dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"success": True, "status": "Rejected"})
+
+
+class RegistrationDossierVerifyTokenView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        from django.utils import timezone
+
+        token = request.data.get("token")
+        if not token:
+            return Response({"error": "Token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+        if not os.path.exists(file_path):
+            return Response({"error": "No registration dossier found."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                dossier = json.load(f)
+        except Exception as e:
+            return Response({"error": "Failed to read dossier data."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        admin_clearance = dossier.get("adminClearance", {})
+        stored_token = admin_clearance.get("invitationToken")
+        expires_at_str = admin_clearance.get("invitationExpiresAt")
+
+        if not stored_token or stored_token != token:
+            return Response({"error": "Invalid invitation token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check expiration
+        if expires_at_str:
+            expires_at = timezone.datetime.fromisoformat(expires_at_str)
+            if timezone.is_naive(expires_at):
+                expires_at = timezone.make_aware(expires_at)
+            if timezone.now() > expires_at:
+                return Response({"error": "Invitation token has expired."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if admin_clearance.get("status") == "activated":
+            return Response({"error": "Account has already been activated."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reg_form = dossier.get("regForm", {})
+        return Response({
+            "valid": True,
+            "fullName": reg_form.get("fullName"),
+            "email": reg_form.get("email"),
+            "employeeId": reg_form.get("employee_id") or "EMP-2048"
+        })
+
+
+class RegistrationDossierActivateView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        from django.utils import timezone
+        from employees.models import Employee
+
+        token = request.data.get("token")
+        password = request.data.get("password")
+
+        if not token or not password:
+            return Response({"error": "Token and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
+        if not os.path.exists(file_path):
+            return Response({"error": "No registration dossier found."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                dossier = json.load(f)
+        except Exception as e:
+            return Response({"error": "Failed to read dossier data."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        admin_clearance = dossier.get("adminClearance", {})
+        stored_token = admin_clearance.get("invitationToken")
+        expires_at_str = admin_clearance.get("invitationExpiresAt")
+
+        if not stored_token or stored_token != token:
+            return Response({"error": "Invalid or expired invitation token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check expiration
+        if expires_at_str:
+            expires_at = timezone.datetime.fromisoformat(expires_at_str)
+            if timezone.is_naive(expires_at):
+                expires_at = timezone.make_aware(expires_at)
+            if timezone.now() > expires_at:
+                return Response({"error": "Invitation token has expired."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if admin_clearance.get("status") == "activated":
+            return Response({"error": "Account has already been activated."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reg_form = dossier.get("regForm", {})
+        email = reg_form.get("email")
+
+        # Activate in DB
+        User = get_user_model()
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response({"error": "User record not found in system databases."}, status=status.HTTP_404_NOT_FOUND)
+
+        user.set_password(password)
+        user.is_active = True
+        user.save()
+
+        from django_tenants.utils import schema_context
+        if user.company:
+            with schema_context(user.company.schema_name):
+                employee = Employee.objects.filter(user=user).first()
+                if employee:
+                    employee.is_active = True
+                    employee.save()
+
+        # Update dossier status
+        admin_clearance["status"] = "activated"
+        admin_clearance["invitationStatus"] = "Activated"
+        
+        if "auditLogs" not in admin_clearance:
+            admin_clearance["auditLogs"] = []
+
+        admin_clearance["auditLogs"].append({
+            "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+            "action": "Credentials Created",
+            "details": f"Technician successfully set security credentials. System access granted."
+        })
+        admin_clearance["auditLogs"].append({
+            "timestamp": timezone.now().strftime("%d %b %Y %I:%M %p"),
+            "action": "Workforce Activated",
+            "details": f"Employee portal account transitioned to active state. Welcome to the Caltrack workspace!"
+        })
+
+        dossier["adminClearance"] = admin_clearance
+
+        # Save dossier
+        try:
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(dossier, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            return Response({"error": f"Failed to save dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({"success": True})
+
+
+class PasswordResetVerifyIdentityView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        identity = request.data.get("identity")
+        if not identity:
+            return Response({"detail": "Identity is required"}, status=400)
+        
+        identity = identity.strip()
+        User = get_user_model()
+        user = User.objects.filter(Q(username__iexact=identity) | Q(email__iexact=identity)).first()
+        
+        found_user = user
+        found_employee = None
+        
+        # If not found directly, search all tenant schemas for employee_id or username/email
+        if not found_user and hasattr(connection, 'set_tenant'):
+            from companies.models import Company
+            from employees.models import Employee
+            for company in Company.objects.exclude(schema_name='public'):
+                try:
+                    with schema_context(company.schema_name):
+                        emp = Employee.objects.filter(
+                            Q(employee_id__iexact=identity) |
+                            Q(user__username__iexact=identity) |
+                            Q(user__email__iexact=identity)
+                        ).select_related('user').first()
+                        if emp:
+                            found_user = emp.user
+                            found_employee = emp
+                            break
+                except Exception:
+                    continue
+        
+        # If found user via public model, try to fetch employee details
+        if found_user and not found_employee and getattr(found_user, "company", None):
+            try:
+                with schema_context(found_user.company.schema_name):
+                    from employees.models import Employee
+                    found_employee = Employee.objects.filter(user=found_user).first()
+            except Exception:
+                pass
+
+        # Masking email helper
+        def mask_email(email_str):
+            if not email_str or "@" not in email_str:
+                return "su***@company.com"
+            parts = email_str.split("@")
+            username = parts[0]
+            domain = parts[1]
+            if len(username) <= 2:
+                masked_username = username + "***"
+            else:
+                masked_username = username[:2] + "***"
+            return f"{masked_username}@{domain}"
+
+        if found_user:
+            emp_id = found_employee.employee_id if found_employee else identity
+            name = found_user.get_full_name() or found_user.username
+            department = found_employee.department if (found_employee and found_employee.department) else "Operations"
+            email = found_user.email
+            if not email:
+                email = "suryaramya111111@gmail.com"
+        else:
+            # Local Dev Fallback: return mock details for testing any identity (like EMP1025)
+            if settings.DEBUG:
+                emp_id = identity
+                name = "Surya S"
+                department = "Operations"
+                email = "suryaramya111111@gmail.com"
+            else:
+                return Response({"detail": "No workforce identity detected in system registries."}, status=404)
+
+        return Response({
+            "verified": True,
+            "employee_id": emp_id,
+            "name": name,
+            "department": department,
+            "email": email,
+            "email_masked": mask_email(email)
+        })
+
+def _normalize_phone(phone):
+    if not phone:
+        return ""
+    import re
+    clean = re.sub(r"[^\d+]", "", str(phone))  # remove all non-digits and non-plus characters
+    if not clean.startswith("+"):
+        if len(clean) == 10:
+            clean = f"+91{clean}"
+        elif clean.startswith("91") and len(clean) == 12:
+            clean = f"+{clean}"
+        else:
+            clean = f"+{clean}"
+    return clean
+
+
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0].strip()
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+
+class SendOTPView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = []
+
+    def post(self, request):
+        import random
+        import os
+        import time
+        import hashlib
+        from django.core.cache import cache
+        from django.conf import settings
+        from accounts.models import OTPAuditLog
+
+        phone = request.data.get("phone")
+        if not phone:
+            return Response({"detail": "Phone number is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ip = get_client_ip(request)
+        normalized_phone = _normalize_phone(phone)
+
+        # 1. Rate Limiting by IP (Max 5 requests per IP per minute)
+        ip_cache_key = f"otp_rate_ip_{ip}"
+        ip_count = cache.get(ip_cache_key, 0)
+        if ip_count >= 5:
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="rate_limited_ip",
+                details="IP address exceeded 5 requests per minute."
+            )
+            return Response(
+                {"detail": "Too many OTP requests from this IP. Please wait a minute."}, 
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        # 2. Rate Limiting by Phone (Max 5 requests per phone per hour)
+        phone_cache_key = f"otp_rate_phone_{normalized_phone}"
+        phone_count = cache.get(phone_cache_key, 0)
+        if phone_count >= 5:
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="rate_limited_phone",
+                details="Phone number exceeded 5 requests per hour."
+            )
+            return Response(
+                {"detail": "Too many OTP requests for this phone number. Please try again in an hour."}, 
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        # 3. Resend Cooldown (30 seconds)
+        cache_key = f"otp_{normalized_phone}"
+        existing_otp = cache.get(cache_key)
+        if existing_otp and isinstance(existing_otp, dict):
+            last_sent_at = existing_otp.get("last_sent_at", 0)
+            elapsed = time.time() - last_sent_at
+            if elapsed < 30:
+                wait_time = int(30 - elapsed)
+                return Response(
+                    {"detail": f"Please wait {wait_time} seconds before requesting a new OTP."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Generate a secure 4-digit code
+        code = str(random.randint(1000, 9999))
+
+        # Encrypt/Hash OTP using SHA-256 keyed with Django SECRET_KEY
+        hashed_code = hashlib.sha256(f"{settings.SECRET_KEY}:{code}".encode()).hexdigest()
+
+        # Store in cache with 5-minute timeout (300 seconds)
+        otp_data = {
+            "hashed_code": hashed_code,
+            "expires_at": time.time() + 300,
+            "attempts": 0,
+            "last_sent_at": time.time()
+        }
+        cache.set(cache_key, otp_data, timeout=300)
+
+        # Update rate limiting counters
+        cache.set(ip_cache_key, ip_count + 1, timeout=60)
+        cache.set(phone_cache_key, phone_count + 1, timeout=3600)
+
+        # Try to send SMS via Twilio if config exists and isn't placeholder
+        sent_real_sms = False
+        delivery_error = ""
+        try:
+            from twilio.rest import Client as TwilioClient
+            account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+            auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+            from_number = os.getenv("TWILIO_FROM_NUMBER")
+            if account_sid and auth_token and from_number and not account_sid.startswith("your_"):
+                client = TwilioClient(account_sid, auth_token)
+                client.messages.create(
+                    body=f"Caltrack security verification code: {code}. Expires in 5 minutes.",
+                    from_=from_number,
+                    to=normalized_phone
+                )
+                sent_real_sms = True
+        except ImportError:
+            delivery_error = "Twilio client library not installed"
+        except Exception as e:
+            delivery_error = str(e)
+            print(f"Twilio SMS send error: {e}")
+
+        delivery_channel = "sms" if sent_real_sms else "console"
+
+        # Print OTP to server console
+        print("\n" + "=" * 50)
+        print(f"  [SMS GATEWAY] OTP for {normalized_phone} is: {code} (Original input: {phone})")
+        if delivery_error:
+            print(f"  [SMS GATEWAY] Twilio delivery skipped/failed: {delivery_error}")
+        print("" + "=" * 50 + "\n")
+
+        # Log to Audit Trail
+        OTPAuditLog.objects.create(
+            phone=normalized_phone,
+            ip_address=ip,
+            action="send_request",
+            details=f"OTP generated and sent via {delivery_channel}. Expiry in 5 mins."
+        )
+
+        response_data = {
+            "success": True, 
+            "message": "OTP sent successfully.",
+            "delivery_channel": delivery_channel
+        }
+        if settings.DEBUG:
+            response_data["code"] = code
+
+        return Response(response_data)
+
+
+class VerifyOTPView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = []
+
+    def post(self, request):
+        import time
+        import hashlib
+        from django.core.cache import cache
+        from django.conf import settings
+        from accounts.models import OTPAuditLog
+
+        phone = request.data.get("phone")
+        code = request.data.get("code")
+
+        if not phone or not code:
+            return Response({"detail": "Phone number and verification code are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ip = get_client_ip(request)
+        normalized_phone = _normalize_phone(phone)
+        cache_key = f"otp_{normalized_phone}"
+        otp_data = cache.get(cache_key)
+
+        if not otp_data or not isinstance(otp_data, dict):
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="verify_failed",
+                details="OTP not found or already expired."
+            )
+            return Response(
+                {"detail": "OTP code expired or not found. Please request a new one."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check maximum attempts (5)
+        if otp_data.get("attempts", 0) >= 5:
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="attempts_exceeded",
+                details="Exceeded 5 validation attempts."
+            )
+            return Response(
+                {"detail": "Maximum verification attempts exceeded. Please request a new OTP."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check expiry
+        if time.time() > otp_data.get("expires_at", 0):
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="verify_failed",
+                details="OTP expired."
+            )
+            return Response(
+                {"detail": "OTP has expired. Please request a new one."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Hashed code comparison
+        hashed_input = hashlib.sha256(f"{settings.SECRET_KEY}:{str(code).strip()}".encode()).hexdigest()
+
+        if otp_data.get("hashed_code") == hashed_input:
+            # Successfully verified
+            cache.delete(cache_key)
+            OTPAuditLog.objects.create(
+                phone=normalized_phone,
+                ip_address=ip,
+                action="verify_success",
+                details="OTP successfully verified."
+            )
+            return Response({"success": True, "message": "OTP verified successfully."})
+        else:
+            # Increment attempts
+            attempts = otp_data.get("attempts", 0) + 1
+            otp_data["attempts"] = attempts
+            remaining = 5 - attempts
+
+            if remaining <= 0:
+                cache.delete(cache_key)
+                OTPAuditLog.objects.create(
+                    phone=normalized_phone,
+                    ip_address=ip,
+                    action="attempts_exceeded",
+                    details="Attempts limit reached on failed validation."
+                )
+                return Response(
+                    {"detail": "Maximum verification attempts exceeded. Please request a new OTP."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                remaining_time = int(otp_data.get("expires_at", 0) - time.time())
+                if remaining_time > 0:
+                    cache.set(cache_key, otp_data, timeout=remaining_time)
+                else:
+                    cache.delete(cache_key)
+
+                OTPAuditLog.objects.create(
+                    phone=normalized_phone,
+                    ip_address=ip,
+                    action="verify_failed",
+                    details=f"Invalid code entered. Attempts: {attempts} of 5."
+                )
+                return Response(
+                    {"detail": f"Invalid verification code. {remaining} attempts remaining."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+
+class ApprovedEmployeesListView(APIView):
+    """
+    GET /api/auth/approved-employees/
+    Returns all employees who have been approved (and are now in the DB),
+    either inactive (invitation sent, not yet activated) or active (activated/logged in).
+    Used by the Admin Approval Center to populate the Approved Employees tab.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from employees.models import Employee
+        from django.utils import timezone as tz
+
+        User = get_user_model()
+        company = getattr(request, "company", None) or getattr(request.user, "company", None)
+
+        # Fetch employees with role=EMPLOYEE from the DB
+        employee_qs = Employee.objects.select_related("user").filter(
+            user__role=User.Role.EMPLOYEE
+        )
+        if company:
+            employee_qs = employee_qs.filter(company=company)
+
+        result = []
+        for emp in employee_qs:
+            user = emp.user
+            # Determine activation status
+            if user.is_active:
+                activation_status = "activated"
+                status_label = "Activated"
+            else:
+                activation_status = "approved"
+                status_label = "Invitation Sent"
+
+            result.append({
+                "id": emp.id,
+                "employee_id": emp.employee_id,
+                "full_name": user.get_full_name() or user.username,
+                "email": user.email,
+                "phone": emp.phone or "—",
+                "title": emp.title or "Field Operations Tech",
+                "is_active": user.is_active,
+                "activation_status": activation_status,
+                "status_label": status_label,
+                "hourly_rate": float(emp.hourly_rate) if emp.hourly_rate is not None else 0.0,
+                "date_joined": user.date_joined.strftime("%d %b %Y") if user.date_joined else "—",
+                "country": emp.country or "—",
+                "department": emp.department or "Operations",
+            })
+
+        return Response({"success": True, "data": result})
+
+
+class DeleteAccountView(APIView):
+    """
+    POST /api/auth/delete-account/
+    Securely deletes an employee account using email and password verification.
+    This workflow is restricted to employee accounts only (admins/managers cannot be deleted this way).
+    Supports:
+    - Employee self-deletion (deletes logged-in user, clears cookies)
+    - Admin/Manager deletion (deletes employee user, does not clear admin cookies)
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        email = request.data.get("email", "").strip()
+        password = request.data.get("password", "")
+
+        if not email or not password:
+            return Response(
+                {"success": False, "message": "Both email and password are required to confirm account deletion."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        User = get_user_model()
+        target_user = User.objects.filter(email__iexact=email).first()
+
+        if not target_user:
+            return Response(
+                {"success": False, "message": "No account found with the provided email address."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Check target user's role is employee
+        if target_user.role != "employee":
+            return Response(
+                {"success": False, "message": "Only employee accounts can be deleted via this workflow."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Check password
+        if not target_user.check_password(password):
+            return Response(
+                {"success": False, "message": "Incorrect password. Account deletion aborted."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Clean up all foreign key references to target_user in tenant schemas to prevent database IntegrityError
+        from django_tenants.utils import schema_context
+        from companies.models import Company
+        from django.apps import apps
+
+        companies = Company.objects.exclude(schema_name="public")
+        for comp in companies:
+            with schema_context(comp.schema_name):
+                # 1. Clean up employees
+                if apps.is_installed("employees"):
+                    from employees.models import Employee
+                    Employee.objects.filter(user=target_user).delete()
+                    Employee.objects.filter(invited_by=target_user).update(invited_by=None)
+                
+                # 2. Clean up settings_hub
+                if apps.is_installed("settings_hub"):
+                    from settings_hub.models import TeamInvite, APIKey, Webhook
+                    TeamInvite.objects.filter(invited_by=target_user).update(invited_by=None)
+                    APIKey.objects.filter(created_by=target_user).update(created_by=None)
+                    Webhook.objects.filter(created_by=target_user).update(created_by=None)
+
+                # 3. Clean up time logs
+                if apps.is_installed("time_tracking"):
+                    from time_tracking.models import TimeLog
+                    TimeLog.objects.filter(approved_by=target_user).update(approved_by=None)
+
+                # 4. Clean up mileage
+                if apps.is_installed("mileage"):
+                    try:
+                        from mileage.models import MileageTrip
+                        MileageTrip.objects.filter(approved_by=target_user).update(approved_by=None)
+                    except Exception:
+                        pass
+
+                # 5. Clean up payroll
+                if apps.is_installed("payroll"):
+                    try:
+                        from payroll.models import PayrollRecord
+                        PayrollRecord.objects.filter(generated_by=target_user).update(generated_by=None)
+                    except Exception:
+                        pass
+
+                # 6. Clean up leaves
+                if apps.is_installed("leaves"):
+                    try:
+                        from leaves.models import LeaveRequest
+                        LeaveRequest.objects.filter(approved_by=target_user).update(approved_by=None)
+                    except Exception:
+                        pass
+
+                # 7. Clean up tasks
+                if apps.is_installed("tasks"):
+                    try:
+                        from tasks.models import Task, TaskAttachment, TaskActivityLog
+                        Task.objects.filter(assigned_by=target_user).update(assigned_by=None)
+                        Task.objects.filter(assigned_to=target_user).delete()
+                        TaskAttachment.objects.filter(uploaded_by=target_user).update(uploaded_by=None)
+                        TaskActivityLog.objects.filter(actor=target_user).update(actor=None)
+                    except Exception:
+                        pass
+
+                # 8. Clean up service requests
+                if apps.is_installed("service_requests"):
+                    try:
+                        from service_requests.models import ServiceRequest
+                        ServiceRequest.objects.filter(assigned_by=target_user).update(assigned_by=None)
+                    except Exception:
+                        pass
+
+                # 9. Clean up inventory
+                if apps.is_installed("inventory"):
+                    try:
+                        from inventory.models import InventoryIssuance, InventoryTransfer
+                        InventoryIssuance.objects.filter(issued_by=target_user).update(issued_by=None)
+                        InventoryTransfer.objects.filter(requested_by=target_user).delete()
+                    except Exception:
+                        pass
+
+        # Delete target user inside their company schema context
+        schema_name = "public"
+        if getattr(target_user, "company", None):
+            schema_name = target_user.company.schema_name
+        elif getattr(request.user, "company", None):
+            schema_name = request.user.company.schema_name
+
+        with schema_context(schema_name):
+            target_user.delete()
+
+        response_data = {"success": True, "message": "Account successfully deleted."}
+
+        # Clear cookies/session if the logged-in user deleted their own account
+        if target_user == request.user:
+            response = Response(response_data)
+            _clear_auth_cookies(response)
+            return response
+
+        return Response(response_data)
+
+
+class SendEmailOTPView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        import random
+        import time
+        import hashlib
+        from django.core.cache import cache
+        from django.core.mail import send_mail
+        from django.conf import settings
+        from accounts.models import OTPAuditLog
+
+        user = request.user
+        email = user.email
+        if not email:
+            return Response({"success": False, "message": "Your account does not have a registered email address."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ip = get_client_ip(request)
+        
+        # Rate limit by IP (max 5 requests per IP per minute)
+        ip_cache_key = f"email_otp_rate_ip_{ip}"
+        ip_count = cache.get(ip_cache_key, 0)
+        if ip_count >= 5:
+            return Response(
+                {"success": False, "message": "Too many request from this IP. Please wait a minute."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        # Rate limit by email (max 5 requests per email per hour)
+        email_cache_key = f"email_otp_rate_email_{email.lower()}"
+        email_count = cache.get(email_cache_key, 0)
+        if email_count >= 5:
+            return Response(
+                {"success": False, "message": "Too many password reset requests. Please try again in an hour."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        # Cooldown (30 seconds)
+        cache_key = f"email_otp_{email.lower()}"
+        existing_otp = cache.get(cache_key)
+        if existing_otp and isinstance(existing_otp, dict):
+            last_sent_at = existing_otp.get("last_sent_at", 0)
+            elapsed = time.time() - last_sent_at
+            if elapsed < 30:
+                wait_time = int(30 - elapsed)
+                return Response(
+                    {"success": False, "message": f"Please wait {wait_time} seconds before requesting a new code."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Generate 6-digit code
+        code = str(random.randint(100000, 999999))
+        hashed_code = hashlib.sha256(f"{settings.SECRET_KEY}:{code}".encode()).hexdigest()
+
+        # Store in cache for 5 minutes
+        otp_data = {
+            "hashed_code": hashed_code,
+            "expires_at": time.time() + 300,
+            "attempts": 0,
+            "last_sent_at": time.time()
+        }
+        cache.set(cache_key, otp_data, timeout=300)
+
+        # Update rate limiting counters
+        cache.set(ip_cache_key, ip_count + 1, timeout=60)
+        cache.set(email_cache_key, email_count + 1, timeout=3600)
+
+        # Premium HTML Email Content
+        subject = "CALtrack Verification Code"
+        body_text = (
+            "━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "CALTRACK SECURITY HUB\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"Hello {user.first_name or user.username},\n\n"
+            "Your CALtrack security verification code is:\n\n"
+            f"{code}\n\n"
+            "This code is valid for 5 minutes.\n"
+            "If you did not request this code, please change your password immediately.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "CALtrack Security Intelligence\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━"
+        )
+        
+        html_message = f"""
+        <div style="background-color: #03050d; color: #f1f5f9; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px 20px; max-width: 600px; margin: 0 auto; border: 1px solid #1e293b; border-radius: 24px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);">
+            <div style="text-align: center; border-bottom: 2px solid #1e293b; padding-bottom: 20px; margin-bottom: 25px;">
+                <div style="color: #6366f1; font-weight: 900; font-size: 20px; letter-spacing: 0.25em; text-transform: uppercase;">
+                    CALTRACK SECURITY HUB
+                </div>
+            </div>
+            <div style="padding: 0 10px;">
+                <p style="font-size: 15px; line-height: 1.6; color: #cbd5e1; margin-bottom: 20px;">
+                    Hello {user.first_name or user.username},
+                </p>
+                <p style="font-size: 14px; line-height: 1.6; color: #94a3b8; margin-bottom: 25px;">
+                    A verification code has been requested to change your password:
+                </p>
+                
+                <div style="background-color: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 30px;">
+                    <span style="font-family: monospace; font-size: 11px; text-transform: uppercase; color: #818cf8; display: block; margin-bottom: 8px;">Verification Code</span>
+                    <span style="font-family: monospace; font-size: 32px; font-weight: bold; color: #f1f5f9; letter-spacing: 4px;">{code}</span>
+                </div>
+                
+                <p style="font-size: 13px; line-height: 1.6; color: #64748b; margin-bottom: 25px;">
+                    This security token will expire in 5 minutes. If you did not initiate this action, please secure your account immediately.
+                </p>
+            </div>
+            <div style="text-align: center; border-top: 2px solid #1e293b; padding-top: 20px; margin-top: 35px; color: #475569; font-size: 10px; font-family: monospace; letter-spacing: 0.15em; text-transform: uppercase;">
+                CALtrack Security Intelligence
+            </div>
+        </div>
+        """
+
+        try:
+            send_mail(
+                subject,
+                body_text,
+                settings.DEFAULT_FROM_EMAIL,
+                [email],
+                fail_silently=False,
+                html_message=html_message
+            )
+            # Log audit
+            OTPAuditLog.objects.create(
+                phone="",
+                ip_address=ip,
+                action="email_otp_sent",
+                details=f"Email OTP sent to {email}. Expiry in 5 mins."
+            )
+        except Exception as e:
+            print(f"Failed to send email OTP: {e}")
+            return Response({"success": False, "message": "Failed to send verification email. Please try again."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        response_data = {
+            "success": True,
+            "message": "Verification code sent to your email successfully."
+        }
+        if settings.DEBUG:
+            response_data["code"] = code
+
+        return Response(response_data)
+
+
+class PasswordResetWithOTPView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        import time
+        import hashlib
+        from django.core.cache import cache
+        from django.conf import settings
+        from accounts.models import OTPAuditLog
+
+        otp_code = request.data.get("otp_code")
+        new_password = request.data.get("new_password")
+        confirm_password = request.data.get("confirm_password")
+
+        if not otp_code or not new_password or not confirm_password:
+            return Response({"success": False, "message": "Verification code and new passwords are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if new_password != confirm_password:
+            return Response({"success": False, "message": "Passwords do not match."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if len(new_password) < 8:
+            return Response({"success": False, "message": "Password must be at least 8 characters."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = request.user
+        email = user.email
+        if not email:
+            return Response({"success": False, "message": "User email address not found."}, status=status.HTTP_400_BAD_REQUEST)
+
+        ip = get_client_ip(request)
+        cache_key = f"email_otp_{email.lower()}"
+        otp_data = cache.get(cache_key)
+
+        if not otp_data or not isinstance(otp_data, dict):
+            return Response({"success": False, "message": "Verification code expired or not found. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check maximum attempts
+        attempts = otp_data.get("attempts", 0)
+        if attempts >= 5:
+            cache.delete(cache_key)
+            return Response({"success": False, "message": "Maximum verification attempts exceeded. Please request a new code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check expiry
+        if time.time() > otp_data.get("expires_at", 0):
+            cache.delete(cache_key)
+            return Response({"success": False, "message": "Verification code has expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Hash verification
+        hashed_input = hashlib.sha256(f"{settings.SECRET_KEY}:{str(otp_code).strip()}".encode()).hexdigest()
+
+        if otp_data.get("hashed_code") == hashed_input:
+            # Success: reset password
+            user.set_password(new_password)
+            user.save(update_fields=["password"])
+            cache.delete(cache_key)
+
+            # Log audit
+            OTPAuditLog.objects.create(
+                phone="",
+                ip_address=ip,
+                action="email_otp_reset_success",
+                details=f"Password successfully reset via email OTP for {email}."
+            )
+            return Response({"success": True, "message": "Password updated successfully."})
+        else:
+            # Increment attempts
+            attempts += 1
+            otp_data["attempts"] = attempts
+            remaining = 5 - attempts
+            
+            if remaining <= 0:
+                cache.delete(cache_key)
+                return Response({"success": False, "message": "Maximum verification attempts exceeded. Please request a new code."}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                remaining_time = int(otp_data.get("expires_at", 0) - time.time())
+                if remaining_time > 0:
+                    cache.set(cache_key, otp_data, timeout=remaining_time)
+                else:
+                    cache.delete(cache_key)
+                return Response({"success": False, "message": f"Invalid verification code. {remaining} attempts remaining."}, status=status.HTTP_400_BAD_REQUEST)
+
 

@@ -32,7 +32,7 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser):
     """
-    Custom user model for QuickTIMS using MongoDB ObjectId as primary key.
+    Custom user model for QuickTIMS.
     Extends AbstractBaseUser to avoid the Django auth permission/group system
     which requires contenttypes and complex M2M tables not needed in a JWT API.
     """
@@ -101,3 +101,20 @@ class User(AbstractBaseUser):
 
     def is_employee(self) -> bool:
         return self.role == self.Role.EMPLOYEE
+
+
+class OTPAuditLog(models.Model):
+    phone = models.CharField(max_length=30)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    action = models.CharField(max_length=30)  # e.g. send_request, send_failed, rate_limited_ip, rate_limited_phone, verify_success, verify_failed, attempts_exceeded
+    details = models.TextField(blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-timestamp"]
+        verbose_name = "OTP Audit Log"
+        verbose_name_plural = "OTP Audit Logs"
+
+    def __str__(self):
+        return f"{self.phone} - {self.action} @ {self.timestamp}"
+

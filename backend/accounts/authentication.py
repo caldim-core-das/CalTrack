@@ -17,6 +17,39 @@ class CookieJWTAuthentication(JWTAuthentication):
     """
 
     def authenticate(self, request):
+        # 1. Try standard header / cookie authentication
+        auth_res = self._authenticate_credentials(request)
+        if not auth_res:
+            return None
+            
+        user, validated = auth_res
+        
+        # 2. Perform trial status check
+        exempt_prefixes = [
+            "/api/auth/",
+            "/api/trial/",
+            "/api/settings/billing/subscription/",
+            "/api/settings/invoices/",
+        ]
+        path = request.path
+        if not any(path.startswith(prefix) for prefix in exempt_prefixes):
+            company = getattr(user, "company", None)
+            if company:
+                from trial_management.models import TrialPlan
+                try:
+                    trial = company.trial_plan
+                    if not trial.is_active and trial.status not in [TrialPlan.Status.CONVERTED, TrialPlan.Status.CONVERTED_TO_PAID]:
+                        from rest_framework.exceptions import PermissionDenied
+                        raise PermissionDenied({
+                            "success": False, 
+                            "message": "Your free trial has expired. Please upgrade to continue."
+                        })
+                except TrialPlan.DoesNotExist:
+                    pass
+        
+        return user, validated
+
+    def _authenticate_credentials(self, request):
         # 1. Try the Authorization header first (standard simplejwt path)
         header = self.get_header(request)
         if header is not None:

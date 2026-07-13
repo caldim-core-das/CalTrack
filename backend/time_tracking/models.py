@@ -1,4 +1,5 @@
 from django.db import models
+from utils.validators import validate_upload
 
 from employees.models import Employee
 
@@ -135,14 +136,14 @@ class TimeLog(models.Model):
     clock_in_lon = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     clock_in_address = models.TextField(blank=True)
     clock_in_notes = models.TextField(blank=True)
-    clock_in_photo = models.ImageField(upload_to="time_logs/photos/", null=True, blank=True)
+    clock_in_photo = models.ImageField(upload_to="time_logs/photos/", null=True, blank=True, validators=[validate_upload])
 
     clock_out = models.DateTimeField(null=True, blank=True)
     clock_out_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     clock_out_lon = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     clock_out_address = models.TextField(blank=True)
     clock_out_notes = models.TextField(blank=True)
-    clock_out_photo = models.ImageField(upload_to="time_logs/photos/", null=True, blank=True)
+    clock_out_photo = models.ImageField(upload_to="time_logs/photos/", null=True, blank=True, validators=[validate_upload])
 
     # Which location was matched at clock-in
     location = models.ForeignKey(
@@ -192,6 +193,16 @@ class TimeLog(models.Model):
             # New Production Indexes:
             models.Index(fields=["status", "work_date"], name="tl_status_date_idx"),
             models.Index(fields=["employee", "status"], name="tl_emp_status_idx"),
+        ]
+        constraints = [
+            # MEDIUM 3 — Race-condition guard: an employee can only have one
+            # open (active) time log at a time.  The partial constraint is only
+            # enforced when clock_out IS NULL so it does not block historical rows.
+            models.UniqueConstraint(
+                fields=["employee"],
+                condition=models.Q(clock_out__isnull=True),
+                name="unique_open_timelog_per_employee",
+            )
         ]
 
     @property

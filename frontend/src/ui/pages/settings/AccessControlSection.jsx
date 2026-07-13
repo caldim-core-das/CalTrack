@@ -1,4 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useAuth } from "../../../state/auth/useAuth.js"
+import { apiRequest } from "../../../api/client.js"
 import { ShieldCheck, Lock, Eye, Edit3, Check, RefreshCcw, Info, Globe, MapPin, Activity, Users, CreditCard, BarChart3 } from "lucide-react"
 import { Button, Card, Pill } from "../../components/kit.jsx"
 
@@ -11,6 +13,7 @@ const MODULES = [
 ]
 
 export default function AccessControlSection() {
+  const { refreshMe } = useAuth()
   const [permissions, setPermissions] = useState({
     live_location: { admin: ["view", "modify"], employee: ["view"] },
     locations: { admin: ["view", "modify"], employee: [] },
@@ -22,25 +25,51 @@ export default function AccessControlSection() {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
 
+  useEffect(() => {
+    async function loadPermissions() {
+      try {
+        const res = await apiRequest("/company/me")
+        if (res.module_permissions) {
+          setPermissions(res.module_permissions)
+        }
+      } catch (err) {
+        console.error("Failed to load permissions", err)
+      }
+    }
+    loadPermissions()
+  }, [])
+
   const togglePerm = (modId, role, action) => {
     setPermissions(prev => {
-      const current = prev[modId][role]
+      const modPerms = prev[modId] || { admin: [], employee: [] }
+      const current = modPerms[role] || []
       const next = current.includes(action)
         ? current.filter(a => a !== action)
         : [...current, action]
       return {
         ...prev,
-        [modId]: { ...prev[modId], [role]: next }
+        [modId]: { ...modPerms, [role]: next }
       }
     })
   }
 
   const handleSave = async () => {
     setSaving(true)
-    await new Promise(r => setTimeout(r, 1000))
-    setSaving(false)
-    setSuccess(true)
-    setTimeout(() => setSuccess(false), 3000)
+    try {
+      await apiRequest("/company/update", {
+        method: "PUT",
+        json: {
+          module_permissions: permissions
+        }
+      })
+      await refreshMe()
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 3000)
+    } catch (err) {
+      console.error("Failed to save permissions", err)
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -110,40 +139,6 @@ export default function AccessControlSection() {
         ))}
       </div>
 
-      {/* --- Advanced System Constraints --- */}
-      <section className="mt-12">
-        <header className="mb-8">
-          <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-3">
-            <ShieldCheck size={24} className="text-indigo-600" />
-            Advanced System Constraints
-          </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Configure deep-level restrictions for critical operational security.</p>
-        </header>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <ConstraintCard
-            title="SOS Response Authority"
-            desc="Only users with this permission can acknowledge and resolve SOS emergency alerts."
-            roles={["Super Admin", "Dispatchers"]}
-          />
-          <ConstraintCard
-            title="Geofence Boundary Edit"
-            desc="Control who can modify job site perimeters and geofencing sensitivity."
-            roles={["Admin Only"]}
-          />
-          <ConstraintCard
-            title="Manual Clock-In Override"
-            desc="Allow employees to clock in manually if GPS verification fails (Not Recommended)."
-            roles={["None (Strict GPS)"]}
-            warning
-          />
-          <ConstraintCard
-            title="Device Authorization"
-            desc="Require administrator approval for every new device used by an employee."
-            roles={["Super Admin"]}
-          />
-        </div>
-      </section>
 
       <footer className="pt-6 border-t border-stroke dark:border-slate-800 flex justify-between items-center">
         <div className="flex items-center gap-3">
@@ -174,26 +169,5 @@ function PermissionBtn({ active, onClick, icon, label }) {
       {icon}
       {label}
     </button>
-  )
-}
-
-function ConstraintCard({ title, desc, roles, warning }) {
-  return (
-    <div className={`p-6 rounded-3xl border transition-all ${warning ? 'bg-orange-50/50 dark:bg-orange-950/10 border-orange-200 dark:border-orange-900/30' : 'bg-surface2 dark:bg-slate-950/20 border-stroke dark:border-slate-800'}`}>
-      <div className="flex justify-between items-start mb-4">
-        <h4 className="text-[13px] font-black text-slate-900 dark:text-white uppercase tracking-wider">{title}</h4>
-        {warning && <Pill tone="warn">Critical</Pill>}
-      </div>
-      <p className="text-xs text-slate-500 dark:text-slate-500 leading-relaxed mb-6">{desc}</p>
-
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-[9px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-widest">Active For:</span>
-        {roles.map(r => (
-          <span key={r} className="px-2 py-1 rounded-lg bg-bg dark:bg-slate-900 border border-stroke dark:border-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300">
-            {r}
-          </span>
-        ))}
-      </div>
-    </div>
   )
 }
