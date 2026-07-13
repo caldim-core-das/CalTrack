@@ -67,11 +67,34 @@ def _sr_qs(request):
 
 # ─── 1. PUBLIC VIEWS ──────────────────────────────────────────────────────────
 
+class CatalogCategoryListView(APIView):
+    permission_classes = [permissions.AllowAny]
+    def get(self, request):
+        from .models import CatalogCategory
+        from .serializers import CatalogCategorySerializer
+        cats = CatalogCategory.objects.all().order_by('name')
+        data = CatalogCategorySerializer(cats, many=True).data
+        return Response({"success": True, "data": data})
+
+class CatalogServiceListView(APIView):
+    permission_classes = [permissions.AllowAny]
+    def get(self, request):
+        from .models import CatalogService
+        from .serializers import CatalogServiceSerializer
+        cat_id = request.GET.get('category_id')
+        qs = CatalogService.objects.all().order_by('name')
+        if cat_id:
+            qs = qs.filter(category_id=cat_id)
+        data = CatalogServiceSerializer(qs, many=True).data
+        return Response({"success": True, "data": data})
+
 class BookingCreateView(APIView):
     """
     POST /api/booking/
     Public — no authentication required.
     Creates a ServiceRequest and returns the human-readable request_id.
+    COD:    status=confirmed, payment_status=pending
+    Online: status=waiting_for_payment, payment_status=processing
     """
     permission_classes = [permissions.AllowAny]
     parser_classes     = [MultiPartParser, FormParser, JSONParser]
@@ -84,8 +107,72 @@ class BookingCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         company = _get_company(request)
-        sr = serializer.save(company=company)
-        
+
+        # Determine payment method and set initial statuses
+        payment_method = (request.data.get("payment_method") or "COD").upper()
+        if payment_method == "ONLINE":
+            initial_status = ServiceRequest.Status.WAITING_FOR_PAYMENT
+            initial_payment_status = ServiceRequest.PaymentStatus.PROCESSING
+        else:
+            payment_method = "COD"
+            initial_status = ServiceRequest.Status.CONFIRMED
+            initial_payment_status = ServiceRequest.PaymentStatus.PENDING
+
+        # Link authenticated customer if logged in
+        if request.user and request.user.is_authenticated and hasattr(request.user, 'role') and request.user.role == 'customer':
+            user = request.user
+            customer_name = request.data.get("customer_name", "")
+            email = request.data.get("email", "")
+            phone = request.data.get("phone", "")
+
+            sr = serializer.save(
+                company=company,
+                customer=user,
+                status=initial_status,
+                payment_method=payment_method,
+                payment_status=initial_payment_status,
+            )
+
+            # Sync name
+            if customer_name and not user.first_name and not user.last_name:
+                parts = customer_name.strip().split(" ")
+                user.first_name = parts[0]
+                user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+
+            # Sync email and merge profiles if duplicates exist
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+
+            email_clean = email.lower().strip() if email else ""
+            if email_clean and not user.email:
+                other_user = User.objects.filter(email__iexact=email_clean, role=User.Role.CUSTOMER).exclude(pk=user.pk).first()
+                if other_user:
+                    other_user.service_requests_as_customer.all().update(customer=user)
+                    if other_user.phone and not user.phone:
+                        user.phone = other_user.phone
+                    other_user.delete()
+                user.email = email_clean
+
+            # Sync phone and merge profiles if duplicates exist
+            phone_clean = phone.strip() if phone else ""
+            if phone_clean and not user.phone:
+                other_user = User.objects.filter(phone=phone_clean, role=User.Role.CUSTOMER).exclude(pk=user.pk).first()
+                if other_user:
+                    other_user.service_requests_as_customer.all().update(customer=user)
+                    if other_user.email and not user.email:
+                        user.email = other_user.email
+                    other_user.delete()
+                user.phone = phone_clean
+
+            user.save()
+        else:
+            sr = serializer.save(
+                company=company,
+                status=initial_status,
+                payment_method=payment_method,
+                payment_status=initial_payment_status,
+            )
+
         # Send booking confirmation email
         try:
             from .notifications import send_booking_confirmation
@@ -95,10 +182,38 @@ class BookingCreateView(APIView):
             logging.getLogger(__name__).error(f"Failed to send booking confirmation email: {e}")
 
         return _success(
-            data={"request_id": sr.request_id, "id": sr.id},
+            data={
+                "request_id": sr.request_id,
+                "id": sr.id,
+                "payment_method": sr.payment_method,
+                "payment_status": sr.payment_status,
+                "booking_status": sr.status,
+                "total_amount": float(sr.total_amount),
+            },
             message="Your service request has been submitted successfully.",
             status_code=201,
         )
+
+
+class CustomerMyBookingsView(APIView):
+    """
+    GET /api/booking/my-bookings/
+    Authenticated customers can view their past bookings.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if not hasattr(request.user, 'role') or request.user.role != 'customer':
+            return _error("Only customers can view their bookings.", 403)
+        
+        company = _get_company(request)
+        qs = ServiceRequest.objects.filter(customer=request.user).select_related('assigned_employee', 'assigned_employee__user')
+        if company:
+            qs = qs.filter(company=company)
+        
+        qs = qs.order_by("-id")
+        serializer = ServiceRequestListSerializer(qs, many=True)
+        return _success(data=serializer.data)
 
 
 class FeedbackTokenView(APIView):
@@ -498,6 +613,7 @@ class AdminEmployeeListView(APIView):
                 "title": e.title,
                 "email": e.user.email,
                 "hourly_rate": float(e.hourly_rate) if e.hourly_rate is not None else 0.0,
+                "department": e.department,
             }
             for e in qs
         ]

@@ -25,25 +25,25 @@ function Toast({ message, type = "success", onDismiss }) {
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 const STATUS_META = {
-  new_request:           { label: "New",           color: "#3B82F6", bg: "#EFF6FF", border: "#BFDBFE" },
-  reviewed:              { label: "Reviewed",       color: "#6366F1", bg: "#EEF2FF", border: "#C7D2FE" },
-  assigned:              { label: "Assigned",       color: "#8B5CF6", bg: "#F5F3FF", border: "#DDD6FE" },
-  accepted:              { label: "Accepted",       color: "#F59E0B", bg: "#FFFBEB", border: "#FDE68A" },
-  in_progress:           { label: "In Progress",    color: "#F97316", bg: "#FFF7ED", border: "#FDBA74" },
-  completed:             { label: "Completed",      color: "#10B981", bg: "#ECFDF5", border: "#6EE7B7" },
-  awaiting_verification: { label: "Verifying",      color: "#14B8A6", bg: "#F0FDFA", border: "#99F6E4" },
-  verified:              { label: "Verified",       color: "#059669", bg: "#D1FAE5", border: "#6EE7B7" },
-  feedback_pending:      { label: "Feedback",       color: "#64748B", bg: "#F8FAFC", border: "#CBD5E1" },
-  feedback_received:     { label: "Fb Received",    color: "#EC4899", bg: "#FDF2F8", border: "#FBCFE8" },
-  closed:                { label: "Closed",         color: "#475569", bg: "#F1F5F9", border: "#CBD5E1" },
-  rejected:              { label: "Rejected",       color: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
-  rework_requested:      { label: "Rework",         color: "#DC2626", bg: "#FEF2F2", border: "#FCA5A5" },
+  new_request: { label: "New", color: "#3B82F6", bg: "#EFF6FF", border: "#BFDBFE" },
+  reviewed: { label: "Reviewed", color: "#6366F1", bg: "#EEF2FF", border: "#C7D2FE" },
+  assigned: { label: "Assigned", color: "#8B5CF6", bg: "#F5F3FF", border: "#DDD6FE" },
+  accepted: { label: "Accepted", color: "#F59E0B", bg: "#FFFBEB", border: "#FDE68A" },
+  in_progress: { label: "In Progress", color: "#F97316", bg: "#FFF7ED", border: "#FDBA74" },
+  completed: { label: "Completed", color: "#10B981", bg: "#ECFDF5", border: "#6EE7B7" },
+  awaiting_verification: { label: "Verifying", color: "#14B8A6", bg: "#F0FDFA", border: "#99F6E4" },
+  verified: { label: "Verified", color: "#059669", bg: "#D1FAE5", border: "#6EE7B7" },
+  feedback_pending: { label: "Feedback", color: "#64748B", bg: "#F8FAFC", border: "#CBD5E1" },
+  feedback_received: { label: "Fb Received", color: "#EC4899", bg: "#FDF2F8", border: "#FBCFE8" },
+  closed: { label: "Closed", color: "#475569", bg: "#F1F5F9", border: "#CBD5E1" },
+  rejected: { label: "Rejected", color: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
+  rework_requested: { label: "Rework", color: "#DC2626", bg: "#FEF2F2", border: "#FCA5A5" },
 }
 
 const PRIORITY_META = {
-  low:    { label: "Low",    color: "#64748B", bg: "#F1F5F9" },
+  low: { label: "Low", color: "#64748B", bg: "#F1F5F9" },
   normal: { label: "Normal", color: "#3B82F6", bg: "#EFF6FF" },
-  high:   { label: "High",   color: "#F97316", bg: "#FFF7ED" },
+  high: { label: "High", color: "#F97316", bg: "#FFF7ED" },
   urgent: { label: "Urgent", color: "#EF4444", bg: "#FEF2F2" },
 }
 
@@ -94,7 +94,7 @@ function PriorityBadge({ priority }) {
 
 function TechAvatar({ name, size = 32 }) {
   const initial = (name || "?").charAt(0).toUpperCase()
-  const colors = ["#7C3AED","#2563EB","#059669","#D97706","#DC2626","#0891B2"]
+  const colors = ["#7C3AED", "#2563EB", "#059669", "#D97706", "#DC2626", "#0891B2"]
   const color = colors[initial.charCodeAt(0) % colors.length]
   return (
     <div style={{
@@ -198,23 +198,23 @@ function EmployeePicker({ employees, onAssign, loading }) {
 
 /* ─── Main Component ─────────────────────────────────────────────────────── */
 export function ServiceRequestsPage() {
-  const [requests, setRequests]           = useState([])
-  const [allRequests, setAllRequests]     = useState([])
-  const [employees, setEmployees]         = useState([])
-  const [selectedId, setSelectedId]       = useState(null)
-  const [detail, setDetail]               = useState(null)
-  const [loading, setLoading]             = useState(true)
+  const [requests, setRequests] = useState([])
+  const [allRequests, setAllRequests] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [selectedId, setSelectedId] = useState(null)
+  const [detail, setDetail] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
-  const [error, setError]                 = useState(null)
+  const [error, setError] = useState(null)
   const [actionSuccess, setActionSuccess] = useState(null)
-  const [toast, setToast]                 = useState(null)
-  const [showAssign, setShowAssign]       = useState(false)
+  const [toast, setToast] = useState(null)
+  const [showAssign, setShowAssign] = useState(false)
 
   const showToast = (msg, type = "success") => setToast({ msg, type, id: Date.now() })
 
   // Filters
-  const [search, setSearch]             = useState("")
+  const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [priorityFilter, setPriorityFilter] = useState("")
 
@@ -557,6 +557,66 @@ export function ServiceRequestsPage() {
                   )}
                 </div>
               </div>
+
+              {/* Booking Details */}
+              {(detail.cart_data || detail.total_amount > 0 || detail.preferred_time) && (
+                (() => {
+                  let parsedCart = [];
+                  if (typeof detail.cart_data === "string") {
+                    try { parsedCart = JSON.parse(detail.cart_data); } catch (e) { }
+                  } else if (Array.isArray(detail.cart_data)) {
+                    parsedCart = detail.cart_data;
+                  }
+
+                  if (parsedCart.length === 0 && !detail.total_amount && !detail.preferred_time) return null;
+
+                  return (
+                    <div className="sr-desc-card" style={{ marginBottom: 15 }}>
+                      <div className="sr-info-card-title"><ClipboardCheck size={13} /> Booking Details</div>
+
+                      {detail.preferred_time && (
+                        <div className="sr-info-row" style={{ marginBottom: 15 }}>
+                          <span className="sr-info-key"><Clock size={11} /> Preferred Time</span>
+                          <span className="sr-info-val sr-info-val--sm">{detail.preferred_time}</span>
+                        </div>
+                      )}
+
+                      {parsedCart.length > 0 && (
+                        <div className="sr-cart-items" style={{ marginBottom: 15 }}>
+                          <table style={{ width: "100%", fontSize: "0.85rem", borderCollapse: "collapse" }}>
+                            <thead>
+                              <tr style={{ borderBottom: "1px solid #e2e8f0", color: "#64748B", textAlign: "left" }}>
+                                <th style={{ padding: "8px 0", fontWeight: 600 }}>Service</th>
+                                <th style={{ padding: "8px 0", fontWeight: 600, textAlign: "center" }}>Qty</th>
+                                <th style={{ padding: "8px 0", fontWeight: 600, textAlign: "right" }}>Price</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {parsedCart.map((item, idx) => (
+                                <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                  <td style={{ padding: "10px 0", color: "#334155" }}>
+                                    <div style={{ fontWeight: 500 }}>{item.name}</div>
+                                    {item.categoryName && <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{item.categoryName}</div>}
+                                  </td>
+                                  <td style={{ padding: "10px 0", textAlign: "center", color: "#475569" }}>{item.quantity}</td>
+                                  <td style={{ padding: "10px 0", textAlign: "right", color: "#475569" }}>${item.price}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {(detail.total_amount > 0 || parsedCart.length > 0) && (
+                        <div className="sr-info-row" style={{ borderTop: "1px solid #e2e8f0", paddingTop: 12, justifyContent: "space-between" }}>
+                          <span className="sr-info-key" style={{ fontWeight: 600, color: "#1e293b", fontSize: "0.95rem" }}>Total Amount</span>
+                          <span className="sr-info-val" style={{ fontWeight: 700, color: "#7C3AED", fontSize: "1.05rem" }}>${detail.total_amount || 0}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+              )}
 
               {/* Description + Photo */}
               <div className="sr-desc-card">
@@ -1192,5 +1252,12 @@ function SrStyles() {
         gap: 0.5rem; padding: 2.5rem 1rem; color: #94a3b8;
       }
     `}</style>
+  )
+}
+      .sr - center - msg {
+  display: flex; flex - direction: column; align - items: center; justify - content: center;
+  gap: 0.5rem; padding: 2.5rem 1rem; color: #94a3b8;
+}
+`}</style>
   )
 }

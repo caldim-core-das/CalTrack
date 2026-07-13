@@ -22,6 +22,9 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    },
     // Warm up the most-visited pages so the first dev request is instant
     warmup: {
       clientFiles: [

@@ -95,6 +95,9 @@ MIDDLEWARE = [
 
 SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 
+# Allow Google Sign-In popup to return tokens properly
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+
 # ---------------------------------------------------------------------------
 # Database Configuration - PostgreSQL (Production) or SQLite (Local Dev)
 # ---------------------------------------------------------------------------

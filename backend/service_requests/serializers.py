@@ -9,8 +9,19 @@ from rest_framework import serializers
 from employees.models import Employee
 from .models import (
     EmployeeJob, EmployeePerformance, JobCompletionProof,
-    ServiceFeedback, ServiceRequest, SERVICE_CATEGORIES,
+    ServiceFeedback, ServiceRequest, CatalogCategory, CatalogService
 )
+
+class CatalogServiceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CatalogService
+        fields = '__all__'
+
+class CatalogCategorySerializer(serializers.ModelSerializer):
+    services = CatalogServiceSerializer(many=True, read_only=True)
+    class Meta:
+        model = CatalogCategory
+        fields = '__all__'
 
 
 # ── Public ────────────────────────────────────────────────────────────────────
@@ -23,18 +34,25 @@ class ServiceRequestPublicCreateSerializer(serializers.ModelSerializer):
         fields = (
             "customer_name", "phone", "email",
             "service_category", "issue_title", "description", "address",
-            "preferred_date", "photo",
+            "preferred_date", "preferred_time", "total_amount", "cart_data",
+            "photo", "payment_method",
         )
         extra_kwargs = {
-            "description": {"required": False, "allow_blank": True},
-            "email":       {"required": False, "allow_blank": True, "allow_null": True},
-            "photo":       {"required": False, "allow_null": True},
+            "description":    {"required": False, "allow_blank": True},
+            "email":          {"required": False, "allow_blank": True, "allow_null": True},
+            "photo":          {"required": False, "allow_null": True},
+            "payment_method": {"required": False, "allow_null": True, "allow_blank": True},
+            "preferred_time": {"required": False, "allow_blank": True, "allow_null": True},
+            "cart_data":      {"required": False},
         }
 
-    def validate_service_category(self, value):
-        valid = [c[0] for c in SERVICE_CATEGORIES]
-        if value not in valid:
-            raise serializers.ValidationError(f"Invalid category. Choose from: {valid}")
+    def validate_cart_data(self, value):
+        import json
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except ValueError:
+                raise serializers.ValidationError("Value must be valid JSON.")
         return value
 
     def validate_preferred_date(self, value):
@@ -107,9 +125,11 @@ class ServiceRequestListSerializer(serializers.ModelSerializer):
     service_category_display = serializers.CharField(
         source="get_service_category_display", read_only=True
     )
-    status_display    = serializers.CharField(source="get_status_display", read_only=True)
-    priority_display  = serializers.CharField(source="get_priority_display", read_only=True)
-    assigned_employee = EmployeeMinimalSerializer(read_only=True)
+    status_display         = serializers.CharField(source="get_status_display", read_only=True)
+    priority_display       = serializers.CharField(source="get_priority_display", read_only=True)
+    payment_method_display = serializers.CharField(source="get_payment_method_display", read_only=True)
+    payment_status_display = serializers.CharField(source="get_payment_status_display", read_only=True)
+    assigned_employee      = EmployeeMinimalSerializer(read_only=True)
 
     class Meta:
         model = ServiceRequest
@@ -118,6 +138,9 @@ class ServiceRequestListSerializer(serializers.ModelSerializer):
             "service_category", "service_category_display",
             "issue_title", "address", "preferred_date",
             "status", "status_display", "priority", "priority_display",
+            "payment_method", "payment_method_display",
+            "payment_status", "payment_status_display",
+            "total_amount", "transaction_id", "invoice_id",
             "assigned_employee", "created_at", "updated_at",
         )
 
@@ -133,30 +156,48 @@ class ServiceFeedbackNestedSerializer(serializers.ModelSerializer):
 
 
 class ServiceRequestDetailSerializer(serializers.ModelSerializer):
-    """Full detail — includes photo URL + allowed next transitions."""
+    """Full detail — includes photo URL + payment info + allowed next transitions."""
     service_category_display = serializers.CharField(
         source="get_service_category_display", read_only=True
     )
-    status_display    = serializers.CharField(source="get_status_display", read_only=True)
-    priority_display  = serializers.CharField(source="get_priority_display", read_only=True)
-    assigned_employee = EmployeeMinimalSerializer(read_only=True)
-    photo_url         = serializers.SerializerMethodField()
-    allowed_transitions = serializers.SerializerMethodField()
-    has_feedback      = serializers.SerializerMethodField()
-    feedback_token    = serializers.SerializerMethodField()
-    feedback          = ServiceFeedbackNestedSerializer(read_only=True, allow_null=True)
+    status_display         = serializers.CharField(source="get_status_display", read_only=True)
+    priority_display       = serializers.CharField(source="get_priority_display", read_only=True)
+    payment_method_display = serializers.CharField(source="get_payment_method_display", read_only=True)
+    payment_status_display = serializers.CharField(source="get_payment_status_display", read_only=True)
+    assigned_employee      = EmployeeMinimalSerializer(read_only=True)
+    payment_collected_by   = serializers.SerializerMethodField()
+    photo_url              = serializers.SerializerMethodField()
+    allowed_transitions    = serializers.SerializerMethodField()
+    has_feedback           = serializers.SerializerMethodField()
+    feedback_token         = serializers.SerializerMethodField()
+    feedback               = ServiceFeedbackNestedSerializer(read_only=True, allow_null=True)
 
     class Meta:
         model = ServiceRequest
         fields = (
             "id", "request_id", "customer_name", "phone", "email",
             "service_category", "service_category_display",
-            "issue_title", "description", "address", "preferred_date",
+            "issue_title", "description", "address", "preferred_date", "preferred_time",
+            "total_amount", "cart_data",
+            "payment_method", "payment_method_display",
+            "payment_status", "payment_status_display",
+            "transaction_id", "payment_gateway",
+            "payment_collected_by", "payment_collected_at", "invoice_id",
             "photo_url", "status", "status_display", "priority", "priority_display",
             "assigned_employee", "allowed_transitions",
             "has_feedback", "feedback_token", "feedback",
             "created_at", "updated_at",
         )
+
+    def get_payment_collected_by(self, obj):
+        if obj.payment_collected_by:
+            emp = obj.payment_collected_by
+            return {
+                "id": emp.id,
+                "employee_id": emp.employee_id,
+                "full_name": emp.user.get_full_name() or emp.user.username,
+            }
+        return None
 
     def get_photo_url(self, obj):
         if obj.photo:

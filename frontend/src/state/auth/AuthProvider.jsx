@@ -34,8 +34,6 @@ export function AuthProvider({ children }) {
       console.log("DEBUG: apiFetchMe raw response:", JSON.stringify(me))
     } catch (e) {
       console.error("DEBUG: apiFetchMe exception:", e)
-    } catch (e) {
-      // Silent error logging or handling
     }
 
     if (me?.username && me?.role) {

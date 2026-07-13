@@ -68,7 +68,7 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
     if (file.size > 5 * 1024 * 1024) { showToast("Avatar must be under 5 MB.", "error"); return }
     setAvatarFile(file)
     setAvatarPreview(URL.createObjectURL(file))
-    
+
     // Upload immediately
     try {
       const body = new FormData()
@@ -83,9 +83,9 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
 
   const handleRemoveAvatar = async () => {
     try {
-      await apiRequest("/auth/profile/", { 
-        method: "PATCH", 
-        json: { avatar: null } 
+      await apiRequest("/auth/profile/", {
+        method: "PATCH",
+        json: { avatar: null }
       })
       setAvatarPreview(null)
       setAvatarFile(null)
@@ -170,8 +170,8 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
       <div className="stCard">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--fg)" }}>Personal Information</div>
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={() => {
               if (isEditing) {
                 // Cancel: restore original values
@@ -185,14 +185,14 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
               }
               setIsEditing(!isEditing)
             }}
-            style={{ 
-              fontSize: 12, 
-              color: isEditing ? "#E94560" : "#5d5fef", 
-              fontWeight: 700, 
-              background: "none", 
-              border: "none", 
-              cursor: "pointer", 
-              padding: "4px 8px" 
+            style={{
+              fontSize: 12,
+              color: isEditing ? "#E94560" : "#5d5fef",
+              fontWeight: 700,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px 8px"
             }}
           >
             {isEditing ? "Cancel" : "Edit"}

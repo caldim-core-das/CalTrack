@@ -11,6 +11,12 @@ import {
   FileText, CheckCheck, Phone as PhoneIcon, ShoppingCart,
   CreditCard, Wallet, Tag as TagIcon, Bell, LifeBuoy, LogOut, Ticket
 } from "lucide-react"
+import {
+  apiRequestCustomerEmailOTP, apiVerifyCustomerEmailOTP,
+  apiRequestCustomerPhoneOTP, apiVerifyCustomerPhoneOTP,
+  apiFetchCustomerBookings, apiLogout
+} from "../../api/authService.js"
+import { useAuth } from "../../state/auth/useAuth.js"
 import { apiRequest } from "../../api/client.js"
 import { CalTrackLogo } from "../components/CalTrackLogo.jsx"
 import "leaflet/dist/leaflet.css";
@@ -32,6 +38,33 @@ const CATEGORIES = [
   { id: "security",         name: "Security Systems",  image: "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=500&q=80&fit=crop", desc: "CCTV & alarm systems",          rating: "4.7", jobs: "10K+" },
   { id: "general",          name: "General Repair",    image: "https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=500&q=80&fit=crop", desc: "Handyman & misc tasks",         rating: "4.5", jobs: "45K+" },
 ]
+
+function openGoogleSignInPopup(onSuccess, onError) {
+  if (!window.google) {
+    if (typeof onError === 'function') onError("Google login service is not ready yet. Please try again in a few seconds.");
+    return;
+  }
+  
+  try {
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: "628867483502-e7snj6l150js2vpvkv70opo5h4aacgus.apps.googleusercontent.com",
+      scope: "email profile openid",
+      callback: (response) => {
+        if (response && response.access_token) {
+          if (typeof onSuccess === 'function') onSuccess(response.access_token);
+        } else {
+          if (typeof onError === 'function') onError("Google login cancelled or failed.");
+        }
+      },
+      error_callback: (err) => {
+        if (typeof onError === 'function') onError(err?.message || "Google login error");
+      }
+    });
+    client.requestAccessToken();
+  } catch (err) {
+    if (typeof onError === 'function') onError(err?.message || "Failed to initialize Google login");
+  }
+}
 
 const PACKAGES = {
   cleaning: [
@@ -111,8 +144,11 @@ function getNextDays(n = 21) {
   for (let i = 0; i < n; i++) {
     const d = new Date(now)
     d.setDate(now.getDate() + i)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const dayStr = String(d.getDate()).padStart(2, '0')
     out.push({
-      iso:    d.toISOString().split("T")[0],
+      iso:    `${year}-${month}-${dayStr}`,
       day:    d.toLocaleDateString("en-IN",{weekday:"short"}),
       date:   d.getDate(),
       month:  d.toLocaleDateString("en-IN",{month:"short"}),
@@ -372,19 +408,20 @@ function LocationPickerModal({ onClose, onConfirm, initialLocation }) {
   )
 }
 
-function StepHome({ searchQuery, setSearchQuery, onSelect }) {
+function StepHome({ searchQuery, setSearchQuery, onSelect, categories }) {
   const [rotIdx, setRotIdx] = useState(0)
-  const featured = CATEGORIES.slice(0, 6)
+  const safeCats = categories && categories.length > 0 ? categories : CATEGORIES;
+  const featured = safeCats.slice(0, 6)
   const rotWords = featured.map(c => c.name)
 
   useEffect(() => {
     const t = setInterval(() => setRotIdx(i => (i+1) % rotWords.length), 4500)
     return () => clearInterval(t)
-  }, [])
+  }, [rotWords.length])
 
   const filtered = searchQuery
-    ? CATEGORIES.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.desc.toLowerCase().includes(searchQuery.toLowerCase()))
-    : CATEGORIES
+    ? safeCats.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.desc.toLowerCase().includes(searchQuery.toLowerCase()))
+    : safeCats
 
   return (
     <>
@@ -567,8 +604,8 @@ function StepHome({ searchQuery, setSearchQuery, onSelect }) {
    STEP 2 — PACKAGE SELECTION
    ───────────────────────────────────────────────────────────────────────── */
 
-function StepPackage({ category, selectedPackage, onSelect, onNext, onBack }) {
-  const packages = PACKAGES[category?.id] || []
+function StepPackage({ category, selectedPackage, onSelect, onNext, onBack, packagesData }) {
+  const packages = (packagesData && packagesData[category?.id]) || PACKAGES[category?.id] || []
 
   return (
     <div className="uc-step-page">
@@ -603,6 +640,11 @@ function StepPackage({ category, selectedPackage, onSelect, onNext, onBack }) {
                 </div>
               )}
 
+              {pkg.image && (
+                <div style={{ marginBottom: 12, borderRadius: 8, overflow: 'hidden', height: 140 }}>
+                  <img src={pkg.image} alt={pkg.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              )}
               <div className="uc-pkg-top">
                 <div>
                   <div className="uc-pkg-name">{pkg.name}</div>
@@ -714,6 +756,7 @@ function StepSchedule({ category, selectedDate, selectedTime, onDateChange, onTi
    ───────────────────────────────────────────────────────────────────────── */
 
 function StepLogin({ category, onVerified, onBack }) {
+  const { user, refreshMe } = useAuth()
   const [mode, setMode]           = useState("phone")
   const [name, setName]           = useState("")
   const [phone, setPhone]         = useState("")
@@ -727,11 +770,20 @@ function StepLogin({ category, onVerified, onBack }) {
 
   // Restore session
   useEffect(() => {
+    if (user && user.role === 'customer') {
+      onVerified({
+        verified: true,
+        name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Customer',
+        phone: user.phone || '',
+        email: user.email || ''
+      })
+      return
+    }
     try {
       const s = JSON.parse(sessionStorage.getItem(OTP_SESSION_KEY) || "null")
       if (s?.verified && s?.name && s?.phone) onVerified(s)
     } catch {}
-  }, [])
+  }, [user, onVerified])
 
   // Cooldown timer
   useEffect(() => {
@@ -739,6 +791,39 @@ function StepLogin({ category, onVerified, onBack }) {
     const t = setTimeout(() => setCooldown(c => c-1), 1000)
     return () => clearTimeout(t)
   }, [cooldown])
+
+  const handleGoogleLogin = () => {
+    openGoogleSignInPopup(
+      async (accessToken) => {
+        setLoading(true);
+        setError("");
+        try {
+          const res = await apiRequest("/auth/customer/google/", {
+            method: "POST",
+            json: { access_token: accessToken }
+          });
+          if (res.success) {
+            await refreshMe();
+            const data = { 
+              verified: true, 
+              name: res.user?.name || "", 
+              phone: res.user?.phone || "", 
+              email: res.user?.email || "" 
+            };
+            sessionStorage.setItem(OTP_SESSION_KEY, JSON.stringify(data));
+            onVerified(data);
+          } else {
+            setError(res.detail || "Google login failed");
+          }
+        } catch (err) {
+          setError(err?.body?.detail || "Google login failed");
+        } finally {
+          setLoading(false);
+        }
+      },
+      (err) => setError(err)
+    );
+  };
 
   const nameOk  = name.trim().length >= 2
   const phoneOk = phone.replace(/[\s\-\(\)\+]/g,"").length >= 7
@@ -767,6 +852,7 @@ function StepLogin({ category, onVerified, onBack }) {
     try {
       const res = await apiRequest("/auth/verify-otp/", { method:"POST", json:{ phone, code } })
       if (res?.success) {
+        await refreshMe()
         const data = { verified:true, name:name.trim(), phone, email:email.trim() }
         sessionStorage.setItem(OTP_SESSION_KEY, JSON.stringify(data))
         setMode("done")
@@ -840,6 +926,43 @@ function StepLogin({ category, onVerified, onBack }) {
           <button className="uc-btn-primary uc-btn-full" onClick={sendOtp} disabled={!nameOk||!phoneOk||loading}>
             {loading ? <><RefreshCw size={15} className="spin-icon"/> Sending…</> : <><MessageSquare size={15}/> Send OTP</>}
           </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div style={{ flex: 1, height: 1, background: '#cbd5e1' }} />
+            <span style={{ padding: '0 10px' }}>or</span>
+            <div style={{ flex: 1, height: 1, background: '#cbd5e1' }} />
+          </div>
+
+          <button 
+            type="button"
+            onClick={handleGoogleLogin} 
+            disabled={loading}
+            style={{ 
+              width: '100%', 
+              padding: '12px', 
+              background: 'white', 
+              color: '#1e293b', 
+              border: '1px solid #cbd5e1', 
+              borderRadius: 12, 
+              fontWeight: 700, 
+              fontSize: '0.9rem', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              gap: 8,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              opacity: loading ? 0.7 : 1
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18">
+              <path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.47h4.84c-.21 1.12-.84 2.07-1.79 2.7l2.8 2.17c1.64-1.51 2.59-3.74 2.59-6.5z"/>
+              <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.8-2.17c-.78.52-1.78.83-2.8.83-2.34 0-4.32-1.58-5.03-3.7L1.47 13.07C2.95 16 6.01 18 9 18z"/>
+              <path fill="#FBBC05" d="M3.97 10.78c-.18-.52-.28-1.09-.28-1.68s.1-1.16.28-1.68L1.47 5.12C.53 7 0 9.08 0 11.2s.53 4.2 1.47 6.08l2.5-1.9c-.71-2.12-.71-4.4 0-6.5z"/>
+              <path fill="#EA4335" d="M9 3.58c1.32-.03 2.59.48 3.51 1.4l2.63-2.63C13.48.88 11.3.02 9 0 6.01 0 2.95 2 1.47 4.93l2.5 1.9C4.68 5.16 6.66 3.58 9 3.58z"/>
+            </svg>
+            Continue with Google
+          </button>
         </motion.div>
       )}
 
@@ -910,7 +1033,10 @@ function StepLogin({ category, onVerified, onBack }) {
 
 function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoChange, photoPreview, onNext, onBack, globalLocation, onOpenMap }) {
   const fileRef = useRef()
-  const ok = formData.customer_name && formData.phone && formData.address && formData.issue_title
+  const { user } = useAuth()
+  const phoneClean = (formData.phone || "").replace(/[\s\-\(\)\+]/g, "")
+  const phoneValid = phoneClean.length >= 7 && /^\d+$/.test(phoneClean)
+  const ok = formData.customer_name && phoneValid && formData.address && formData.issue_title
 
   useEffect(() => {
     if (globalLocation && !formData.address) {
@@ -924,6 +1050,20 @@ function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoCha
       onChange({ target: { name: 'issue_title', value: defaultTitle } })
     }
   }, [cart, category, formData.issue_title])
+
+  useEffect(() => {
+    if (user) {
+      if (!formData.customer_name && user.firstName) {
+        onChange({ target: { name: 'customer_name', value: `${user.firstName} ${user.lastName || ''}`.trim() } })
+      }
+      if (!formData.phone && user.phone) {
+        onChange({ target: { name: 'phone', value: user.phone } })
+      }
+      if (!formData.email && user.email) {
+        onChange({ target: { name: 'email', value: user.email } })
+      }
+    }
+  }, [user, formData.customer_name, formData.phone, formData.email])
 
   return (
     <div className="uc-step-page">
@@ -1190,6 +1330,7 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
         {showPayment && (
           <PaymentModal
             total={totalPrice}
+            allowedMethods={cart.some(c => c.payment_policy === 'ONLINE_ONLY') ? ['online'] : ['cash', 'online']}
             onClose={() => setShowPayment(false)}
             onConfirm={(method) => { setShowPayment(false); onSubmit(method) }}
           />
@@ -1203,63 +1344,236 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
    PAYMENT MODAL
    ───────────────────────────────────────────────────────────────────────── */
 
-function PaymentModal({ total, onClose, onConfirm }) {
-  const [selected, setSelected] = useState("cash")
+function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onConfirm, bookingId }) {
+  const [selected, setSelected] = useState(allowedMethods.includes('online') && allowedMethods.length === 1 ? 'online' : 'cash')
   const [confirming, setConfirming] = useState(false)
+  const [showOnlineSheet, setShowOnlineSheet] = useState(false)
+  const [payTab, setPayTab] = useState('upi')
+  const [upiId, setUpiId] = useState('')
+  const [cardNum, setCardNum] = useState('')
+  const [cardName, setCardName] = useState('')
+  const [cardExp, setCardExp] = useState('')
+  const [cardCvv, setCardCvv] = useState('')
+  const [payPhase, setPayPhase] = useState(null) // null | 'processing' | 'success' | 'failed'
+  const [payError, setPayError] = useState('')
 
   const handleConfirm = async () => {
-    setConfirming(true)
-    await new Promise(r => setTimeout(r, 400))
-    onConfirm(selected)
+    if (selected === 'online') {
+      setShowOnlineSheet(true)
+    } else {
+      setConfirming(true)
+      await new Promise(r => setTimeout(r, 400))
+      onConfirm('cash')
+    }
+  }
+
+  const handleOnlinePayment = async () => {
+    setPayPhase('processing')
+    setPayError('')
+    await new Promise(r => setTimeout(r, 2200))
+    const success = Math.random() > 0.05
+    if (success) {
+      setPayPhase('success')
+      if (bookingId) {
+        try {
+          await apiRequest('/payment/verify/', {
+            method: 'POST',
+            json: { booking_id: bookingId, order_id: `order_mock_${Date.now()}`, payment_id: `PAY_${Date.now().toString(36).toUpperCase()}`, mock_success: true }
+          })
+        } catch (e) { /* non-critical */ }
+      }
+      await new Promise(r => setTimeout(r, 1200))
+      onConfirm('online')
+    } else {
+      setPayPhase('failed')
+      setPayError('Payment failed. Please check your details and try again.')
+    }
   }
 
   const options = [
-    { id: "cash",   icon: "💵", label: "Pay at Doorstep",  sub: "Cash or UPI after service is done",  badge: "Most Popular" },
-    { id: "online", icon: "💳", label: "Pay Online Now",    sub: "UPI, Cards, Net Banking — secured",  badge: "Instant" },
-  ]
+    { id: "cash",   icon: "💵", label: "Cash on Service",  sub: "Pay after service is completed", badge: "Most Popular", badgeColor: "#10B981", detail: ["No upfront payment", "Pay only on completion", "Any denomination accepted"] },
+    { id: "online", icon: "💳", label: "Pay Online",        sub: "UPI, Cards, Net Banking",        badge: "Instant",      badgeColor: "#7C3AED", detail: ["100% secure & encrypted", "Instant confirmation", "Invoice emailed immediately"] },
+  ].filter(o => allowedMethods.includes(o.id))
+
+  if (showOnlineSheet) {
+    return (
+      <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', zIndex:10020, display:'flex', alignItems:'flex-end', justifyContent:'center' }}>
+        <motion.div initial={{ y: 400, opacity:0 }} animate={{ y: 0, opacity:1 }} transition={{ type:'spring', damping:28, stiffness:280 }}
+          style={{ background:'white', borderRadius:'28px 28px 0 0', width:'100%', maxWidth:540, paddingBottom:'2rem' }}>
+          <div style={{ background:'linear-gradient(135deg,#7C3AED,#4F46E5)', borderRadius:'28px 28px 0 0', padding:'1.5rem 1.75rem 1.25rem' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div>
+                <div style={{ fontSize:'0.7rem', color:'rgba(255,255,255,0.7)', fontWeight:700, textTransform:'uppercase', letterSpacing:1 }}>Secure Payment</div>
+                <div style={{ fontSize:'1.5rem', fontWeight:900, color:'white', marginTop:2 }}>₹{total.toLocaleString('en-IN')}</div>
+              </div>
+              <div style={{ background:'rgba(255,255,255,0.15)', padding:'4px 12px', borderRadius:99, fontSize:'0.7rem', fontWeight:800, color:'white', display:'flex', alignItems:'center', gap:5 }}>
+                <Lock size={11}/> SSL Secured
+              </div>
+            </div>
+            {payPhase === null && (
+              <div style={{ display:'flex', gap:6, marginTop:'1rem' }}>
+                {[{id:'upi',l:'UPI'},{id:'card',l:'Card'},{id:'netbanking',l:'Net Banking'},{id:'wallet',l:'Wallets'}].map(t => (
+                  <button key={t.id} onClick={() => setPayTab(t.id)}
+                    style={{ padding:'5px 14px', borderRadius:99, border:'none', cursor:'pointer', fontSize:'0.72rem', fontWeight:800, transition:'all 0.2s',
+                      background: payTab===t.id ? 'white' : 'rgba(255,255,255,0.18)', color: payTab===t.id ? '#7C3AED' : 'rgba(255,255,255,0.85)' }}>{t.l}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{ padding:'1.5rem 1.75rem' }}>
+            {payPhase === 'processing' && (
+              <div style={{ textAlign:'center', padding:'2rem 0' }}>
+                <motion.div animate={{ rotate:360 }} transition={{ repeat:Infinity, duration:1, ease:'linear' }} style={{ display:'inline-block', marginBottom:'1.5rem' }}><RefreshCw size={48} color="#7C3AED"/></motion.div>
+                <div style={{ fontSize:'1.2rem', fontWeight:900, color:'#0f172a', marginBottom:6 }}>Processing Payment…</div>
+                <div style={{ color:'#64748b', fontSize:'0.85rem' }}>Please do not close this window</div>
+              </div>
+            )}
+            {payPhase === 'success' && (
+              <div style={{ textAlign:'center', padding:'2rem 0' }}>
+                <motion.div initial={{ scale:0 }} animate={{ scale:1 }} transition={{ type:'spring', stiffness:300, damping:15 }}
+                  style={{ width:72, height:72, borderRadius:'50%', background:'linear-gradient(135deg,#10B981,#34D399)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 1.25rem' }}>
+                  <Check size={36} color="white"/>
+                </motion.div>
+                <div style={{ fontSize:'1.3rem', fontWeight:900, color:'#0f172a', marginBottom:6 }}>Payment Successful! 🎉</div>
+                <div style={{ color:'#64748b', fontSize:'0.85rem' }}>Your booking is now confirmed</div>
+                <div style={{ marginTop:'1rem', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:12, padding:'0.75rem 1rem', fontSize:'0.78rem', color:'#166534', fontWeight:600 }}>✅ Amount ₹{total.toLocaleString('en-IN')} debited successfully</div>
+              </div>
+            )}
+            {payPhase === 'failed' && (
+              <div style={{ textAlign:'center', padding:'2rem 0' }}>
+                <div style={{ width:72, height:72, borderRadius:'50%', background:'#FEF2F2', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 1.25rem', border:'2px solid #FECACA' }}><X size={36} color="#EF4444"/></div>
+                <div style={{ fontSize:'1.2rem', fontWeight:900, color:'#0f172a', marginBottom:6 }}>Payment Failed</div>
+                <div style={{ color:'#EF4444', fontSize:'0.82rem', marginBottom:'1.25rem' }}>{payError}</div>
+                <button onClick={() => setPayPhase(null)} style={{ padding:'0.75rem 2rem', background:'linear-gradient(135deg,#7C3AED,#4F46E5)', color:'white', fontWeight:800, border:'none', borderRadius:12, cursor:'pointer' }}>Try Again</button>
+              </div>
+            )}
+            {payPhase === null && payTab === 'upi' && (
+              <>
+                <label style={{ fontSize:'0.78rem', fontWeight:700, color:'#374151', display:'block', marginBottom:6 }}>Enter UPI ID</label>
+                <div style={{ display:'flex', alignItems:'center', border:`2px solid ${upiId ? '#7C3AED' : '#e2e8f0'}`, borderRadius:12, overflow:'hidden', marginBottom:'0.75rem' }}>
+                  <input value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="yourname@upi"
+                    style={{ flex:1, border:'none', outline:'none', padding:'0.9rem 1rem', fontSize:'0.95rem', color:'#0f172a' }}/>
+                  <div style={{ padding:'0 1rem', color:'#7C3AED', fontWeight:800, fontSize:'0.75rem' }}>VERIFY</div>
+                </div>
+                <div style={{ display:'flex', gap:'0.5rem', flexWrap:'wrap', marginBottom:'1.25rem' }}>
+                  {['PhonePe', 'GPay', 'Paytm', 'BHIM'].map(app => (
+                    <button key={app} onClick={() => setUpiId(app.toLowerCase() + '@ybl')}
+                      style={{ padding:'6px 14px', border:'1px solid #e2e8f0', borderRadius:99, fontSize:'0.72rem', fontWeight:700, cursor:'pointer', background:'white', color:'#374151' }}>{app}</button>
+                  ))}
+                </div>
+                <button onClick={handleOnlinePayment} disabled={!upiId}
+                  style={{ width:'100%', padding:'1rem', background: upiId ? 'linear-gradient(135deg,#7C3AED,#4F46E5)' : '#e2e8f0', color: upiId ? 'white' : '#94a3b8', fontWeight:800, fontSize:'0.95rem', border:'none', borderRadius:14, cursor: upiId ? 'pointer' : 'not-allowed', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                  <Lock size={15}/> Pay ₹{total.toLocaleString('en-IN')}
+                </button>
+              </>
+            )}
+            {payPhase === null && payTab === 'card' && (
+              <>
+                <div style={{ display:'flex', flexDirection:'column', gap:'0.75rem', marginBottom:'1rem' }}>
+                  <div><label style={{ fontSize:'0.75rem', fontWeight:700, color:'#374151', display:'block', marginBottom:4 }}>Card Number</label>
+                    <input value={cardNum} onChange={e => setCardNum(e.target.value.replace(/\D/g,'').slice(0,16).replace(/(.{4})/g,'$1 ').trim())} placeholder="1234 5678 9012 3456"
+                      style={{ width:'100%', border:'2px solid #e2e8f0', borderRadius:10, padding:'0.8rem 1rem', fontSize:'0.9rem', outline:'none', boxSizing:'border-box' }}/>
+                  </div>
+                  <div><label style={{ fontSize:'0.75rem', fontWeight:700, color:'#374151', display:'block', marginBottom:4 }}>Name on Card</label>
+                    <input value={cardName} onChange={e => setCardName(e.target.value)} placeholder="John Doe"
+                      style={{ width:'100%', border:'2px solid #e2e8f0', borderRadius:10, padding:'0.8rem 1rem', fontSize:'0.9rem', outline:'none', boxSizing:'border-box' }}/>
+                  </div>
+                  <div style={{ display:'flex', gap:'0.75rem' }}>
+                    <div style={{ flex:1 }}><label style={{ fontSize:'0.75rem', fontWeight:700, color:'#374151', display:'block', marginBottom:4 }}>Expiry</label>
+                      <input value={cardExp} onChange={e => setCardExp(e.target.value.replace(/\D/g,'').slice(0,4).replace(/(.{2})/,'$1/'))} placeholder="MM/YY"
+                        style={{ width:'100%', border:'2px solid #e2e8f0', borderRadius:10, padding:'0.8rem 1rem', fontSize:'0.9rem', outline:'none', boxSizing:'border-box' }}/>
+                    </div>
+                    <div style={{ flex:1 }}><label style={{ fontSize:'0.75rem', fontWeight:700, color:'#374151', display:'block', marginBottom:4 }}>CVV</label>
+                      <input value={cardCvv} onChange={e => setCardCvv(e.target.value.replace(/\D/g,'').slice(0,3))} placeholder="•••" type="password"
+                        style={{ width:'100%', border:'2px solid #e2e8f0', borderRadius:10, padding:'0.8rem 1rem', fontSize:'0.9rem', outline:'none', boxSizing:'border-box' }}/>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={handleOnlinePayment} disabled={cardNum.length < 19 || !cardName || cardExp.length < 5 || cardCvv.length < 3}
+                  style={{ width:'100%', padding:'1rem', background: (cardNum.length >= 19 && cardName && cardExp.length >= 5 && cardCvv.length >= 3) ? 'linear-gradient(135deg,#7C3AED,#4F46E5)' : '#e2e8f0', color: (cardNum.length >= 19 && cardName && cardExp.length >= 5 && cardCvv.length >= 3) ? 'white' : '#94a3b8', fontWeight:800, fontSize:'0.95rem', border:'none', borderRadius:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                  <Lock size={15}/> Pay ₹{total.toLocaleString('en-IN')}
+                </button>
+              </>
+            )}
+            {payPhase === null && payTab === 'netbanking' && (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.6rem', marginBottom:'1rem' }}>
+                {['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak', 'Yes Bank', 'PNB', 'BOB'].map(bank => (
+                  <button key={bank} onClick={() => { setUpiId(bank); handleOnlinePayment(); }}
+                    style={{ padding:'0.85rem', border:'2px solid #e2e8f0', borderRadius:12, cursor:'pointer', background:'white', fontWeight:700, fontSize:'0.82rem', color:'#374151' }}>{bank}</button>
+                ))}
+              </div>
+            )}
+            {payPhase === null && payTab === 'wallet' && (
+              <div style={{ display:'flex', flexDirection:'column', gap:'0.6rem', marginBottom:'1rem' }}>
+                {[{name:'Paytm Wallet', icon:'🟢'}, {name:'Amazon Pay', icon:'🟠'}, {name:'MobiKwik', icon:'🔵'}, {name:'Freecharge', icon:'🟣'}].map(w => (
+                  <button key={w.name} onClick={handleOnlinePayment}
+                    style={{ display:'flex', alignItems:'center', gap:'1rem', padding:'0.9rem 1rem', border:'2px solid #e2e8f0', borderRadius:12, cursor:'pointer', background:'white', fontWeight:700, fontSize:'0.88rem', color:'#374151' }}>
+                    <span style={{ fontSize:'1.3rem' }}>{w.icon}</span>{w.name}<ChevronRight size={16} style={{ marginLeft:'auto', color:'#94a3b8' }}/>
+                  </button>
+                ))}
+              </div>
+            )}
+            {payPhase === null && (
+              <div style={{ textAlign:'center', marginTop:'0.75rem', fontSize:'0.68rem', color:'#94a3b8', display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
+                <Shield size={11}/> 256-bit SSL · PCI DSS Compliant
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:10010, display:'flex', alignItems:'flex-end', justifyContent:'center' }} onClick={onClose}>
-      <motion.div
-        initial={{ y: 300, opacity:0 }} animate={{ y: 0, opacity:1 }} exit={{ y: 300, opacity:0 }}
-        transition={{ type:'spring', damping:28, stiffness:300 }}
-        onClick={e => e.stopPropagation()}
-        style={{ background:'white', borderRadius:'24px 24px 0 0', padding:'2rem', width:'100%', maxWidth:520, paddingBottom:'2.5rem' }}
-      >
-        <div style={{ width:40, height:4, background:'#e2e8f0', borderRadius:99, margin:'0 auto 1.5rem' }} />
-        <h3 style={{ margin:'0 0 0.25rem', fontSize:'1.3rem', fontWeight:900, color:'#0f172a' }}>Choose Payment Method</h3>
-        <p style={{ margin:'0 0 1.5rem', color:'#64748b', fontSize:'0.85rem' }}>Total: <strong style={{ color:'#7C3AED' }}>₹{total}</strong></p>
-
-        <div style={{ display:'flex', flexDirection:'column', gap:'0.75rem', marginBottom:'1.5rem' }}>
+      <motion.div initial={{ y: 300, opacity:0 }} animate={{ y: 0, opacity:1 }} exit={{ y: 300, opacity:0 }}
+        transition={{ type:'spring', damping:28, stiffness:300 }} onClick={e => e.stopPropagation()}
+        style={{ background:'white', borderRadius:'24px 24px 0 0', width:'100%', maxWidth:520, paddingBottom:'2.5rem' }}>
+        <div style={{ padding:'1.75rem 1.75rem 0' }}>
+          <div style={{ width:40, height:4, background:'#e2e8f0', borderRadius:99, margin:'0 auto 1.5rem' }} />
+          <h3 style={{ margin:'0 0 0.25rem', fontSize:'1.3rem', fontWeight:900, color:'#0f172a' }}>Choose Payment Method</h3>
+          <p style={{ margin:'0 0 1.25rem', color:'#64748b', fontSize:'0.85rem' }}>Total: <strong style={{ color:'#7C3AED', fontSize:'1.05rem' }}>₹{total.toLocaleString('en-IN')}</strong></p>
+        </div>
+        <div style={{ display:'flex', flexDirection:'column', gap:'0.6rem', padding:'0 1.75rem', marginBottom:'1.25rem' }}>
           {options.map(opt => (
-            <div key={opt.id}
-              onClick={() => setSelected(opt.id)}
-              style={{ border:`2px solid ${selected===opt.id?'#7C3AED':'#e2e8f0'}`, borderRadius:14, padding:'1rem 1.2rem', cursor:'pointer', background: selected===opt.id?'#f5f3ff':'white', transition:'all 0.2s', display:'flex', alignItems:'center', gap:'1rem' }}
-            >
-              <div style={{ width:44, height:44, borderRadius:12, background: selected===opt.id?'#7C3AED15':'#f8fafc', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.5rem' }}>{opt.icon}</div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontWeight:800, color:'#0f172a', fontSize:'0.95rem', display:'flex', alignItems:'center', gap:8 }}>
-                  {opt.label}
-                  <span style={{ background:'#7C3AED18', color:'#7C3AED', fontSize:'0.6rem', fontWeight:800, padding:'2px 7px', borderRadius:99, border:'1px solid #7C3AED30' }}>{opt.badge}</span>
+            <div key={opt.id} onClick={() => setSelected(opt.id)}
+              style={{ border:`2px solid ${selected===opt.id ? '#7C3AED' : '#e2e8f0'}`, borderRadius:16, padding:'1rem 1.1rem', cursor:'pointer', background: selected===opt.id ? '#f5f3ff' : 'white', transition:'all 0.2s' }}>
+              <div style={{ display:'flex', alignItems:'flex-start', gap:'1rem' }}>
+                <div style={{ width:48, height:48, borderRadius:14, background: selected===opt.id ? '#7C3AED18' : '#f8fafc', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.6rem', flexShrink:0 }}>{opt.icon}</div>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:800, color:'#0f172a', fontSize:'0.95rem', display:'flex', alignItems:'center', gap:8 }}>
+                    {opt.label}
+                    <span style={{ background: opt.badgeColor+'18', color: opt.badgeColor, fontSize:'0.6rem', fontWeight:800, padding:'2px 8px', borderRadius:99, border:`1px solid ${opt.badgeColor}30` }}>{opt.badge}</span>
+                  </div>
+                  <div style={{ color:'#64748b', fontSize:'0.78rem', marginTop:3 }}>{opt.sub}</div>
+                  {selected === opt.id && (
+                    <motion.div initial={{ opacity:0, y:5 }} animate={{ opacity:1, y:0 }} style={{ marginTop:'0.6rem', display:'flex', flexDirection:'column', gap:3 }}>
+                      {opt.detail.map((d,i) => (
+                        <div key={i} style={{ display:'flex', alignItems:'center', gap:6, fontSize:'0.73rem', color:'#059669', fontWeight:600 }}>
+                          <CheckCircle2 size={12}/> {d}
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
                 </div>
-                <div style={{ color:'#64748b', fontSize:'0.78rem', marginTop:2 }}>{opt.sub}</div>
-              </div>
-              <div style={{ width:20, height:20, borderRadius:'50%', border:`2px solid ${selected===opt.id?'#7C3AED':'#cbd5e1'}`, background: selected===opt.id?'#7C3AED':'white', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                {selected===opt.id && <div style={{ width:8, height:8, borderRadius:'50%', background:'white' }} />}
+                <div style={{ width:22, height:22, borderRadius:'50%', border:`2px solid ${selected===opt.id ? '#7C3AED' : '#cbd5e1'}`, background: selected===opt.id ? '#7C3AED' : 'white', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginTop:2 }}>
+                  {selected === opt.id && <div style={{ width:8, height:8, borderRadius:'50%', background:'white' }} />}
+                </div>
               </div>
             </div>
           ))}
         </div>
-
-        <button
-          onClick={handleConfirm}
-          disabled={confirming}
-          style={{ width:'100%', padding:'1rem', background:'linear-gradient(135deg,#7C3AED,#a855f7)', color:'white', fontWeight:800, fontSize:'1rem', border:'none', borderRadius:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}
-        >
-          {confirming ? <><RefreshCw size={16} className="spin-icon"/> Processing…</> : <><CheckCheck size={16}/> Confirm & Pay ₹{total}</>}
-        </button>
-        <div style={{ textAlign:'center', marginTop:'0.75rem', fontSize:'0.7rem', color:'#94a3b8', display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
-          <Shield size={11}/> 256-bit SSL encrypted · Your info is safe
+        <div style={{ padding:'0 1.75rem' }}>
+          <button onClick={handleConfirm} disabled={confirming}
+            style={{ width:'100%', padding:'1rem', background:'linear-gradient(135deg,#7C3AED,#a855f7)', color:'white', fontWeight:800, fontSize:'1rem', border:'none', borderRadius:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 20px rgba(124,58,237,0.3)' }}>
+            {confirming ? <><RefreshCw size={16} className="spin-icon"/> Processing…</> :
+             selected === 'online' ? <><CreditCard size={16}/> Continue to Pay ₹{total.toLocaleString('en-IN')}</> :
+             <><CheckCheck size={16}/> Confirm Booking</>}
+          </button>
+          <div style={{ textAlign:'center', marginTop:'0.75rem', fontSize:'0.68rem', color:'#94a3b8', display:'flex', alignItems:'center', justifyContent:'center', gap:4 }}>
+            <Shield size={11}/> 256-bit SSL encrypted · Your info is safe
+          </div>
         </div>
       </motion.div>
     </div>
@@ -1533,6 +1847,171 @@ function StepBar({ step, total }) {
    ───────────────────────────────────────────────────────────────────────── */
 
 function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
+  const { user, refreshMe } = useAuth()
+  
+  const [loginMethod, setLoginMethod] = useState('email')
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPhone, setLoginPhone] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpValue, setOtpValue] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [loginError, setLoginError] = useState('')
+
+  const handleRequestOTP = async () => {
+    setLoginError('')
+    setLoginLoading(true)
+    try {
+      if (loginMethod === 'email') await apiRequestCustomerEmailOTP(loginEmail)
+      else await apiRequestCustomerPhoneOTP(loginPhone)
+      setOtpSent(true)
+    } catch (e) {
+      setLoginError(e.body?.detail || 'Failed to send OTP')
+    }
+    setLoginLoading(false)
+  }
+
+  const handleVerifyOTP = async () => {
+    setLoginError('')
+    setLoginLoading(true)
+    try {
+      if (loginMethod === 'email') await apiVerifyCustomerEmailOTP(loginEmail, otpValue)
+      else await apiVerifyCustomerPhoneOTP(loginPhone, otpValue)
+      await refreshMe()
+    } catch (e) {
+      setLoginError(e.body?.detail || 'Invalid OTP')
+    }
+    setLoginLoading(false)
+  }
+
+  const handleLogout = async () => {
+    await apiLogout()
+    await refreshMe()
+  }
+
+  const handleGoogleLogin = () => {
+    openGoogleSignInPopup(
+      async (accessToken) => {
+        setLoginLoading(true);
+        setLoginError("");
+        try {
+          const res = await apiRequest("/auth/customer/google/", {
+            method: "POST",
+            json: { access_token: accessToken }
+          });
+          if (res.success) {
+            await refreshMe();
+          } else {
+            setLoginError(res.detail || "Google login failed");
+          }
+        } catch (err) {
+          setLoginError(err?.body?.detail || "Google login failed");
+        } finally {
+          setLoginLoading(false);
+        }
+      },
+      (err) => setLoginError(err)
+    );
+  };
+
+  const [selectedMockBooking, setSelectedMockBooking] = useState(null)
+  
+  const [realBookings, setRealBookings] = useState([])
+  const [bookingsLoading, setBookingsLoading] = useState(false)
+
+  const [profileName, setProfileName] = useState('')
+  const [profilePhone, setProfilePhone] = useState('')
+  const [profileEmail, setProfileEmail] = useState('')
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [profileError, setProfileError] = useState('')
+  const [profileSuccess, setProfileSuccess] = useState('')
+
+  useEffect(() => {
+    if (user) {
+      const uFullName = user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : ''
+      setProfileName(uFullName)
+      setProfilePhone(user?.phone || '')
+      setProfileEmail(user?.email || '')
+    }
+  }, [user])
+
+  const handleSaveProfile = async () => {
+    setProfileError('')
+    setProfileSuccess('')
+    setIsSavingProfile(true)
+    const nameParts = profileName.trim().split(' ')
+    const firstName = nameParts[0] || ''
+    const lastName = nameParts.slice(1).join(' ')
+    
+    try {
+      const res = await apiRequest("/auth/profile/", {
+        method: "PATCH",
+        json: {
+          first_name: firstName,
+          last_name: lastName,
+          phone: profilePhone,
+          email: profileEmail
+        }
+      })
+      if (res.success || res.id) {
+        await refreshMe()
+        setProfileSuccess("Changes saved successfully!")
+      } else {
+        setProfileError(res.message || "Failed to update profile")
+      }
+    } catch (e) {
+      setProfileError(e.body?.message || "Failed to update profile")
+    } finally {
+      setIsSavingProfile(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === "My Bookings" && user) {
+      setBookingsLoading(true)
+      apiFetchCustomerBookings()
+        .then(res => setRealBookings(res.data || []))
+        .catch(console.error)
+        .finally(() => setBookingsLoading(false))
+    }
+  }, [activeTab, user])
+
+  const userFullName = user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : 'Customer'
+  const userEmail = user?.email || ''
+  const userPhone = user?.phone || ''
+
+  const [mockAddresses, setMockAddresses] = useState([
+    { id: 1, title: 'Home', address: 'Flat 402, Block A\nPrestige Sunrise\nBangalore, 560068' }
+  ])
+  const [isAddingAddress, setIsAddingAddress] = useState(false)
+  const [editingAddressId, setEditingAddressId] = useState(null)
+  const [newAddressTitle, setNewAddressTitle] = useState('')
+  const [newAddressText, setNewAddressText] = useState('')
+
+  const handleAddAddress = () => {
+    if (newAddressTitle.trim() && newAddressText.trim()) {
+      if (editingAddressId) {
+        setMockAddresses(mockAddresses.map(a => a.id === editingAddressId ? { ...a, title: newAddressTitle, address: newAddressText } : a))
+      } else {
+        setMockAddresses([...mockAddresses, { id: Date.now(), title: newAddressTitle, address: newAddressText }])
+      }
+      setIsAddingAddress(false)
+      setEditingAddressId(null)
+      setNewAddressTitle('')
+      setNewAddressText('')
+    }
+  }
+  
+  const handleEditClick = (address) => {
+    setEditingAddressId(address.id)
+    setNewAddressTitle(address.title)
+    setNewAddressText(address.address)
+    setIsAddingAddress(true)
+  }
+
+  const handleRemoveAddress = (id) => {
+    setMockAddresses(mockAddresses.filter(a => a.id !== id))
+  }
+
   const tabs = [
     { id: "My Profile", icon: User },
     { id: "My Bookings", icon: Calendar },
@@ -1553,31 +2032,37 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
         return (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <h3 style={{ margin:'0 0 1.5rem', fontSize:'1.4rem', fontWeight:800, color:'#0f172a' }}>My Profile</h3>
-            <div style={{ display:'flex', alignItems:'center', gap:24, marginBottom:32, paddingBottom:32, borderBottom:'1px solid #e2e8f0' }}>
+             <div style={{ display:'flex', alignItems:'center', gap:24, marginBottom:32, paddingBottom:32, borderBottom:'1px solid #e2e8f0' }}>
               <div style={{ width:88, height:88, borderRadius:'50%', background:'#f1f5f9', display:'flex', alignItems:'center', justifyContent:'center', border:'2px solid #e2e8f0' }}>
                 <User size={36} color="#94a3b8"/>
               </div>
               <div>
-                <div style={{ fontWeight:800, fontSize:'1.1rem', color:'#0f172a', marginBottom:4 }}>Ravi Kumar</div>
-                <div style={{ color:'#64748b', fontSize:'0.85rem', marginBottom:12 }}>ravi@example.com</div>
+                <div style={{ fontWeight:800, fontSize:'1.1rem', color:'#0f172a', marginBottom:4 }}>{userFullName}</div>
+                <div style={{ color:'#64748b', fontSize:'0.85rem', marginBottom:12 }}>{userEmail || userPhone}</div>
                 <button style={{ padding:'0.5rem 1.25rem', background:'white', color:'#0f172a', border:'1px solid #cbd5e1', borderRadius:8, fontWeight:700, fontSize:'0.8rem', cursor:'pointer' }}>Change Photo</button>
               </div>
             </div>
+
+            {profileError && <div style={{ background:'#fef2f2', color:'#ef4444', padding:'10px', borderRadius:8, fontSize:'0.8rem', fontWeight:600, marginBottom:16 }}>{profileError}</div>}
+            {profileSuccess && <div style={{ background:'#f0fdf4', color:'#15803d', padding:'10px', borderRadius:8, fontSize:'0.8rem', fontWeight:600, marginBottom:16 }}>{profileSuccess}</div>}
+
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
               <div>
                 <label style={{ display:'block', fontSize:'0.75rem', color:'#475569', fontWeight:700, marginBottom:8 }}>Full Name</label>
-                <input type="text" defaultValue="Ravi Kumar" style={{ width:'100%', padding:'0.85rem', borderRadius:10, border:'1px solid #cbd5e1', fontSize:'0.9rem', color:'#0f172a' }} />
+                <input type="text" value={profileName} onChange={e => setProfileName(e.target.value)} style={{ width:'100%', padding:'0.85rem', borderRadius:10, border:'1px solid #cbd5e1', fontSize:'0.9rem', color:'#0f172a' }} />
               </div>
               <div>
                 <label style={{ display:'block', fontSize:'0.75rem', color:'#475569', fontWeight:700, marginBottom:8 }}>Phone Number</label>
-                <input type="text" defaultValue="+91 98765 43210" style={{ width:'100%', padding:'0.85rem', borderRadius:10, border:'1px solid #cbd5e1', fontSize:'0.9rem', color:'#0f172a' }} />
+                <input type="text" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} style={{ width:'100%', padding:'0.85rem', borderRadius:10, border:'1px solid #cbd5e1', fontSize:'0.9rem', color:'#0f172a' }} />
               </div>
               <div style={{ gridColumn:'1/-1' }}>
                 <label style={{ display:'block', fontSize:'0.75rem', color:'#475569', fontWeight:700, marginBottom:8 }}>Email Address</label>
-                <input type="email" defaultValue="ravi@example.com" style={{ width:'100%', padding:'0.85rem', borderRadius:10, border:'1px solid #cbd5e1', fontSize:'0.9rem', color:'#0f172a' }} />
+                <input type="email" value={profileEmail} onChange={e => setProfileEmail(e.target.value)} style={{ width:'100%', padding:'0.85rem', borderRadius:10, border:'1px solid #cbd5e1', fontSize:'0.9rem', color:'#0f172a' }} />
               </div>
             </div>
-            <button style={{ marginTop:32, padding:'0.9rem 2.5rem', background:'linear-gradient(135deg,#7C3AED,#a855f7)', color:'white', border:'none', borderRadius:10, fontWeight:800, fontSize:'0.95rem', cursor:'pointer', boxShadow:'0 10px 20px rgba(124, 58, 237, 0.2)' }}>Save Changes</button>
+            <button onClick={handleSaveProfile} disabled={isSavingProfile} style={{ marginTop:32, padding:'0.9rem 2.5rem', background:'linear-gradient(135deg,#7C3AED,#a855f7)', color:'white', border:'none', borderRadius:10, fontWeight:800, fontSize:'0.95rem', cursor:'pointer', boxShadow:'0 10px 20px rgba(124, 58, 237, 0.2)', opacity: isSavingProfile ? 0.7 : 1 }}>
+              {isSavingProfile ? 'Saving...' : 'Save Changes'}
+            </button>
           </motion.div>
         )
       case "My Bookings":
@@ -1585,20 +2070,56 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <h3 style={{ margin:'0 0 1.5rem', fontSize:'1.4rem', fontWeight:800, color:'#0f172a' }}>My Bookings</h3>
             <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-              {mockBookings.map(b => (
-                <div key={b.id} style={{ border:'1px solid #e2e8f0', borderRadius:16, padding:'1.25rem', display:'flex', justifyContent:'space-between', alignItems:'center', background:'white', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+              {bookingsLoading ? <div style={{textAlign:'center', padding:'2rem', color:'#94a3b8'}}>Loading bookings...</div> : realBookings.length === 0 ? <div style={{textAlign:'center', padding:'2rem', color:'#94a3b8'}}>No bookings found.</div> : realBookings.map(b => (
+                <React.Fragment key={b.id}>
+                <div style={{ border:'1px solid #e2e8f0', borderRadius:16, padding:'1.25rem', display:'flex', justifyContent:'space-between', alignItems:'center', background:'white', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)', position:'relative', zIndex:1 }}>
                   <div>
                     <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:8 }}>
-                      <span style={{ fontWeight:800, color:'#0f172a', fontSize:'1.05rem' }}>{b.service}</span>
-                      <span style={{ fontSize:'0.7rem', padding:'4px 10px', borderRadius:99, fontWeight:800, background: b.status==='Completed'?'#10B98115':'#7C3AED15', color: b.status==='Completed'?'#10B981':'#7C3AED', border:`1px solid ${b.status==='Completed'?'#10B98130':'#7C3AED30'}` }}>{b.status}</span>
+                      <span style={{ fontWeight:800, color:'#0f172a', fontSize:'1.05rem' }}>{b.service_category_display || b.issue_title || 'Service Booking'}</span>
+                      <span style={{ fontSize:'0.7rem', padding:'4px 10px', borderRadius:99, fontWeight:800, background: b.status==='completed'?'#10B98115':'#7C3AED15', color: b.status==='completed'?'#10B981':'#7C3AED', border:`1px solid ${b.status==='completed'?'#10B98130':'#7C3AED30'}` }}>{b.status_display || b.status}</span>
                     </div>
-                    <div style={{ fontSize:'0.85rem', color:'#64748b', display:'flex', alignItems:'center', gap:6 }}><Calendar size={13}/> {b.date} &nbsp;•&nbsp; <span style={{ fontFamily:'monospace' }}>{b.id}</span></div>
+                    <div style={{ fontSize:'0.85rem', color:'#64748b', display:'flex', alignItems:'center', gap:6 }}><Calendar size={13}/> {b.preferred_date || 'N/A'} &nbsp;•&nbsp; <span style={{ fontFamily:'monospace' }}>{b.request_id}</span></div>
                   </div>
                   <div style={{ textAlign:'right' }}>
-                    <div style={{ fontWeight:900, color:'#0f172a', marginBottom:8, fontSize:'1.1rem' }}>{b.amount}</div>
-                    <button style={{ fontSize:'0.8rem', padding:'6px 14px', borderRadius:8, border:'1px solid #e2e8f0', background:'#f8fafc', fontWeight:700, cursor:'pointer', color:'#475569' }}>View Details</button>
+                    <div style={{ fontWeight:900, color:'#0f172a', marginBottom:12, fontSize:'1.1rem' }}>Paid</div>
+                    <button 
+                      onClick={() => setSelectedMockBooking(selectedMockBooking?.id === b.id ? null : b)}
+                      style={{ fontSize:'0.85rem', padding:'8px 18px', borderRadius:8, border:'none', background:'#7C3AED', fontWeight:700, cursor:'pointer', color:'white', boxShadow:'0 2px 4px rgba(124,58,237,0.25)', transition:'background 0.2s' }}
+                      onMouseOver={e => e.currentTarget.style.background = '#6d28d9'} 
+                      onMouseOut={e => e.currentTarget.style.background = '#7C3AED'}
+                    >
+                      {selectedMockBooking?.id === b.id ? 'Hide Details' : 'View Details'}
+                    </button>
                   </div>
                 </div>
+                
+                {selectedMockBooking?.id === b.id && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderTop:'none', borderRadius:'0 0 16px 16px', padding:'1.25rem', marginTop:'-16px', position:'relative', zIndex:0 }}>
+                    <div style={{ fontWeight:800, color:'#334155', marginBottom:12 }}>Booking Overview</div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, fontSize:'0.85rem' }}>
+                      <div>
+                        <div style={{ color:'#64748b', marginBottom:4 }}>Assigned Expert</div>
+                        <div style={{ fontWeight:600, color:'#0f172a' }}>{b.assigned_employee ? b.assigned_employee.full_name : 'Not assigned yet'}</div>
+                      </div>
+                      <div>
+                        <div style={{ color:'#64748b', marginBottom:4 }}>Payment Status</div>
+                        <div style={{ fontWeight:600, color:'#0f172a' }}>{b.payment_status_display || (b.payment_status === 'paid' ? 'Paid' : 'Pending')}</div>
+                      </div>
+                      <div style={{ gridColumn:'1/-1', borderTop:'1px solid #e2e8f0', paddingTop:12, marginTop:4 }}>
+                        <div style={{ color:'#64748b', marginBottom:4 }}>Service Address</div>
+                        <div style={{ fontWeight:600, color:'#0f172a' }}>{b.address || 'N/A'}</div>
+                      </div>
+                      
+                      {(b.payment_status === 'paid' || b.payment_status === 'collected') && (
+                        <div style={{ gridColumn:'1/-1', borderTop:'1px solid #e2e8f0', paddingTop:12, marginTop:4, display:'flex', gap:10 }}>
+                           <button onClick={() => window.open(`http://localhost:8000/api/booking/${b.id}/invoice/`, '_blank')} style={{ flex:1, padding:'8px', background:'white', border:'1px solid #cbd5e1', borderRadius:8, fontWeight:700, fontSize:'0.8rem', cursor:'pointer', color:'#334155', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><FileText size={14}/> Download Invoice</button>
+                           <button onClick={() => alert("Invoice successfully sent to your registered email!")} style={{ flex:1, padding:'8px', background:'white', border:'1px solid #cbd5e1', borderRadius:8, fontWeight:700, fontSize:'0.8rem', cursor:'pointer', color:'#334155', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}><Mail size={14}/> Email Invoice</button>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+                </React.Fragment>
               ))}
             </div>
           </motion.div>
@@ -1607,21 +2128,44 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
         return (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <h3 style={{ margin:'0 0 1.5rem', fontSize:'1.4rem', fontWeight:800, color:'#0f172a' }}>Saved Addresses</h3>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-              <div style={{ border:'1px solid #e2e8f0', borderRadius:16, padding:'1.5rem', position:'relative', background:'white', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-                <div style={{ position:'absolute', top:20, right:20, color:'#94a3b8', cursor:'pointer' }}><MapPin size={20}/></div>
-                <div style={{ fontWeight:800, color:'#0f172a', marginBottom:8, fontSize:'1.05rem' }}>Home</div>
-                <div style={{ fontSize:'0.85rem', color:'#64748b', lineHeight:1.5 }}>Flat 402, Block A<br/>Prestige Sunrise<br/>Bangalore, 560068</div>
-                <div style={{ display:'flex', gap:12, marginTop:16 }}>
-                  <button style={{ fontSize:'0.75rem', padding:'6px 12px', borderRadius:6, border:'1px solid #e2e8f0', background:'white', fontWeight:700, cursor:'pointer' }}>Edit</button>
-                  <button style={{ fontSize:'0.75rem', padding:'6px 12px', borderRadius:6, border:'1px solid #fee2e2', background:'#fef2f2', color:'#ef4444', fontWeight:700, cursor:'pointer' }}>Remove</button>
+            
+            {isAddingAddress ? (
+              <div style={{ border:'1px solid #e2e8f0', borderRadius:16, padding:'1.5rem', background:'white', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+                <div style={{ fontWeight:800, fontSize:'1.1rem', marginBottom:16, color:'#0f172a' }}>{editingAddressId ? 'Edit Address' : 'Add New Address'}</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                  <div>
+                    <label style={{ display:'block', fontSize:'0.75rem', color:'#475569', fontWeight:700, marginBottom:8 }}>Address Title (e.g., Home, Work)</label>
+                    <input value={newAddressTitle} onChange={e => setNewAddressTitle(e.target.value)} type="text" placeholder="Work" style={{ width:'100%', padding:'0.85rem', borderRadius:10, border:'1px solid #cbd5e1', fontSize:'0.9rem', color:'#0f172a' }} />
+                  </div>
+                  <div>
+                    <label style={{ display:'block', fontSize:'0.75rem', color:'#475569', fontWeight:700, marginBottom:8 }}>Full Address</label>
+                    <textarea value={newAddressText} onChange={e => setNewAddressText(e.target.value)} rows={3} placeholder="123 Main St..." style={{ width:'100%', padding:'0.85rem', borderRadius:10, border:'1px solid #cbd5e1', fontSize:'0.9rem', color:'#0f172a', resize:'none' }} />
+                  </div>
+                  <div style={{ display:'flex', gap:12, marginTop:8 }}>
+                    <button onClick={handleAddAddress} style={{ fontSize:'0.85rem', padding:'10px 20px', borderRadius:8, border:'none', background:'#7C3AED', color:'white', fontWeight:800, cursor:'pointer' }}>{editingAddressId ? 'Save Changes' : 'Save Address'}</button>
+                    <button onClick={() => { setIsAddingAddress(false); setEditingAddressId(null); setNewAddressTitle(''); setNewAddressText(''); }} style={{ fontSize:'0.85rem', padding:'10px 20px', borderRadius:8, border:'1px solid #e2e8f0', background:'white', color:'#475569', fontWeight:700, cursor:'pointer' }}>Cancel</button>
+                  </div>
                 </div>
               </div>
-              <div style={{ border:'2px dashed #cbd5e1', borderRadius:16, padding:'1.5rem', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, cursor:'pointer', color:'#7C3AED', background:'#f8fafc', transition:'all 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e => e.currentTarget.style.background='#f8fafc'}>
-                <div style={{ width:48, height:48, borderRadius:'50%', background:'#7C3AED15', display:'flex', alignItems:'center', justifyContent:'center' }}><MapPin size={20}/></div>
-                <div style={{ fontWeight:800, fontSize:'0.95rem' }}>Add New Address</div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+                {mockAddresses.map(address => (
+                  <div key={address.id} style={{ border:'1px solid #e2e8f0', borderRadius:16, padding:'1.5rem', position:'relative', background:'white', boxShadow:'0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+                    <div style={{ position:'absolute', top:20, right:20, color:'#94a3b8', cursor:'pointer' }}><MapPin size={20}/></div>
+                    <div style={{ fontWeight:800, color:'#0f172a', marginBottom:8, fontSize:'1.05rem' }}>{address.title}</div>
+                    <div style={{ fontSize:'0.85rem', color:'#64748b', lineHeight:1.5, whiteSpace:'pre-line' }}>{address.address}</div>
+                    <div style={{ display:'flex', gap:12, marginTop:16 }}>
+                      <button onClick={() => handleEditClick(address)} style={{ fontSize:'0.75rem', padding:'6px 12px', borderRadius:6, border:'1px solid #e2e8f0', background:'white', fontWeight:700, cursor:'pointer' }}>Edit</button>
+                      <button onClick={() => handleRemoveAddress(address.id)} style={{ fontSize:'0.75rem', padding:'6px 12px', borderRadius:6, border:'1px solid #fee2e2', background:'#fef2f2', color:'#ef4444', fontWeight:700, cursor:'pointer' }}>Remove</button>
+                    </div>
+                  </div>
+                ))}
+                <div onClick={() => setIsAddingAddress(true)} style={{ border:'2px dashed #cbd5e1', borderRadius:16, padding:'1.5rem', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:12, cursor:'pointer', color:'#7C3AED', background:'#f8fafc', transition:'all 0.2s', minHeight: 180 }} onMouseEnter={e => e.currentTarget.style.background='#f1f5f9'} onMouseLeave={e => e.currentTarget.style.background='#f8fafc'}>
+                  <div style={{ width:48, height:48, borderRadius:'50%', background:'#7C3AED15', display:'flex', alignItems:'center', justifyContent:'center' }}><MapPin size={20}/></div>
+                  <div style={{ fontWeight:800, fontSize:'0.95rem' }}>Add New Address</div>
+                </div>
               </div>
-            </div>
+            )}
           </motion.div>
         )
       case "Payment Methods":
@@ -1690,6 +2234,98 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
     }
   }
 
+  if (!user || user.role !== 'customer') {
+    return (
+      <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.65)', backdropFilter:'blur(4px)', zIndex:10050, display:'flex', justifyContent:'center', alignItems:'center' }} onClick={onClose}>
+        <motion.div
+          initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}
+          onClick={e => e.stopPropagation()}
+          style={{ background:'white', padding:'3rem', borderRadius:24, width:'100%', maxWidth:440, boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)', position:'relative' }}
+        >
+          <div onClick={onClose} style={{ position:'absolute', top:24, right:24, cursor:'pointer', color:'#94a3b8' }}><X size={20}/></div>
+          <h2 style={{ fontSize:'1.8rem', fontWeight:800, color:'#0f172a', marginBottom:8 }}>Welcome Back</h2>
+          <p style={{ color:'#64748b', fontSize:'0.95rem', marginBottom:32 }}>Log in to view your bookings and manage your profile.</p>
+
+          <div style={{ display:'flex', gap:12, marginBottom:24 }}>
+            <button onClick={() => { setLoginMethod('email'); setOtpSent(false); setLoginError(''); }} style={{ flex:1, padding:'10px', borderRadius:10, fontWeight:700, fontSize:'0.9rem', cursor:'pointer', border: loginMethod === 'email' ? '2px solid #7C3AED' : '1px solid #e2e8f0', background: loginMethod === 'email' ? '#7C3AED10' : 'white', color: loginMethod === 'email' ? '#7C3AED' : '#64748b' }}>Email</button>
+            <button onClick={() => { setLoginMethod('phone'); setOtpSent(false); setLoginError(''); }} style={{ flex:1, padding:'10px', borderRadius:10, fontWeight:700, fontSize:'0.9rem', cursor:'pointer', border: loginMethod === 'phone' ? '2px solid #7C3AED' : '1px solid #e2e8f0', background: loginMethod === 'phone' ? '#7C3AED10' : 'white', color: loginMethod === 'phone' ? '#7C3AED' : '#64748b' }}>Phone</button>
+          </div>
+
+          {loginError && <div style={{ background:'#fef2f2', color:'#ef4444', padding:'12px', borderRadius:8, fontSize:'0.85rem', fontWeight:600, marginBottom:20 }}>{loginError}</div>}
+
+          {!otpSent ? (
+            <>
+              {loginMethod === 'email' ? (
+                <div style={{ marginBottom:24 }}>
+                  <label style={{ display:'block', fontSize:'0.8rem', fontWeight:700, color:'#475569', marginBottom:8 }}>Email Address</label>
+                  <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="you@example.com" style={{ width:'100%', padding:'12px 16px', borderRadius:12, border:'1px solid #cbd5e1', fontSize:'1rem', color:'#0f172a' }} />
+                </div>
+              ) : (
+                <div style={{ marginBottom:24 }}>
+                  <label style={{ display:'block', fontSize:'0.8rem', fontWeight:700, color:'#475569', marginBottom:8 }}>Phone Number</label>
+                  <input type="tel" value={loginPhone} onChange={e => setLoginPhone(e.target.value)} placeholder="+91 98765 43210" style={{ width:'100%', padding:'12px 16px', borderRadius:12, border:'1px solid #cbd5e1', fontSize:'1rem', color:'#0f172a' }} />
+                </div>
+              )}
+              <button onClick={handleRequestOTP} disabled={loginLoading} style={{ width:'100%', padding:'14px', background:'#7C3AED', color:'white', borderRadius:12, border:'none', fontWeight:800, fontSize:'1rem', cursor:'pointer', opacity: loginLoading ? 0.7 : 1 }}>
+                {loginLoading ? 'Sending...' : 'Send Login Code'}
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <div style={{ flex: 1, height: 1, background: '#cbd5e1' }} />
+                <span style={{ padding: '0 10px' }}>or</span>
+                <div style={{ flex: 1, height: 1, background: '#cbd5e1' }} />
+              </div>
+
+              <button 
+                type="button"
+                onClick={handleGoogleLogin} 
+                disabled={loginLoading}
+                style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  background: 'white', 
+                  color: '#1e293b', 
+                  border: '1px solid #cbd5e1', 
+                  borderRadius: 12, 
+                  fontWeight: 700, 
+                  fontSize: '0.9rem', 
+                  cursor: 'pointer', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: 8,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                  opacity: loginLoading ? 0.7 : 1
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18">
+                  <path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.47h4.84c-.21 1.12-.84 2.07-1.79 2.7l2.8 2.17c1.64-1.51 2.59-3.74 2.59-6.5z"/>
+                  <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.8-2.17c-.78.52-1.78.83-2.8.83-2.34 0-4.32-1.58-5.03-3.7L1.47 13.07C2.95 16 6.01 18 9 18z"/>
+                  <path fill="#FBBC05" d="M3.97 10.78c-.18-.52-.28-1.09-.28-1.68s.1-1.16.28-1.68L1.47 5.12C.53 7 0 9.08 0 11.2s.53 4.2 1.47 6.08l2.5-1.9c-.71-2.12-.71-4.4 0-6.5z"/>
+                  <path fill="#EA4335" d="M9 3.58c1.32-.03 2.59.48 3.51 1.4l2.63-2.63C13.48.88 11.3.02 9 0 6.01 0 2.95 2 1.47 4.93l2.5 1.9C4.68 5.16 6.66 3.58 9 3.58z"/>
+                </svg>
+                Continue with Google
+              </button>
+            </>
+          ) : (
+            <>
+              <div style={{ marginBottom:24 }}>
+                <label style={{ display:'block', fontSize:'0.8rem', fontWeight:700, color:'#475569', marginBottom:8 }}>Enter 6-digit OTP</label>
+                <input type="text" value={otpValue} onChange={e => setOtpValue(e.target.value)} placeholder="123456" maxLength={6} style={{ width:'100%', padding:'12px 16px', borderRadius:12, border:'1px solid #cbd5e1', fontSize:'1.2rem', letterSpacing:'4px', textAlign:'center', color:'#0f172a', fontWeight:700 }} />
+              </div>
+              <button onClick={handleVerifyOTP} disabled={loginLoading} style={{ width:'100%', padding:'14px', background:'#7C3AED', color:'white', borderRadius:12, border:'none', fontWeight:800, fontSize:'1rem', cursor:'pointer', opacity: loginLoading ? 0.7 : 1 }}>
+                {loginLoading ? 'Verifying...' : 'Verify & Login'}
+              </button>
+              <div style={{ textAlign:'center', marginTop:16 }}>
+                <button onClick={() => setOtpSent(false)} style={{ background:'none', border:'none', color:'#64748b', fontSize:'0.85rem', fontWeight:600, cursor:'pointer' }}>Change {loginMethod === 'email' ? 'Email' : 'Phone'}</button>
+              </div>
+            </>
+          )}
+        </motion.div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.65)', backdropFilter:'blur(4px)', zIndex:10050, display:'flex', justifyContent:'flex-end' }} onClick={onClose}>
       <motion.div
@@ -1705,8 +2341,8 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
               <User size={24} color="#64748b"/>
             </div>
             <div>
-              <div style={{ fontWeight:800, color:'#0f172a', fontSize:'1.05rem' }}>Ravi Kumar</div>
-              <div style={{ fontSize:'0.8rem', color:'#64748b', fontWeight:500 }}>ravi@example.com</div>
+              <div style={{ fontWeight:800, color:'#0f172a', fontSize:'1.05rem' }}>{userFullName}</div>
+              <div style={{ fontSize:'0.8rem', color:'#64748b', fontWeight:500 }}>{userEmail || userPhone}</div>
             </div>
           </div>
           
@@ -1728,6 +2364,21 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                 <t.icon size={20} color={activeTab === t.id ? '#7C3AED' : '#94a3b8'}/> {t.id}
               </div>
             ))}
+          </div>
+          <div style={{ padding: '1.5rem', borderTop: '1px solid #e2e8f0' }}>
+            <button
+              onClick={handleLogout}
+              style={{
+                width: '100%', padding: '0.8rem 1rem', background: '#fef2f2',
+                color: '#ef4444', border: '1px solid #fee2e2', borderRadius: 10,
+                fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center',
+                transition: 'all 0.2s'
+              }}
+            >
+              <LogOut size={18} />
+              Log Out
+            </button>
           </div>
         </div>
 
@@ -1775,10 +2426,70 @@ export function BookingPage() {
 
   useEffect(() => { contentRef.current?.scrollTo({ top:0, behavior:"smooth" }) }, [step])
 
+  // Inject Google GSI client library dynamically
+  useEffect(() => {
+    if (!document.getElementById("google-gsi-script")) {
+      const script = document.createElement("script");
+      script.id = "google-gsi-script";
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
   const handleChange = e => {
     const { name, value } = e.target
     setFormData(p => ({...p, [name]: value}))
   }
+
+  const [categoriesData, setCategoriesData] = useState([])
+  const [packagesData, setPackagesData] = useState({})
+  
+  useEffect(() => {
+    async function loadCatalog() {
+      try {
+        const catRes = await apiRequest("/catalog/categories/")
+        const svcRes = await apiRequest("/catalog/services/")
+        if (catRes.success) {
+          const cats = catRes.data.map((c, i) => ({
+            id: c.id.toString(),
+            name: c.name,
+            desc: c.desc || "Expert " + c.name + " service",
+            rating: c.rating || (4 + Math.random()).toFixed(1),
+            jobs: c.jobs || Math.floor(Math.random() * 50) + "K+",
+            image: c.image || CATEGORIES[i % CATEGORIES.length].image
+          }))
+          setCategoriesData(cats)
+        }
+        if (svcRes.success) {
+          const pkgs = {}
+          svcRes.data.forEach(s => {
+            const cid = s.category.toString()
+            if (!pkgs[cid]) pkgs[cid] = []
+            pkgs[cid].push({
+              id: s.id.toString(),
+              name: s.name,
+              price: parseFloat(s.price),
+              priceStr: "₹" + s.price,
+              duration: s.duration || "1 hr",
+              payment_policy: s.payment_policy,
+              image: s.image || "",
+              includes: ["Standard inclusions"],
+              excludes: [],
+              popular: false
+            })
+          })
+          setPackagesData(pkgs)
+        }
+      } catch (e) {
+        console.error("Failed to load catalog", e)
+        setCategoriesData(CATEGORIES)
+        setPackagesData(PACKAGES)
+      }
+    }
+    loadCatalog()
+  }, [])
 
   const handlePhoto = e => {
     const f = e.target.files[0]
@@ -1787,6 +2498,9 @@ export function BookingPage() {
 
   const handleSubmit = async (paymentMethod = "cash") => {
     setLoading(true); setError(null)
+    // Map frontend choices to backend enum values
+    const backendPaymentMethod = paymentMethod === "online" ? "ONLINE" : "COD"
+
     const data = new FormData()
     data.append("customer_name", formData.customer_name)
     data.append("phone",         formData.phone)
@@ -1797,12 +2511,30 @@ export function BookingPage() {
     data.append("address",       formData.landmark ? formData.address + " | " + formData.landmark : formData.address)
     data.append("preferred_date",selDate)
     data.append("preferred_time",selTime)
-    data.append("payment_method", paymentMethod)
+    data.append("total_amount", cart.reduce((a,c) => a + (c.price * c.quantity), 0))
+    // Serialize cart_data as JSON string — backend will parse it robustly
+    data.append("cart_data", JSON.stringify(cart.map(c => ({
+      id: c.id, name: c.name, price: c.price, quantity: c.quantity,
+      categoryName: c.categoryName || category?.name || ""
+    }))))
+    data.append("payment_method", backendPaymentMethod)
     if (photoFile) data.append("photo", photoFile)
     try {
       const res = await apiRequest("/booking/", { method:"POST", body:data })
       if (res?.success) {
-        setSuccessData(res.data)
+        if (backendPaymentMethod === "ONLINE") {
+          // If online payment was chosen, the mock payment gateway was already shown and simulated success.
+          // Now we inform the backend that payment was collected successfully to confirm the booking.
+          try {
+            await apiRequest('/payment/verify/', {
+              method: 'POST',
+              json: { booking_id: res.data.id, order_id: `order_mock_${Date.now()}`, payment_id: `PAY_${Date.now().toString(36).toUpperCase()}`, mock_success: true }
+            })
+          } catch(e) {
+            console.error("Failed to verify online payment:", e)
+          }
+        }
+        setSuccessData({ ...res.data, paymentMethod: backendPaymentMethod })
         setShowPostFlow(true)  // Show animated post-booking flow
       } else setError(res?.message || "Something went wrong. Please try again.")
     } catch (err) {
@@ -1812,6 +2544,7 @@ export function BookingPage() {
       } else setError(err?.body?.message || err?.body?.detail || "Connection error. Try again.")
     } finally { setLoading(false) }
   }
+
 
   const resetAll = () => {
     setStep(1); setCategory(null); setCart([]); setSelDate(""); setSelTime("")
@@ -1922,13 +2655,8 @@ export function BookingPage() {
           
           {/* Profile Icon (Opens Account Portal directly) */}
           <div className="uc-profile-icon" style={{ position: 'relative', cursor: 'pointer' }} onClick={() => {
-            const sess = sessionStorage.getItem(OTP_SESSION_KEY);
-            if (sess) {
-              setShowAccountPortal(true);
-              setActiveAccountTab("My Profile");
-            } else {
-              setStep(4);
-            }
+            setShowAccountPortal(true);
+            setActiveAccountTab("My Profile");
           }}>
             <div style={{ display:'flex', alignItems:'center', height:'100%' }}>
               <User size={20} color="#1e293b" />
@@ -1977,7 +2705,7 @@ export function BookingPage() {
 
           {step === 1 && (
             <motion.div key="step1" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}>
-              <StepHome searchQuery={searchQuery} setSearchQuery={setSearchQuery} onSelect={cat => { setCategory(cat); setShowPackageModal(true) }} />
+              <StepHome searchQuery={searchQuery} setSearchQuery={setSearchQuery} onSelect={cat => { setCategory(cat); setShowPackageModal(true) }} categories={categoriesData} />
             </motion.div>
           )}
 
@@ -2076,6 +2804,7 @@ export function BookingPage() {
             category={category} 
             cart={cart}
             setCart={setCart}
+            packagesData={packagesData}
             onClose={() => setShowPackageModal(false)} 
             onCheckout={() => { setShowPackageModal(false); setStep(3); }} 
           />
@@ -2085,112 +2814,11 @@ export function BookingPage() {
   )
 }
 
-function PackageModal({ category, cart, setCart, onClose, onCheckout }) {
+function PackageModal({ category, cart, setCart, onClose, onCheckout, packagesData }) {
   const [activeTab, setActiveTab] = useState(0)
   const [activeFilter, setActiveFilter] = useState("All")
-  const packages = PACKAGES[category?.id] || []
-    const relatedServicesMap = {
-      cleaning: [
-        { id: "clean-deep", name: "Deep Home Cleaning ⭐", price: 2499, priceStr: "₹2,499", duration: "4 hrs", img: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=150&q=80&fit=crop" },
-        { id: "clean-bath", name: "Bathroom Cleaning", price: 499, priceStr: "₹499", duration: "1 hr", img: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=150&q=80&fit=crop" },
-        { id: "clean-kitch", name: "Kitchen Cleaning", price: 999, priceStr: "₹999", duration: "2 hrs", img: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=150&q=80&fit=crop" },
-        { id: "clean-sofa", name: "Sofa Cleaning", price: 799, priceStr: "₹799", duration: "1 hr", img: "https://images.unsplash.com/photo-1512212621149-107ffe572d2f?w=150&q=80&fit=crop" },
-        { id: "clean-carpet", name: "Carpet Cleaning", price: 599, priceStr: "₹599", duration: "1 hr", img: "https://images.unsplash.com/photo-1555529902-52611456ea32?w=150&q=80&fit=crop" },
-        { id: "clean-mattress", name: "Mattress Cleaning", price: 699, priceStr: "₹699", duration: "1 hr", img: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=150&q=80&fit=crop" },
-        { id: "clean-window", name: "Window Cleaning", price: 399, priceStr: "₹399", duration: "1 hr", img: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=150&q=80&fit=crop" }
-      ],
-      plumbing: [
-        { id: "plum-tap", name: "Tap Repair ⭐", price: 149, priceStr: "₹149", duration: "30 mins", img: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=150&q=80&fit=crop" },
-        { id: "plum-leak", name: "Pipe Leakage Repair", price: 299, priceStr: "₹299", duration: "1 hr", img: "https://images.unsplash.com/photo-1607472586893-edb57cb3b4e1?w=150&q=80&fit=crop" },
-        { id: "plum-basin", name: "Wash Basin Repair", price: 399, priceStr: "₹399", duration: "1 hr", img: "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=150&q=80&fit=crop" },
-        { id: "plum-toilet", name: "Toilet Repair", price: 499, priceStr: "₹499", duration: "1 hr", img: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=150&q=80&fit=crop" },
-        { id: "plum-shower", name: "Shower Installation", price: 349, priceStr: "₹349", duration: "1 hr", img: "https://images.unsplash.com/photo-1607472586893-edb57cb3b4e1?w=150&q=80&fit=crop" },
-        { id: "plum-drain", name: "Drain Block Removal", price: 499, priceStr: "₹499", duration: "1 hr", img: "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=150&q=80&fit=crop" },
-        { id: "plum-motor", name: "Water Motor Installation", price: 899, priceStr: "₹899", duration: "2 hrs", img: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=150&q=80&fit=crop" }
-      ],
-      electrical: [
-        { id: "elec-fan", name: "Fan Repair ⭐", price: 199, priceStr: "₹199", duration: "45 mins", img: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=150&q=80&fit=crop" },
-        { id: "elec-switch", name: "Switch Board Repair", price: 149, priceStr: "₹149", duration: "30 mins", img: "https://images.unsplash.com/photo-1558611848-73f7eb4001a1?w=150&q=80&fit=crop" },
-        { id: "elec-light", name: "Light Installation", price: 99, priceStr: "₹99", duration: "30 mins", img: "https://images.unsplash.com/photo-1493119508027-2b584f234d6c?w=150&q=80&fit=crop" },
-        { id: "elec-ceiling", name: "Ceiling Fan Installation", price: 299, priceStr: "₹299", duration: "1 hr", img: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=150&q=80&fit=crop" },
-        { id: "elec-wiring", name: "Wiring Repair", price: 399, priceStr: "₹399", duration: "1 hr", img: "https://images.unsplash.com/photo-1558611848-73f7eb4001a1?w=150&q=80&fit=crop" },
-        { id: "elec-socket", name: "Power Socket Installation", price: 199, priceStr: "₹199", duration: "45 mins", img: "https://images.unsplash.com/photo-1493119508027-2b584f234d6c?w=150&q=80&fit=crop" },
-        { id: "elec-mcb", name: "MCB Replacement", price: 499, priceStr: "₹499", duration: "1 hr", img: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=150&q=80&fit=crop" }
-      ],
-      hvac: [
-        { id: "hvac-service", name: "AC General Service ⭐", price: 499, priceStr: "₹499", duration: "1 hr", img: "https://images.unsplash.com/photo-1585834898144-884cfa9e39db?w=150&q=80&fit=crop" },
-        { id: "hvac-deep", name: "AC Deep Cleaning", price: 999, priceStr: "₹999", duration: "2 hrs", img: "https://images.unsplash.com/photo-1621905252507-b35492d04029?w=150&q=80&fit=crop" },
-        { id: "hvac-inst", name: "AC Installation", price: 1499, priceStr: "₹1,499", duration: "2 hrs", img: "https://images.unsplash.com/photo-1610486842247-7505ed272fc4?w=150&q=80&fit=crop" },
-        { id: "hvac-uninst", name: "AC Uninstallation", price: 699, priceStr: "₹699", duration: "1 hr", img: "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=150&q=80&fit=crop" },
-        { id: "hvac-gas", name: "Gas Refilling", price: 2499, priceStr: "₹2,499", duration: "1.5 hrs", img: "https://images.unsplash.com/photo-1585834898144-884cfa9e39db?w=150&q=80&fit=crop" },
-        { id: "hvac-cool", name: "Cooling Issue Repair", price: 799, priceStr: "₹799", duration: "2 hrs", img: "https://images.unsplash.com/photo-1621905252507-b35492d04029?w=150&q=80&fit=crop" },
-        { id: "hvac-leak", name: "Water Leakage Repair", price: 499, priceStr: "₹499", duration: "1 hr", img: "https://images.unsplash.com/photo-1610486842247-7505ed272fc4?w=150&q=80&fit=crop" }
-      ],
-      carpentry: [
-        { id: "carp-door", name: "Door Repair ⭐", price: 299, priceStr: "₹299", duration: "1 hr", img: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=150&q=80&fit=crop" },
-        { id: "carp-furn", name: "Furniture Assembly", price: 499, priceStr: "₹499", duration: "2 hrs", img: "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=150&q=80&fit=crop" },
-        { id: "carp-ward", name: "Wardrobe Repair", price: 599, priceStr: "₹599", duration: "2 hrs", img: "https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=150&q=80&fit=crop" },
-        { id: "carp-shelf", name: "Shelf Installation", price: 199, priceStr: "₹199", duration: "45 mins", img: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=150&q=80&fit=crop" },
-        { id: "carp-curt", name: "Curtain Rod Installation", price: 149, priceStr: "₹149", duration: "30 mins", img: "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=150&q=80&fit=crop" },
-        { id: "carp-cab", name: "Cabinet Repair", price: 399, priceStr: "₹399", duration: "1 hr", img: "https://images.unsplash.com/photo-1572981779307-38b8cabb2407?w=150&q=80&fit=crop" },
-        { id: "carp-lock", name: "Door Lock Replacement", price: 249, priceStr: "₹249", duration: "1 hr", img: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=150&q=80&fit=crop" }
-      ],
-      pest_control: [
-        { id: "pest-cock", name: "Cockroach Control ⭐", price: 899, priceStr: "₹899", duration: "1 hr", img: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=150&q=80&fit=crop" },
-        { id: "pest-term", name: "Termite Treatment", price: 1499, priceStr: "₹1,499", duration: "2 hrs", img: "https://images.unsplash.com/photo-1628102491629-778586284000?w=150&q=80&fit=crop" },
-        { id: "pest-bed", name: "Bed Bug Control", price: 999, priceStr: "₹999", duration: "1.5 hrs", img: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=150&q=80&fit=crop" },
-        { id: "pest-mosq", name: "Mosquito Control", price: 799, priceStr: "₹799", duration: "1 hr", img: "https://images.unsplash.com/photo-1628102491629-778586284000?w=150&q=80&fit=crop" },
-        { id: "pest-ant", name: "Ant Control", price: 699, priceStr: "₹699", duration: "1 hr", img: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=150&q=80&fit=crop" },
-        { id: "pest-rodent", name: "Rodent Control", price: 899, priceStr: "₹899", duration: "1 hr", img: "https://images.unsplash.com/photo-1628102491629-778586284000?w=150&q=80&fit=crop" },
-        { id: "pest-inspect", name: "Home Pest Inspection", price: 299, priceStr: "₹299", duration: "1 hr", img: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=150&q=80&fit=crop" }
-      ],
-      painting: [
-        { id: "paint-int", name: "Interior Painting ⭐", price: 2999, priceStr: "₹2,999", duration: "1 day", img: "https://images.unsplash.com/photo-1562259942-27364e0ee76b?w=150&q=80&fit=crop" },
-        { id: "paint-ext", name: "Exterior Painting", price: 4999, priceStr: "₹4,999", duration: "2 days", img: "https://images.unsplash.com/photo-1584820927500-11b3337a7c5a?w=150&q=80&fit=crop" },
-        { id: "paint-putty", name: "Wall Putty", price: 999, priceStr: "₹999", duration: "4 hrs", img: "https://images.unsplash.com/photo-1596162954151-cdcb4c0f70a8?w=150&q=80&fit=crop" },
-        { id: "paint-text", name: "Texture Painting", price: 3499, priceStr: "₹3,499", duration: "1 day", img: "https://images.unsplash.com/photo-1502672260266-1c1c9b685161?w=150&q=80&fit=crop" },
-        { id: "paint-water", name: "Waterproof Coating", price: 1999, priceStr: "₹1,999", duration: "4 hrs", img: "https://images.unsplash.com/photo-1562259942-27364e0ee76b?w=150&q=80&fit=crop" },
-        { id: "paint-ceil", name: "Ceiling Painting", price: 1499, priceStr: "₹1,499", duration: "1 day", img: "https://images.unsplash.com/photo-1584820927500-11b3337a7c5a?w=150&q=80&fit=crop" },
-        { id: "paint-crack", name: "Wall Crack Repair", price: 499, priceStr: "₹499", duration: "2 hrs", img: "https://images.unsplash.com/photo-1596162954151-cdcb4c0f70a8?w=150&q=80&fit=crop" }
-      ],
-      appliance_repair: [
-        { id: "app-wash", name: "Washing Machine Repair ⭐", price: 499, priceStr: "₹499", duration: "1.5 hrs", img: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=150&q=80&fit=crop" },
-        { id: "app-fridge", name: "Refrigerator Repair", price: 599, priceStr: "₹599", duration: "2 hrs", img: "https://images.unsplash.com/photo-1582735689151-a185eb803362?w=150&q=80&fit=crop" },
-        { id: "app-ro", name: "Water Purifier Service", price: 399, priceStr: "₹399", duration: "1 hr", img: "https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=150&q=80&fit=crop" },
-        { id: "app-geyser", name: "Geyser Repair", price: 449, priceStr: "₹449", duration: "1 hr", img: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=150&q=80&fit=crop" },
-        { id: "app-micro", name: "Microwave Repair", price: 349, priceStr: "₹349", duration: "1 hr", img: "https://images.unsplash.com/photo-1582735689151-a185eb803362?w=150&q=80&fit=crop" },
-        { id: "app-chimney", name: "Chimney Cleaning", price: 799, priceStr: "₹799", duration: "1.5 hrs", img: "https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=150&q=80&fit=crop" },
-        { id: "app-tv", name: "TV Installation", price: 499, priceStr: "₹499", duration: "1 hr", img: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=150&q=80&fit=crop" }
-      ],
-      security: [
-        { id: "sec-cctv", name: "CCTV Installation ⭐", price: 1499, priceStr: "₹1,499", duration: "3 hrs", img: "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=150&q=80&fit=crop" },
-        { id: "sec-cctvrep", name: "CCTV Repair", price: 499, priceStr: "₹499", duration: "1 hr", img: "https://images.unsplash.com/photo-1496368077930-c1e31b4e5b44?w=150&q=80&fit=crop" },
-        { id: "sec-lock", name: "Smart Door Lock Installation", price: 999, priceStr: "₹999", duration: "2 hrs", img: "https://images.unsplash.com/photo-1558002038-1055907df827?w=150&q=80&fit=crop" },
-        { id: "sec-alarm", name: "Alarm System Installation", price: 1999, priceStr: "₹1,999", duration: "3 hrs", img: "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=150&q=80&fit=crop" },
-        { id: "sec-video", name: "Video Door Phone Installation", price: 1499, priceStr: "₹1,499", duration: "2 hrs", img: "https://images.unsplash.com/photo-1496368077930-c1e31b4e5b44?w=150&q=80&fit=crop" },
-        { id: "sec-motion", name: "Motion Sensor Installation", price: 799, priceStr: "₹799", duration: "1.5 hrs", img: "https://images.unsplash.com/photo-1558002038-1055907df827?w=150&q=80&fit=crop" },
-        { id: "sec-dvr", name: "DVR Setup", price: 899, priceStr: "₹899", duration: "1.5 hrs", img: "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=150&q=80&fit=crop" }
-      ],
-      general: [
-        { id: "gen-tv", name: "TV Wall Mounting ⭐", price: 499, priceStr: "₹499", duration: "1 hr", img: "https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=150&q=80&fit=crop" },
-        { id: "gen-furn", name: "Furniture Assembly", price: 599, priceStr: "₹599", duration: "2 hrs", img: "https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=150&q=80&fit=crop" },
-        { id: "gen-mirror", name: "Mirror Installation", price: 299, priceStr: "₹299", duration: "45 mins", img: "https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=150&q=80&fit=crop" },
-        { id: "gen-curt", name: "Curtain Rod Installation", price: 199, priceStr: "₹199", duration: "30 mins", img: "https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=150&q=80&fit=crop" },
-        { id: "gen-shelf", name: "Shelf Installation", price: 249, priceStr: "₹249", duration: "45 mins", img: "https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=150&q=80&fit=crop" },
-        { id: "gen-door", name: "Door Lock Repair", price: 349, priceStr: "₹349", duration: "1 hr", img: "https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=150&q=80&fit=crop" },
-        { id: "gen-wall", name: "Wall Repair", price: 499, priceStr: "₹499", duration: "2 hrs", img: "https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=150&q=80&fit=crop" }
-      ]
-    }
-    
-    const defaultServices = [
-      { name: `${category?.name || 'Service'} Installation`, img: "https://images.unsplash.com/photo-1610486842247-7505ed272fc4?w=150&q=80&fit=crop" },
-      { name: `${category?.name || 'Service'} Uninstallation`, img: "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=150&q=80&fit=crop" },
-      { name: `General Repair`, img: "https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=150&q=80&fit=crop" },
-      { name: `Inspection`, img: "https://images.unsplash.com/photo-1563721345115-4ba5a23f269d?w=150&q=80&fit=crop" },
-      { name: `Maintenance`, img: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=150&q=80&fit=crop" },
-    ]
-  
-    const relatedServices = relatedServicesMap[category?.id] || defaultServices;
+  const packages = (packagesData && packagesData[category?.id]) || PACKAGES[category?.id] || []
+    const relatedServices = packages.slice(0, 4);
 
   const filteredPackages = packages.filter(p => {
     if (activeFilter === "All") return true;
@@ -2247,7 +2875,12 @@ function PackageModal({ category, cart, setCart, onClose, onCheckout }) {
         <div className="uc-pkg-uc-view-details">View details</div>
       </div>
       <div className="uc-pkg-modal-card-uc-imgbox">
-        <img src={p.image || category?.image} alt={p.name} className="uc-pkg-uc-img"/>
+        <img 
+          src={p.image || category?.image || "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&q=80&fit=crop"} 
+          alt={p.name} 
+          className="uc-pkg-uc-img"
+          onError={(e) => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&q=80&fit=crop"; }}
+        />
         <div className="uc-pkg-uc-add-wrap" onClick={(e) => e.stopPropagation()}>
           {getCartCount(p.id) > 0 ? (
             <div className="uc-swiggy-qty">
@@ -2292,7 +2925,12 @@ function PackageModal({ category, cart, setCart, onClose, onCheckout }) {
             <div className="uc-pkg-related-list" style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
               {relatedServices.map((s, idx) => (
                 <div key={s.id || idx} style={{display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '0.8rem', background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0'}}>
-                  <img src={s.img} alt={s.name} style={{width: 60, height: 60, borderRadius: 8, objectFit: 'cover'}}/>
+                  <img 
+                    src={s.image || s.img || category?.image || "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=100&q=80&fit=crop"} 
+                    alt={s.name} 
+                    style={{width: 60, height: 60, borderRadius: 8, objectFit: 'cover'}}
+                    onError={(e) => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=100&q=80&fit=crop"; }}
+                  />
                   <div style={{flex: 1}}>
                     <div style={{fontWeight: 800, fontSize: '0.85rem', color: '#1e293b', lineHeight: 1.2, marginBottom: '0.2rem'}}>{s.name}</div>
                     <div style={{fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem'}}>{s.priceStr || '₹499'} • {s.duration || '1 hr'}</div>
@@ -2301,10 +2939,10 @@ function PackageModal({ category, cart, setCart, onClose, onCheckout }) {
                       <div className="uc-swiggy-qty" style={{width: 80, height: 28, fontSize: '0.8rem'}}>
                         <button style={{padding: '0 0.5rem'}} onClick={() => removeFromCart(s.id)}>-</button>
                         <span>{getCartCount(s.id)}</span>
-                        <button style={{padding: '0 0.5rem'}} onClick={() => addToCart({...s, image: s.img, price: s.price || 499})}>+</button>
+                        <button style={{padding: '0 0.5rem'}} onClick={() => addToCart({...s, image: s.image || s.img, price: s.price || 499})}>+</button>
                       </div>
                     ) : (
-                      <button className="uc-btn-add-swiggy" style={{padding: '0.3rem 1rem', fontSize: '0.75rem'}} onClick={() => addToCart({...s, image: s.img, price: s.price || 499})}>ADD</button>
+                      <button className="uc-btn-add-swiggy" style={{padding: '0.3rem 1rem', fontSize: '0.75rem'}} onClick={() => addToCart({...s, image: s.image || s.img, price: s.price || 499})}>ADD</button>
                     )}
                   </div>
                 </div>

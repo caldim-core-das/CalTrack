@@ -1,4 +1,8 @@
 from django.urls import path
+from .views_catalog import (
+    AdminCatalogCategoryListView, AdminCatalogCategoryDetailView,
+    AdminCatalogServiceListView, AdminCatalogServiceDetailView, ImageUploadView
+)
 from .views import (
     NotificationPreferenceView,
     SessionListView, SessionRevokeView, SessionRevokeAllView, LoginHistoryView,
@@ -37,6 +41,13 @@ urlpatterns = [
     # Billing
     path("billing/subscription/", BillingSubscriptionView.as_view(), name="billing-subscription"),
     path("invoices/", InvoiceListView.as_view(), name="invoice-list"),
+
+    # Catalog
+    path("catalog/categories/", AdminCatalogCategoryListView.as_view(), name="settings-catalog-categories-list"),
+    path("catalog/categories/<int:pk>/", AdminCatalogCategoryDetailView.as_view(), name="settings-catalog-categories-detail"),
+    path("catalog/services/", AdminCatalogServiceListView.as_view(), name="settings-catalog-services-list"),
+    path("catalog/services/<int:pk>/", AdminCatalogServiceDetailView.as_view(), name="settings-catalog-services-detail"),
+    path("catalog/upload-image/", ImageUploadView.as_view(), name="settings-catalog-upload-image"),
 
     # Data / Privacy
     path("data/export/", DataExportView.as_view(), name="data-export"),

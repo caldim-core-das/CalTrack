@@ -12,6 +12,11 @@ from .views import (
     RegistrationDossierVerifyTokenView, RegistrationDossierActivateView,
     ApprovedEmployeesListView, DeleteAccountView, SendEmailOTPView, PasswordResetWithOTPView
 )
+from .customer_auth import (
+    CustomerEmailOTPRequestView, CustomerEmailOTPVerifyView,
+    CustomerPhoneOTPRequestView, CustomerPhoneOTPVerifyView,
+    CustomerGoogleLoginView
+)
 
 urlpatterns = [
     path("login/",          LoginView.as_view(),                  name="jwt-login"),
@@ -41,5 +46,10 @@ urlpatterns = [
     path("password/reset-with-otp/", PasswordResetWithOTPView.as_view(), name="password-reset-with-otp"),
     path("approved-employees/", ApprovedEmployeesListView.as_view(), name="approved-employees"),
     path("delete-account/", DeleteAccountView.as_view(), name="delete-account"),
+    path("customer/email/request-otp/", CustomerEmailOTPRequestView.as_view(), name="customer-email-otp-request"),
+    path("customer/email/verify-otp/", CustomerEmailOTPVerifyView.as_view(), name="customer-email-otp-verify"),
+    path("customer/phone/request-otp/", CustomerPhoneOTPRequestView.as_view(), name="customer-phone-otp-request"),
+    path("customer/phone/verify-otp/", CustomerPhoneOTPVerifyView.as_view(), name="customer-phone-otp-verify"),
+    path("customer/google/", CustomerGoogleLoginView.as_view(), name="customer-google-login"),
 ]
 

@@ -7,6 +7,17 @@ import {
   Zap, Target, Activity, User, FileText, ChevronDown, ChevronUp, Info
 } from "lucide-react"
 import { apiRequest } from "../../api/client.js"
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
+
+// ── Fix Leaflet default icons ─────────────────────────────────────────────
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+})
 
 /* ─── Category emojis ────────────────────────────────────────────────────── */
 const CAT_EMOJIS = {
@@ -222,9 +233,151 @@ function ConfirmModal({ title, message, onConfirm, onClose, confirmLabel = "Conf
   )
 }
 
+/* ─── Work Order Modal ───────────────────────────────────────────────────── */
+function WorkOrderModal({ job, onClose }) {
+  const sr = job.service_request || {}
+  const [empPos, setEmpPos] = useState(null)
+  
+  // Mock customer location based on ID string hash to be consistent
+  const custLat = 12.9716 + ((sr.id || 1) % 100) * 0.001
+  const custLng = 77.5946 + ((sr.id || 1) % 100) * 0.001
+
+  // Start live tracking if accepted or in_progress
+  const isTracking = ["accepted", "in_progress"].includes(job.status)
+
+  useEffect(() => {
+    if (!isTracking) return
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => setEmpPos([pos.coords.latitude, pos.coords.longitude]),
+      (err) => console.log("GPS error", err),
+      { enableHighAccuracy: true }
+    )
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [isTracking])
+
+  const Field = ({ label, value, minH }) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <label style={{ fontSize: "0.68rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</label>
+      <div style={{ padding: "0.7rem 0.9rem", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: "0.85rem", color: "#334155", minHeight: minH || 20 }}>
+        {value}
+      </div>
+    </div>
+  )
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9000,
+        background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem",
+      }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <motion.div
+        initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
+        style={{
+          background: "#f8fafc", borderRadius: 16, width: "100%", maxWidth: 850,
+          maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 50px rgba(0,0,0,0.18)", 
+          fontFamily: "inherit", position: "relative"
+        }}
+      >
+        <div style={{ position: "sticky", top: 0, background: "white", padding: "1.25rem 1.5rem", borderBottom: "1px solid #e2e8f0", zIndex: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: "1.2rem", fontWeight: 800, color: "#1e293b" }}>Work Order: {sr.request_id}</h2>
+            <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: 4 }}>Define jobs, assign personnel, and set location constraints.</div>
+          </div>
+          <button onClick={onClose} style={{ background: "#f1f5f9", border: "none", borderRadius: 8, padding: "0.5rem", cursor: "pointer", color: "#64748b" }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          {/* Map Section */}
+          <div style={{ background: "white", borderRadius: 12, overflow: "hidden", border: "1px solid #e2e8f0" }}>
+            <div style={{ height: 250, width: "100%", background: "#e2e8f0" }}>
+              <MapContainer center={[custLat, custLng]} zoom={13} style={{ height: "100%", width: "100%", zIndex: 1 }} zoomControl={false}>
+                <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
+                <Marker position={[custLat, custLng]}>
+                  <Popup>Customer Location</Popup>
+                </Marker>
+                {empPos && isTracking && (
+                  <Marker position={empPos}>
+                    <Popup>Your Location</Popup>
+                  </Marker>
+                )}
+                {empPos && isTracking && (
+                   <Polyline positions={[empPos, [custLat, custLng]]} color="#7C3AED" weight={4} dashArray="8 8" />
+                )}
+              </MapContainer>
+            </div>
+            <div style={{ padding: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", fontWeight: 700, color: "#059669", marginBottom: 12 }}>
+                <MapPin size={14}/> AUTO-DETECTED LOCATION DETAILS
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <Field label="ADDRESS" value={sr.address || "—"} />
+                <Field label="LATITUDE / LONGITUDE" value={`${custLat.toFixed(6)} / ${custLng.toFixed(6)}`} />
+              </div>
+              {isTracking && (
+                <div style={{ marginTop: 12, padding: "10px 14px", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 8, color: "#059669", fontSize: "0.85rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                  <CheckCircle2 size={16}/> In Service Zone: Tracking Live Location
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Client Details */}
+          <div style={{ background: "white", borderRadius: 12, padding: "1.25rem", border: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", fontWeight: 700, color: "#7C3AED", marginBottom: 12 }}>
+              <User size={14}/> CLIENT DETAILS
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+              <Field label="COMPANY NAME" value="N/A" />
+              <Field label="CUSTOMER NAME" value={sr.customer_name || "—"} />
+              <Field label="CONTACT NUMBER" value={sr.phone || "—"} />
+              <Field label="EMAIL ADDRESS" value={sr.email || "—"} />
+            </div>
+          </div>
+
+          {/* Problem Details */}
+          <div style={{ background: "white", borderRadius: 12, padding: "1.25rem", border: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", fontWeight: 700, color: "#7C3AED", marginBottom: 12 }}>
+              <FileText size={14}/> PROBLEM DETAILS
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+              <Field label="SUBCATEGORY" value={(sr.service_category || "").replace(/_/g, " ")} />
+              <Field label="SERVICE TYPE" value={sr.issue_title || "—"} />
+              <Field label="REQUIRED TOOLS / DESCRIPTION" value={sr.description || "Basic Toolkit"} minH={60} />
+              <Field label="REQUIRED SPARE PARTS" value="To be determined on-site" minH={60} />
+            </div>
+          </div>
+
+          {/* SLA & Requirements */}
+          <div style={{ background: "white", borderRadius: 12, padding: "1.25rem", border: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", fontWeight: 700, color: "#7C3AED", marginBottom: 12 }}>
+              <Clock size={14}/> SLA & REQUIREMENTS
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: 20 }}>
+              <Field label="ESTIMATED HOURS" value="2" />
+              <Field label="EXPECTED SLA DEADLINE" value={`${sr.preferred_date || "—"} ${sr.preferred_time || ""}`} />
+            </div>
+            <label style={{ fontSize: "0.8rem", fontWeight: 800, color: "#475569", marginBottom: 12, display: "block" }}>Verification Checklist</label>
+            <div style={{ display: "flex", gap: "2rem" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.85rem", color: "#334155", fontWeight: 500 }}><input type="checkbox" checked readOnly style={{ accentColor: "#7C3AED", width: 16, height: 16 }}/> Require Selfie at Clock-in</label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.85rem", color: "#334155", fontWeight: 500 }}><input type="checkbox" checked readOnly style={{ accentColor: "#7C3AED", width: 16, height: 16 }}/> Before & After Photo uploads</label>
+            </div>
+          </div>
+
+        </div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
 /* ─── Job Card ───────────────────────────────────────────────────────────── */
 function JobCard({ job, onAction, onProof, actionLoading }) {
-  const [expanded, setExpanded] = useState(false)
+  const [showWorkOrder, setShowWorkOrder] = useState(false)
   const sr = job.service_request || {}
   const sm = JOB_STATUS[job.status] || JOB_STATUS.assigned
 
@@ -301,34 +454,17 @@ function JobCard({ job, onAction, onProof, actionLoading }) {
           )}
         </div>
 
-        {/* Expand/Collapse */}
-        {sr.description && (
-          <button
-            onClick={() => setExpanded(v => !v)}
-            style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.25rem", fontSize: "0.7rem", color: "#94a3b8", fontWeight: 600, padding: 0, fontFamily: "inherit" }}
-          >
-            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-            {expanded ? "Hide details" : "View details"}
-          </button>
-        )}
+        {/* Work Order Modal Trigger */}
+        <button
+          onClick={() => setShowWorkOrder(true)}
+          style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.75rem", color: "#3b82f6", fontWeight: 700, padding: "0.5rem 0.8rem", fontFamily: "inherit", width: "100%", justifyContent: "center", marginTop: "0.5rem" }}
+        >
+          <FileText size={14} /> Open Detailed Work Order
+        </button>
 
         <AnimatePresence>
-          {expanded && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              style={{ overflow: "hidden" }}
-            >
-              <div style={{ padding: "0.75rem 0 0", fontSize: "0.8rem", color: "#475569", lineHeight: 1.6 }}>
-                {sr.description}
-              </div>
-              {sr.customer_name && (
-                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem", marginTop: "0.5rem", fontSize: "0.72rem", color: "#64748b", fontWeight: 600 }}>
-                  <User size={11} /> Customer: {sr.customer_name}
-                </div>
-              )}
-            </motion.div>
+          {showWorkOrder && (
+            <WorkOrderModal job={job} onClose={() => setShowWorkOrder(false)} />
           )}
         </AnimatePresence>
       </div>

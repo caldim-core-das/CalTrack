@@ -98,8 +98,8 @@ function EditEmployeeModal({ employee, onClose, onSave, saving }) {
               <button
                 type="button"
                 className={`h-11 px-4 rounded-xl border border-stroke dark:border-slate-800 text-sm font-black uppercase tracking-widest transition-all ${isActive
-                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
-                    : "bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300"
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
+                  : "bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300"
                   }`}
                 onClick={() => setIsActive(v => !v)}
                 disabled={saving}
@@ -323,8 +323,8 @@ function EmployeeHistoryDrawer({ employee, onClose }) {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`px-5 py-3.5 text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition-all border-b-2 ${tab === t.id
-                  ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                  : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white"
                 }`}
             >{t.label}</button>
           ))}
