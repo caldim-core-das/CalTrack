@@ -63,6 +63,12 @@ export async function apiFetchMe() {
     })
     clearTimeout(timeoutId)
     const text = await res.text()
+    let data
+    try { data = JSON.parse(text) } catch { data = text || null }
+    if (!res.ok) return null
+    return data
+  } catch {
+    clearTimeout(timeoutId)
     if (!res.ok) {
       console.warn("apiFetchMe failed with status:", res.status, text)
       return null

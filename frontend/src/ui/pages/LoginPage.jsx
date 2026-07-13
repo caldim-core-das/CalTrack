@@ -354,6 +354,8 @@ export function LoginPage() {
         const u = await login(username.trim(), password)
         if (!u) {
           setError("Login failed. Please check your credentials and try again.")
+          return
+        }
           setFailedIdentity(username)
           setFailedReason("Unable to retrieve user profile after successful login.")
           setShowFailedLogin(true)
