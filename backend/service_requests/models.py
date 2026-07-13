@@ -82,7 +82,7 @@ class ServiceRequest(models.Model):
     # Service details
     service_category = models.CharField(max_length=50, choices=SERVICE_CATEGORIES)
     issue_title      = models.CharField(max_length=300)
-    description      = models.TextField()
+    description      = models.TextField(blank=True, default="")
     address          = models.TextField()
     preferred_date   = models.DateField()
     photo            = models.ImageField(upload_to="service_requests/photos/", null=True, blank=True)

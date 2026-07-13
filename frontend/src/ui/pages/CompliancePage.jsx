@@ -905,6 +905,10 @@ function HealthCard({ title, subtitle, status, detail, children }) {
 }
 
 function ComplianceOverviewPanel({ onNavigate }) {
+  const { user } = useAuth()
+  const isUK = user?.company_country === "UK"
+  const isUS = user?.company_country === "US"
+
   const [otData, setOtData]       = useState(null)
   const [wageData, setWageData]   = useState(null)
   const [rtwData, setRtwData]     = useState(null)
@@ -1000,7 +1004,11 @@ function ComplianceOverviewPanel({ onNavigate }) {
       status: "ok",
       detail: "Every time log edit and deletion is permanently recorded with before/after state",
     },
-  ]
+  ].filter(c => {
+    if (c.id === "uk-wtr" || c.id === "rtw" || c.id === "paye") return isUK
+    if (c.id === "flsa") return isUS
+    return true
+  })
 
   return (
     <div>
@@ -1191,6 +1199,15 @@ export function CompliancePage() {
   const { isAdmin } = useRole()
   const [tab, setTab] = useState("overview")
 
+  const isUK = user?.company_country === "UK"
+  const isUS = user?.company_country === "US"
+
+  const filteredTabs = TABS.filter(t => {
+    if (t.id === "uk-wtr" || t.id === "rtw" || t.id === "paye") return isUK
+    if (t.id === "flsa") return isUS
+    return true
+  })
+
   if (!isAdmin) {
     return (
       <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 overflow-hidden">
@@ -1241,7 +1258,7 @@ export function CompliancePage() {
 
       {/* Tab bar */}
       <div style={{ display: "flex", gap: 4, borderBottom: "2px solid var(--stroke)", paddingBottom: 0 }}>
-        {TABS.map(t => (
+        {filteredTabs.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}

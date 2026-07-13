@@ -54,60 +54,39 @@ export function TrialBanner() {
   };
 
   return (
-    <div
-      style={{
-        padding: "12px 24px",
-        perspective: "1000px",
-        display: "flex",
-        justifyContent: "center",
-        zIndex: 9999,
-        background: "transparent",
-        pointerEvents: "none",
-      }}
-    >
+    <>
       <div
         id="trial-banner"
+        className="premium-trial-capsule"
         style={{
-          background: "rgba(15, 23, 42, 0.9)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          borderRadius: 20,
-          padding: "10px 28px",
+          background: "rgba(255, 255, 255, 0.05)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          border: "none",
+          borderRadius: 14,
+          padding: "6px 16px",
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          gap: 20,
-          maxWidth: 960,
-          width: "100%",
-          boxShadow: "0 15px 35px -5px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)",
+          gap: 12,
           transformStyle: "preserve-3d",
-          transform: "translateZ(0px) rotateX(0deg) rotateY(0deg)",
-          transition: "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s",
-          animation: "floatCapsule 0.6s cubic-bezier(0.16, 1, 0.3, 1) both, borderCycle 4s linear infinite",
-          pointerEvents: "auto",
+          position: "relative",
+          overflow: "hidden",
           fontFamily: "Inter, system-ui, sans-serif",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateZ(15px) rotateX(3deg) rotateY(-1deg) translateY(-2px)";
-          e.currentTarget.style.boxShadow = "0 25px 50px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255,255,255,0.15)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "translateZ(0px) rotateX(0deg) rotateY(0deg)";
-          e.currentTarget.style.boxShadow = "0 15px 35px -5px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1)";
+          transition: "all 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
+          height: 38,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12, transform: "translateZ(10px)" }}>
-          {cfg.icon}
+        <div style={{ display: "flex", alignItems: "center", transform: "translateZ(10px)" }}>
           <span
             style={{
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 800,
               letterSpacing: "-0.2px",
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              animation: "textCycle 4s linear infinite",
+              gap: 6,
+              animation: "textCycle 5s linear infinite",
+              whiteSpace: "nowrap",
             }}
           >
             {cfg.label}
@@ -115,10 +94,10 @@ export function TrialBanner() {
               <span
                 style={{
                   display: "inline-block",
-                  width: 6,
-                  height: 6,
+                  width: 5,
+                  height: 5,
                   borderRadius: "50%",
-                  animation: "pulseDot 1.2s infinite alternate, dotCycle 4s linear infinite",
+                  animation: "pulseDot 1.2s infinite alternate, dotCycle 5s linear infinite",
                 }}
               />
             )}
@@ -127,22 +106,21 @@ export function TrialBanner() {
 
         <button
           id="trial-banner-upgrade-btn"
-          className="btn"
+          className="btn premium-upgrade-button"
           onClick={handleUpgradeClick}
           style={{
             background: cfg.btnGrad,
             color: "#fff",
-            fontSize: 12,
+            fontSize: 11,
             fontWeight: 800,
-            padding: "8px 22px",
-            borderRadius: 10,
+            padding: "5px 14px",
+            borderRadius: 8,
             whiteSpace: "nowrap",
             border: "none",
             cursor: "pointer",
             transform: "translateZ(15px)",
-            boxShadow: `0 4px 14px rgba(255,255,255,0.05)`,
             transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-            animation: "buttonCycle 4s linear infinite",
+            animation: "buttonCycle 5s linear infinite",
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = "translateZ(20px) scale(1.03)";
@@ -157,54 +135,104 @@ export function TrialBanner() {
         </button>
 
         <style>{`
-          @keyframes floatCapsule {
-            from { transform: translateY(-50px) scale(0.95); opacity: 0; }
-            to   { transform: translateY(0) scale(1); opacity: 1; }
+          .premium-trial-capsule {
+            animation: bannerBob 6s ease-in-out infinite, borderCycle 5s linear infinite;
+          }
+          .premium-trial-capsule::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -150%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(
+              90deg,
+              rgba(255, 255, 255, 0) 0%,
+              rgba(255, 255, 255, 0.02) 20%,
+              rgba(255, 255, 255, 0.12) 50%,
+              rgba(255, 255, 255, 0.02) 80%,
+              rgba(255, 255, 255, 0) 100%
+            );
+            transform: skewX(-25deg);
+            pointer-events: none;
+            animation: glassShimmer 5s ease-in-out infinite;
+          }
+          .premium-trial-capsule:hover {
+            transform: translateZ(12px) rotateX(2deg) rotateY(-1deg);
+            box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.15), 
+                        0 0 15px rgba(255, 255, 255, 0.05);
+          }
+          @keyframes bannerBob {
+            0% { transform: translateY(0px) rotateX(0.2deg); }
+            50% { transform: translateY(-2px) rotateX(-0.2deg); }
+            100% { transform: translateY(0px) rotateX(0.2deg); }
+          }
+          @keyframes glassShimmer {
+            0% { left: -150%; }
+            35% { left: 150%; }
+            100% { left: 150%; }
           }
           @keyframes borderCycle {
-            0%, 100% { border-color: rgba(93, 95, 239, 0.4); box-shadow: 0 15px 35px -5px rgba(93, 95, 239, 0.15); }
-            25%      { border-color: rgba(236, 72, 153, 0.4); box-shadow: 0 15px 35px -5px rgba(236, 72, 153, 0.15); }
-            50%      { border-color: rgba(245, 158, 11, 0.4); box-shadow: 0 15px 35px -5px rgba(245, 158, 11, 0.15); }
-            75%      { border-color: rgba(16, 185, 129, 0.4); box-shadow: 0 15px 35px -5px rgba(16, 185, 129, 0.15); }
+            0% { 
+              background: rgba(93, 95, 239, 0.08);
+              box-shadow: 0 4px 12px -2px rgba(93, 95, 239, 0.15); 
+            }
+            20% { 
+              background: rgba(236, 72, 153, 0.08);
+              box-shadow: 0 4px 12px -2px rgba(236, 72, 153, 0.15); 
+            }
+            40% { 
+              background: rgba(245, 158, 11, 0.08);
+              box-shadow: 0 4px 12px -2px rgba(245, 158, 11, 0.15); 
+            }
+            60% { 
+              background: rgba(16, 185, 129, 0.08);
+              box-shadow: 0 4px 12px -2px rgba(16, 185, 129, 0.15); 
+            }
+            80% { 
+              background: rgba(6, 182, 212, 0.08);
+              box-shadow: 0 4px 12px -2px rgba(6, 182, 212, 0.15); 
+            }
+            100% { 
+              background: rgba(93, 95, 239, 0.08);
+              box-shadow: 0 4px 12px -2px rgba(93, 95, 239, 0.15); 
+            }
           }
           @keyframes textCycle {
-            0%, 100% { color: #818cf8; }
-            25%      { color: #f472b6; }
-            50%      { color: #fbbf24; }
-            75%      { color: #34d399; }
+            0% { color: #818cf8; }
+            20% { color: #f472b6; }
+            40% { color: #fbbf24; }
+            60% { color: #34d399; }
+            80% { color: #22d3ee; }
+            100% { color: #818cf8; }
           }
           @keyframes dotCycle {
-            0%, 100% { background: #818cf8; box-shadow: 0 0 10px #818cf8; }
-            25%      { background: #f472b6; box-shadow: 0 0 10px #f472b6; }
-            50%      { background: #fbbf24; box-shadow: 0 0 10px #fbbf24; }
-            75%      { background: #34d399; box-shadow: 0 0 10px #34d399; }
+            0% { background: #818cf8; box-shadow: 0 0 8px #818cf8; }
+            20% { background: #f472b6; box-shadow: 0 0 8px #f472b6; }
+            40% { background: #fbbf24; box-shadow: 0 0 8px #fbbf24; }
+            60% { background: #34d399; box-shadow: 0 0 8px #34d399; }
+            80% { background: #22d3ee; box-shadow: 0 0 8px #22d3ee; }
+            100% { background: #818cf8; box-shadow: 0 0 8px #818cf8; }
           }
           @keyframes buttonCycle {
-            0%, 100% { box-shadow: 0 4px 14px rgba(93, 95, 239, 0.4); }
-            25%      { box-shadow: 0 4px 14px rgba(236, 72, 153, 0.4); }
-            50%      { box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4); }
-            75%      { box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4); }
+            0% { box-shadow: 0 2px 8px rgba(93, 95, 239, 0.3); }
+            20% { box-shadow: 0 2px 8px rgba(236, 72, 153, 0.3); }
+            40% { box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3); }
+            60% { box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3); }
+            80% { box-shadow: 0 2px 8px rgba(6, 182, 212, 0.3); }
+            100% { box-shadow: 0 2px 8px rgba(93, 95, 239, 0.3); }
           }
           @keyframes pulseDot {
             from { transform: scale(0.8); opacity: 0.4; }
             to   { transform: scale(1.4); opacity: 1; }
           }
-          .animate-sparkle-glow {
-            animation: sparkleGlow 1.5s ease-in-out infinite alternate;
-          }
-          @keyframes sparkleGlow {
-            from { transform: scale(0.9) rotate(0deg); opacity: 0.8; }
-            to   { transform: scale(1.15) rotate(15deg); opacity: 1; }
-          }
-          .animate-spin-slow {
-            animation: spinSlow 12s linear infinite;
-          }
-          @keyframes spinSlow {
-            from { transform: rotate(0deg); }
-            to   { transform: rotate(360deg); }
+          @media (max-width: 1024px) {
+            .premium-trial-capsule {
+              display: none !important;
+            }
           }
         `}</style>
       </div>
-    </div>
+    </>
   );
 }

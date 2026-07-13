@@ -726,6 +726,55 @@ class TwoFactorSetupView(APIView):
 class AcceptInviteView(APIView):
     permission_classes = [permissions.AllowAny]
 
+    def get(self, request):
+        token = request.query_params.get("token")
+        org_schema = request.query_params.get("org")
+
+        if not token:
+            return Response({"detail": "Token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if org_schema:
+            if hasattr(connection, 'set_tenant'):
+                from companies.models import Company
+                company = Company.objects.filter(schema_name=org_schema).first()
+                if company:
+                    connection.set_tenant(company)
+        
+        invite = None
+        if connection.schema_name != "public":
+            try:
+                invite = TeamInvite.objects.filter(token=token).first()
+            except Exception:
+                pass
+        
+        if not invite:
+            from django_tenants.utils import schema_context
+            from companies.models import Company
+            for company in Company.objects.exclude(schema_name="public"):
+                with schema_context(company.schema_name):
+                    try:
+                        invite = TeamInvite.objects.filter(token=token).first()
+                        if invite:
+                            break
+                    except Exception:
+                        pass
+
+        if not invite:
+            return Response({"detail": "Invalid or expired invitation token."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if invite.status != "pending" or invite.is_expired:
+            return Response({"detail": "This invitation is no longer valid."}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            "valid": True,
+            "company_name": invite.company.company_name,
+            "role": invite.role,
+            "region": invite.region or invite.company.primary_country,
+            "default_state": invite.default_state,
+            "email": invite.email,
+            "invited_by": invite.invited_by.get_full_name() if invite.invited_by else "",
+        })
+
     def post(self, request):
         token = request.data.get("token")
         password = request.data.get("password")
@@ -834,12 +883,18 @@ class AcceptInviteView(APIView):
                         "title": invite.role.title(),
                         "hourly_rate": 0,
                         "invited_by": invite.invited_by,
+                        "country": invite.region or invite.company.primary_country,
+                        "state": invite.default_state or getattr(invite.company, "default_state", ""),
                     }
                 )
                 if not created:
                     employee.is_active = True
                     employee.invited_by = invite.invited_by
-                    employee.save(update_fields=["is_active", "invited_by"])
+                    if not employee.country:
+                        employee.country = invite.region or invite.company.primary_country
+                    if not getattr(employee, "state", None):
+                        employee.state = invite.default_state or getattr(invite.company, "default_state", "")
+                    employee.save(update_fields=["is_active", "invited_by", "country", "state"])
 
         except Exception as e:
             traceback.print_exc()
@@ -1123,10 +1178,7 @@ class RegistrationDossierApproveView(APIView):
             username = email.split("@")[0] if email else f"user_{uuid.uuid4().hex[:6]}"
             user = User.objects.filter(email__iexact=email).first()
             company = getattr(request, "company", None) or getattr(request.user, "company", None)
-            if not company:
-                emp = Employee.objects.filter(user=request.user).first()
-                if emp:
-                    company = emp.company
+            
             if not company:
                 from companies.models import Company
                 company = Company.objects.exclude(schema_name="public").first() or Company.objects.first()
@@ -1147,30 +1199,32 @@ class RegistrationDossierApproveView(APIView):
                 user.company = company
                 user.save()
 
-            employee = Employee.objects.filter(user=user).first()
-            if employee:
-                # Check if this employee_id is already taken in the target company (excluding this record itself)
-                collision = Employee.objects.filter(company=company, employee_id=employee.employee_id).exclude(id=employee.id).exists()
-                if collision or employee.employee_id == "EMP-2048":
-                    employee.employee_id = generate_next_employee_id(company)
-                employee.company = company
-                employee.phone = phone
-                employee.country = region
-                employee.is_active = False
-                employee.invited_by = request.user
-                employee.save()
-            else:
-                employee = Employee.objects.create(
-                    user=user,
-                    company=company,
-                    employee_id=reg_form.get("employee_id") or generate_next_employee_id(company),
-                    phone=phone,
-                    title="Field Operations Tech (L2)",
-                    hourly_rate=0.00,
-                    country=region,
-                    is_active=False,
-                    invited_by=request.user
-                )
+            from django_tenants.utils import schema_context
+            with schema_context(company.schema_name):
+                employee = Employee.objects.filter(user=user).first()
+                if employee:
+                    # Check if this employee_id is already taken in the target company (excluding this record itself)
+                    collision = Employee.objects.filter(company=company, employee_id=employee.employee_id).exclude(id=employee.id).exists()
+                    if collision or employee.employee_id == "EMP-2048":
+                        employee.employee_id = generate_next_employee_id(company)
+                    employee.company = company
+                    employee.phone = phone
+                    employee.country = region
+                    employee.is_active = False
+                    employee.invited_by = request.user
+                    employee.save()
+                else:
+                    employee = Employee.objects.create(
+                        user=user,
+                        company=company,
+                        employee_id=reg_form.get("employee_id") or generate_next_employee_id(company),
+                        phone=phone,
+                        title="Field Operations Tech (L2)",
+                        hourly_rate=0.00,
+                        country=region,
+                        is_active=False,
+                        invited_by=request.user
+                    )
 
             # Send simulated invitation email
             frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")

@@ -18,9 +18,9 @@ class EmployeeUserSerializer(serializers.ModelSerializer):
 class EmployeeSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
     user = EmployeeUserSerializer(read_only=True)
-    first_name = serializers.CharField(source='user.first_name', required=False)
-    last_name = serializers.CharField(source='user.last_name', required=False)
-    email = serializers.EmailField(source='user.email', required=False)
+    first_name = serializers.CharField(source='user.first_name', required=False, allow_blank=True)
+    last_name = serializers.CharField(source='user.last_name', required=False, allow_blank=True)
+    email = serializers.EmailField(source='user.email', required=False, allow_blank=True)
     role = serializers.CharField(source='user.role', required=False)
     job_site_name = serializers.SlugRelatedField(
         source='assigned_job_site',
@@ -161,7 +161,9 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return value
 
     def update(self, instance, validated_data):
+        print("UPDATE CALLED WITH VALIDATED DATA:", validated_data)
         user_data = validated_data.pop('user', {})
+        print("USER DATA EXTRACTED:", user_data)
         user = instance.user
 
         # Update user fields

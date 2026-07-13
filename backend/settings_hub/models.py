@@ -136,6 +136,12 @@ class TeamInvite(models.Model):
     invited_by = models.ForeignKey(AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="sent_invites")
     email = models.EmailField()
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="employee")
+    region = models.CharField(
+        max_length=2,
+        choices=[("US", "United States"), ("UK", "United Kingdom")],
+        blank=True, null=True
+    )
+    default_state = models.CharField(max_length=100, blank=True, null=True)
     token = models.CharField(max_length=64, unique=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     expires_at = models.DateTimeField()

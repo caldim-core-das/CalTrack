@@ -427,7 +427,6 @@ export function AppShell() {
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-bg text-fg font-body">
-      <TrialBanner />
       <TrialExpiredModal />
       <CommandPalette open={cmdOpen} setOpen={setCmdOpen} />
 
@@ -440,12 +439,25 @@ export function AppShell() {
               <span className="font-bold text-slate-900 dark:text-white text-base tracking-tight truncate max-w-[200px]" title={orgName || "CalTrack"}>
                 {orgName || "CalTrack"}
               </span>
-              <span className="text-[10px] professional-subtitle text-blue-500 leading-none">Enterprise</span>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[10px] professional-subtitle text-blue-500 leading-none">Enterprise</span>
+                {user?.employee_country && (
+                  <span style={{
+                    padding: "2px 6px", borderRadius: 12,
+                    background: user.employee_country === "UK" ? "#eff0fe" : "#ecfdf5",
+                    color: user.employee_country === "UK" ? "#5d5fef" : "#059669",
+                    fontSize: "9px", fontWeight: 800, lineHeight: 1
+                  }}>
+                    {user.employee_country === "UK" ? "🇬🇧 UK · WTR" : "🇺🇸 US · FLSA"}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-6">
+          <TrialBanner />
           <button
             type="button"
             className="hidden md:flex items-center gap-3 px-5 py-2.5 bg-white dark:bg-black hover:bg-slate-50 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm text-slate-500 dark:text-white/80 hover:text-slate-900 dark:hover:text-white transition-all duration-300 w-72 group shadow-sm dark:shadow-lg dark:shadow-black/20 active:scale-[0.98]"

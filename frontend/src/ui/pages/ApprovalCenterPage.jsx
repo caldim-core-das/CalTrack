@@ -943,6 +943,67 @@ export function ApprovalCenterPage() {
       {viewingEmployee && (
         <ApprovedEmployeeDetailModal emp={viewingEmployee} onClose={() => setViewingEmployee(null)} />
       )}
+
+      {/* ── DOCUMENT VIEW MODAL ── */}
+      {showDocModal && activeEmployee && createPortal(
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setShowDocModal(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-4xl h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
+              <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <Eye size={18} className="text-indigo-500" /> 
+                {showDocModal === "aadhaar" ? "Aadhaar Card" : showDocModal === "pan" ? "PAN Card" : "Driving License"}
+              </h3>
+              <button onClick={() => setShowDocModal(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 p-2 rounded-full transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-6 bg-slate-50 dark:bg-slate-950/50 flex items-center justify-center">
+              {(() => {
+                const activeFileKey = showDocModal === "aadhaar" ? "aadhaarFileFileData" : showDocModal === "pan" ? "panFileFileData" : "drivingLicenseFileFileData";
+                const activeFileData = activeEmployee?.docForm?.[activeFileKey];
+                
+                if (activeFileData && activeFileData.startsWith("data:image")) {
+                  return (
+                    <div className="w-full max-w-3xl bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-center p-2">
+                      <img src={activeFileData} alt="Document" className="w-full h-auto object-contain rounded-lg max-h-[60vh]" />
+                    </div>
+                  );
+                }
+
+                if (activeFileData && activeFileData.startsWith("data:application/pdf")) {
+                  return (
+                    <div className="w-full max-w-3xl h-[65vh] bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex items-center justify-center p-2">
+                      <iframe src={activeFileData} title="Document PDF" className="w-full h-full rounded-lg" />
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="w-full max-w-2xl aspect-[4/3] bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center text-slate-400 relative overflow-hidden group">
+                     <div className="absolute inset-0 bg-slate-100 dark:bg-slate-800 animate-pulse opacity-50" />
+                     <FileText size={64} className="mb-4 text-slate-300 dark:text-slate-700 relative z-10" />
+                     <p className="font-bold text-slate-600 dark:text-slate-400 relative z-10 text-center px-4">
+                       {showDocModal === "aadhaar" ? activeEmployee.docForm?.aadhaarFile || "aadhaar_scan.pdf" : 
+                        showDocModal === "pan" ? activeEmployee.docForm?.panFile || "pan_scan.pdf" : 
+                        activeEmployee.docForm?.drivingLicenseFile || "driving_license.pdf"}
+                     </p>
+                     <p className="text-xs mt-2 text-slate-400 relative z-10 text-center px-4">
+                       Document viewer integration is pending actual file storage backend. This is a secure preview placeholder.
+                     </p>
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="p-6 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-white dark:bg-slate-900 shrink-0">
+              <Button variant="ghost" onClick={() => setShowDocModal(null)}>Close</Button>
+              <button onClick={() => setShowDocModal(null)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-xs transition-colors">
+                Download Copy
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

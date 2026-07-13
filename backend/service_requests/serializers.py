@@ -25,6 +25,11 @@ class ServiceRequestPublicCreateSerializer(serializers.ModelSerializer):
             "service_category", "issue_title", "description", "address",
             "preferred_date", "photo",
         )
+        extra_kwargs = {
+            "description": {"required": False, "allow_blank": True},
+            "email":       {"required": False, "allow_blank": True, "allow_null": True},
+            "photo":       {"required": False, "allow_null": True},
+        }
 
     def validate_service_category(self, value):
         valid = [c[0] for c in SERVICE_CATEGORIES]

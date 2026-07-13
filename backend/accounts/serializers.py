@@ -12,18 +12,39 @@ class UserSerializer(serializers.ModelSerializer):
     company_schema = serializers.SerializerMethodField()
     avatar_url = serializers.SerializerMethodField()
     company_permissions = serializers.SerializerMethodField()
+    employee_country = serializers.SerializerMethodField()
+    company_country = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = (
             "id", "username", "email", "first_name", "last_name", "role",
             "company", "company_name", "company_domain", "company_schema", "bio", "phone", "timezone", "language",
-            "avatar_url", "two_fa_enabled", "company_permissions",
+            "avatar_url", "two_fa_enabled", "company_permissions", "employee_country", "company_country"
         )
 
     def get_company_permissions(self, obj):
         try:
             return obj.company.module_permissions if obj.company else None
+        except Exception:
+            return None
+
+    def get_employee_country(self, obj):
+        try:
+            if obj.company:
+                from django_tenants.utils import schema_context
+                with schema_context(obj.company.schema_name):
+                    from employees.models import Employee
+                    employee = Employee.objects.filter(user=obj).first()
+                    if employee and employee.country:
+                        return employee.country
+            return obj.company.primary_country if obj.company else None
+        except Exception:
+            return None
+
+    def get_company_country(self, obj):
+        try:
+            return obj.company.primary_country if obj.company else None
         except Exception:
             return None
 
