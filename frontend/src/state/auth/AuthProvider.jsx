@@ -31,6 +31,9 @@ export function AuthProvider({ children }) {
     let me;
     try {
       me = await apiFetchMe()
+      console.log("DEBUG: apiFetchMe raw response:", JSON.stringify(me))
+    } catch (e) {
+      console.error("DEBUG: apiFetchMe exception:", e)
     } catch (e) {
       // Silent error logging or handling
     }
@@ -58,6 +61,7 @@ export function AuthProvider({ children }) {
       }
       return u
     } else {
+      console.log("DEBUG: refreshMe check failed — username:", me?.username, "role:", me?.role, "company:", me?.company)
       // Not authenticated (cookies missing, expired, or server rejected them)
       setUser(null)
       return null
@@ -108,6 +112,8 @@ export function AuthProvider({ children }) {
     }, 6000)
 
     refreshMe()
+      .then((u) => console.log("DEBUG: refreshMe resolved with:", u))
+      .catch((e) => console.error("DEBUG: refreshMe rejected with:", e))
       .catch(() => {})
       .finally(() => {
         clearTimeout(fallbackTimer)

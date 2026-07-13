@@ -203,6 +203,7 @@ const ONBOARDING_DISMISSED_KEY = "caltrack.onboarding.dismissed"
 export function App() {
   const { isReady, user } = useAuth()
   const { isAdmin } = useRole()
+  console.log("DEBUG: App component rendered. isReady:", isReady, "user:", user, "isAdmin:", isAdmin);
 
   // Helper: where should an admin land after login?
   const adminDefaultRoute = () => {
