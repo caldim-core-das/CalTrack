@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { apiRequest } from "../../api/client.js"
@@ -49,6 +49,7 @@ export function AcceptInvitePage() {
   const navigate = useNavigate()
   const { refreshMe, loginWithGoogle } = useAuth()
 
+  const [inviteData, setInviteData] = useState(null)
   const [formData, setFormData] = useState({ first_name: "", last_name: "", password: "" })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -56,6 +57,19 @@ export function AcceptInvitePage() {
   const ONBOARDING_DISMISSED_KEY = "caltrack.onboarding.dismissed"
   const adminRoute = () =>
     localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true" ? routes.dashboard : routes.get_started
+
+  useEffect(() => {
+    if (token) {
+      apiRequest(`/auth/accept-invite/?token=${token}&org=${org || ""}`)
+        .then(res => {
+          setInviteData(res)
+          if (res.email) {
+            setFormData(p => ({ ...p, email: res.email })) // Optionally use email
+          }
+        })
+        .catch(err => setError(err?.body?.detail || "Invalid or expired invite link."))
+    }
+  }, [token, org])
 
   const handleGoogleSuccess = async (tr) => {
     setLoading(true)
@@ -127,10 +141,30 @@ export function AcceptInvitePage() {
       <div className="flex-1 flex flex-col justify-center items-center p-8 lg:p-12 bg-white overflow-y-auto">
         <div className="w-full max-w-[440px]">
 
-          <div className="text-center mb-12">
+          <div className="text-center mb-8">
             <h1 className="text-[32px] font-black text-[#0F172A] leading-tight tracking-tight">Join Your Team</h1>
             <p className="text-[#64748B] font-medium mt-3">Setup your account to start tracking time</p>
           </div>
+
+          {inviteData?.region && (
+            <div style={{ padding: "16px 20px", borderRadius: 14, border: "1.5px solid var(--stroke2)",
+              background: "var(--surface)", marginBottom: 24 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: "var(--muted)",
+                textTransform: "uppercase", letterSpacing: 1, marginBottom: 10 }}>
+                Your Operating Region
+              </div>
+              <div style={{ fontSize: 24, marginBottom: 6 }}>
+                {inviteData.region === "UK" ? "🇬🇧" : "🇺🇸"}
+                {inviteData.region === "UK" ? " United Kingdom" : " United States"}
+                {inviteData.default_state && ` · ${inviteData.default_state}`}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                {inviteData.region === "UK"
+                  ? "WTR 48-hr cap · PAYE Tax · NI Contributions · 28 days statutory leave"
+                  : "FLSA overtime rules · Minimum wage per state · No statutory leave"}
+              </div>
+            </div>
+          )}
 
           {/* Social Join */}
           <div className="space-y-4 mb-8">

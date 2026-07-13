@@ -276,6 +276,8 @@ class TeamInviteListCreateView(APIView):
             invited_by=request.user,
             email=email,
             role=serializer.validated_data["role"],
+            region=request.user.company.primary_country,
+            default_state=request.user.company.default_state,
         )
 
         from django.core.mail import send_mail
@@ -291,6 +293,8 @@ class TeamInviteListCreateView(APIView):
             'inviter_name': request.user.get_full_name() or request.user.username,
             'role': invite.role,
             'invite_link': invite_link,
+            'region': invite.region,
+            'default_state': invite.default_state,
         }
         
         html_message = render_to_string('emails/team_invite.html', context)

@@ -210,6 +210,12 @@ export default function TeamMembersSection({ showToast, SectionHeader }) {
                 <Button variant="ghost" onClick={() => setShowInviteForm(false)} className="h-[52px] px-6">Cancel</Button>
               </div>
             </div>
+            {user?.company_country && (
+              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 14 }}>ℹ️</span> This employee will join under your company's region: 
+                <strong style={{ color: "var(--fg)" }}>{user.company_country === "UK" ? "🇬🇧 United Kingdom" : "🇺🇸 United States"}</strong>
+              </div>
+            )}
           </div>
         )}
       </Card>

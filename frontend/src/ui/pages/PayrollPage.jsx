@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useRole } from "../../state/auth/useRole.js"
+import { useAuth } from "../../state/auth/useAuth.js"
 import { Banknote, X, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Clock, Users, TrendingUp, DollarSign, Loader2, FileText, Download, Printer, Share2, Globe, Mail, Eye, Palette, Layout, Type, Sparkles, User, MapPin, Calendar, Filter } from "lucide-react"
 
 // Custom hook to detect if dark mode is active
@@ -1757,6 +1758,7 @@ function FilterDropdown({ options, value, onChange, isDark }) {
 export function PayrollPage() {
   const isDark = useDarkMode()
   const { isAdmin } = useRole()
+  const { user } = useAuth()
   const [records, setRecords] = useState([])
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1767,7 +1769,7 @@ export function PayrollPage() {
   const [filterEmp, setFilterEmp] = useState("")
   const [sortField, setSortField] = useState("generated_at")
   const [sortDir, setSortDir] = useState("desc")
-  const [regionFilter, setRegionFilter] = useState("all")
+  const [regionFilter, setRegionFilter] = useState(user?.company_country || "all")
   const [hoveredRow, setHoveredRow] = useState(null)
 
   const [dateFilterMode, setDateFilterMode] = useState("all")
