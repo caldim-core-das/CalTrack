@@ -132,6 +132,23 @@ const REVIEWS = [
   { name:"Sanjay P.", rating:5, text:"Wiring issue sorted in under an hour. Very knowledgeable electrician.", cat:"electrical", ago:"3 days ago", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop" },
 ]
 
+function getRelativeTime(isoString) {
+  if (!isoString) return "Recently";
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+  return `${Math.floor(diffDays / 30)} months ago`;
+}
+
+function generateAvatarUrl(name) {
+  const n = name || "C";
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(n)}&background=random&color=fff&size=150`;
+}
+
 const OTP_SESSION_KEY = "bk_cust_verified"
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -242,10 +259,24 @@ function LocationPickerModal({ onClose, onConfirm, initialLocation }) {
   const [search, setSearch] = useState(initialLocation || "")
   const [isFetching, setIsFetching] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
-  const [mapCenter, setMapCenter] = useState([28.524, 77.204]) // Default to Saket
+  const [mapCenter, setMapCenter] = useState([28.524, 77.204]) // Default fallback
   const [searchResults, setSearchResults] = useState([])
   const [mapObj, setMapObj] = useState(null)
   const isTyping = useRef(false)
+  
+  // Center map on user's current location when modal opens
+  useEffect(() => {
+    if (navigator.geolocation && mapObj) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        setMapCenter([lat, lon]);
+        mapObj.flyTo([lat, lon], 14);
+      }, (err) => {
+        console.error("Geolocation failed", err);
+      });
+    }
+  }, [mapObj]);
 
   // Fetch location suggestions when typing
   useEffect(() => {
@@ -408,7 +439,7 @@ function LocationPickerModal({ onClose, onConfirm, initialLocation }) {
   )
 }
 
-function StepHome({ searchQuery, setSearchQuery, onSelect, categories }) {
+function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicReviews }) {
   const [rotIdx, setRotIdx] = useState(0)
   const safeCats = categories && categories.length > 0 ? categories : CATEGORIES;
   const featured = safeCats.slice(0, 6)
@@ -575,26 +606,28 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories }) {
       </div>
 
       {/* Reviews */}
-      <div className="uc-reviews-section">
-        <h2 className="uc-section-title" style={{ textAlign:"center" }}>What our customers say</h2>
-        <div className="uc-reviews-grid">
-          {REVIEWS.map((r, i) => (
-            <motion.div key={i} className="uc-review-card" initial={{ opacity:0,y:20 }} animate={{ opacity:1,y:0 }} transition={{ delay: i*0.08 }}>
-              <div className="uc-review-top">
-                <img src={r.avatar} alt={r.name} className="uc-review-avatar-img" />
-                <div>
-                  <div className="uc-review-name">{r.name}</div>
-                  <div className="uc-review-ago">{r.ago}</div>
+      {dynamicReviews && dynamicReviews.length > 0 && (
+        <div className="uc-reviews-section">
+          <h2 className="uc-section-title" style={{ textAlign:"center" }}>What our customers say</h2>
+          <div className="uc-reviews-grid">
+            {dynamicReviews.map((r, i) => (
+              <motion.div key={i} className="uc-review-card" initial={{ opacity:0,y:20 }} animate={{ opacity:1,y:0 }} transition={{ delay: i*0.08 }}>
+                <div className="uc-review-top">
+                  <img src={r.avatar} alt={r.name} className="uc-review-avatar-img" />
+                  <div>
+                    <div className="uc-review-name">{r.name}</div>
+                    <div className="uc-review-ago">{r.ago}</div>
+                  </div>
+                  <div style={{ marginLeft: 'auto' }}>
+                    <StarRow rating={r.rating} size={14} />
+                  </div>
                 </div>
-                <div style={{ marginLeft: 'auto' }}>
-                  <StarRow rating={r.rating} size={14} />
-                </div>
-              </div>
-              <p className="uc-review-text">"{r.text}"</p>
-            </motion.div>
-          ))}
+                <p className="uc-review-text">"{r.text}"</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
     </>
   )
@@ -2414,6 +2447,7 @@ export function BookingPage() {
   const [photoFile, setPhotoFile]   = useState(null)
   const [photoPreview, setPhotoPreview] = useState(null)
   const [showPackageModal, setShowPackageModal] = useState(false)
+  const [dynamicReviews, setDynamicReviews] = useState([])
   
   const [searchQuery, setSearchQuery] = useState("")
   const [location, setLocation] = useState("H37, Block H- Saket- Ne...")
@@ -2455,10 +2489,10 @@ export function BookingPage() {
           const cats = catRes.data.map((c, i) => ({
             id: c.id.toString(),
             name: c.name,
-            desc: c.desc || "Expert " + c.name + " service",
-            rating: c.rating || (4 + Math.random()).toFixed(1),
-            jobs: c.jobs || Math.floor(Math.random() * 50) + "K+",
-            image: c.image || CATEGORIES[i % CATEGORIES.length].image
+            desc: c.description || "Expert " + c.name + " service",
+            rating: c.rating || "4.8",
+            jobs: c.jobs_count_str || "10K+",
+            image: c.image || "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&q=80&fit=crop"
           }))
           setCategoriesData(cats)
         }
@@ -2474,22 +2508,73 @@ export function BookingPage() {
               priceStr: "₹" + s.price,
               duration: s.duration || "1 hr",
               payment_policy: s.payment_policy,
-              image: s.image || "",
-              includes: ["Standard inclusions"],
-              excludes: [],
-              popular: false
+              image: s.image || "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&q=80&fit=crop",
+              includes: Array.isArray(s.includes) && s.includes.length > 0 ? s.includes : ["Standard inclusions"],
+              excludes: Array.isArray(s.excludes) ? s.excludes : [],
+              popular: !!s.popular,
+              tag: s.tag || ""
             })
           })
           setPackagesData(pkgs)
         }
       } catch (e) {
         console.error("Failed to load catalog", e)
-        setCategoriesData(CATEGORIES)
-        setPackagesData(PACKAGES)
       }
     }
     loadCatalog()
+
+    // Fetch initial location
+    if (navigator.geolocation) {
+      setLocation("Detecting location...")
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          fetch(`https://photon.komoot.io/reverse?lon=${lon}&lat=${lat}`)
+            .then(res => res.json())
+            .then(data => {
+               if (data && data.features && data.features.length > 0) {
+                 const p = data.features[0].properties;
+                 const display = [p.name, p.street, p.city, p.state, p.country].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i).join(", ");
+                 setLocation(display);
+               } else {
+                 setLocation("Location not found");
+               }
+            })
+            .catch(() => setLocation("Unable to determine location"));
+        },
+        () => {
+          setLocation("Select a location");
+        }
+      );
+    } else {
+      setLocation("Select a location");
+    }
   }, [])
+
+  useEffect(() => {
+    let query = "";
+    if (category) {
+      query = `?category=${encodeURIComponent(category.id || category.name)}`;
+    }
+    apiRequest(`/public/feedback/${query}`)
+      .then(res => {
+        if (res?.success && res.data && res.data.length > 0) {
+          const formatted = res.data.map(r => ({
+            name: r.name,
+            rating: r.rating,
+            text: r.text,
+            cat: r.category,
+            ago: getRelativeTime(r.submitted_at),
+            avatar: generateAvatarUrl(r.name)
+          }));
+          setDynamicReviews(formatted);
+        } else {
+          setDynamicReviews([]);
+        }
+      })
+      .catch(err => console.error("Error fetching feedback:", err));
+  }, [category]);
 
   const handlePhoto = e => {
     const f = e.target.files[0]
@@ -2705,7 +2790,7 @@ export function BookingPage() {
 
           {step === 1 && (
             <motion.div key="step1" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}>
-              <StepHome searchQuery={searchQuery} setSearchQuery={setSearchQuery} onSelect={cat => { setCategory(cat); setShowPackageModal(true) }} categories={categoriesData} />
+              <StepHome searchQuery={searchQuery} setSearchQuery={setSearchQuery} onSelect={cat => { setCategory(cat); setShowPackageModal(true) }} categories={categoriesData} dynamicReviews={dynamicReviews} />
             </motion.div>
           )}
 

@@ -51,6 +51,7 @@ export function AuthProvider({ children }) {
         language:  me.language   ?? "en",
         avatar_url:me.avatar_url ?? null,
         two_fa_enabled: me.two_fa_enabled ?? false,
+        employee_roles: me.employee_roles ?? [],
       }
       setUser(u)
       if (me.company_name) {

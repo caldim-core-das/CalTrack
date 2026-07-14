@@ -28,10 +28,10 @@ class EmployeeLocationSerializer(serializers.ModelSerializer):
         return f"{user.first_name} {user.last_name}".strip() or user.username
 
     def get_clock_in(self, obj):
-        return obj.time_log.clock_in
+        return obj.time_log.clock_in if obj.time_log else None
 
     def get_clock_in_photo(self, obj):
-        if obj.time_log.clock_in_photo:
+        if obj.time_log and obj.time_log.clock_in_photo:
             request = self.context.get('request')
             if request:
                 return request.build_absolute_uri(obj.time_log.clock_in_photo.url)
@@ -39,9 +39,11 @@ class EmployeeLocationSerializer(serializers.ModelSerializer):
         return None
 
     def get_clock_in_address(self, obj):
-        return obj.time_log.clock_in_address
+        return obj.time_log.clock_in_address if obj.time_log else None
 
     def get_worked_seconds(self, obj):
+        if not obj.time_log:
+            return 0
         if not obj.time_log.clock_out:
             from django.utils import timezone
             delta = timezone.now() - obj.time_log.clock_in

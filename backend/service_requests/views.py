@@ -614,6 +614,7 @@ class AdminEmployeeListView(APIView):
                 "email": e.user.email,
                 "hourly_rate": float(e.hourly_rate) if e.hourly_rate is not None else 0.0,
                 "department": e.department,
+                "service_roles": e.service_roles,
             }
             for e in qs
         ]
@@ -751,11 +752,33 @@ class EmployeeJobCompleteView(APIView):
 
         with transaction.atomic():
             sr = job.service_request
-            # Step sequentially to satisfy state machine validation rules
-            apply_transition(sr, ServiceRequest.Status.COMPLETED)
-            apply_transition(sr, ServiceRequest.Status.AWAITING_VERIFICATION)
-            apply_transition(sr, ServiceRequest.Status.VERIFIED)
-            apply_transition(sr, ServiceRequest.Status.FEEDBACK_PENDING)
+            # Step through any intermediate states gracefully (handles any starting status)
+            S = ServiceRequest.Status
+            COMPLETION_PATH = [
+                S.ACCEPTED,
+                S.IN_PROGRESS,
+                S.COMPLETED,
+                S.AWAITING_VERIFICATION,
+                S.VERIFIED,
+                S.FEEDBACK_PENDING,
+            ]
+            from service_requests.state_machine import ALLOWED_TRANSITIONS
+            # Keep stepping through states until we reach FEEDBACK_PENDING
+            # This handles any starting status (CONFIRMED, ASSIGNED, IN_PROGRESS, etc.)
+            max_steps = 10  # safety guard against infinite loops
+            while sr.status != S.FEEDBACK_PENDING and max_steps > 0:
+                max_steps -= 1
+                allowed = ALLOWED_TRANSITIONS.get(sr.status, set())
+                # Find the next step along the COMPLETION_PATH
+                next_step = None
+                for candidate in COMPLETION_PATH:
+                    if candidate in allowed:
+                        next_step = candidate
+                        break
+                if next_step is None:
+                    break  # no valid transition found — stop
+                apply_transition(sr, next_step)
+
             sr.save(update_fields=["status", "updated_at"])
 
             job.status = EmployeeJob.Status.COMPLETED
@@ -765,20 +788,14 @@ class EmployeeJobCompleteView(APIView):
             # Create feedback model record (generates token)
             feedback, _ = ServiceFeedback.objects.get_or_create(service_request=sr)
 
-        # Dispatch notifications outside the transaction block
+        # Send single combined completion+feedback email outside the transaction
         import logging
         logger = logging.getLogger(__name__)
         try:
-            from .notifications import send_work_completion_email
-            send_work_completion_email(sr)
+            from .notifications import send_completion_and_feedback_email
+            send_completion_and_feedback_email(sr, str(feedback.feedback_token))
         except Exception as e:
-            logger.error(f"Failed to auto-send work completion email: {e}")
-
-        try:
-            from .notifications import send_feedback_link
-            send_feedback_link(sr, str(feedback.feedback_token))
-        except Exception as e:
-            logger.error(f"Failed to auto-send feedback link: {e}")
+            logger.error(f"Failed to send completion+feedback email: {e}")
 
         return _success(message="Work marked as Complete. Feedback request sent to customer.")
 
@@ -832,3 +849,44 @@ class EmployeePerformanceView(APIView):
 
         serializer = EmployeePerformanceSerializer(perf)
         return _success(data=serializer.data)
+
+
+class PublicFeedbackListView(APIView):
+    """GET /api/public/feedback/ — fetch recent public feedback for catalog/booking display"""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        category_slug = request.query_params.get("category")
+        
+        qs = ServiceFeedback.objects.filter(is_submitted=True).select_related("service_request")
+        
+        # Filter by category if provided, checking the catalog slug or exact text match
+        if category_slug:
+            # ServiceCategory is a string in ServiceRequest (often the catalog category ID or name).
+            # But the simplest is to match the category name roughly if it's stored as text,
+            # or try to match if service_category matches the slug/id. 
+            # In our db, service_category stores the category ID from the catalog.
+            qs = qs.filter(service_request__service_category=category_slug)
+            
+        # Get top 15 most recent
+        feedbacks = qs.order_by("-submitted_at")[:15]
+        
+        data = []
+        for f in feedbacks:
+            # Mask the name (e.g. "John D.")
+            full_name = f.service_request.customer_name or "Customer"
+            parts = full_name.split()
+            if len(parts) > 1:
+                display_name = f"{parts[0]} {parts[1][0]}."
+            else:
+                display_name = full_name
+                
+            data.append({
+                "name": display_name,
+                "rating": f.rating,
+                "text": f.comment or ("Great service!" if f.rating >= 4 else "Service completed."),
+                "submitted_at": f.submitted_at.isoformat() if f.submitted_at else None,
+                "category": f.service_request.service_category
+            })
+            
+        return _success(data=data)

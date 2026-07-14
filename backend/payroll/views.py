@@ -177,6 +177,11 @@ class PayrollRecordViewSet(viewsets.ReadOnlyModelViewSet):
     def get_permissions(self):
         if self.action == "send_invoice_email":
             return [permissions.IsAuthenticated(), RequireModuleAccess("payroll", "modify")]
+        
+        # Employees can view their own records without strict module access
+        if self.request.user and getattr(self.request.user, "role", None) == "employee":
+            return [permissions.IsAuthenticated()]
+            
         return [permissions.IsAuthenticated(), RequireModuleAccess("payroll", "view")]
 
     def get_queryset(self):

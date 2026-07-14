@@ -9,6 +9,7 @@ import {
   CheckCheck, Ban, Repeat2, ThumbsUp, Send, Copy
 } from "lucide-react"
 import { apiRequest } from "../../api/client.js"
+import { CATEGORY_TO_ROLES_MAP, TECHNICIAN_ROLES } from "../../utils/roles.js"
 
 /* ─── Toast ─────────────────────────────────────────────────────────────── */
 function Toast({ message, type = "success", onDismiss }) {
@@ -201,6 +202,7 @@ export function ServiceRequestsPage() {
   const [requests, setRequests] = useState([])
   const [allRequests, setAllRequests] = useState([])
   const [employees, setEmployees] = useState([])
+  const [categoriesMap, setCategoriesMap] = useState({})
   const [selectedId, setSelectedId] = useState(null)
   const [detail, setDetail] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -239,7 +241,31 @@ export function ServiceRequestsPage() {
     apiRequest("/admin/service-requests/employees/")
       .then(res => { if (res?.success) setEmployees(res.data) })
       .catch(err => console.error("Error loading technicians:", err))
+      
+    apiRequest("/catalog/categories/")
+      .then(res => {
+        if (res?.success) {
+          const cmap = {}
+          res.data.forEach(c => {
+            const slug = c.slug || c.name.toLowerCase().replace(/ /g, "_")
+            const entry = { name: c.name, image: c.image, slug }
+            cmap[c.id.toString()] = entry
+            cmap[slug] = entry
+          })
+          setCategoriesMap(cmap)
+        }
+      })
+      .catch(err => console.error("Error loading categories:", err))
   }, [])
+
+  const getCategoryInfo = (catIdOrSlug) => {
+    if (!catIdOrSlug) return { name: "General", emoji: "🔧" }
+    const key = catIdOrSlug.toString()
+    const name = categoriesMap[key]?.name || key.replace(/_/g, " ")
+    const slug = name.toLowerCase().replace(/ /g, "_")
+    const emoji = CAT_EMOJIS[slug] || "🔧"
+    return { name, emoji }
+  }
 
   /* Client-side filtering */
   const filtered = useMemo(() => {
@@ -308,7 +334,7 @@ export function ServiceRequestsPage() {
     setActionLoading(true)
     try {
       const res = await apiRequest(`/admin/service-requests/${selectedId}/assign/`, {
-        method: "POST", json: { employee_id: empId },
+        method: "PATCH", json: { employee_id: empId },
       })
       if (res?.success) {
         showToast("Technician assigned!", "success")
@@ -316,7 +342,8 @@ export function ServiceRequestsPage() {
         await refreshAll()
       } else showToast(res?.message || "Assignment failed.", "error")
     } catch (err) {
-      showToast(err?.body?.message || "Assignment error.", "error")
+      const msg = err?.body?.detail || err?.body?.message || "Assignment error."
+      showToast(msg, "error")
     } finally { setActionLoading(false) }
   }
 
@@ -402,7 +429,7 @@ export function ServiceRequestsPage() {
                   <div className="sr-item-top">
                     <div className="sr-item-meta">
                       <span className="sr-item-id">{r.request_id}</span>
-                      <span className="sr-item-emoji">{CAT_EMOJIS[r.service_category] || "🔧"}</span>
+                      <span className="sr-item-emoji">{getCategoryInfo(r.service_category).emoji}</span>
                       <PriorityBadge priority={r.priority} />
                     </div>
                     <span className="sr-item-date">{new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
@@ -451,7 +478,9 @@ export function ServiceRequestsPage() {
                 <div className="sr-detail-header-left">
                   <div className="sr-detail-id-row">
                     <span className="sr-detail-id">{detail.request_id}</span>
-                    <span className="sr-detail-cat">{CAT_EMOJIS[detail.service_category] || "🔧"} {detail.service_category?.replace(/_/g, " ")}</span>
+                    <span className="sr-detail-cat">
+                      {getCategoryInfo(detail.service_category).emoji} {getCategoryInfo(detail.service_category).name}
+                    </span>
                     <StatusBadge status={detail.status} size="md" />
                   </div>
                   <h2 className="sr-detail-title">{detail.issue_title}</h2>
@@ -533,7 +562,19 @@ export function ServiceRequestsPage() {
 
                 {/* Technician */}
                 <div className="sr-info-card">
-                  <div className="sr-info-card-title"><Users size={13} /> Technician</div>
+                  {(() => {
+                    const catKey = detail.service_category?.toString()
+                    const catEntry = categoriesMap[catKey]
+                    const catName = catEntry?.name || (catKey ? catKey.replace(/_/g, " ") : "")
+                    // Use the DB slug from categoriesMap; fall back to generating from name
+                    const catSlug = catEntry?.slug || catName.toLowerCase().replace(/ /g, "_")
+                    const reqRoleIds = CATEGORY_TO_ROLES_MAP[catSlug] || []
+                    const reqRoleLabels = reqRoleIds.map(id => TECHNICIAN_ROLES.find(r => r.id === id)?.label).filter(Boolean)
+                    const roleTitle = reqRoleLabels.length > 0 ? reqRoleLabels.join(" / ") : "Technician"
+                    return (
+                      <div className="sr-info-card-title"><Users size={13} /> {roleTitle}</div>
+                    )
+                  })()}
                   {detail.assigned_employee ? (
                     <div className="sr-tech-assigned">
                       <TechAvatar name={detail.assigned_employee.full_name} size={40} />
@@ -635,9 +676,26 @@ export function ServiceRequestsPage() {
 
               {/* Assign Panel (expandable) */}
               {showAssign && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-                  <EmployeePicker employees={employees} onAssign={handleAssign} loading={actionLoading} />
-                </motion.div>
+                (() => {
+                  const catKey = detail.service_category?.toString()
+                  const catEntry = categoriesMap[catKey]
+                  const catName = catEntry?.name || (catKey ? catKey.replace(/_/g, " ") : "")
+                  // Use the DB slug from categoriesMap; fall back to generating from name
+                  const catSlug = catEntry?.slug || catName.toLowerCase().replace(/ /g, "_")
+                  const reqRoleIds = CATEGORY_TO_ROLES_MAP[catSlug] || []
+                  
+                  const filteredEmployees = employees.filter(emp => {
+                    if (reqRoleIds.length === 0) return true;
+                    if (!emp.service_roles || !Array.isArray(emp.service_roles)) return false;
+                    return emp.service_roles.some(r => reqRoleIds.includes(r));
+                  });
+
+                  return (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+                      <EmployeePicker employees={filteredEmployees} onAssign={handleAssign} loading={actionLoading} />
+                    </motion.div>
+                  )
+                })()
               )}
 
               {/* Completion Proofs */}
@@ -723,11 +781,17 @@ export function ServiceRequestsPage() {
                 <div className="sr-actions-title">Workflow Actions</div>
                 <div className="sr-actions-row">
 
-                  {/* NEW_REQUEST */}
-                  {detail.status === "new_request" && (
+                  {/* NEW_REQUEST / CONFIRMED */}
+                  {["new_request", "confirmed"].includes(detail.status) && (
                     <>
                       <button className="sr-btn-action sr-btn-action--primary" disabled={actionLoading} onClick={() => handleAction("review/")}>
                         <ClipboardCheck size={14} /> Mark Reviewed
+                      </button>
+                      <button
+                        className="sr-btn-action sr-btn-action--primary"
+                        onClick={() => setShowAssign(v => !v)}
+                      >
+                        <Users size={14} /> {showAssign ? "Close Assign Panel" : "Assign Technician"}
                       </button>
                       <button className="sr-btn-action sr-btn-action--danger" disabled={actionLoading} onClick={() => handleAction("reject/")}>
                         <Ban size={14} /> Reject
@@ -1252,12 +1316,5 @@ function SrStyles() {
         gap: 0.5rem; padding: 2.5rem 1rem; color: #94a3b8;
       }
     `}</style>
-  )
-}
-      .sr - center - msg {
-  display: flex; flex - direction: column; align - items: center; justify - content: center;
-  gap: 0.5rem; padding: 2.5rem 1rem; color: #94a3b8;
-}
-`}</style>
   )
 }

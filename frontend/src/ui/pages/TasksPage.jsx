@@ -19,6 +19,7 @@ import { Pill, Button, Card, Input, Select, TextArea } from "../components/kit.j
 import { ClipboardList, Clock, CheckCircle2, AlertCircle, MapPin, Calendar as CalIcon, Play, Save, Trash2, Tag, Loader2, Paperclip, User, Flag, ListChecks, Plus, X, Building2, Camera, ThumbsUp, ThumbsDown, RefreshCw, UserCheck, AlertTriangle, DollarSign, Battery, Wifi, ShieldAlert, Sparkles, Navigation, Upload, Activity, Search, ChevronRight, ChevronDown, Phone, Car, Wrench, MessageSquare, Compass, MoreHorizontal, Hammer, ChevronLeft } from "lucide-react"
 import { SelfieCapture, getPosition } from "./TimePage.jsx"
 import { verifyFaces } from "../../utils/faceVerify.js"
+import { CATEGORY_TO_ROLES_MAP } from "../../utils/roles.js"
 
 const BACKEND_HTTP_HOST = import.meta.env.PROD
   ? `${window.location.origin}/Caltrack`
@@ -3051,7 +3052,12 @@ function DeclinedTasksPanel({ declinedTasks, availableEmployees, onReassigned })
                     }}
                   >
                     <option value="">— Reassign to —</option>
-                    {sortedEmployees.map(emp => {
+                    {sortedEmployees.filter(emp => {
+                      if (!task.category || !CATEGORY_TO_ROLES_MAP[task.category]) return true;
+                      const empRoles = emp.service_roles || [];
+                      const allowedRoles = CATEGORY_TO_ROLES_MAP[task.category];
+                      return empRoles.some(r => allowedRoles.includes(r));
+                    }).map(emp => {
                       const avail = emp.current_availability || "offline"
                       const cfg = AVAILABILITY_CONFIG[avail] || AVAILABILITY_CONFIG.offline
                       const name = `${emp.first_name || emp.user?.first_name || emp.user?.username || "?"} ${emp.last_name || emp.user?.last_name || ""}`.trim()
@@ -3205,9 +3211,17 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
 
   // Sort employees by availability + GPS distance priority (Urban Company / Swiggy flow)
   const empList = useMemo(() => {
-    const list = availableEmployees && availableEmployees.length > 0
+    let list = availableEmployees && availableEmployees.length > 0
       ? [...availableEmployees]
       : [...employees];
+
+    if (form.category && CATEGORY_TO_ROLES_MAP[form.category]) {
+      const allowedRoles = CATEGORY_TO_ROLES_MAP[form.category];
+      list = list.filter(emp => {
+        const empRoles = emp.service_roles || [];
+        return empRoles.some(r => allowedRoles.includes(r));
+      });
+    }
 
     const nearbyMap = {};
     if (workflowData?.nearby_employees) {

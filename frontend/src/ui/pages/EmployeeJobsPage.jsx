@@ -28,11 +28,11 @@ const CAT_EMOJIS = {
 
 /* ─── Status config ──────────────────────────────────────────────────────── */
 const JOB_STATUS = {
-  assigned:    { label: "Assigned",    color: "#3B82F6", bg: "#EFF6FF", border: "#BFDBFE" },
-  accepted:    { label: "Accepted",    color: "#F59E0B", bg: "#FFFBEB", border: "#FDE68A" },
+  assigned: { label: "Assigned", color: "#3B82F6", bg: "#EFF6FF", border: "#BFDBFE" },
+  accepted: { label: "Accepted", color: "#F59E0B", bg: "#FFFBEB", border: "#FDE68A" },
   in_progress: { label: "In Progress", color: "#F97316", bg: "#FFF7ED", border: "#FDBA74" },
-  completed:   { label: "Completed",   color: "#10B981", bg: "#ECFDF5", border: "#6EE7B7" },
-  rejected:    { label: "Rejected",    color: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
+  completed: { label: "Completed", color: "#10B981", bg: "#ECFDF5", border: "#6EE7B7" },
+  rejected: { label: "Rejected", color: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
 }
 
 /* ─── Toast ─────────────────────────────────────────────────────────────── */
@@ -237,7 +237,7 @@ function ConfirmModal({ title, message, onConfirm, onClose, confirmLabel = "Conf
 function WorkOrderModal({ job, onClose }) {
   const sr = job.service_request || {}
   const [empPos, setEmpPos] = useState(null)
-  
+
   // Mock customer location based on ID string hash to be consistent
   const custLat = 12.9716 + ((sr.id || 1) % 100) * 0.001
   const custLng = 77.5946 + ((sr.id || 1) % 100) * 0.001
@@ -278,7 +278,7 @@ function WorkOrderModal({ job, onClose }) {
         initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
         style={{
           background: "#f8fafc", borderRadius: 16, width: "100%", maxWidth: 850,
-          maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 50px rgba(0,0,0,0.18)", 
+          maxHeight: "90vh", overflowY: "auto", boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
           fontFamily: "inherit", position: "relative"
         }}
       >
@@ -307,13 +307,13 @@ function WorkOrderModal({ job, onClose }) {
                   </Marker>
                 )}
                 {empPos && isTracking && (
-                   <Polyline positions={[empPos, [custLat, custLng]]} color="#7C3AED" weight={4} dashArray="8 8" />
+                  <Polyline positions={[empPos, [custLat, custLng]]} color="#7C3AED" weight={4} dashArray="8 8" />
                 )}
               </MapContainer>
             </div>
             <div style={{ padding: "1rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", fontWeight: 700, color: "#059669", marginBottom: 12 }}>
-                <MapPin size={14}/> AUTO-DETECTED LOCATION DETAILS
+                <MapPin size={14} /> AUTO-DETECTED LOCATION DETAILS
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
                 <Field label="ADDRESS" value={sr.address || "—"} />
@@ -321,7 +321,7 @@ function WorkOrderModal({ job, onClose }) {
               </div>
               {isTracking && (
                 <div style={{ marginTop: 12, padding: "10px 14px", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 8, color: "#059669", fontSize: "0.85rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
-                  <CheckCircle2 size={16}/> In Service Zone: Tracking Live Location
+                  <CheckCircle2 size={16} /> In Service Zone: Tracking Live Location
                 </div>
               )}
             </div>
@@ -330,7 +330,7 @@ function WorkOrderModal({ job, onClose }) {
           {/* Client Details */}
           <div style={{ background: "white", borderRadius: 12, padding: "1.25rem", border: "1px solid #e2e8f0" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", fontWeight: 700, color: "#7C3AED", marginBottom: 12 }}>
-              <User size={14}/> CLIENT DETAILS
+              <User size={14} /> CLIENT DETAILS
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
               <Field label="COMPANY NAME" value="N/A" />
@@ -343,7 +343,7 @@ function WorkOrderModal({ job, onClose }) {
           {/* Problem Details */}
           <div style={{ background: "white", borderRadius: 12, padding: "1.25rem", border: "1px solid #e2e8f0" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", fontWeight: 700, color: "#7C3AED", marginBottom: 12 }}>
-              <FileText size={14}/> PROBLEM DETAILS
+              <FileText size={14} /> PROBLEM DETAILS
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
               <Field label="SUBCATEGORY" value={(sr.service_category || "").replace(/_/g, " ")} />
@@ -356,7 +356,7 @@ function WorkOrderModal({ job, onClose }) {
           {/* SLA & Requirements */}
           <div style={{ background: "white", borderRadius: 12, padding: "1.25rem", border: "1px solid #e2e8f0" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", fontWeight: 700, color: "#7C3AED", marginBottom: 12 }}>
-              <Clock size={14}/> SLA & REQUIREMENTS
+              <Clock size={14} /> SLA & REQUIREMENTS
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: 20 }}>
               <Field label="ESTIMATED HOURS" value="2" />
@@ -364,8 +364,8 @@ function WorkOrderModal({ job, onClose }) {
             </div>
             <label style={{ fontSize: "0.8rem", fontWeight: 800, color: "#475569", marginBottom: 12, display: "block" }}>Verification Checklist</label>
             <div style={{ display: "flex", gap: "2rem" }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.85rem", color: "#334155", fontWeight: 500 }}><input type="checkbox" checked readOnly style={{ accentColor: "#7C3AED", width: 16, height: 16 }}/> Require Selfie at Clock-in</label>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.85rem", color: "#334155", fontWeight: 500 }}><input type="checkbox" checked readOnly style={{ accentColor: "#7C3AED", width: 16, height: 16 }}/> Before & After Photo uploads</label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.85rem", color: "#334155", fontWeight: 500 }}><input type="checkbox" checked readOnly style={{ accentColor: "#7C3AED", width: 16, height: 16 }} /> Require Selfie at Clock-in</label>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.85rem", color: "#334155", fontWeight: 500 }}><input type="checkbox" checked readOnly style={{ accentColor: "#7C3AED", width: 16, height: 16 }} /> Before & After Photo uploads</label>
             </div>
           </div>
 
@@ -381,13 +381,13 @@ function JobCard({ job, onAction, onProof, actionLoading }) {
   const sr = job.service_request || {}
   const sm = JOB_STATUS[job.status] || JOB_STATUS.assigned
 
-  const canAccept    = job.status === "assigned"
-  const canReject    = job.status === "assigned"
-  const canStart     = job.status === "accepted"
-  const canComplete  = job.status === "in_progress"
-  const canProof     = ["in_progress", "completed"].includes(job.status)
-  const isDone       = job.status === "completed"
-  const isRejected   = job.status === "rejected"
+  const canAccept = job.status === "assigned"
+  const canReject = job.status === "assigned"
+  const canStart = job.status === "accepted"
+  const canComplete = job.status === "in_progress"
+  const canProof = ["in_progress", "completed"].includes(job.status)
+  const isDone = job.status === "completed"
+  const isRejected = job.status === "rejected"
 
   return (
     <motion.div
@@ -613,7 +613,7 @@ function StarRating({ score }) {
   const num = Math.round(parseFloat(score) || 0)
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-      {[1,2,3,4,5].map(s => (
+      {[1, 2, 3, 4, 5].map(s => (
         <Star key={s} size={16} style={{ fill: s <= num ? "#F59E0B" : "none", color: s <= num ? "#F59E0B" : "#e2e8f0" }} />
       ))}
       <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#1e293b", marginLeft: 4 }}>{parseFloat(score || 0).toFixed(1)}</span>
@@ -623,16 +623,14 @@ function StarRating({ score }) {
 
 /* ─── Main Page ──────────────────────────────────────────────────────────── */
 export function EmployeeJobsPage() {
-  const [jobs, setJobs]               = useState([])
-  const [performance, setPerformance] = useState(null)
+  const [jobs, setJobs] = useState([])
   const [jobsLoading, setJobsLoading] = useState(true)
-  const [perfLoading, setPerfLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null) // jobId
-  const [proofLoading, setProofLoading]   = useState(false)
-  const [proofJob, setProofJob]           = useState(null)
-  const [confirmModal, setConfirmModal]   = useState(null) // { jobId, action, title, message }
-  const [toast, setToast]                 = useState(null)
-  const [activeTab, setActiveTab]         = useState("active") // active | history | performance
+  const [proofLoading, setProofLoading] = useState(false)
+  const [proofJob, setProofJob] = useState(null)
+  const [confirmModal, setConfirmModal] = useState(null) // { jobId, action, title, message }
+  const [toast, setToast] = useState(null)
+  const [activeTab, setActiveTab] = useState("active") // active | history
 
   const showToast = (msg, type = "success") => setToast({ msg, type, id: Date.now() })
 
@@ -646,24 +644,14 @@ export function EmployeeJobsPage() {
     finally { setJobsLoading(false) }
   }
 
-  /* ── Load Performance ── */
-  const loadPerformance = async () => {
-    setPerfLoading(true)
-    try {
-      const res = await apiRequest("/employee/performance/")
-      if (res?.success) setPerformance(res.data)
-    } catch (err) { console.error(err) }
-    finally { setPerfLoading(false) }
-  }
-
-  useEffect(() => { loadJobs(); loadPerformance() }, [])
+  useEffect(() => { loadJobs() }, [])
 
   /* ── Job Actions ── */
   const handleAction = (jobId, action) => {
     const labels = {
       accept: { title: "Accept Job", message: "Are you ready to take on this job?", label: "Accept", danger: false },
       reject: { title: "Decline Job", message: "Are you sure you want to decline this assignment?", label: "Decline", danger: true },
-      start:  { title: "Start Work", message: "Confirm that you are at the customer's location and starting work now.", label: "Start", danger: false },
+      start: { title: "Start Work", message: "Confirm that you are at the customer's location and starting work now.", label: "Start", danger: false },
       complete: { title: "Mark Complete", message: "Confirm that the work has been fully completed to the customer's satisfaction.", label: "Mark Complete", danger: false },
     }
     setConfirmModal({ jobId, action, ...labels[action] })
@@ -683,7 +671,7 @@ export function EmployeeJobsPage() {
       if (res?.success) {
         showToast(res.message || "Action completed!", "success")
         loadJobs()
-        if (action === "complete") loadPerformance()
+        if (action === "complete") loadJobs()
       } else {
         showToast(res?.message || "Action failed.", "error")
       }
@@ -759,7 +747,7 @@ export function EmployeeJobsPage() {
           My Job Dashboard
         </div>
         <div className="ej-header-actions">
-          <button className="ej-refresh-btn" onClick={() => { loadJobs(); loadPerformance() }}>
+          <button className="ej-refresh-btn" onClick={() => { loadJobs() }}>
             <RefreshCw size={13} className={jobsLoading ? "ejSpin" : ""} style={{ animation: jobsLoading ? "ejSpin 0.8s linear infinite" : "none" }} />
             Refresh
           </button>
@@ -775,9 +763,6 @@ export function EmployeeJobsPage() {
         <button className={`ej-tab ${activeTab === "history" ? "ej-tab--active" : ""}`} onClick={() => setActiveTab("history")}>
           <CheckCheck size={14} /> History
           {historyJobs.length > 0 && <span className="ej-tab-count">{historyJobs.length}</span>}
-        </button>
-        <button className={`ej-tab ${activeTab === "performance" ? "ej-tab--active" : ""}`} onClick={() => setActiveTab("performance")}>
-          <BarChart3 size={14} /> Performance
         </button>
       </div>
 
@@ -842,92 +827,6 @@ export function EmployeeJobsPage() {
                     />
                   ))}
                 </div>
-              )}
-            </motion.div>
-          )}
-
-          {/* ── Performance Tab ── */}
-          {activeTab === "performance" && (
-            <motion.div key="perf" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              {perfLoading ? (
-                <div className="ej-center">
-                  <RefreshCw size={24} style={{ color: "#7C3AED", animation: "ejSpin 0.8s linear infinite" }} />
-                  <span style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 700 }}>Loading stats...</span>
-                </div>
-              ) : !performance ? (
-                <div className="ej-center">
-                  <div className="ej-empty-icon"><BarChart3 size={24} /></div>
-                  <h3 style={{ fontSize: "0.9rem", fontWeight: 800, color: "#475569" }}>No stats yet</h3>
-                  <p style={{ fontSize: "0.78rem", color: "#94a3b8", maxWidth: 280 }}>
-                    Complete jobs and receive customer feedback to populate your performance dashboard.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {/* KPI Grid */}
-                  <div className="ej-kpi-grid">
-                    <KpiCard label="Jobs Completed" value={performance.jobs_completed_count} icon={CheckCheck} color="#10B981" />
-                    <KpiCard label="Avg Rating" value={parseFloat(performance.average_rating || 0).toFixed(1)} icon={Star} color="#F59E0B" suffix="/5" />
-                    <KpiCard label="Completion Rate" value={parseFloat(performance.completion_rate || 0).toFixed(0)} icon={Target} color="#7C3AED" suffix="%" />
-                    <KpiCard label="CSAT Score" value={parseFloat(performance.customer_satisfaction_score || 0).toFixed(1)} icon={ThumbsUp} color="#3B82F6" suffix="/5" />
-                  </div>
-
-                  {/* Detailed Stats */}
-                  <div className="ej-perf-card">
-                    <div className="ej-perf-title"><Activity size={14} style={{ color: "#7C3AED" }} /> Detailed Metrics</div>
-
-                    <div className="ej-perf-row">
-                      <span className="ej-perf-label">Average Rating</span>
-                      <StarRating score={performance.average_rating} />
-                    </div>
-
-                    <div className="ej-perf-row">
-                      <span className="ej-perf-label">Customer Satisfaction</span>
-                      <span className="ej-perf-val" style={{ color: "#3B82F6" }}>
-                        {parseFloat(performance.customer_satisfaction_score || 0).toFixed(2)} / 5.00
-                      </span>
-                    </div>
-
-                    <div className="ej-perf-row">
-                      <span className="ej-perf-label">Feedback Count</span>
-                      <span className="ej-perf-val">{performance.feedback_count}</span>
-                    </div>
-
-                    <div className="ej-perf-row" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.5rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                        <span className="ej-perf-label">Completion Rate</span>
-                        <span className="ej-perf-val">{parseFloat(performance.completion_rate || 0).toFixed(1)}%</span>
-                      </div>
-                      <div className="ej-progress-bar" style={{ width: "100%" }}>
-                        <div className="ej-progress-fill" style={{ width: `${Math.min(parseFloat(performance.completion_rate || 0), 100)}%` }} />
-                      </div>
-                    </div>
-
-                    <div className="ej-perf-row">
-                      <span className="ej-perf-label">Last Updated</span>
-                      <span style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600 }}>
-                        {performance.last_updated ? new Date(performance.last_updated).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Tips */}
-                  <div style={{ marginTop: "1rem", background: "#faf5ff", border: "1px solid #DDD6FE", borderRadius: 14, padding: "1rem" }}>
-                    <div style={{ fontSize: "0.75rem", fontWeight: 800, color: "#7C3AED", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                      <Zap size={13} /> Tips to improve your rating
-                    </div>
-                    {[
-                      "Arrive on time for every scheduled booking",
-                      "Keep customer informed of progress",
-                      "Upload completion proof photos after every job",
-                      "Be professional and courteous at all times",
-                    ].map(tip => (
-                      <div key={tip} style={{ display: "flex", alignItems: "flex-start", gap: "0.4rem", fontSize: "0.78rem", color: "#475569", padding: "0.25rem 0" }}>
-                        <span style={{ color: "#10B981", fontWeight: 700, flexShrink: 0 }}>✓</span> {tip}
-                      </div>
-                    ))}
-                  </div>
-                </>
               )}
             </motion.div>
           )}

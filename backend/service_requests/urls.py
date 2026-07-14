@@ -6,6 +6,7 @@ from .views import (
     BookingCreateView,
     CustomerMyBookingsView,
     FeedbackTokenView,
+    PublicFeedbackListView,
     CatalogCategoryListView,
     CatalogServiceListView,
     # Admin — Service Requests
@@ -51,6 +52,7 @@ urlpatterns = [
     path("booking/my-bookings/",             CustomerMyBookingsView.as_view(), name="sr-my-bookings"),
     path("booking/<int:pk>/invoice/",        InvoiceDownloadView.as_view(),  name="sr-invoice"),
     path("feedback/<uuid:token>/",           FeedbackTokenView.as_view(),    name="sr-feedback-token"),
+    path("public/feedback/",                 PublicFeedbackListView.as_view(), name="sr-public-feedback"),
 
     # ── Payment ───────────────────────────────────────────────────────────────
     path("payment/initiate/",                PaymentInitiateView.as_view(),  name="payment-initiate"),

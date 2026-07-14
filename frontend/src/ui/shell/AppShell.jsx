@@ -6,6 +6,7 @@ import { isOffline } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { routes } from "../routes.js"
 import { ThemeToggle } from "./ThemeToggle.jsx"
+import { TECHNICIAN_ROLES } from "../../utils/roles.js"
 import ThemeSwitch from "@/components/ui/theme-switch"
 import { CommandPalette } from "./CommandPalette.jsx"
 import { NotificationCenter } from "./NotificationCenter.jsx"
@@ -32,7 +33,7 @@ const ALL_NAV_ITEMS = [
   { label: "Dashboard", to: routes.dashboard, icon: <Home size={20} />, color: "#10B981" },
   { label: "Service Requests", to: routes.admin_service_requests, icon: <Wrench size={20} />, color: "#6366F1", adminOnly: true },
   { label: "Feedback Logs", to: routes.admin_feedback, icon: <MessageSquare size={20} />, color: "#F59E0B", adminOnly: true },
-  { label: "Feedback", to: routes.employee_jobs, icon: <MessageSquare size={20} />, color: "#14B8A6", employeeOnly: true },
+  { label: "Feedback", to: routes.employee_feedback, icon: <MessageSquare size={20} />, color: "#F59E0B", employeeOnly: true },
   { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1", employeeOnly: true },
   { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6", adminOnly: true, module: "locations" },
   { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444", adminOnly: true, module: "live_location" },
@@ -537,7 +538,13 @@ export function AppShell() {
                             border: `1px solid ${isAdmin ? "#c4b5fd" : "#a7f3d0"}`,
                           }}
                         >
-                          {isAdmin ? "Administrator" : "Employee"}
+                          {(() => {
+                            if (isAdmin) return "Administrator"
+                            if (user?.role === "employee" && Array.isArray(user?.employee_roles) && user.employee_roles.length > 0) {
+                              return user.employee_roles.map(rId => TECHNICIAN_ROLES.find(t => t.id === rId)?.label).filter(Boolean).join(" / ") || "Employee"
+                            }
+                            return "Employee"
+                          })()}
                         </span>
                       </div>
                     </div>

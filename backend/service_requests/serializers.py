@@ -19,9 +19,37 @@ class CatalogServiceSerializer(serializers.ModelSerializer):
 
 class CatalogCategorySerializer(serializers.ModelSerializer):
     services = CatalogServiceSerializer(many=True, read_only=True)
+    rating = serializers.SerializerMethodField()
+    jobs_count_str = serializers.SerializerMethodField()
+    
     class Meta:
         model = CatalogCategory
         fields = '__all__'
+        
+    def get_rating(self, obj):
+        from django.db import models
+        from .models import ServiceFeedback
+        avg = ServiceFeedback.objects.filter(
+            service_request__service_category=str(obj.id),
+            is_submitted=True,
+            rating__isnull=False
+        ).aggregate(models.Avg("rating"))["rating__avg"]
+        return str(round(avg, 1)) if avg else "4.8"
+
+    def get_jobs_count_str(self, obj):
+        from .models import ServiceRequest
+        cnt = ServiceRequest.objects.filter(
+            service_category=str(obj.id),
+            status__in=["completed", "closed", "verified", "awaiting_verification"]
+        ).count()
+        if cnt == 0:
+            return "New"
+        elif cnt < 100:
+            return f"{cnt} bookings"
+        elif cnt < 1000:
+            return f"{cnt//100 * 100}+ bookings"
+        else:
+            return f"{round(cnt/1000, 1)}K+ bookings"
 
 
 # ── Public ────────────────────────────────────────────────────────────────────
