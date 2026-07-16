@@ -9,7 +9,7 @@ import {
     Copy, RefreshCcw, Check,
     MoreHorizontal, ChevronRight,
     Columns, UserCircle, ShieldCheck,
-    Mail, Settings2, Archive, Edit3, Trash2
+    Mail, Settings2, Archive, Edit3, Trash2, ExternalLink
 } from "lucide-react"
 import "./SettingsSubpages.css"
 
@@ -1180,7 +1180,7 @@ export function PeopleSettingsPage() {
                                                     {dossierData.interviewState && dossierData.interviewState.interviewLogs && dossierData.interviewState.interviewLogs.length > 0 ? (
                                                         dossierData.interviewState.interviewLogs.map((log, lidx) => (
                                                             <div key={lidx} style={{ marginBottom: 6 }}>
-                                                                <div style={{ fontWeight: "bold" }}>Q: {log.question.replace(/Officer Sarah|Interviewer:/, "").trim()}</div>
+                                                                <div style={{ fontWeight: "bold" }}>Q: {(log.question || "").replace(/Officer Sarah|Interviewer:/, "").trim()}</div>
                                                                 <div style={{ color: "#2563eb" }}>A: {log.answer}</div>
                                                             </div>
                                                         ))

@@ -129,7 +129,7 @@ export function WorkSchedulesSettingsPage() {
             }
 
             try {
-                const locData = await apiRequest("/locations/")
+                const locData = await apiRequest("/time/locations/")
                 const list = Array.isArray(locData) ? locData : locData.results || []
                 setLocations(list.length > 0 ? list : DEFAULT_LOCATIONS)
             } catch (e) {

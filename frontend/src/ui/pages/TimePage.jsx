@@ -488,6 +488,12 @@ function AdminTimePage() {
   const [logsOpen, setLogsOpen] = useState(true)
   const [statusFilter, setStatusFilter] = useState("all") // all | live | done
 
+  // Day Popup state
+  const [selectedDatePopup, setSelectedDatePopup] = useState(null)
+  const [popupTasks, setPopupTasks] = useState([])
+  const [popupLoading, setPopupLoading] = useState(false)
+  const [expandedEmpId, setExpandedEmpId] = useState(null)
+
   // Real-time month selection
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
@@ -531,6 +537,20 @@ function AdminTimePage() {
   }, [selectedMonth, selectedYear])
 
   useEffect(() => { load() }, [load])
+
+  // Fetch tasks when a calendar day is clicked
+  useEffect(() => {
+    if (!selectedDatePopup) return
+    let active = true
+    setPopupLoading(true)
+    apiRequest(`/tasks/admin/?due_date=${selectedDatePopup}`)
+      .then(res => {
+        if (active) setPopupTasks(unwrapResults(res))
+      })
+      .catch(err => console.error("Failed to fetch day tasks", err))
+      .finally(() => { if (active) setPopupLoading(false) })
+    return () => { active = false }
+  }, [selectedDatePopup])
 
   // ── Real KPI Calculations ──
   const monthStats = useMemo(() => {
@@ -754,33 +774,51 @@ function AdminTimePage() {
                         {week.map((day, dIdx) => {
                           const dateStr = day ? `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` : null
                           const dayLogs = day ? logs.filter(l => l.work_date === dateStr) : []
+                          const hasLogs = dayLogs.length > 0
                           const isWeekend = dIdx === 0 || dIdx === 6
-                          const attendancePct = dayLogs.length > 0 && employees.length > 0 ? Math.round((dayLogs.length / employees.length) * 100) : 0
+                          const attendancePct = hasLogs && employees.length > 0 ? Math.round((dayLogs.length / employees.length) * 100) : 0
                           const isToday = day && dateStr === todayStr
 
+                          const dayName = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dIdx]
+                          
                           return (
-                            <div key={`d-${wIdx}-${dIdx}`} className={`group flex flex-col items-center justify-center min-h-[90px] rounded-[1.5rem] p-2 relative transition-all duration-300 ${!day ? 'bg-transparent' : isToday ? 'bg-surface dark:bg-slate-800 shadow-[0_15px_30px_-5px_rgba(0,0,0,0.1)] dark:shadow-[0_15px_30px_-5px_rgba(0,0,0,0.4)] ring-1 ring-slate-100 dark:ring-slate-700 scale-[1.05] z-20 cursor-pointer' : `bg-slate-50 dark:bg-slate-950/50 border border-transparent hover:scale-105 hover:bg-surface dark:hover:bg-slate-800 z-10 cursor-pointer ${monthThemes[selectedMonth].calBg}`}`}>
+                            <div 
+                              key={`d-${wIdx}-${dIdx}`} 
+                              onClick={() => { if (hasLogs || isToday) setSelectedDatePopup(dateStr) }}
+                              className="relative flex items-center justify-center min-h-[90px]"
+                            >
                               {day && (
-                                <>
-                                  {isToday && (
-                                    <div className={`absolute top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-[3px] rounded-full text-[7px] font-black text-white uppercase tracking-widest shadow-sm ${monthThemes[selectedMonth].badge}`}>
-                                      Today
+                                <div className="relative group/blob cursor-pointer">
+                                  {isToday ? (
+                                    <>
+                                      {/* Floating Droplets for Today */}
+                                      <div className="absolute -left-3 top-[40%] w-3 h-3 rounded-full bg-[#FF4747] opacity-80 shadow-sm animate-pulse"></div>
+                                      
+                                      {/* Main Blob Today */}
+                                      <div className={`flex flex-col items-center justify-center w-[75px] h-[60px] animate-liquid-blob bg-gradient-to-br from-[#FF514A] to-[#FF8E53] shadow-[0_10px_25px_-5px_rgba(255,81,74,0.4)] z-20 transition-transform duration-300 hover:scale-105`}>
+                                        <div className="text-[7px] font-black text-white/90 uppercase tracking-widest mt-1.5">Today</div>
+                                        <span className="text-xl font-black text-white leading-none tracking-tight">{day}</span>
+                                        <div className="text-[9px] font-bold text-white/80 mt-0.5">{dayName}</div>
+                                      </div>
+                                    </>
+                                  ) : hasLogs ? (
+                                    <>
+                                      {/* Floating Droplets for Active Day */}
+                                      <div className="absolute -right-2 top-2 w-2 h-2 rounded-full bg-[#C2C2FF] opacity-90"></div>
+                                      <div className="absolute -right-1 bottom-1 w-3.5 h-3.5 rounded-full bg-[#B2AFFF] opacity-80 shadow-sm"></div>
+                                      
+                                      {/* Main Blob Active */}
+                                      <div className={`flex flex-col items-center justify-center w-[75px] h-[55px] animate-liquid-blob bg-gradient-to-br from-[#E2E1FF] to-[#CCCDFF] dark:from-indigo-500/40 dark:to-indigo-500/20 shadow-[0_8px_20px_-6px_rgba(204,205,255,0.5)] dark:shadow-none z-10 transition-transform duration-300 hover:scale-105`}>
+                                        <span className="text-xl font-black text-[#191932] dark:text-white leading-none tracking-tight mt-1">{day}</span>
+                                        <div className="text-[10px] font-bold text-[#4B4B6A] dark:text-indigo-200 mt-0.5">{dayName}</div>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center w-12 h-12 rounded-full bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-400 opacity-60 transition-colors">
+                                      <span className="text-base font-black tracking-tight leading-none">{day}</span>
                                     </div>
                                   )}
-                                  <span className={`text-lg font-black tracking-tight transition-colors ${isToday ? 'text-slate-900 dark:text-white' : isWeekend ? 'text-slate-400 dark:text-slate-600' : `text-slate-800 dark:text-slate-300 ${monthThemes[selectedMonth].calText}`}`}>{day}</span>
-                                  <div className="mt-1 flex flex-col items-center gap-1.5 min-h-[16px]">
-                                    {dayLogs.length > 0 ? (
-                                      <div className={`w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.1)] transition-colors ${isToday ? monthThemes[selectedMonth].badge : attendancePct > 80 ? 'bg-emerald-500' : attendancePct > 50 ? 'bg-amber-500' : 'bg-rose-500'}`}></div>
-                                    ) : day && !isWeekend && (
-                                      <div className={`w-1.5 h-1.5 rounded-full transition-colors ${isToday ? monthThemes[selectedMonth].badge : monthThemes[selectedMonth].dot}`}></div>
-                                    )}
-                                    {dayLogs.length > 0 && (
-                                      <span className={`absolute bottom-2 text-[9px] font-black uppercase tracking-widest ${isToday ? 'text-slate-400 dark:text-slate-500' : `text-slate-400 dark:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity ${monthThemes[selectedMonth].calText}`}`}>
-                                        {attendancePct}%
-                                      </span>
-                                    )}
-                                  </div>
-                                </>
+                                </div>
                               )}
                             </div>
                           )
@@ -941,6 +979,195 @@ function AdminTimePage() {
           )}
         </div>
       </div>
+
+      {/* 📅 Day Summary Modal */}
+      {selectedDatePopup && createPortal(
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-surface dark:bg-slate-900 w-full max-w-4xl rounded-[2rem] shadow-2xl border border-stroke dark:border-slate-800 flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-stroke dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50 shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-2xl">
+                  <Calendar size={28} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                    {new Date(selectedDatePopup).toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                  </h2>
+                  <p className="text-[12px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                    {logs.filter(l => l.work_date === selectedDatePopup).length} Employees active
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedDatePopup(null)} className="p-2 bg-white dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white rounded-xl border border-stroke dark:border-slate-700 shadow-sm transition-all">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-slate-50 dark:bg-slate-950/20">
+              {popupLoading ? (
+                <div className="flex flex-col items-center justify-center h-48 text-slate-400 gap-4">
+                  <RefreshCw className="animate-spin" size={32} />
+                  <span className="text-[11px] font-black uppercase tracking-widest">Loading task data...</span>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-6">
+                  {(() => {
+                    // Find employees who clocked in on this day
+                    const dayLogs = logs.filter(l => l.work_date === selectedDatePopup);
+                    const empIds = [...new Set(dayLogs.map(l => l.employee))];
+                    
+                    if (empIds.length === 0) {
+                      return (
+                        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                          <Users size={48} className="opacity-20 mb-4" />
+                          <div className="text-sm font-bold">No employees worked on this date.</div>
+                        </div>
+                      )
+                    }
+
+                    return empIds.map(empId => {
+                      const emp = employees.find(e => e.id === empId);
+                      const name = emp ? (emp.user?.first_name || emp.user?.username || "Employee") : "Unknown";
+                      const avatar = name.charAt(0).toUpperCase();
+                      const eTasks = popupTasks.filter(t => t.assigned_to === emp?.user?.id);
+                      
+                      const completed = eTasks.filter(t => t.status === "completed").length;
+                      const pending = eTasks.filter(t => t.status === "pending").length;
+                      const inProgress = eTasks.filter(t => t.status === "in_progress").length;
+
+                      const isExpanded = expandedEmpId === empId;
+
+                      return (
+                        <div key={empId} className={`group bg-white dark:bg-slate-900 border ${isExpanded ? 'border-indigo-300 dark:border-indigo-500/50 shadow-md' : 'border-transparent shadow-[0_4px_20px_rgb(0,0,0,0.03)]'} rounded-[2rem] p-5 transition-all duration-300 hover:shadow-lg`}>
+                          <div 
+                            className="flex flex-col sm:flex-row gap-6 items-start sm:items-center cursor-pointer"
+                            onClick={() => setExpandedEmpId(isExpanded ? null : empId)}
+                          >
+                            {/* Unique Blob Employee Avatar */}
+                            <div className="flex items-center gap-4 min-w-[200px]">
+                              <div className="w-14 h-14 bg-gradient-to-br from-indigo-100 to-indigo-50 dark:from-indigo-900/40 dark:to-indigo-800/20 text-indigo-600 dark:text-indigo-400 font-black text-xl flex items-center justify-center animate-liquid-blob shadow-sm">
+                                {avatar}
+                              </div>
+                              <div>
+                                <div className="text-[15px] font-black text-slate-900 dark:text-white tracking-tight">{name}</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">#{emp?.employee_id || empId.slice(0,6)}</div>
+                              </div>
+                            </div>
+                            
+                            {/* Minimalist Metrics */}
+                            <div className="flex-1 w-full flex items-center justify-around gap-2 px-4 py-2 bg-slate-50/50 dark:bg-slate-950/30 rounded-2xl">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-500 flex items-center justify-center">
+                                  <CheckSquare size={14} />
+                                </div>
+                                <div className="flex flex-col">
+                                  <div className="text-xl font-black text-slate-800 dark:text-slate-200 leading-none">{completed}</div>
+                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Done</span>
+                                </div>
+                              </div>
+                              
+                              <div className="w-px h-8 bg-slate-200 dark:bg-slate-800"></div>
+
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-500 flex items-center justify-center">
+                                  <Clock size={14} />
+                                </div>
+                                <div className="flex flex-col">
+                                  <div className="text-xl font-black text-slate-800 dark:text-slate-200 leading-none">{pending}</div>
+                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Pending</span>
+                                </div>
+                              </div>
+
+                              <div className="w-px h-8 bg-slate-200 dark:bg-slate-800"></div>
+
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-500 flex items-center justify-center">
+                                  <RefreshCw size={14} />
+                                </div>
+                                <div className="flex flex-col">
+                                  <div className="text-xl font-black text-slate-800 dark:text-slate-200 leading-none">{inProgress}</div>
+                                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Active</span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Accordion Icon */}
+                            <div className="hidden sm:flex items-center justify-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-slate-400 group-hover:bg-indigo-50 dark:group-hover:bg-indigo-500/20 group-hover:text-indigo-500 transition-colors">
+                              <ChevronDown size={18} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                            </div>
+                          </div>
+                          
+                          {/* Expanded Task Details */}
+                          {isExpanded && (
+                            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 fade-in duration-300">
+                              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Task Details</h4>
+                              {eTasks.length === 0 ? (
+                                <div className="text-sm font-bold text-slate-500">No tasks assigned for this date.</div>
+                              ) : (
+                                <div className="flex flex-col gap-3">
+                                  {eTasks.map(t => (
+                                    <div key={t.id} className="flex flex-col gap-2 p-4 bg-slate-50 dark:bg-slate-950/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                      <div className="flex items-start justify-between">
+                                        <div className="flex items-center gap-3">
+                                          {t.status === 'completed' ? <CheckCircle2 size={16} className="text-emerald-500 shrink-0" /> :
+                                           t.status === 'in_progress' ? <RefreshCw size={16} className="text-blue-500 animate-spin-slow shrink-0" /> :
+                                           <Clock size={16} className="text-amber-500 shrink-0" />}
+                                          <div className="text-[13px] font-bold text-slate-700 dark:text-slate-300 leading-tight pr-4">{t.title}</div>
+                                        </div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-500 shrink-0">
+                                          {t.status.replace('_', ' ')}
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="mt-4 ml-7 grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-4 border-t border-slate-100 dark:border-slate-800/60 pt-3">
+                                        {t.client_name && (
+                                          <div className="flex items-center gap-2.5 text-[12px] text-slate-600 dark:text-slate-300">
+                                            <div className="p-1.5 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 rounded-lg shrink-0">
+                                              <User size={13} strokeWidth={2.5} />
+                                            </div>
+                                            <span className="font-bold truncate">{t.client_name}</span>
+                                          </div>
+                                        )}
+                                        {(t.started_at || t.completed_at) && (
+                                          <div className="flex items-center gap-2.5 text-[12px] text-slate-600 dark:text-slate-300">
+                                            <div className="p-1.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 rounded-lg shrink-0">
+                                              <Timer size={13} strokeWidth={2.5} />
+                                            </div>
+                                            <span className="font-bold">
+                                              {t.started_at ? new Date(t.started_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--'} 
+                                              {" - "} 
+                                              {t.completed_at ? new Date(t.completed_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Active'}
+                                            </span>
+                                          </div>
+                                        )}
+                                        {(t.job_address || t.area || t.city) && (
+                                          <div className="flex items-start gap-2.5 text-[12px] text-slate-500 dark:text-slate-400 md:col-span-2">
+                                            <div className="p-1.5 bg-amber-50 dark:bg-amber-500/10 text-amber-500 rounded-lg shrink-0 mt-0.5">
+                                              <MapPin size={13} strokeWidth={2.5} />
+                                            </div>
+                                            <span className="font-medium leading-relaxed line-clamp-2 mt-1">
+                                              {[t.job_address, t.area, t.city].filter(Boolean).join(', ')}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    });
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ⏳ Shift Summary Overlay */}
       {selectedAuditLog && createPortal(
@@ -1223,9 +1450,9 @@ function AdminLogRow({ log, onAction, onView }) {
             {log.status === 'submitted' ? 'In Review' : (log.status || (isLive ? 'Live' : 'Draft'))}
           </Pill>
           {log.face_match_status && log.face_match_status !== 'skipped' && (
-            <div className={`flex items-center gap-1 text-[9px] font-black uppercase ${log.face_match_status === 'matched' ? 'text-emerald-500' : 'text-red-500'}`}>
-              {log.face_match_status === 'matched' ? <Check size={10} /> : <AlertCircle size={10} />}
-              {log.face_match_status === 'matched' ? 'Verified' : 'Mismatch'}
+            <div className={`flex items-center gap-1 text-[9px] font-black uppercase ${log.face_match_status === 'matched' || log.status === 'approved' ? 'text-emerald-500' : 'text-red-500'}`}>
+              {log.face_match_status === 'matched' || log.status === 'approved' ? <Check size={10} /> : <AlertCircle size={10} />}
+              {log.face_match_status === 'matched' || log.status === 'approved' ? 'Verified' : 'Mismatch'}
             </div>
           )}
           {log.status === 'rejected' && log.admin_notes && (
