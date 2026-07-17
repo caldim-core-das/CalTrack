@@ -221,12 +221,37 @@ export function extractAuthError(err, fallback = "Something went wrong. Please t
 /**
  * Fetch registration dossier from backend
  */
-export async function apiFetchRegistrationDossier() {
+export async function apiFetchRegistrationDossier(id = null, status = null) {
   try {
-    return await fetchJSON("/auth/registration-dossier/")
+    if (!id) {
+      try {
+        const local = localStorage.getItem("caltrack_activation_dossier")
+        if (local) {
+          const parsed = JSON.parse(local)
+          if (parsed?.id) id = parsed.id
+        }
+      } catch (e) {}
+    }
+    let query = ""
+    if (id) query = `?id=${id}`
+    else if (status) query = `?status=${status}`
+    const res = await fetchJSON(`/auth/registration-dossier/${query}`)
+    // If it returns an array, return the first one for backward compatibility
+    if (Array.isArray(res)) return res.length > 0 ? res[0] : null
+    return res
   } catch (err) {
     console.error("Fetch dossier API error", err)
     return null
+  }
+}
+
+export async function apiFetchRegistrationDossiers(status = "pending") {
+  try {
+    const res = await fetchJSON(`/auth/registration-dossier/?status=${status}`)
+    return Array.isArray(res) ? res : []
+  } catch (err) {
+    console.error("Fetch dossiers API error", err)
+    return []
   }
 }
 
@@ -247,10 +272,11 @@ export async function apiSaveRegistrationDossier(dossier) {
 /**
  * Delete registration dossier from backend
  */
-export async function apiDeleteRegistrationDossier() {
+export async function apiDeleteRegistrationDossier(id) {
   try {
     return await fetchJSON("/auth/registration-dossier/", {
-      method: "DELETE"
+      method: "DELETE",
+      body: JSON.stringify(id ? { id } : {})
     })
   } catch (err) {
     console.error("Delete dossier API error", err)
@@ -300,9 +326,10 @@ export async function apiTechSetPassword(payload) {
 /**
  * Approve registration request dossier (generates invitation token)
  */
-export async function apiApproveRegistrationDossier() {
+export async function apiApproveRegistrationDossier(id) {
   return fetchJSON("/auth/registration-dossier/approve/", {
-    method: "POST"
+    method: "POST",
+    body: JSON.stringify({ id })
   })
 }
 
@@ -312,7 +339,7 @@ export async function apiApproveRegistrationDossier() {
 export async function apiRejectRegistrationDossier(payload) {
   return fetchJSON("/auth/registration-dossier/reject/", {
     method: "POST",
-    body: JSON.stringify(payload) // { remarks, reasonCategory }
+    body: JSON.stringify(payload) // { id, remarks, reasonCategory }
   })
 }
 

@@ -152,9 +152,9 @@ export function ApprovalCenterPage() {
   // ── Tab state ──────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("pending") // "pending" | "approved" | "rejected"
 
-  // ── Dossier state (pending employee registration) ──────────────────────────
-  const [dossier, setDossier] = useState(null)
-  const [dossierLoading, setDossierLoading] = useState(true)
+  // ── Dossiers state (pending employee registration) ──────────────────────────
+  const [pendingDossiers, setPendingDossiers] = useState([])
+  const [dossiersLoading, setDossiersLoading] = useState(true)
 
   // ── Approved employees from DB ─────────────────────────────────────────────
   const [approvedEmployees, setApprovedEmployees] = useState([])
@@ -173,26 +173,17 @@ export function ApprovalCenterPage() {
   const [rejectError, setRejectError] = useState("")
   const [showDocModal, setShowDocModal] = useState(null)
 
-  // ── Fetch dossier ──────────────────────────────────────────────────────────
-  const loadDossier = useCallback(async () => {
+  // ── Fetch dossiers ──────────────────────────────────────────────────────────
+  const loadDossiers = useCallback(async () => {
     try {
-      const backendDossier = await apiFetchRegistrationDossier()
-      if (backendDossier && backendDossier.regForm?.fullName) {
-        setDossier(backendDossier)
-        localStorage.setItem("caltrack_activation_dossier", JSON.stringify(backendDossier))
-        setDossierLoading(false)
-        return
-      }
-      const saved = localStorage.getItem("caltrack_activation_dossier")
-      if (saved) {
-        try { setDossier(JSON.parse(saved)) } catch (e) {}
-      } else {
-        setDossier(null)
-      }
+      // Import the list fetching function
+      const { apiFetchRegistrationDossiers } = await import("../../api/authService.js")
+      const dossiers = await apiFetchRegistrationDossiers("pending")
+      setPendingDossiers(dossiers || [])
     } catch (e) {
-      console.error("Failed to load dossier", e)
+      console.error("Failed to load dossiers", e)
     } finally {
-      setDossierLoading(false)
+      setDossiersLoading(false)
     }
   }, [])
 
@@ -211,77 +202,60 @@ export function ApprovalCenterPage() {
   }, [])
 
   useEffect(() => {
-    loadDossier()
+    loadDossiers()
     loadApprovedEmployees()
     const interval = setInterval(() => {
-      loadDossier()
+      loadDossiers()
       loadApprovedEmployees()
     }, 5000)
     return () => clearInterval(interval)
-  }, [loadDossier, loadApprovedEmployees])
-
-  // ── Derived dossier status ─────────────────────────────────────────────────
-  const dossierStatus = dossier?.adminClearance?.status || "pending"
+  }, [loadDossiers, loadApprovedEmployees])
 
   // Build active employee from real dossier data
-  const activeEmployee = useMemo(() => {
-    if (!dossier?.regForm?.fullName) return null
-    const statusLabel =
-      dossierStatus === "approved" ? "Invitation Sent"
-      : dossierStatus === "activated" ? "Activated"
-      : dossierStatus === "rejected" ? "Rejected"
-      : "Pending Review"
-    return {
-      id: "EMP-2048",
-      name: dossier.regForm.fullName || "—",
-      phone: dossier.regForm.phone || "—",
-      email: dossier.regForm.email || "—",
-      location: dossier.regForm.address || "—",
-      regDate: dossier.regForm.regDate || "—",
-      trustScore: dossier.trustScore || 0,
-      status: statusLabel,
-      dossierStatus,
-      regForm: dossier.regForm,
-      docForm: dossier.docForm,
-      academyState: dossier.academyState,
-      interviewState: dossier.interviewState,
-      adminClearance: dossier.adminClearance,
-    }
-  }, [dossier, dossierStatus])
+  const pendingQueue = useMemo(() => {
+    return pendingDossiers.map(d => {
+      const statusLabel = "Pending Review"
+      return {
+        id: d.id, // We use the database ID here
+        name: d.regForm?.fullName || d.email || "—",
+        phone: d.regForm?.phone || "—",
+        email: d.regForm?.email || d.email || "—",
+        location: d.regForm?.address || "—",
+        regDate: d.regForm?.regDate || d.created_at || "—",
+        trustScore: d.trustScore || 0,
+        status: statusLabel,
+        dossierStatus: "pending",
+        regForm: d.regForm,
+        docForm: d.docForm,
+        academyState: d.academyState,
+        interviewState: d.interviewState,
+        adminClearance: d.adminClearance,
+        rawDossier: d
+      }
+    })
+  }, [pendingDossiers])
+
+  const activeEmployee = viewingEmployee || (pendingQueue.length > 0 ? pendingQueue[0] : null)
 
   // ── Metrics ────────────────────────────────────────────────────────────────
   const metrics = useMemo(() => {
-    const pending = (!dossier?.regForm?.fullName || ["approved", "activated", "rejected"].includes(dossierStatus)) ? 0 : 1
-    const rejected = (dossier?.regForm?.fullName && dossierStatus === "rejected") ? 1 : 0
     return {
-      pending,
+      pending: pendingQueue.length,
       approved: approvedEmployees.length,
-      rejected,
+      rejected: 0,
     }
-  }, [dossier, dossierStatus, approvedEmployees])
-
-  // ── Pending queue: only show dossier if status is "pending" ────────────────
-  const pendingQueue = useMemo(() => {
-    if (!dossier?.regForm?.fullName) return []
-    if (["approved", "activated", "rejected"].includes(dossierStatus)) return []
-    return [activeEmployee].filter(Boolean)
-  }, [dossier, dossierStatus, activeEmployee])
-
-  // ── Rejected queue ─────────────────────────────────────────────────────────
-  const rejectedQueue = useMemo(() => {
-    if (!dossier?.regForm?.fullName) return []
-    if (dossierStatus !== "rejected") return []
-    return [activeEmployee].filter(Boolean)
-  }, [dossier, dossierStatus, activeEmployee])
+  }, [pendingQueue, approvedEmployees])
 
   // ── Approve/Reject handlers ────────────────────────────────────────────────
   async function confirmApprove() {
     try {
-      await apiApproveRegistrationDossier()
-      await loadDossier()
+      if (!activeEmployee) return
+      await apiApproveRegistrationDossier(activeEmployee.id)
+      await loadDossiers()
       await loadApprovedEmployees()
       setShowApproveConfirm(false)
       setShowReviewModal(false)
+      setViewingEmployee(null)
       setActiveTab("approved") // Switch to approved tab
     } catch (e) {
       console.error("Failed to approve employee", e)
@@ -305,13 +279,16 @@ export function ApprovalCenterPage() {
         fraud: "Fraud Risk Detected", other: "Other"
       }[k] || k))
     try {
+      if (!activeEmployee) return
       await apiRejectRegistrationDossier({
+        id: activeEmployee.id,
         remarks: rejectRemarks,
         reasonCategory: selectedReasons.join(", ") || "Document Verification Failed"
       })
-      await loadDossier()
+      await loadDossiers()
       setShowRejectForm(false)
       setShowReviewModal(false)
+      setViewingEmployee(null)
       setRejectRemarks("")
       setRejectReasons({ aadhaar: false, pan: false, blurred: false, face: false, training: false, call: false, duplicate: false, fraud: false, other: false })
       setRejectError("")
@@ -325,217 +302,7 @@ export function ApprovalCenterPage() {
   // ── Tab config ─────────────────────────────────────────────────────────────
   const tabs = [
     { id: "pending", label: "Pending Review", icon: Clock, count: metrics.pending, color: "amber" },
-    { id: "approved", label: "Approved Employees", icon: UserCheck, count: metrics.approved, color: "emerald" },
-    { id: "rejected", label: "Rejected", icon: UserX, count: metrics.rejected, color: "rose" },
   ]
-
-  // ─── Dossier Review Content (reusable) ─────────────────────────────────────
-  function DossierContent({ emp, inModal = false }) {
-    if (!emp) return null
-    return (
-      <div className={`flex-1 overflow-y-auto pb-32 space-y-5 ${inModal ? "p-8" : "p-6"}`}>
-
-        {/* Header info */}
-        <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-900 to-indigo-700 border-2 border-indigo-500/40 overflow-hidden flex items-center justify-center shrink-0">
-              {emp.regForm?.profilePic
-                ? <img src={emp.regForm.profilePic} alt="Biometric" className="w-full h-full object-cover" />
-                : <User className="text-indigo-300 w-6 h-6" />
-              }
-            </div>
-            <div>
-              <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">Active Dossier Audit</span>
-              <h2 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">{emp.name}</h2>
-              <span className="text-[10px] text-slate-400 font-mono">{emp.id} • Submitted {emp.regDate}</span>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Pill tone="good">Trust Score: {emp.trustScore}%</Pill>
-            <Pill tone={emp.status === "Invitation Sent" || emp.status === "Activated" ? "good" : emp.status === "Rejected" ? "bad" : "warn"}>
-              {emp.status}
-            </Pill>
-          </div>
-        </div>
-
-        {/* Personal Information */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
-          <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-              <span className="text-indigo-500">1️⃣</span> Personal Information
-            </h3>
-            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">✓ VERIFIED</span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs font-semibold">
-            {[
-              ["Full Name", emp.name],
-              ["Phone Number", emp.phone],
-              ["Email Address", emp.email],
-              ["Current Location", emp.location],
-              ["Registration Date", emp.regDate],
-              ["Employee ID", emp.id],
-            ].map(([lbl, val]) => (
-              <div key={lbl}>
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">{lbl}</span>
-                <span className="text-slate-800 dark:text-slate-200">{val}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Registration Verification */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
-          <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-              <span className="text-indigo-500">2️⃣</span> Registration Verification
-            </h3>
-            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">✓ VERIFIED</span>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              ["Phone OTP", emp.regForm?.otpStatus === "verified"],
-              ["Face Scan", emp.regForm?.isBiometricCompleted],
-              ["Registration", emp.regForm?.isCompleted],
-            ].map(([lbl, done]) => (
-              <div key={lbl} className={`flex items-center gap-3 p-3 rounded-xl border ${done ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800"}`}>
-                <CheckCircle2 size={15} className={done ? "text-emerald-600 shrink-0" : "text-slate-400 shrink-0"} />
-                <div>
-                  <div className="text-[8px] font-black text-slate-400 uppercase tracking-wider">{lbl}</div>
-                  <div className={`text-[10px] font-bold ${done ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>{done ? "Verified" : "Pending"}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Trust Score */}
-          <div className="mt-2 p-4 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-200 dark:border-slate-800">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Trust Score</span>
-              <span className="text-sm font-black text-emerald-600">{emp.trustScore}%</span>
-            </div>
-            <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2">
-              <div className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-2 rounded-full transition-all duration-700" style={{ width: `${emp.trustScore}%` }} />
-            </div>
-          </div>
-        </div>
-
-        {/* Identity Documents */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
-          <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
-            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-              <span className="text-indigo-500">3️⃣</span> Identity Documents
-            </h3>
-            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">✓ VERIFIED</span>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { label: "Aadhaar Card", key: "aadhaar", fileKey: "aadhaarFile" },
-              { label: "PAN Card", key: "pan", fileKey: "panFile" },
-              { label: "Driving License", key: "license", fileKey: "drivingLicenseFile" },
-            ].map(({ label, key, fileKey }) => (
-              <div key={key} className="p-3 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between h-24 bg-slate-50 dark:bg-slate-950/20">
-                <div>
-                  <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">{label}</span>
-                  <span className="text-[10px] font-black text-slate-800 dark:text-slate-200 mt-1 block truncate">
-                    {emp.docForm?.[fileKey] || `${key}_scan.pdf`}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setShowDocModal(key)}
-                  className="flex items-center gap-1 text-[9px] font-bold text-indigo-600 hover:text-indigo-700 mt-1"
-                >
-                  <Eye size={10} /> View
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Training & Interview */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
-          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
-            <span className="text-indigo-500">4️⃣</span> Training &amp; Interview
-          </h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className={`p-3 rounded-xl border ${emp.academyState?.isCompleted ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200"}`}>
-              <span className="text-[8px] font-black text-slate-400 uppercase block">Training Academy</span>
-              <span className={`text-xs font-bold ${emp.academyState?.isCompleted ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>
-                {emp.academyState?.isCompleted ? "✓ Completed (100%)" : "Pending"}
-              </span>
-            </div>
-            <div className={`p-3 rounded-xl border ${emp.interviewState?.isCompleted ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200"}`}>
-              <span className="text-[8px] font-black text-slate-400 uppercase block">Interview / Compliance</span>
-              <span className={`text-xs font-bold ${emp.interviewState?.isCompleted ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>
-                {emp.interviewState?.isCompleted ? "✓ Passed" : "Pending"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Email Telemetry (post-approval) */}
-        {dossier?.adminClearance?.invitationToken && (
-          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
-            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
-              <span className="text-indigo-500">5️⃣</span> Email &amp; Invitation Telemetry
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase">Recipient</span>
-                <span className="text-slate-800 dark:text-slate-200 text-xs font-semibold truncate block">{emp.email}</span>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase">Status</span>
-                <span className="inline-flex items-center gap-1 font-bold text-emerald-600 text-xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  {dossier.adminClearance?.invitationEmailStatus || "Delivered"}
-                </span>
-              </div>
-              <div className="col-span-2 p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-indigo-200 dark:border-indigo-800">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="text-[8px] text-indigo-500 font-black uppercase block">Activation URL</span>
-                    <span className="text-[9px] font-mono text-slate-700 dark:text-slate-300 truncate block max-w-xs">
-                      {`${window.location.origin}/create-password?token=${dossier.adminClearance.invitationToken}`}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/create-password?token=${dossier.adminClearance.invitationToken}`)
-                      alert("Activation Link copied!")
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-[10px] font-bold shrink-0 ml-2"
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Audit Timeline */}
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
-          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
-            <Clock className="text-indigo-600" size={14} /> Audit Timeline
-          </h3>
-          <div className="space-y-3 font-mono text-[10px] text-slate-500 dark:text-slate-400 pl-4 border-l border-indigo-500/20">
-            {dossier?.adminClearance?.auditLogs?.length > 0 ? (
-              dossier.adminClearance.auditLogs.map((log, idx) => (
-                <div key={idx} className="relative">
-                  <div className="absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full bg-indigo-600" />
-                  <span className="text-slate-900 dark:text-white font-bold mr-2">{log.timestamp}</span>
-                  <span className="text-indigo-500 font-bold mr-2">[{log.action}]</span>
-                  <span className="text-slate-600 dark:text-slate-300">{log.details}</span>
-                </div>
-              ))
-            ) : (
-              <div className="text-slate-400 text-[10px]">No audit logs yet.</div>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   // ─── Main Render ─────────────────────────────────────────────────────────────
   return (
@@ -546,19 +313,19 @@ export function ApprovalCenterPage() {
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2 uppercase tracking-tight">
             <Award className="text-indigo-600 dark:text-indigo-500" size={22} />
-            Employee Approval Center
+            Pending Review
           </h1>
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
-            Manage employee onboarding, approvals, and activated workforce roster.
+            Review and process pending employee registration dossiers.
           </p>
         </div>
-        <Button variant="ghost" onClick={() => { loadDossier(); loadApprovedEmployees() }} className="flex gap-2 text-xs">
+        <Button variant="ghost" onClick={() => { loadDossiers(); loadApprovedEmployees() }} className="flex gap-2 text-xs">
           <RefreshCw size={14} /> Refresh
         </Button>
       </div>
 
       {/* ── METRICS GRID ── */}
-      <div className="grid grid-cols-3 gap-5 px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
+      <div className="grid grid-cols-1 gap-5 px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
         <div
           onClick={() => setActiveTab("pending")}
           className={`rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all border ${activeTab === "pending" ? "bg-amber-50 dark:bg-amber-900/10 border-amber-300 dark:border-amber-700 shadow-sm" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800 hover:border-slate-300"}`}
@@ -568,28 +335,6 @@ export function ApprovalCenterPage() {
             <span className="text-2xl font-black text-amber-500 mt-1 block">{metrics.pending}</span>
           </div>
           <Clock size={28} className="text-amber-400/40" />
-        </div>
-
-        <div
-          onClick={() => setActiveTab("approved")}
-          className={`rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all border ${activeTab === "approved" ? "bg-emerald-50 dark:bg-emerald-900/10 border-emerald-300 dark:border-emerald-700 shadow-sm" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800 hover:border-slate-300"}`}
-        >
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Approved Workforce</span>
-            <span className="text-2xl font-black text-emerald-500 mt-1 block">{metrics.approved}</span>
-          </div>
-          <UserCheck size={28} className="text-emerald-400/40" />
-        </div>
-
-        <div
-          onClick={() => setActiveTab("rejected")}
-          className={`rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all border ${activeTab === "rejected" ? "bg-rose-50 dark:bg-rose-900/10 border-rose-300 dark:border-rose-700 shadow-sm" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800 hover:border-slate-300"}`}
-        >
-          <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Rejected Dossiers</span>
-            <span className="text-2xl font-black text-rose-500 mt-1 block">{metrics.rejected}</span>
-          </div>
-          <XCircle size={28} className="text-rose-400/40" />
         </div>
       </div>
 
@@ -632,7 +377,7 @@ export function ApprovalCenterPage() {
                 <Clock size={12} /> Registration Queue
               </h2>
 
-              {dossierLoading ? (
+              {dossiersLoading ? (
                 <div className="flex items-center justify-center py-8 text-slate-400">
                   <Loader2 size={20} className="animate-spin mr-2" />
                   <span className="text-xs">Loading...</span>
@@ -642,13 +387,11 @@ export function ApprovalCenterPage() {
                   <ClipboardList size={32} className="opacity-30" />
                   <p className="text-xs font-bold uppercase tracking-wider">No Pending Applications</p>
                   <p className="text-[10px] font-semibold opacity-70">
-                    {dossier?.regForm?.fullName
-                      ? "The dossier has already been processed."
-                      : "Waiting for an employee to complete registration."}
+                    Waiting for employees to complete registration.
                   </p>
                 </div>
               ) : pendingQueue.map((emp) => (
-                <div key={emp.id} className="p-4 rounded-2xl border border-amber-200 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-900/5 shadow-sm">
+                <div key={emp.id} className={`p-4 rounded-2xl border transition-all ${activeEmployee?.id === emp.id ? 'border-amber-400 dark:border-amber-600 bg-amber-100/50 dark:bg-amber-900/20 shadow-md ring-2 ring-amber-400/20' : 'border-amber-200 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-900/5 shadow-sm'}`}>
                   <div className="flex justify-between items-start gap-1 mb-3">
                     <div className="min-w-0">
                       <div className="text-sm font-black text-slate-900 dark:text-white truncate">{emp.name}</div>
@@ -669,10 +412,10 @@ export function ApprovalCenterPage() {
                   </div>
                   <Button
                     variant="ghost"
-                    onClick={() => setShowReviewModal(true)}
-                    className="w-full mt-3 h-9 font-bold bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800/40"
+                    onClick={() => setViewingEmployee(emp)}
+                    className={`w-full mt-3 h-9 font-bold border transition-all ${activeEmployee?.id === emp.id ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600' : 'bg-white dark:bg-slate-800 border-amber-200 dark:border-amber-800/40'}`}
                   >
-                    <Eye size={12} className="mr-1.5" /> Review Dossier
+                    <Eye size={12} className="mr-1.5" /> {activeEmployee?.id === emp.id ? 'Viewing Details' : 'Review Dossier'}
                   </Button>
                 </div>
               ))}
@@ -721,109 +464,9 @@ export function ApprovalCenterPage() {
           </div>
         )}
 
-        {/* APPROVED TAB */}
-        {activeTab === "approved" && (
-          <div className="h-full overflow-y-auto p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
-                  <UserCheck size={16} className="text-emerald-500" /> Approved Workforce Roster
-                </h2>
-                <p className="text-[10px] text-slate-500 mt-0.5">
-                  Employees who have been approved and are either awaiting activation or actively using the platform.
-                </p>
-              </div>
-            </div>
+        {/* APPROVED TAB (Removed) */}
 
-            {approvedLoading ? (
-              <div className="flex items-center justify-center py-16 text-slate-400">
-                <Loader2 size={24} className="animate-spin mr-3" />
-                <span className="text-sm">Loading approved employees...</span>
-              </div>
-            ) : approvedEmployees.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center text-slate-400 space-y-3">
-                <div className="w-20 h-20 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center shadow-sm">
-                  <Users size={36} className="opacity-30" />
-                </div>
-                <div>
-                  <p className="text-sm font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">No Approved Employees Yet</p>
-                  <p className="text-xs mt-1 max-w-xs">Once you approve a registration, the employee will appear here.</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* Status legend */}
-                <div className="flex items-center gap-4 mb-5 text-[10px] font-bold">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                    <span className="text-slate-600 dark:text-slate-400">Active ({approvedEmployees.filter(e => e.is_active).length})</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
-                    <span className="text-slate-600 dark:text-slate-400">Invited / Pending Activation ({approvedEmployees.filter(e => !e.is_active).length})</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {approvedEmployees.map((emp) => (
-                    <ApprovedEmployeeCard
-                      key={emp.id}
-                      emp={emp}
-                      onView={setViewingEmployee}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* REJECTED TAB */}
-        {activeTab === "rejected" && (
-          <div className="flex h-full overflow-hidden">
-            <div className="w-[300px] border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 overflow-y-auto p-5 space-y-4">
-              <h2 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
-                <UserX size={12} /> Rejected Dossiers
-              </h2>
-
-              {rejectedQueue.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400 space-y-2">
-                  <XCircle size={32} className="opacity-30" />
-                  <p className="text-xs font-bold uppercase tracking-wider">No Rejected Records</p>
-                  <p className="text-[10px] opacity-70">No registration dossiers have been rejected.</p>
-                </div>
-              ) : rejectedQueue.map((emp) => (
-                <div key={emp.id} className="p-4 rounded-2xl border border-rose-200 dark:border-rose-800/40 bg-rose-50/50 dark:bg-rose-900/5 shadow-sm">
-                  <div className="flex justify-between items-start gap-1 mb-3">
-                    <div>
-                      <div className="text-sm font-black text-slate-900 dark:text-white truncate">{emp.name}</div>
-                      <div className="text-[10px] font-mono text-slate-500 mt-0.5">{emp.id}</div>
-                    </div>
-                    <Pill tone="bad">{emp.status}</Pill>
-                  </div>
-                  {dossier?.adminClearance?.remarks && (
-                    <div className="mt-2 p-2 bg-rose-100 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl">
-                      <span className="text-[8px] font-black text-rose-500 uppercase block mb-0.5">Rejection Reason</span>
-                      <span className="text-[10px] text-rose-700 dark:text-rose-300 font-semibold">{dossier.adminClearance.remarks}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="flex-grow flex flex-col bg-slate-50 dark:bg-slate-950 overflow-hidden">
-              {rejectedQueue.length > 0
-                ? <DossierContent emp={activeEmployee} />
-                : (
-                  <div className="flex-grow flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-4">
-                    <XCircle size={40} className="text-slate-300 dark:text-slate-700" />
-                    <p className="text-sm font-bold text-slate-500">No rejected dossiers to display.</p>
-                  </div>
-                )
-              }
-            </div>
-          </div>
-        )}
+        {/* REJECTED TAB (Removed) */}
       </div>
 
       {/* ── DOSSIER REVIEW MODAL ── */}
@@ -1004,6 +647,214 @@ export function ApprovalCenterPage() {
         </div>,
         document.body
       )}
+    </div>
+  )
+}
+
+// ─── Dossier Review Content (reusable component) ──────────────────────────
+export function DossierContent({ emp, inModal = false, setShowDocModal = () => {} }) {
+  if (!emp) return null
+  return (
+    <div className={`flex-1 overflow-y-auto pb-32 space-y-5 ${inModal ? "p-4" : "p-6"}`}>
+
+      {/* Header info */}
+      <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-900 to-indigo-700 border-2 border-indigo-500/40 overflow-hidden flex items-center justify-center shrink-0">
+            {emp.regForm?.profilePic
+              ? <img src={emp.regForm.profilePic} alt="Biometric" className="w-full h-full object-cover" />
+              : <User className="text-indigo-300 w-6 h-6" />
+            }
+          </div>
+          <div>
+            <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">Active Dossier Audit</span>
+            <h2 className="text-lg font-black text-slate-900 dark:text-white mt-0.5">{emp.name}</h2>
+            <span className="text-[10px] text-slate-400 font-mono">{emp.id} • Submitted {emp.regDate || "—"}</span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Pill tone="good">Trust Score: {emp.trustScore || 100}%</Pill>
+          <Pill tone={emp.status === "Invitation Sent" || emp.status === "Activated" || emp.status === "Active" ? "good" : emp.status === "Rejected" ? "bad" : "warn"}>
+            {emp.status}
+          </Pill>
+        </div>
+      </div>
+
+      {/* Personal Information */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">1️⃣</span> Personal Information
+          </h3>
+          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">✓ VERIFIED</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs font-semibold">
+          {[
+            ["Full Name", emp.name],
+            ["Phone Number", emp.phone],
+            ["Email Address", emp.email],
+            ["Current Location", emp.location || emp.country],
+            ["Registration Date", emp.regDate || "—"],
+            ["Employee ID", emp.id],
+          ].map(([lbl, val]) => (
+            <div key={lbl}>
+              <span className="block text-[8px] text-slate-400 font-bold uppercase mb-1">{lbl}</span>
+              <span className="text-slate-800 dark:text-slate-200">{val || "—"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Registration Verification */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">2️⃣</span> Registration Verification
+          </h3>
+          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">✓ VERIFIED</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            ["Phone OTP", emp.regForm?.otpStatus === "verified" || emp.status === "Active"],
+            ["Face Scan", emp.regForm?.isBiometricCompleted || emp.status === "Active"],
+            ["Registration", emp.regForm?.isCompleted || emp.status === "Active"],
+          ].map(([lbl, done]) => (
+            <div key={lbl} className={`flex items-center gap-3 p-3 rounded-xl border ${done ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800"}`}>
+              <CheckCircle2 size={15} className={done ? "text-emerald-600 shrink-0" : "text-slate-400 shrink-0"} />
+              <div>
+                <div className="text-[8px] font-black text-slate-400 uppercase tracking-wider">{lbl}</div>
+                <div className={`text-[10px] font-bold ${done ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>{done ? "Verified" : "Pending"}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Trust Score */}
+        <div className="mt-2 p-4 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Trust Score</span>
+            <span className="text-sm font-black text-emerald-600">{emp.trustScore || 100}%</span>
+          </div>
+          <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2">
+            <div className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-2 rounded-full transition-all duration-700" style={{ width: `${emp.trustScore || 100}%` }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Identity Documents */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-indigo-500">3️⃣</span> Identity Documents
+          </h3>
+          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">✓ VERIFIED</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: "Aadhaar Card", key: "aadhaar", fileKey: "aadhaarFile" },
+            { label: "PAN Card", key: "pan", fileKey: "panFile" },
+            { label: "Driving License", key: "license", fileKey: "drivingLicenseFile" },
+          ].map(({ label, key, fileKey }) => (
+            <div key={key} className="p-3 border border-slate-200 dark:border-slate-800 rounded-xl flex flex-col justify-between h-24 bg-slate-50 dark:bg-slate-950/20">
+              <div>
+                <span className="text-[8px] text-slate-400 font-bold uppercase tracking-wider block">{label}</span>
+                <span className="text-[10px] font-black text-slate-800 dark:text-slate-200 mt-1 block truncate">
+                  {emp.docForm?.[fileKey] || `${key}_scan.pdf`}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowDocModal(key)}
+                className="flex items-center gap-1 text-[9px] font-bold text-indigo-600 hover:text-indigo-700 mt-1"
+              >
+                <Eye size={10} /> View
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Training & Interview */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
+        <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <span className="text-indigo-500">4️⃣</span> Training &amp; Interview
+        </h3>
+        <div className="grid grid-cols-2 gap-3">
+          <div className={`p-3 rounded-xl border ${emp.academyState?.isCompleted || emp.status === "Active" ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200"}`}>
+            <span className="text-[8px] font-black text-slate-400 uppercase block">Training Academy</span>
+            <span className={`text-xs font-bold ${emp.academyState?.isCompleted || emp.status === "Active" ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>
+              {emp.academyState?.isCompleted || emp.status === "Active" ? "✓ Completed (100%)" : "Pending"}
+            </span>
+          </div>
+          <div className={`p-3 rounded-xl border ${emp.interviewState?.isCompleted || emp.status === "Active" ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200"}`}>
+            <span className="text-[8px] font-black text-slate-400 uppercase block">Interview / Compliance</span>
+            <span className={`text-xs font-bold ${emp.interviewState?.isCompleted || emp.status === "Active" ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"}`}>
+              {emp.interviewState?.isCompleted || emp.status === "Active" ? "✓ Passed" : "Pending"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Email Telemetry (post-approval) */}
+      {emp.adminClearance?.invitationToken && (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
+          <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
+            <span className="text-indigo-500">5️⃣</span> Email &amp; Invitation Telemetry
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1">
+              <span className="block text-[8px] text-slate-400 font-bold uppercase">Recipient</span>
+              <span className="text-slate-800 dark:text-slate-200 text-xs font-semibold truncate block">{emp.email}</span>
+            </div>
+            <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800 space-y-1">
+              <span className="block text-[8px] text-slate-400 font-bold uppercase">Status</span>
+              <span className="inline-flex items-center gap-1 font-bold text-emerald-600 text-xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {emp.adminClearance?.invitationEmailStatus || "Delivered"}
+              </span>
+            </div>
+            <div className="col-span-2 p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-indigo-200 dark:border-indigo-800">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="text-[8px] text-indigo-500 font-black uppercase block">Activation URL</span>
+                  <span className="text-[9px] font-mono text-slate-700 dark:text-slate-300 truncate block max-w-xs">
+                    {`${window.location.origin}/create-password?token=${emp.adminClearance.invitationToken}`}
+                  </span>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/create-password?token=${emp.adminClearance.invitationToken}`)
+                    alert("Activation Link copied!")
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-[10px] font-bold shrink-0 ml-2"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Audit Timeline */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 space-y-3 shadow-sm">
+        <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5 pb-3 border-b border-slate-100 dark:border-slate-800/80">
+          <Clock className="text-indigo-600" size={14} /> Audit Timeline
+        </h3>
+        <div className="space-y-3 font-mono text-[10px] text-slate-500 dark:text-slate-400 pl-4 border-l border-indigo-500/20">
+          {emp.adminClearance?.auditLogs?.length > 0 ? (
+            emp.adminClearance.auditLogs.map((log, idx) => (
+              <div key={idx} className="relative">
+                <div className="absolute left-[-21px] top-1 w-2.5 h-2.5 rounded-full bg-indigo-600" />
+                <span className="text-slate-900 dark:text-white font-bold mr-2">{log.timestamp}</span>
+                <span className="text-indigo-500 font-bold mr-2">[{log.action}]</span>
+                <span className="text-slate-600 dark:text-slate-300">{log.details}</span>
+              </div>
+            ))
+          ) : (
+            <div className="text-slate-400 text-[10px]">No audit logs yet.</div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

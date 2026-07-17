@@ -1087,37 +1087,71 @@ class RegistrationDossierView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
-        if os.path.exists(file_path):
-            try:
-                if os.path.getsize(file_path) == 0:
-                    return Response({})
-                with open(file_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                return Response(data)
-            except Exception as e:
-                print(f"Error loading registration dossier: {e}")
-                return Response({})
-        return Response({})
+        from .models import RegistrationDossier
+        dossier_id = request.query_params.get("id")
+        status_param = request.query_params.get("status", "pending")
+        
+        if dossier_id:
+            dossiers = RegistrationDossier.objects.filter(id=dossier_id)
+        elif status_param == "all":
+            dossiers = RegistrationDossier.objects.all()
+        else:
+            dossiers = RegistrationDossier.objects.filter(status=status_param)
+        
+        data = []
+        for d in dossiers:
+            item = {
+                "id": d.id,
+                "email": d.email,
+                "status": d.status,
+                "trustScore": d.trust_score,
+                "regForm": d.reg_form_data,
+                "docForm": d.doc_form_data,
+                "academyState": d.academy_state_data,
+                "interviewState": d.interview_state_data,
+                "adminClearance": d.admin_clearance_data,
+                "created_at": d.created_at.isoformat(),
+            }
+            data.append(item)
+        return Response(data)
 
     def post(self, request):
-        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
-        try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(request.data, f, indent=4, ensure_ascii=False)
-            return Response({"success": True})
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
+        from .models import RegistrationDossier
+        dossier_id = request.data.get("id")
+        email = request.data.get("regForm", {}).get("email") or request.data.get("email")
+        if not email and not dossier_id:
+            return Response({"error": "Email or ID is required"}, status=400)
+        
+        if dossier_id:
+            d, _ = RegistrationDossier.objects.get_or_create(id=dossier_id)
+        else:
+            d, _ = RegistrationDossier.objects.get_or_create(email=email)
+            
+        d.full_name = request.data.get("regForm", {}).get("fullName", d.full_name)
+        d.phone = request.data.get("regForm", {}).get("phone", d.phone)
+        d.region = request.data.get("regForm", {}).get("region", d.region)
+        if "status" in request.data:
+            d.status = request.data["status"]
+        if "trustScore" in request.data:
+            d.trust_score = request.data["trustScore"]
+            
+        d.reg_form_data = request.data.get("regForm", d.reg_form_data)
+        d.doc_form_data = request.data.get("docForm", d.doc_form_data)
+        d.academy_state_data = request.data.get("academyState", d.academy_state_data)
+        d.interview_state_data = request.data.get("interviewState", d.interview_state_data)
+        d.admin_clearance_data = request.data.get("adminClearance", d.admin_clearance_data)
+        
+        d.save()
+        
+        return Response({"success": True, "id": d.id})
 
     def delete(self, request):
-        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
-        if os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-                return Response({"success": True})
-            except Exception as e:
-                return Response({"error": str(e)}, status=500)
-        return Response({"success": True})
+        from .models import RegistrationDossier
+        dossier_id = request.data.get("id") or request.query_params.get("id")
+        if dossier_id:
+            RegistrationDossier.objects.filter(id=dossier_id).delete()
+            return Response({"success": True})
+        return Response({"error": "ID is required"}, status=400)
 
 
 class RegistrationDossierApproveView(APIView):
@@ -1128,22 +1162,22 @@ class RegistrationDossierApproveView(APIView):
             from django.utils import timezone
             from django.core.mail import send_mail
             from employees.models import Employee
+            from .models import RegistrationDossier
 
-            file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
-            if not os.path.exists(file_path):
+            dossier_id = request.data.get("id")
+            if not dossier_id:
+                return Response({"error": "Dossier ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+                
+            try:
+                dossier = RegistrationDossier.objects.get(id=dossier_id)
+            except RegistrationDossier.DoesNotExist:
                 return Response({"error": "No registration request dossier found."}, status=status.HTTP_400_BAD_REQUEST)
 
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    dossier = json.load(f)
-            except Exception as e:
-                return Response({"error": f"Failed to load dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-            reg_form = dossier.get("regForm", {})
-            email = reg_form.get("email")
-            full_name = reg_form.get("fullName", "")
-            phone = reg_form.get("phone", "")
-            region = reg_form.get("region", "IN")
+            reg_form = dossier.reg_form_data
+            email = dossier.email
+            full_name = dossier.full_name
+            phone = dossier.phone
+            region = dossier.region
 
             if not email:
                 return Response({"error": "Registrant email not found in dossier."}, status=status.HTTP_400_BAD_REQUEST)
@@ -1153,7 +1187,7 @@ class RegistrationDossierApproveView(APIView):
             expires_at = timezone.now() + timezone.timedelta(hours=24)
 
             # Update dossier status
-            admin_clearance = dossier.get("adminClearance", {})
+            admin_clearance = dossier.admin_clearance_data
             admin_clearance["status"] = "approved"
             admin_clearance["remarks"] = "Application reviewed and approved. Invitation email sent."
             admin_clearance["invitationStatus"] = "Sent"
@@ -1171,7 +1205,8 @@ class RegistrationDossierApproveView(APIView):
                 "details": f"Registration request approved by {request.user.get_full_name() or request.user.username}. Secure invitation dispatched."
             })
 
-            dossier["adminClearance"] = admin_clearance
+            dossier.admin_clearance_data = admin_clearance
+            dossier.status = "approved"
 
             # Create/Update User & Employee as inactive
             User = get_user_model()
@@ -1265,11 +1300,7 @@ The Caltrack Team
                 })
 
             # Save dossier
-            try:
-                with open(file_path, "w", encoding="utf-8") as f:
-                    json.dump(dossier, f, indent=4, ensure_ascii=False)
-            except Exception as e:
-                return Response({"error": f"Failed to save dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            dossier.save()
 
             return Response({"success": True, "invitationStatus": "Sent"})
         except Exception as approve_error:
@@ -1289,29 +1320,28 @@ class RegistrationDossierRejectView(APIView):
     def post(self, request):
         from django.utils import timezone
         from django.core.mail import send_mail
+        from .models import RegistrationDossier
 
         remarks = request.data.get("remarks", "Document Verification Failed")
         reason_category = request.data.get("reasonCategory", "Other")
 
-        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
-        if not os.path.exists(file_path):
-            return Response({"error": "No registration request dossier found."}, status=status.HTTP_400_BAD_REQUEST)
+        dossier_id = request.data.get("id")
+        if not dossier_id:
+            return Response({"error": "Dossier ID is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                dossier = json.load(f)
-        except Exception as e:
-            return Response({"error": f"Failed to load dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            dossier = RegistrationDossier.objects.get(id=dossier_id)
+        except RegistrationDossier.DoesNotExist:
+            return Response({"error": "No registration request dossier found."}, status=status.HTTP_400_BAD_REQUEST)
 
-        reg_form = dossier.get("regForm", {})
-        email = reg_form.get("email")
-        full_name = reg_form.get("fullName", "")
+        email = dossier.email
+        full_name = dossier.full_name
 
         if not email:
             return Response({"error": "Registrant email not found in dossier."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Update dossier status
-        admin_clearance = dossier.get("adminClearance", {})
+        admin_clearance = dossier.admin_clearance_data
         admin_clearance["status"] = "rejected"
         admin_clearance["remarks"] = remarks
         admin_clearance["reasonCategory"] = reason_category
@@ -1327,7 +1357,8 @@ class RegistrationDossierRejectView(APIView):
             "details": f"Registration request rejected by {request.user.get_full_name() or request.user.username}. Reason: {remarks}"
         })
 
-        dossier["adminClearance"] = admin_clearance
+        dossier.admin_clearance_data = admin_clearance
+        dossier.status = "rejected"
 
         # Send simulated rejection email
         subject = "Caltrack Registration Update"
@@ -1367,11 +1398,7 @@ The Caltrack Team
             })
 
         # Save dossier
-        try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(dossier, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            return Response({"error": f"Failed to save dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        dossier.save()
 
         return Response({"success": True, "status": "Rejected"})
 
@@ -1381,22 +1408,19 @@ class RegistrationDossierVerifyTokenView(APIView):
 
     def post(self, request):
         from django.utils import timezone
+        from .models import RegistrationDossier
 
         token = request.data.get("token")
         if not token:
             return Response({"error": "Token is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
-        if not os.path.exists(file_path):
-            return Response({"error": "No registration dossier found."}, status=status.HTTP_400_BAD_REQUEST)
+        # In PostgreSQL we can query JSONFields directly, but we'll iterate or use a basic filter
+        dossier = RegistrationDossier.objects.filter(admin_clearance_data__invitationToken=token).first()
+        
+        if not dossier:
+            return Response({"error": "Invalid or expired invitation token."}, status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                dossier = json.load(f)
-        except Exception as e:
-            return Response({"error": "Failed to read dossier data."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        admin_clearance = dossier.get("adminClearance", {})
+        admin_clearance = dossier.admin_clearance_data
         stored_token = admin_clearance.get("invitationToken")
         expires_at_str = admin_clearance.get("invitationExpiresAt")
 
@@ -1414,7 +1438,7 @@ class RegistrationDossierVerifyTokenView(APIView):
         if admin_clearance.get("status") == "activated":
             return Response({"error": "Account has already been activated."}, status=status.HTTP_400_BAD_REQUEST)
 
-        reg_form = dossier.get("regForm", {})
+        reg_form = dossier.reg_form_data
         return Response({
             "valid": True,
             "fullName": reg_form.get("fullName"),
@@ -1429,6 +1453,7 @@ class RegistrationDossierActivateView(APIView):
     def post(self, request):
         from django.utils import timezone
         from employees.models import Employee
+        from .models import RegistrationDossier
 
         token = request.data.get("token")
         password = request.data.get("password")
@@ -1436,22 +1461,13 @@ class RegistrationDossierActivateView(APIView):
         if not token or not password:
             return Response({"error": "Token and password are required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        file_path = os.path.join(settings.BASE_DIR, "caltrack_activation_dossier.json")
-        if not os.path.exists(file_path):
-            return Response({"error": "No registration dossier found."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                dossier = json.load(f)
-        except Exception as e:
-            return Response({"error": "Failed to read dossier data."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        admin_clearance = dossier.get("adminClearance", {})
-        stored_token = admin_clearance.get("invitationToken")
-        expires_at_str = admin_clearance.get("invitationExpiresAt")
-
-        if not stored_token or stored_token != token:
+        dossier = RegistrationDossier.objects.filter(admin_clearance_data__invitationToken=token).first()
+        
+        if not dossier:
             return Response({"error": "Invalid or expired invitation token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        admin_clearance = dossier.admin_clearance_data
+        expires_at_str = admin_clearance.get("invitationExpiresAt")
 
         # Check expiration
         if expires_at_str:
@@ -1464,8 +1480,7 @@ class RegistrationDossierActivateView(APIView):
         if admin_clearance.get("status") == "activated":
             return Response({"error": "Account has already been activated."}, status=status.HTTP_400_BAD_REQUEST)
 
-        reg_form = dossier.get("regForm", {})
-        email = reg_form.get("email")
+        email = dossier.email
 
         # Activate in DB
         User = get_user_model()
@@ -1503,14 +1518,10 @@ class RegistrationDossierActivateView(APIView):
             "details": f"Employee portal account transitioned to active state. Welcome to the Caltrack workspace!"
         })
 
-        dossier["adminClearance"] = admin_clearance
+        dossier.admin_clearance_data = admin_clearance
 
         # Save dossier
-        try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(dossier, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            return Response({"error": f"Failed to save dossier: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        dossier.save()
 
         return Response({"success": True})
 

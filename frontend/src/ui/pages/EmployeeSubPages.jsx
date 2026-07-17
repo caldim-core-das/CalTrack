@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { apiFetchRegistrationDossier, apiSaveRegistrationDossier, apiDeleteRegistrationDossier } from "../../api/authService.js"
 import { Card, Pill, Button } from "../components/kit.jsx"
-import { Users, FileText, CheckCircle2, XCircle, FolderOpen, Award, TrendingUp, ShieldCheck } from "lucide-react"
+import { Users, FileText, CheckCircle2, XCircle, FolderOpen, Award, TrendingUp, ShieldCheck, Eye, Edit, Trash2, X, ChevronDown, ChevronRight } from "lucide-react"
+import { createPortal } from "react-dom"
+import { DossierContent } from "./ApprovalCenterPage.jsx"
 
 // helper format
 const formatEmployeeId = (value) => {
@@ -205,10 +207,6 @@ export function EmployeesDashboardPage() {
     </div>
   )
 }
-
-import { createPortal } from "react-dom"
-import { Eye, Edit, Trash2, X, ChevronDown, ChevronRight } from "lucide-react"
-
 // 2. Approved Employees Page
 export function ApprovedEmployeesPage() {
   const [employees, setEmployees] = useState([])
@@ -412,8 +410,8 @@ export function ApprovedEmployeesPage() {
       {/* ── VIEW EMPLOYEE DETAILS MODAL ── */}
       {viewingEmployee && createPortal(
         <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl p-6 flex flex-col space-y-6">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
               <h3 className="text-sm font-black uppercase tracking-wider text-slate-850 dark:text-white">
                 Employee Profile Details
               </h3>
@@ -422,48 +420,26 @@ export function ApprovedEmployeesPage() {
               </button>
             </div>
             
-            <div className="grid grid-cols-2 gap-4 text-xs font-semibold">
-              <div className="col-span-2 p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Full Name</span>
-                <span className="text-slate-900 dark:text-white text-sm font-black">
-                  {viewingEmployee.user?.first_name ? `${viewingEmployee.user.first_name} ${viewingEmployee.user.last_name}` : viewingEmployee.name}
-                </span>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Employee ID</span>
-                <span className="text-slate-900 dark:text-white font-mono">{formatEmployeeId(viewingEmployee.employee_id || viewingEmployee.id)}</span>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Title</span>
-                <span className="text-slate-900 dark:text-white">{viewingEmployee.title || "Field Technician"}</span>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Email</span>
-                <span className="text-slate-900 dark:text-white font-mono break-all">{viewingEmployee.user?.email || viewingEmployee.email || "—"}</span>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Phone</span>
-                <span className="text-slate-900 dark:text-white">{viewingEmployee.phone || "—"}</span>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Hourly Rate</span>
-                <span className="text-slate-900 dark:text-white">${viewingEmployee.hourly_rate ? parseFloat(viewingEmployee.hourly_rate).toFixed(2) : "0.00"}/hr</span>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Country</span>
-                <span className="text-slate-900 dark:text-white">{viewingEmployee.country || "US"}</span>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Department</span>
-                <span className="text-slate-900 dark:text-white">{viewingEmployee.department || "—"}</span>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800">
-                <span className="block text-[8px] text-slate-400 font-bold uppercase mb-0.5">Status</span>
-                <Pill tone="good">Active</Pill>
-              </div>
+            <div className="flex-1 overflow-y-auto">
+              <DossierContent 
+                emp={{
+                  id: viewingEmployee.employee_id || viewingEmployee.id,
+                  name: viewingEmployee.user?.first_name ? `${viewingEmployee.user.first_name} ${viewingEmployee.user.last_name}` : viewingEmployee.name,
+                  email: viewingEmployee.user?.email || viewingEmployee.email,
+                  phone: viewingEmployee.phone,
+                  location: viewingEmployee.country,
+                  status: "Active",
+                  trustScore: 100,
+                  regDate: viewingEmployee.hire_date || "—",
+                  regForm: { isBiometricCompleted: true, isCompleted: true, otpStatus: "verified" },
+                  academyState: { isCompleted: true },
+                  interviewState: { isCompleted: true }
+                }} 
+                inModal={true} 
+              />
             </div>
-
-            <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+            
+            <div className="flex justify-end p-4 border-t border-slate-100 dark:border-slate-800 shrink-0">
               <Button onClick={() => setViewingEmployee(null)} className="h-10 px-5 font-bold">
                 Close
               </Button>

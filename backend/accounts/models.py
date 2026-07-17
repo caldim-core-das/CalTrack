@@ -122,3 +122,36 @@ class OTPAuditLog(models.Model):
     def __str__(self):
         return f"{self.phone} - {self.action} @ {self.timestamp}"
 
+
+class RegistrationDossier(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    )
+
+    email = models.EmailField(unique=True)
+    full_name = models.CharField(max_length=150, blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    region = models.CharField(max_length=50, blank=True, default="IN")
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    trust_score = models.IntegerField(default=0)
+    
+    # Store complete forms as JSON instead of rigidly defining all fields
+    reg_form_data = models.JSONField(default=dict, blank=True)
+    doc_form_data = models.JSONField(default=dict, blank=True)
+    academy_state_data = models.JSONField(default=dict, blank=True)
+    interview_state_data = models.JSONField(default=dict, blank=True)
+    admin_clearance_data = models.JSONField(default=dict, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Registration Dossier"
+        verbose_name_plural = "Registration Dossiers"
+
+    def __str__(self):
+        return f"Dossier: {self.full_name} ({self.email}) - {self.status}"

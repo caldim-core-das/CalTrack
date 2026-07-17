@@ -297,10 +297,10 @@ export default function AuditLedger({ logs, loading, elapsed, downloadLogPdf, su
                       <div style={{
                         display: "flex", alignItems: "center", gap: 3,
                         fontSize: 9, fontWeight: 900, textTransform: "uppercase",
-                        color: l.face_match_status === 'matched' ? "var(--al-approved-text)" : "var(--al-rejected-text)"
+                        color: l.face_match_status === 'matched' ? "var(--al-approved-text)" : (l.face_match_status === 'pending' ? "var(--al-pending-text, #f59e0b)" : "var(--al-rejected-text)")
                       }}>
-                        {l.face_match_status === 'matched' ? <CheckCircle2 size={10} /> : <AlertCircle size={10} />}
-                        {l.face_match_status === 'matched' ? 'Verified' : 'Mismatch'}
+                        {l.face_match_status === 'matched' ? <CheckCircle2 size={10} /> : (l.face_match_status === 'pending' ? <Clock size={10} /> : <AlertCircle size={10} />)}
+                        {l.face_match_status === 'matched' ? 'Verified' : (l.face_match_status === 'pending' ? 'Pending' : (l.face_match_status === 'no_face' ? 'No Face' : 'Mismatch'))}
                       </div>
                     )}
                     {l.status === 'rejected' && l.admin_notes && (
