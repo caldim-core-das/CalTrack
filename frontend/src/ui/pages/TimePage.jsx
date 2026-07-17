@@ -1910,7 +1910,7 @@ return (
               setShowSelfie(false);
               setFaceVerifyStatus('verifying');
               setError('');
-              let clockInPhoto = openLog.clock_in_photo;
+              let clockInPhoto = user?.avatar_url || openLog.clock_in_photo;
               if (clockInPhoto && clockInPhoto.startsWith('/')) {
                 const host = API_BASE_URL.replace('/api', '');
                 clockInPhoto = `${host}${clockInPhoto}`;

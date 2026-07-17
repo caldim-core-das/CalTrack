@@ -47,7 +47,13 @@ async function getDescriptor(imageSrc) {
       }
     }
     img.onerror = () => resolve(null)
-    img.src = imageSrc
+    
+    // Bypass browser cache for crossOrigin requests to prevent Canvas CORS errors
+    let finalSrc = imageSrc
+    if (imageSrc && imageSrc.startsWith('http')) {
+      finalSrc = imageSrc + (imageSrc.includes('?') ? '&' : '?') + 'cors=' + Date.now()
+    }
+    img.src = finalSrc
   })
 }
 
