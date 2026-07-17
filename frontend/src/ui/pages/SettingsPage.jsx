@@ -16,20 +16,21 @@ import {
 const WorkSchedulesSettingsSection = lazy(() =>
   import("./WorkSchedulesSettingsPage.jsx").then(m => ({ default: m.WorkSchedulesSettingsPage }))
 )
-const ProfileSection        = lazy(() => import("./settings/ProfileSection.jsx"))
+const ProfileSection = lazy(() => import("./settings/ProfileSection.jsx"))
 const AccountSecuritySection = lazy(() => import("./settings/AccountSecuritySection.jsx"))
-const AppearanceSection     = lazy(() => import("./settings/AppearanceSection.jsx"))
-const NotificationsSection  = lazy(() => import("./settings/NotificationsSection.jsx"))
-const BillingSection        = lazy(() => import("./settings/BillingSection.jsx"))
+const AppearanceSection = lazy(() => import("./settings/AppearanceSection.jsx"))
+const NotificationsSection = lazy(() => import("./settings/NotificationsSection.jsx"))
+const BillingSection = lazy(() => import("./settings/BillingSection.jsx"))
 const MembersSettingsSection = lazy(() =>
   import("./PeopleSettingsPage.jsx").then(m => ({ default: m.PeopleSettingsPage }))
 )
-const TeamMembersSection    = lazy(() => import("./settings/TeamMembersSection.jsx"))
-const InvoicesSection       = lazy(() => import("./settings/InvoicesSection.jsx"))
-const WorkspaceSection      = lazy(() => import("./settings/WorkspaceSection.jsx"))
-const PrivacyDataSection    = lazy(() => import("./settings/PrivacyDataSection.jsx"))
-const DangerZoneSection     = lazy(() => import("./settings/DangerZoneSection.jsx"))
-const AccessControlSection  = lazy(() => import("./settings/AccessControlSection.jsx"))
+const TeamMembersSection = lazy(() => import("./settings/TeamMembersSection.jsx"))
+const InvoicesSection = lazy(() => import("./settings/InvoicesSection.jsx"))
+const WorkspaceSection = lazy(() => import("./settings/WorkspaceSection.jsx"))
+const PrivacyDataSection = lazy(() => import("./settings/PrivacyDataSection.jsx"))
+const DangerZoneSection = lazy(() => import("./settings/DangerZoneSection.jsx"))
+const AccessControlSection = lazy(() => import("./settings/AccessControlSection.jsx"))
+const CatalogSettingsSection = lazy(() => import("./settings/CatalogSettingsSection.jsx"))
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function Toast({ message, type = "success", onDismiss }) {
@@ -164,6 +165,13 @@ const TABS = [
     to: routes.settings_data,
   },
   {
+    id: "catalog",
+    label: "Service Catalog",
+    subtitle: "Manage categories, services, pricing, and payment policies.",
+    icon: <Database size={15} />,
+    adminOnly: true,
+  },
+  {
     id: "rbac",
     label: "Access Control",
     subtitle: "Module visibility, data modification rights, and role-based permissions.",
@@ -235,11 +243,10 @@ export function SettingsPage({ section: sectionProp }) {
               <button
                 key={tab.id}
                 onClick={() => setActiveSection(tab.id)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-                  isActive 
-                    ? "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 shadow-sm shadow-indigo-100/20 dark:shadow-none" 
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${isActive
+                    ? "bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 shadow-sm shadow-indigo-100/20 dark:shadow-none"
                     : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:text-slate-900 dark:hover:text-white"
-                }`}
+                  }`}
               >
                 <span className={`${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400 dark:text-slate-500"} shrink-0`}>
                   {tab.icon}
@@ -271,19 +278,20 @@ export function SettingsPage({ section: sectionProp }) {
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
             <Suspense fallback={<Loader />}>
-              {activeSection === "profile"       && <ProfileSection markDirty={markDirty} showToast={showToast} Field={Field} SectionHeader={SectionHeader} />}
-              {activeSection === "security"      && <AccountSecuritySection markDirty={markDirty} showToast={showToast} Field={Field} SectionHeader={SectionHeader} />}
-              {activeSection === "appearance"    && <AppearanceSection showToast={showToast} SectionHeader={SectionHeader} />}
+              {activeSection === "profile" && <ProfileSection markDirty={markDirty} showToast={showToast} Field={Field} SectionHeader={SectionHeader} />}
+              {activeSection === "security" && <AccountSecuritySection markDirty={markDirty} showToast={showToast} Field={Field} SectionHeader={SectionHeader} />}
+              {activeSection === "appearance" && <AppearanceSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "notifications" && <NotificationsSection showToast={showToast} SectionHeader={SectionHeader} />}
-              {activeSection === "billing"       && <BillingSection showToast={showToast} SectionHeader={SectionHeader} />}
-              {activeSection === "people"        && <MembersSettingsSection />}
-              {activeSection === "team"          && <TeamMembersSection showToast={showToast} SectionHeader={SectionHeader} />}
-              {activeSection === "schedules"     && <WorkSchedulesSettingsSection />}
-              {activeSection === "invoices"      && <InvoicesSection />}
-              {activeSection === "organization"  && <WorkspaceSection showToast={showToast} SectionHeader={SectionHeader} />}
-              {activeSection === "data"          && <PrivacyDataSection showToast={showToast} SectionHeader={SectionHeader} />}
-              {activeSection === "rbac"          && <AccessControlSection />}
-              {activeSection === "danger"        && <DangerZoneSection showToast={showToast} SectionHeader={SectionHeader} />}
+              {activeSection === "billing" && <BillingSection showToast={showToast} SectionHeader={SectionHeader} />}
+              {activeSection === "people" && <MembersSettingsSection />}
+              {activeSection === "team" && <TeamMembersSection showToast={showToast} SectionHeader={SectionHeader} />}
+              {activeSection === "schedules" && <WorkSchedulesSettingsSection />}
+              {activeSection === "invoices" && <InvoicesSection />}
+              {activeSection === "organization" && <WorkspaceSection showToast={showToast} SectionHeader={SectionHeader} />}
+              {activeSection === "data" && <PrivacyDataSection showToast={showToast} SectionHeader={SectionHeader} />}
+              {activeSection === "catalog" && <CatalogSettingsSection showToast={showToast} SectionHeader={SectionHeader} />}
+              {activeSection === "rbac" && <AccessControlSection />}
+              {activeSection === "danger" && <DangerZoneSection showToast={showToast} SectionHeader={SectionHeader} />}
             </Suspense>
           </motion.div>
         </AnimatePresence>

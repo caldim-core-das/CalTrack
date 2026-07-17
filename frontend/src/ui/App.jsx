@@ -152,6 +152,9 @@ const FeedbackManagementPage = lazy(() =>
 const EmployeeJobsPage = lazy(() =>
   import("./pages/EmployeeJobsPage.jsx").then(m => ({ default: m.EmployeeJobsPage }))
 )
+const EmployeeFeedbackPage = lazy(() =>
+  import("./pages/EmployeeFeedbackPage.jsx").then(m => ({ default: m.EmployeeFeedbackPage }))
+)
 
 // ─── Route Guards ────────────────────────────────────────────
 
@@ -183,7 +186,7 @@ function RequireAdminSettings() {
 function RequireModulePermission({ module, action = "view" }) {
   const { user } = useAuth()
   if (!user) return <Navigate to={routes.login} replace />
-  
+
   const perms = user.companyPermissions
   if (perms) {
     const modulePerms = perms[module]
@@ -349,6 +352,7 @@ export function App() {
             <Route path={routes.inventory} element={<InventoryPage />} />
             <Route path={routes.mileage} element={<MileagePage />} />
             <Route path={routes.employee_jobs} element={<EmployeeJobsPage />} />
+            <Route path={routes.employee_feedback} element={<EmployeeFeedbackPage />} />
 
             {/* Employee profile settings — accessible to everyone */}
             <Route path={routes.settings} element={<SettingsPage />} />

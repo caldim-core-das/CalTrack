@@ -60,6 +60,7 @@ class User(AbstractBaseUser):
         MANAGER = "manager", "Manager"
         EMPLOYEE = "employee", "Employee"
         KIOSK = "kiosk", "Kiosk"
+        CUSTOMER = "customer", "Customer"
 
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.EMPLOYEE)
 
@@ -70,9 +71,12 @@ class User(AbstractBaseUser):
     language = models.CharField(max_length=10, default="en")
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True)
 
-    # 2FA
+    # 2FA & OTP Logins
     totp_secret = models.CharField(max_length=100, blank=True, default="")
     two_fa_enabled = models.BooleanField(default=False)
+    email_otp = models.CharField(max_length=6, blank=True, null=True)
+    phone_otp = models.CharField(max_length=6, blank=True, null=True)
+    otp_created_at = models.DateTimeField(blank=True, null=True)
 
     objects = UserManager()
 

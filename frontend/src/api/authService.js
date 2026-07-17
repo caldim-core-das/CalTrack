@@ -38,11 +38,43 @@ async function fetchJSON(path, options = {}) {
  * Login — server sets qt_access + qt_refresh httpOnly cookies in response.
  * Returns { success: true } — no tokens in the body.
  */
-export async function apiLogin(identifier, password) {
+export async function apiLogin(username, password) {
   return fetchJSON("/auth/login/", {
     method: "POST",
-    body: JSON.stringify({ username: identifier, password }),
+    body: JSON.stringify({ username, password })
   })
+}
+
+export async function apiRequestCustomerEmailOTP(email) {
+  return fetchJSON("/auth/customer/email/request-otp/", {
+    method: "POST",
+    body: JSON.stringify({ email })
+  })
+}
+
+export async function apiVerifyCustomerEmailOTP(email, otp) {
+  return fetchJSON("/auth/customer/email/verify-otp/", {
+    method: "POST",
+    body: JSON.stringify({ email, otp })
+  })
+}
+
+export async function apiRequestCustomerPhoneOTP(phone) {
+  return fetchJSON("/auth/customer/phone/request-otp/", {
+    method: "POST",
+    body: JSON.stringify({ phone })
+  })
+}
+
+export async function apiVerifyCustomerPhoneOTP(phone, otp) {
+  return fetchJSON("/auth/customer/phone/verify-otp/", {
+    method: "POST",
+    body: JSON.stringify({ phone, otp })
+  })
+}
+
+export async function apiFetchCustomerBookings() {
+  return fetchJSON("/booking/my-bookings/")
 }
 
 /**
@@ -65,15 +97,10 @@ export async function apiFetchMe() {
     const text = await res.text()
     let data
     try { data = JSON.parse(text) } catch { data = text || null }
-    if (!res.ok) return null
-    return data
-  } catch {
-    clearTimeout(timeoutId)
     if (!res.ok) {
       console.warn("apiFetchMe failed with status:", res.status, text)
       return null
     }
-    const data = JSON.parse(text)
     return data
   } catch (err) {
     clearTimeout(timeoutId)

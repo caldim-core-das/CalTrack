@@ -47,6 +47,7 @@ class Employee(models.Model):
     payroll_group = models.CharField(max_length=100, blank=True, null=True)
     tax_category = models.CharField(max_length=100, blank=True, null=True)
     bank_details = models.JSONField(default=dict, blank=True)
+    service_roles = models.JSONField(default=list, blank=True)
 
     # ── Geofence override (Phase 1, Layer 3) ─────────────────────────────
     allow_all_locations = models.BooleanField(default=False)

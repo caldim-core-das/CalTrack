@@ -72,6 +72,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "is_active",
             "created_at",
             "updated_at",
+            "service_roles",
         )
         read_only_fields = ("id", "created_at", "updated_at", "is_online", "last_login_at", "last_logout_at", "last_activity_at")
 

@@ -9,6 +9,7 @@ import {
   CheckCheck, Ban, Repeat2, ThumbsUp, Send, Copy
 } from "lucide-react"
 import { apiRequest } from "../../api/client.js"
+import { CATEGORY_TO_ROLES_MAP, TECHNICIAN_ROLES } from "../../utils/roles.js"
 
 /* ─── Toast ─────────────────────────────────────────────────────────────── */
 function Toast({ message, type = "success", onDismiss }) {
@@ -25,25 +26,25 @@ function Toast({ message, type = "success", onDismiss }) {
 
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 const STATUS_META = {
-  new_request:           { label: "New",           color: "#3B82F6", bg: "#EFF6FF", border: "#BFDBFE" },
-  reviewed:              { label: "Reviewed",       color: "#6366F1", bg: "#EEF2FF", border: "#C7D2FE" },
-  assigned:              { label: "Assigned",       color: "#8B5CF6", bg: "#F5F3FF", border: "#DDD6FE" },
-  accepted:              { label: "Accepted",       color: "#F59E0B", bg: "#FFFBEB", border: "#FDE68A" },
-  in_progress:           { label: "In Progress",    color: "#F97316", bg: "#FFF7ED", border: "#FDBA74" },
-  completed:             { label: "Completed",      color: "#10B981", bg: "#ECFDF5", border: "#6EE7B7" },
-  awaiting_verification: { label: "Verifying",      color: "#14B8A6", bg: "#F0FDFA", border: "#99F6E4" },
-  verified:              { label: "Verified",       color: "#059669", bg: "#D1FAE5", border: "#6EE7B7" },
-  feedback_pending:      { label: "Feedback",       color: "#64748B", bg: "#F8FAFC", border: "#CBD5E1" },
-  feedback_received:     { label: "Fb Received",    color: "#EC4899", bg: "#FDF2F8", border: "#FBCFE8" },
-  closed:                { label: "Closed",         color: "#475569", bg: "#F1F5F9", border: "#CBD5E1" },
-  rejected:              { label: "Rejected",       color: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
-  rework_requested:      { label: "Rework",         color: "#DC2626", bg: "#FEF2F2", border: "#FCA5A5" },
+  new_request: { label: "New", color: "#3B82F6", bg: "#EFF6FF", border: "#BFDBFE" },
+  reviewed: { label: "Reviewed", color: "#6366F1", bg: "#EEF2FF", border: "#C7D2FE" },
+  assigned: { label: "Assigned", color: "#8B5CF6", bg: "#F5F3FF", border: "#DDD6FE" },
+  accepted: { label: "Accepted", color: "#F59E0B", bg: "#FFFBEB", border: "#FDE68A" },
+  in_progress: { label: "In Progress", color: "#F97316", bg: "#FFF7ED", border: "#FDBA74" },
+  completed: { label: "Completed", color: "#10B981", bg: "#ECFDF5", border: "#6EE7B7" },
+  awaiting_verification: { label: "Verifying", color: "#14B8A6", bg: "#F0FDFA", border: "#99F6E4" },
+  verified: { label: "Verified", color: "#059669", bg: "#D1FAE5", border: "#6EE7B7" },
+  feedback_pending: { label: "Feedback", color: "#64748B", bg: "#F8FAFC", border: "#CBD5E1" },
+  feedback_received: { label: "Fb Received", color: "#EC4899", bg: "#FDF2F8", border: "#FBCFE8" },
+  closed: { label: "Closed", color: "#475569", bg: "#F1F5F9", border: "#CBD5E1" },
+  rejected: { label: "Rejected", color: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
+  rework_requested: { label: "Rework", color: "#DC2626", bg: "#FEF2F2", border: "#FCA5A5" },
 }
 
 const PRIORITY_META = {
-  low:    { label: "Low",    color: "#64748B", bg: "#F1F5F9" },
+  low: { label: "Low", color: "#64748B", bg: "#F1F5F9" },
   normal: { label: "Normal", color: "#3B82F6", bg: "#EFF6FF" },
-  high:   { label: "High",   color: "#F97316", bg: "#FFF7ED" },
+  high: { label: "High", color: "#F97316", bg: "#FFF7ED" },
   urgent: { label: "Urgent", color: "#EF4444", bg: "#FEF2F2" },
 }
 
@@ -94,7 +95,7 @@ function PriorityBadge({ priority }) {
 
 function TechAvatar({ name, size = 32 }) {
   const initial = (name || "?").charAt(0).toUpperCase()
-  const colors = ["#7C3AED","#2563EB","#059669","#D97706","#DC2626","#0891B2"]
+  const colors = ["#7C3AED", "#2563EB", "#059669", "#D97706", "#DC2626", "#0891B2"]
   const color = colors[initial.charCodeAt(0) % colors.length]
   return (
     <div style={{
@@ -198,23 +199,24 @@ function EmployeePicker({ employees, onAssign, loading }) {
 
 /* ─── Main Component ─────────────────────────────────────────────────────── */
 export function ServiceRequestsPage() {
-  const [requests, setRequests]           = useState([])
-  const [allRequests, setAllRequests]     = useState([])
-  const [employees, setEmployees]         = useState([])
-  const [selectedId, setSelectedId]       = useState(null)
-  const [detail, setDetail]               = useState(null)
-  const [loading, setLoading]             = useState(true)
+  const [requests, setRequests] = useState([])
+  const [allRequests, setAllRequests] = useState([])
+  const [employees, setEmployees] = useState([])
+  const [categoriesMap, setCategoriesMap] = useState({})
+  const [selectedId, setSelectedId] = useState(null)
+  const [detail, setDetail] = useState(null)
+  const [loading, setLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
-  const [error, setError]                 = useState(null)
+  const [error, setError] = useState(null)
   const [actionSuccess, setActionSuccess] = useState(null)
-  const [toast, setToast]                 = useState(null)
-  const [showAssign, setShowAssign]       = useState(false)
+  const [toast, setToast] = useState(null)
+  const [showAssign, setShowAssign] = useState(false)
 
   const showToast = (msg, type = "success") => setToast({ msg, type, id: Date.now() })
 
   // Filters
-  const [search, setSearch]             = useState("")
+  const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
   const [priorityFilter, setPriorityFilter] = useState("")
 
@@ -239,7 +241,31 @@ export function ServiceRequestsPage() {
     apiRequest("/admin/service-requests/employees/")
       .then(res => { if (res?.success) setEmployees(res.data) })
       .catch(err => console.error("Error loading technicians:", err))
+      
+    apiRequest("/catalog/categories/")
+      .then(res => {
+        if (res?.success) {
+          const cmap = {}
+          res.data.forEach(c => {
+            const slug = c.slug || c.name.toLowerCase().replace(/ /g, "_")
+            const entry = { name: c.name, image: c.image, slug }
+            cmap[c.id.toString()] = entry
+            cmap[slug] = entry
+          })
+          setCategoriesMap(cmap)
+        }
+      })
+      .catch(err => console.error("Error loading categories:", err))
   }, [])
+
+  const getCategoryInfo = (catIdOrSlug) => {
+    if (!catIdOrSlug) return { name: "General", emoji: "🔧" }
+    const key = catIdOrSlug.toString()
+    const name = categoriesMap[key]?.name || key.replace(/_/g, " ")
+    const slug = name.toLowerCase().replace(/ /g, "_")
+    const emoji = CAT_EMOJIS[slug] || "🔧"
+    return { name, emoji }
+  }
 
   /* Client-side filtering */
   const filtered = useMemo(() => {
@@ -308,7 +334,7 @@ export function ServiceRequestsPage() {
     setActionLoading(true)
     try {
       const res = await apiRequest(`/admin/service-requests/${selectedId}/assign/`, {
-        method: "POST", json: { employee_id: empId },
+        method: "PATCH", json: { employee_id: empId },
       })
       if (res?.success) {
         showToast("Technician assigned!", "success")
@@ -316,7 +342,8 @@ export function ServiceRequestsPage() {
         await refreshAll()
       } else showToast(res?.message || "Assignment failed.", "error")
     } catch (err) {
-      showToast(err?.body?.message || "Assignment error.", "error")
+      const msg = err?.body?.detail || err?.body?.message || "Assignment error."
+      showToast(msg, "error")
     } finally { setActionLoading(false) }
   }
 
@@ -402,7 +429,7 @@ export function ServiceRequestsPage() {
                   <div className="sr-item-top">
                     <div className="sr-item-meta">
                       <span className="sr-item-id">{r.request_id}</span>
-                      <span className="sr-item-emoji">{CAT_EMOJIS[r.service_category] || "🔧"}</span>
+                      <span className="sr-item-emoji">{getCategoryInfo(r.service_category).emoji}</span>
                       <PriorityBadge priority={r.priority} />
                     </div>
                     <span className="sr-item-date">{new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
@@ -451,7 +478,9 @@ export function ServiceRequestsPage() {
                 <div className="sr-detail-header-left">
                   <div className="sr-detail-id-row">
                     <span className="sr-detail-id">{detail.request_id}</span>
-                    <span className="sr-detail-cat">{CAT_EMOJIS[detail.service_category] || "🔧"} {detail.service_category?.replace(/_/g, " ")}</span>
+                    <span className="sr-detail-cat">
+                      {getCategoryInfo(detail.service_category).emoji} {getCategoryInfo(detail.service_category).name}
+                    </span>
                     <StatusBadge status={detail.status} size="md" />
                   </div>
                   <h2 className="sr-detail-title">{detail.issue_title}</h2>
@@ -533,7 +562,19 @@ export function ServiceRequestsPage() {
 
                 {/* Technician */}
                 <div className="sr-info-card">
-                  <div className="sr-info-card-title"><Users size={13} /> Technician</div>
+                  {(() => {
+                    const catKey = detail.service_category?.toString()
+                    const catEntry = categoriesMap[catKey]
+                    const catName = catEntry?.name || (catKey ? catKey.replace(/_/g, " ") : "")
+                    // Use the DB slug from categoriesMap; fall back to generating from name
+                    const catSlug = catEntry?.slug || catName.toLowerCase().replace(/ /g, "_")
+                    const reqRoleIds = CATEGORY_TO_ROLES_MAP[catSlug] || []
+                    const reqRoleLabels = reqRoleIds.map(id => TECHNICIAN_ROLES.find(r => r.id === id)?.label).filter(Boolean)
+                    const roleTitle = reqRoleLabels.length > 0 ? reqRoleLabels.join(" / ") : "Technician"
+                    return (
+                      <div className="sr-info-card-title"><Users size={13} /> {roleTitle}</div>
+                    )
+                  })()}
                   {detail.assigned_employee ? (
                     <div className="sr-tech-assigned">
                       <TechAvatar name={detail.assigned_employee.full_name} size={40} />
@@ -558,6 +599,66 @@ export function ServiceRequestsPage() {
                 </div>
               </div>
 
+              {/* Booking Details */}
+              {(detail.cart_data || detail.total_amount > 0 || detail.preferred_time) && (
+                (() => {
+                  let parsedCart = [];
+                  if (typeof detail.cart_data === "string") {
+                    try { parsedCart = JSON.parse(detail.cart_data); } catch (e) { }
+                  } else if (Array.isArray(detail.cart_data)) {
+                    parsedCart = detail.cart_data;
+                  }
+
+                  if (parsedCart.length === 0 && !detail.total_amount && !detail.preferred_time) return null;
+
+                  return (
+                    <div className="sr-desc-card" style={{ marginBottom: 15 }}>
+                      <div className="sr-info-card-title"><ClipboardCheck size={13} /> Booking Details</div>
+
+                      {detail.preferred_time && (
+                        <div className="sr-info-row" style={{ marginBottom: 15 }}>
+                          <span className="sr-info-key"><Clock size={11} /> Preferred Time</span>
+                          <span className="sr-info-val sr-info-val--sm">{detail.preferred_time}</span>
+                        </div>
+                      )}
+
+                      {parsedCart.length > 0 && (
+                        <div className="sr-cart-items" style={{ marginBottom: 15 }}>
+                          <table style={{ width: "100%", fontSize: "0.85rem", borderCollapse: "collapse" }}>
+                            <thead>
+                              <tr style={{ borderBottom: "1px solid #e2e8f0", color: "#64748B", textAlign: "left" }}>
+                                <th style={{ padding: "8px 0", fontWeight: 600 }}>Service</th>
+                                <th style={{ padding: "8px 0", fontWeight: 600, textAlign: "center" }}>Qty</th>
+                                <th style={{ padding: "8px 0", fontWeight: 600, textAlign: "right" }}>Price</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {parsedCart.map((item, idx) => (
+                                <tr key={idx} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                  <td style={{ padding: "10px 0", color: "#334155" }}>
+                                    <div style={{ fontWeight: 500 }}>{item.name}</div>
+                                    {item.categoryName && <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{item.categoryName}</div>}
+                                  </td>
+                                  <td style={{ padding: "10px 0", textAlign: "center", color: "#475569" }}>{item.quantity}</td>
+                                  <td style={{ padding: "10px 0", textAlign: "right", color: "#475569" }}>${item.price}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {(detail.total_amount > 0 || parsedCart.length > 0) && (
+                        <div className="sr-info-row" style={{ borderTop: "1px solid #e2e8f0", paddingTop: 12, justifyContent: "space-between" }}>
+                          <span className="sr-info-key" style={{ fontWeight: 600, color: "#1e293b", fontSize: "0.95rem" }}>Total Amount</span>
+                          <span className="sr-info-val" style={{ fontWeight: 700, color: "#7C3AED", fontSize: "1.05rem" }}>${detail.total_amount || 0}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+              )}
+
               {/* Description + Photo */}
               <div className="sr-desc-card">
                 <div className="sr-info-card-title"><FileText size={13} /> Issue Description</div>
@@ -575,9 +676,26 @@ export function ServiceRequestsPage() {
 
               {/* Assign Panel (expandable) */}
               {showAssign && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
-                  <EmployeePicker employees={employees} onAssign={handleAssign} loading={actionLoading} />
-                </motion.div>
+                (() => {
+                  const catKey = detail.service_category?.toString()
+                  const catEntry = categoriesMap[catKey]
+                  const catName = catEntry?.name || (catKey ? catKey.replace(/_/g, " ") : "")
+                  // Use the DB slug from categoriesMap; fall back to generating from name
+                  const catSlug = catEntry?.slug || catName.toLowerCase().replace(/ /g, "_")
+                  const reqRoleIds = CATEGORY_TO_ROLES_MAP[catSlug] || []
+                  
+                  const filteredEmployees = employees.filter(emp => {
+                    if (reqRoleIds.length === 0) return true;
+                    if (!emp.service_roles || !Array.isArray(emp.service_roles)) return false;
+                    return emp.service_roles.some(r => reqRoleIds.includes(r));
+                  });
+
+                  return (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}>
+                      <EmployeePicker employees={filteredEmployees} onAssign={handleAssign} loading={actionLoading} />
+                    </motion.div>
+                  )
+                })()
               )}
 
               {/* Completion Proofs */}
@@ -663,11 +781,17 @@ export function ServiceRequestsPage() {
                 <div className="sr-actions-title">Workflow Actions</div>
                 <div className="sr-actions-row">
 
-                  {/* NEW_REQUEST */}
-                  {detail.status === "new_request" && (
+                  {/* NEW_REQUEST / CONFIRMED */}
+                  {["new_request", "confirmed"].includes(detail.status) && (
                     <>
                       <button className="sr-btn-action sr-btn-action--primary" disabled={actionLoading} onClick={() => handleAction("review/")}>
                         <ClipboardCheck size={14} /> Mark Reviewed
+                      </button>
+                      <button
+                        className="sr-btn-action sr-btn-action--primary"
+                        onClick={() => setShowAssign(v => !v)}
+                      >
+                        <Users size={14} /> {showAssign ? "Close Assign Panel" : "Assign Technician"}
                       </button>
                       <button className="sr-btn-action sr-btn-action--danger" disabled={actionLoading} onClick={() => handleAction("reject/")}>
                         <Ban size={14} /> Reject

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import React, { useEffect, useState } from "react"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { apiFetchRegistrationDossier, apiSaveRegistrationDossier, apiDeleteRegistrationDossier } from "../../api/authService.js"
 import { Card, Pill, Button } from "../components/kit.jsx"
@@ -207,7 +207,7 @@ export function EmployeesDashboardPage() {
 }
 
 import { createPortal } from "react-dom"
-import { Eye, Edit, Trash2, X } from "lucide-react"
+import { Eye, Edit, Trash2, X, ChevronDown, ChevronRight } from "lucide-react"
 
 // 2. Approved Employees Page
 export function ApprovedEmployeesPage() {
@@ -1048,6 +1048,8 @@ export function RejectedEmployeesPage() {
 // 4. Document Vault Page
 export function DocumentVaultPage() {
   const [vault, setVault] = useState([])
+  const [viewingDocument, setViewingDocument] = useState(null)
+  const [expandedEmployee, setExpandedEmployee] = useState(null)
 
   useEffect(() => {
     async function load() {
@@ -1065,9 +1067,9 @@ export function DocumentVaultPage() {
           const parsed = JSON.parse(savedDossier)
           if (parsed.regForm && parsed.docForm) {
             const fresh = [
-              { name: parsed.regForm.fullName, type: "Aadhaar Card", file: parsed.docForm.aadhaarFile || "aadhaar_scan.pdf", check: "OCR Approved (99%)" },
-              { name: parsed.regForm.fullName, type: "PAN Card", file: parsed.docForm.panFile || "pan_scan.pdf", check: "OCR Approved (98%)" },
-              { name: parsed.regForm.fullName, type: "Driving License", file: parsed.docForm.drivingLicenseFile || "driving_license.pdf", check: "OCR Approved (99%)" },
+              { name: parsed.regForm.fullName, type: "Aadhaar Card", file: parsed.docForm.aadhaarFile || "aadhaar_scan.pdf", fileData: parsed.docForm.aadhaarFileFileData, check: "OCR Approved (99%)" },
+              { name: parsed.regForm.fullName, type: "PAN Card", file: parsed.docForm.panFile || "pan_scan.pdf", fileData: parsed.docForm.panFileFileData, check: "OCR Approved (98%)" },
+              { name: parsed.regForm.fullName, type: "Driving License", file: parsed.docForm.drivingLicenseFile || "driving_license.pdf", fileData: parsed.docForm.drivingLicenseFileFileData, check: "OCR Approved (99%)" },
             ]
             setVault(fresh)
             return
@@ -1078,6 +1080,14 @@ export function DocumentVaultPage() {
     }
     load()
   }, [])
+
+  const groupedVault = Object.entries(
+    vault.reduce((acc, curr) => {
+      if (!acc[curr.name]) acc[curr.name] = []
+      acc[curr.name].push(curr)
+      return acc
+    }, {})
+  )
 
   return (
     <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-bg overflow-y-auto p-10 space-y-8">
@@ -1101,24 +1111,85 @@ export function DocumentVaultPage() {
                 <th className="py-4">Filename</th>
                 <th className="py-4">AI Verification Check</th>
                 <th className="py-4">Security</th>
+                <th className="py-4 text-right pr-6">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stroke/50 dark:divide-slate-800/50">
-              {vault.map((d, idx) => (
-                <tr key={idx} className="text-sm font-semibold text-slate-700 dark:text-slate-350">
-                  <td className="py-4">{d.name}</td>
-                  <td className="py-4 text-xs font-bold text-slate-500">{d.type}</td>
-                  <td className="py-4 font-mono text-xs text-blue-500">{d.file}</td>
-                  <td className="py-4 text-xs">{d.check}</td>
-                  <td className="py-4">
-                    <Pill tone="good">Encrypted</Pill>
-                  </td>
-                </tr>
+              {groupedVault.map(([empName, docs], idx) => (
+                <React.Fragment key={idx}>
+                  <tr 
+                    className="text-sm font-semibold text-slate-700 dark:text-slate-350 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50" 
+                    onClick={() => setExpandedEmployee(expandedEmployee === empName ? null : empName)}
+                  >
+                    <td className="py-4 font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                      {expandedEmployee === empName ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      {empName}
+                    </td>
+                    <td className="py-4 text-xs font-bold text-slate-500" colSpan={5}>
+                      {docs.length} Document(s)
+                    </td>
+                  </tr>
+                  {expandedEmployee === empName && docs.map((d, dIdx) => (
+                    <tr key={`${idx}-${dIdx}`} className="text-sm font-semibold text-slate-700 dark:text-slate-350 bg-slate-50/50 dark:bg-slate-900/20">
+                      <td className="py-4 pl-10 text-xs text-slate-400">↳</td>
+                      <td className="py-4 text-xs font-bold text-slate-500">{d.type}</td>
+                      <td className="py-4 font-mono text-xs text-blue-500">{d.file}</td>
+                      <td className="py-4 text-xs">{d.check}</td>
+                      <td className="py-4">
+                        <Pill tone="good">Encrypted</Pill>
+                      </td>
+                      <td className="py-4 text-right pr-6">
+                        <div className="flex justify-end gap-2">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setViewingDocument({ file: d.file, data: d.fileData }); }} 
+                            className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                            title="View Document"
+                          >
+                            <Eye size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
         </div>
       </Card>
+
+      {/* ── VIEW DOCUMENT MODAL ── */}
+      {viewingDocument && createPortal(
+        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl p-6 flex flex-col space-y-6">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-sm font-black uppercase tracking-wider text-slate-850 dark:text-white">
+                View Document: {viewingDocument.file}
+              </h3>
+              <button onClick={() => setViewingDocument(null)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800 w-full h-[60vh] flex items-center justify-center overflow-hidden">
+               {viewingDocument.data?.startsWith('data:application/pdf') || viewingDocument.file?.toLowerCase().endsWith('.pdf') ? (
+                  <iframe src={viewingDocument.data || viewingDocument.file} className="w-full h-full" title="Document Viewer" />
+               ) : viewingDocument.data ? (
+                  <img src={viewingDocument.data} alt="Document" className="max-w-full max-h-full object-contain" />
+               ) : (
+                  <div className="text-slate-400 font-bold uppercase tracking-widest text-sm">Document not found</div>
+               )}
+            </div>
+
+            <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
+              <Button onClick={() => setViewingDocument(null)} className="h-10 px-5 font-bold">
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

@@ -1802,7 +1802,13 @@ export function PayrollPage() {
 
   useEffect(() => {
     const today = new Date()
-    const formatDate = (d) => d.toISOString().split("T")[0]
+    
+    // Fix local timezone offset issue when converting to YYYY-MM-DD
+    const formatDate = (d) => {
+      const offset = d.getTimezoneOffset()
+      const localDate = new Date(d.getTime() - (offset*60*1000))
+      return localDate.toISOString().split("T")[0]
+    }
     
     if (dateFilterMode === "today") {
       setFilterStartDate(formatDate(today))
@@ -1810,7 +1816,8 @@ export function PayrollPage() {
     } else if (dateFilterMode === "week") {
       const day = today.getDay()
       const diff = today.getDate() - day + (day === 0 ? -6 : 1)
-      const start = new Date(today.setDate(diff))
+      const start = new Date(today)
+      start.setDate(diff)
       const end = new Date(start)
       end.setDate(end.getDate() + 6)
       setFilterStartDate(formatDate(start))
@@ -1827,6 +1834,13 @@ export function PayrollPage() {
       setGenerateEmpId("all")
     }
   }, [dateFilterMode, employees])
+
+  const handleDateChange = (setter) => (e) => {
+    setter(e.target.value)
+    if (dateFilterMode !== "custom") {
+      setDateFilterMode("custom")
+    }
+  }
 
   async function loadActiveEmployees() {
     if (!filterStartDate || !filterEndDate) return;
@@ -1992,13 +2006,13 @@ export function PayrollPage() {
               <div style={{ display: "flex", gap: 12, flex: 1, minWidth: 260 }}>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>Start Date</label>
-                  <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} disabled={dateFilterMode !== "custom"}
-                    style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", opacity: dateFilterMode !== "custom" ? 0.6 : 1 }} />
+                  <input type="date" value={filterStartDate} onChange={handleDateChange(setFilterStartDate)}
+                    style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", transition: "all 0.2s" }} className="focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
                 </div>
                 <div style={{ flex: 1 }}>
                   <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>End Date</label>
-                  <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} disabled={dateFilterMode !== "custom"}
-                    style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", opacity: dateFilterMode !== "custom" ? 0.6 : 1 }} />
+                  <input type="date" value={filterEndDate} onChange={handleDateChange(setFilterEndDate)}
+                    style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", transition: "all 0.2s" }} className="focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
                 </div>
               </div>
 

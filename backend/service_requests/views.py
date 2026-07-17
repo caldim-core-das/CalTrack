@@ -67,11 +67,34 @@ def _sr_qs(request):
 
 # ─── 1. PUBLIC VIEWS ──────────────────────────────────────────────────────────
 
+class CatalogCategoryListView(APIView):
+    permission_classes = [permissions.AllowAny]
+    def get(self, request):
+        from .models import CatalogCategory
+        from .serializers import CatalogCategorySerializer
+        cats = CatalogCategory.objects.all().order_by('name')
+        data = CatalogCategorySerializer(cats, many=True).data
+        return Response({"success": True, "data": data})
+
+class CatalogServiceListView(APIView):
+    permission_classes = [permissions.AllowAny]
+    def get(self, request):
+        from .models import CatalogService
+        from .serializers import CatalogServiceSerializer
+        cat_id = request.GET.get('category_id')
+        qs = CatalogService.objects.all().order_by('name')
+        if cat_id:
+            qs = qs.filter(category_id=cat_id)
+        data = CatalogServiceSerializer(qs, many=True).data
+        return Response({"success": True, "data": data})
+
 class BookingCreateView(APIView):
     """
     POST /api/booking/
     Public — no authentication required.
     Creates a ServiceRequest and returns the human-readable request_id.
+    COD:    status=confirmed, payment_status=pending
+    Online: status=waiting_for_payment, payment_status=processing
     """
     permission_classes = [permissions.AllowAny]
     parser_classes     = [MultiPartParser, FormParser, JSONParser]
@@ -84,8 +107,72 @@ class BookingCreateView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         company = _get_company(request)
-        sr = serializer.save(company=company)
-        
+
+        # Determine payment method and set initial statuses
+        payment_method = (request.data.get("payment_method") or "COD").upper()
+        if payment_method == "ONLINE":
+            initial_status = ServiceRequest.Status.WAITING_FOR_PAYMENT
+            initial_payment_status = ServiceRequest.PaymentStatus.PROCESSING
+        else:
+            payment_method = "COD"
+            initial_status = ServiceRequest.Status.CONFIRMED
+            initial_payment_status = ServiceRequest.PaymentStatus.PENDING
+
+        # Link authenticated customer if logged in
+        if request.user and request.user.is_authenticated and hasattr(request.user, 'role') and request.user.role == 'customer':
+            user = request.user
+            customer_name = request.data.get("customer_name", "")
+            email = request.data.get("email", "")
+            phone = request.data.get("phone", "")
+
+            sr = serializer.save(
+                company=company,
+                customer=user,
+                status=initial_status,
+                payment_method=payment_method,
+                payment_status=initial_payment_status,
+            )
+
+            # Sync name
+            if customer_name and not user.first_name and not user.last_name:
+                parts = customer_name.strip().split(" ")
+                user.first_name = parts[0]
+                user.last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+
+            # Sync email and merge profiles if duplicates exist
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+
+            email_clean = email.lower().strip() if email else ""
+            if email_clean and not user.email:
+                other_user = User.objects.filter(email__iexact=email_clean, role=User.Role.CUSTOMER).exclude(pk=user.pk).first()
+                if other_user:
+                    other_user.service_requests_as_customer.all().update(customer=user)
+                    if other_user.phone and not user.phone:
+                        user.phone = other_user.phone
+                    other_user.delete()
+                user.email = email_clean
+
+            # Sync phone and merge profiles if duplicates exist
+            phone_clean = phone.strip() if phone else ""
+            if phone_clean and not user.phone:
+                other_user = User.objects.filter(phone=phone_clean, role=User.Role.CUSTOMER).exclude(pk=user.pk).first()
+                if other_user:
+                    other_user.service_requests_as_customer.all().update(customer=user)
+                    if other_user.email and not user.email:
+                        user.email = other_user.email
+                    other_user.delete()
+                user.phone = phone_clean
+
+            user.save()
+        else:
+            sr = serializer.save(
+                company=company,
+                status=initial_status,
+                payment_method=payment_method,
+                payment_status=initial_payment_status,
+            )
+
         # Send booking confirmation email
         try:
             from .notifications import send_booking_confirmation
@@ -95,10 +182,38 @@ class BookingCreateView(APIView):
             logging.getLogger(__name__).error(f"Failed to send booking confirmation email: {e}")
 
         return _success(
-            data={"request_id": sr.request_id, "id": sr.id},
+            data={
+                "request_id": sr.request_id,
+                "id": sr.id,
+                "payment_method": sr.payment_method,
+                "payment_status": sr.payment_status,
+                "booking_status": sr.status,
+                "total_amount": float(sr.total_amount),
+            },
             message="Your service request has been submitted successfully.",
             status_code=201,
         )
+
+
+class CustomerMyBookingsView(APIView):
+    """
+    GET /api/booking/my-bookings/
+    Authenticated customers can view their past bookings.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if not hasattr(request.user, 'role') or request.user.role != 'customer':
+            return _error("Only customers can view their bookings.", 403)
+        
+        company = _get_company(request)
+        qs = ServiceRequest.objects.filter(customer=request.user).select_related('assigned_employee', 'assigned_employee__user')
+        if company:
+            qs = qs.filter(company=company)
+        
+        qs = qs.order_by("-id")
+        serializer = ServiceRequestListSerializer(qs, many=True)
+        return _success(data=serializer.data)
 
 
 class FeedbackTokenView(APIView):
@@ -498,6 +613,8 @@ class AdminEmployeeListView(APIView):
                 "title": e.title,
                 "email": e.user.email,
                 "hourly_rate": float(e.hourly_rate) if e.hourly_rate is not None else 0.0,
+                "department": e.department,
+                "service_roles": e.service_roles,
             }
             for e in qs
         ]
@@ -635,11 +752,33 @@ class EmployeeJobCompleteView(APIView):
 
         with transaction.atomic():
             sr = job.service_request
-            # Step sequentially to satisfy state machine validation rules
-            apply_transition(sr, ServiceRequest.Status.COMPLETED)
-            apply_transition(sr, ServiceRequest.Status.AWAITING_VERIFICATION)
-            apply_transition(sr, ServiceRequest.Status.VERIFIED)
-            apply_transition(sr, ServiceRequest.Status.FEEDBACK_PENDING)
+            # Step through any intermediate states gracefully (handles any starting status)
+            S = ServiceRequest.Status
+            COMPLETION_PATH = [
+                S.ACCEPTED,
+                S.IN_PROGRESS,
+                S.COMPLETED,
+                S.AWAITING_VERIFICATION,
+                S.VERIFIED,
+                S.FEEDBACK_PENDING,
+            ]
+            from service_requests.state_machine import ALLOWED_TRANSITIONS
+            # Keep stepping through states until we reach FEEDBACK_PENDING
+            # This handles any starting status (CONFIRMED, ASSIGNED, IN_PROGRESS, etc.)
+            max_steps = 10  # safety guard against infinite loops
+            while sr.status != S.FEEDBACK_PENDING and max_steps > 0:
+                max_steps -= 1
+                allowed = ALLOWED_TRANSITIONS.get(sr.status, set())
+                # Find the next step along the COMPLETION_PATH
+                next_step = None
+                for candidate in COMPLETION_PATH:
+                    if candidate in allowed:
+                        next_step = candidate
+                        break
+                if next_step is None:
+                    break  # no valid transition found — stop
+                apply_transition(sr, next_step)
+
             sr.save(update_fields=["status", "updated_at"])
 
             job.status = EmployeeJob.Status.COMPLETED
@@ -649,20 +788,14 @@ class EmployeeJobCompleteView(APIView):
             # Create feedback model record (generates token)
             feedback, _ = ServiceFeedback.objects.get_or_create(service_request=sr)
 
-        # Dispatch notifications outside the transaction block
+        # Send single combined completion+feedback email outside the transaction
         import logging
         logger = logging.getLogger(__name__)
         try:
-            from .notifications import send_work_completion_email
-            send_work_completion_email(sr)
+            from .notifications import send_completion_and_feedback_email
+            send_completion_and_feedback_email(sr, str(feedback.feedback_token))
         except Exception as e:
-            logger.error(f"Failed to auto-send work completion email: {e}")
-
-        try:
-            from .notifications import send_feedback_link
-            send_feedback_link(sr, str(feedback.feedback_token))
-        except Exception as e:
-            logger.error(f"Failed to auto-send feedback link: {e}")
+            logger.error(f"Failed to send completion+feedback email: {e}")
 
         return _success(message="Work marked as Complete. Feedback request sent to customer.")
 
@@ -716,3 +849,44 @@ class EmployeePerformanceView(APIView):
 
         serializer = EmployeePerformanceSerializer(perf)
         return _success(data=serializer.data)
+
+
+class PublicFeedbackListView(APIView):
+    """GET /api/public/feedback/ — fetch recent public feedback for catalog/booking display"""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        category_slug = request.query_params.get("category")
+        
+        qs = ServiceFeedback.objects.filter(is_submitted=True).select_related("service_request")
+        
+        # Filter by category if provided, checking the catalog slug or exact text match
+        if category_slug:
+            # ServiceCategory is a string in ServiceRequest (often the catalog category ID or name).
+            # But the simplest is to match the category name roughly if it's stored as text,
+            # or try to match if service_category matches the slug/id. 
+            # In our db, service_category stores the category ID from the catalog.
+            qs = qs.filter(service_request__service_category=category_slug)
+            
+        # Get top 15 most recent
+        feedbacks = qs.order_by("-submitted_at")[:15]
+        
+        data = []
+        for f in feedbacks:
+            # Mask the name (e.g. "John D.")
+            full_name = f.service_request.customer_name or "Customer"
+            parts = full_name.split()
+            if len(parts) > 1:
+                display_name = f"{parts[0]} {parts[1][0]}."
+            else:
+                display_name = full_name
+                
+            data.append({
+                "name": display_name,
+                "rating": f.rating,
+                "text": f.comment or ("Great service!" if f.rating >= 4 else "Service completed."),
+                "submitted_at": f.submitted_at.isoformat() if f.submitted_at else None,
+                "category": f.service_request.service_category
+            })
+            
+        return _success(data=data)

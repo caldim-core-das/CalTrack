@@ -623,7 +623,8 @@ class TimeLogApprovalView(APIView):
             time_log.status = 'approved'
             time_log.approved_by = request.user
             time_log.admin_notes = request.data.get("admin_notes", "")
-            time_log.save(update_fields=['status', 'approved_by', 'admin_notes'])
+            time_log.face_match_status = 'matched'
+            time_log.save(update_fields=['status', 'approved_by', 'admin_notes', 'face_match_status'])
         
         elif action == "reject":
             time_log.status = 'rejected'

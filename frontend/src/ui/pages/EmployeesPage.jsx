@@ -8,6 +8,7 @@ import { useRole } from "../../state/auth/useRole.js"
 import { Button, Card, Input, Pill } from "../components/kit.jsx"
 import { Loader2, ShieldCheck, ShieldOff, AlertTriangle, ChevronDown, ChevronUp, Users, Edit3, Trash2, X, History, CalendarDays, CheckCircle2, Clock3, AlertCircle, Star, Briefcase, TrendingUp } from "lucide-react"
 import { fireSparkleFromEl } from "../sparkle.js"
+import { TECHNICIAN_ROLES } from "../../utils/roles.js"
 
 // ── Exempt status badge ─────────────────────────────────────────────────────
 function ExemptBadge({ status }) {
@@ -28,7 +29,7 @@ function ExemptBadge({ status }) {
   )
 }
 
-function EditEmployeeModal({ employee, onClose, onSave, saving }) {
+function EditEmployeeModal({ employee, availableRoles, onClose, onSave, saving }) {
   const [email, setEmail] = useState(employee.user?.email || "")
   const [firstName, setFirstName] = useState(employee.user?.first_name || "")
   const [lastName, setLastName] = useState(employee.user?.last_name || "")
@@ -42,6 +43,8 @@ function EditEmployeeModal({ employee, onClose, onSave, saving }) {
   const [ukNiCategory, setUkNiCategory] = useState(employee.uk_ni_category || "A")
   const [rolledUpHolidayPay, setRolledUpHolidayPay] = useState(!!employee.rolled_up_holiday_pay)
   const [isActive, setIsActive] = useState(employee.is_active !== false)
+  const [serviceRoles, setServiceRoles] = useState(employee.service_roles || [])
+  const [showRoles, setShowRoles] = useState(false)
 
   async function submit() {
     await onSave({
@@ -60,6 +63,7 @@ function EditEmployeeModal({ employee, onClose, onSave, saving }) {
       uk_ni_category: ukNiCategory,
       rolled_up_holiday_pay: rolledUpHolidayPay,
       is_active: isActive,
+      service_roles: serviceRoles,
     })
   }
 
@@ -98,8 +102,8 @@ function EditEmployeeModal({ employee, onClose, onSave, saving }) {
               <button
                 type="button"
                 className={`h-11 px-4 rounded-xl border border-stroke dark:border-slate-800 text-sm font-black uppercase tracking-widest transition-all ${isActive
-                    ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
-                    : "bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300"
+                  ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300"
+                  : "bg-rose-50 text-rose-700 dark:bg-rose-900/20 dark:text-rose-300"
                   }`}
                 onClick={() => setIsActive(v => !v)}
                 disabled={saving}
@@ -107,6 +111,58 @@ function EditEmployeeModal({ employee, onClose, onSave, saving }) {
                 {isActive ? "Active" : "Inactive"}
               </button>
             </div>
+          </div>
+
+          <div className="mt-6 mb-7 relative group z-10">
+            <div className="flex flex-col gap-1.5">
+              <div className="text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest ml-1">Service Roles</div>
+              <button
+                type="button"
+                onClick={() => setShowRoles(v => !v)}
+                className="w-full text-left bg-bg2 dark:bg-slate-950/50 text-slate-900 dark:text-white border border-stroke2 dark:border-slate-800 py-3.5 px-4 rounded-2xl flex justify-between items-center transition-all duration-300 shadow-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500"
+              >
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  {serviceRoles.length === 0 ? (
+                    <span className="text-slate-400 dark:text-slate-500 text-sm">Select roles...</span>
+                  ) : (
+                    serviceRoles.map(id => {
+                      const roleObj = availableRoles.find(r => r.id === id)
+                      return (
+                        <span key={id} className="inline-flex items-center gap-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50 rounded-lg px-2 py-0.5 text-xs font-bold">
+                          {roleObj?.label || id}
+                        </span>
+                      )
+                    })
+                  )}
+                </div>
+                <ChevronDown size={16} className={`text-slate-400 transition-transform ${showRoles ? "rotate-180" : ""}`} />
+              </button>
+            </div>
+            
+            {showRoles && (
+              <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 p-2 max-h-64 overflow-y-auto">
+                <div className="flex flex-col gap-1">
+                  {availableRoles.map(r => {
+                    const active = serviceRoles.includes(r.id)
+                    return (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => setServiceRoles(prev => active ? prev.filter(x => x !== r.id) : [...prev, r.id])}
+                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                          active
+                            ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                            : "hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
+                        }`}
+                      >
+                        {r.label}
+                        {active && <CheckCircle2 size={16} className="text-indigo-600 dark:text-indigo-400" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="rounded-3xl border border-stroke dark:border-slate-800 overflow-hidden bg-surface dark:bg-slate-950/20 shadow-sm">
@@ -323,8 +379,8 @@ function EmployeeHistoryDrawer({ employee, onClose }) {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`px-5 py-3.5 text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition-all border-b-2 ${tab === t.id
-                  ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
-                  : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white"
                 }`}
             >{t.label}</button>
           ))}
@@ -773,6 +829,11 @@ export function EmployeesPage() {
   const [currency, setCurrency] = useState("USD")
   const [payrollGroup, setPayrollGroup] = useState("")
   const [taxCategory, setTaxCategory] = useState("")
+  const [serviceRoles, setServiceRoles] = useState([])
+
+  // Dynamic roles
+  const [availableRoles, setAvailableRoles] = useState(TECHNICIAN_ROLES)
+  const [roleFilter, setRoleFilter] = useState("")
 
   // Compliance fields
   const [country, setCountry] = useState("US")
@@ -790,7 +851,7 @@ export function EmployeesPage() {
   const [deletingId, setDeletingId] = useState(null)
   const [historyEmployee, setHistoryEmployee] = useState(null)
 
-  const activeCount = useMemo(() => items.filter((e) => e.is_active).length, [items])
+  const activeCount = useMemo(() => items.filter((e) => e.is_active && (!roleFilter || (e.service_roles && e.service_roles.includes(roleFilter)))).length, [items, roleFilter])
 
   async function load() {
     setLoading(true)
@@ -799,9 +860,7 @@ export function EmployeesPage() {
       if (!isAdmin) { setItems([]); return }
       const res = await apiRequest("/employees/")
       const dbItems = unwrapResults(res)
-
-      let finalItems = dbItems
-      setItems(finalItems)
+      setItems(dbItems)
     } catch (err) {
       setError(err?.body?.detail || "Failed to load employees.")
     } finally {
@@ -840,6 +899,7 @@ export function EmployeesPage() {
         payroll_group: data.payroll_group || null,
         tax_category: data.tax_category || null,
         is_active: !!data.is_active,
+        service_roles: data.service_roles || [],
       }
 
       const res = await apiRequest(`/employees/${data.id}/`, { method: "PATCH", json: payload })
@@ -880,6 +940,7 @@ export function EmployeesPage() {
             payroll_group: payload.payroll_group,
             tax_category: payload.tax_category,
             is_active: payload.is_active,
+            service_roles: payload.service_roles,
           }
           const putRes = await apiRequest(`/employees/${data.id}/`, { method: "PUT", json: putPayload })
           const putUpdated = putRes?.data || putRes
@@ -952,6 +1013,7 @@ export function EmployeesPage() {
         currency: currency || null,
         payroll_group: payrollGroup || null,
         tax_category: taxCategory || null,
+        service_roles: serviceRoles,
       }
       await apiRequest("/employees/", { method: "POST", json: payload })
 
@@ -961,6 +1023,7 @@ export function EmployeesPage() {
       setCountry("US"); setState(""); setDateOfBirth(""); setExemptStatus("non_exempt")
       setWeeklySalary(""); setUkTaxCode("1257L"); setUkNiCategory("A"); setRolledUpHolidayPay(false)
       setDepartment(""); setCurrency("USD"); setPayrollGroup(""); setTaxCategory("")
+      setServiceRoles([])
 
       fireSparkleFromEl(submitBtnRef.current)
       setSuccessMsg(`Employee "${username}" created. They can log in at ${window.location.origin} with their username and password.`)
@@ -1009,8 +1072,9 @@ export function EmployeesPage() {
           </div>
         </div>
         <div className="flex items-center gap-4 relative z-10">
+
           <div className="flex items-center gap-3 px-6 py-3 bg-bg dark:bg-slate-800/50 rounded-2xl border border-stroke dark:border-slate-700">
-            <span className="text-[13px] font-black text-slate-700 dark:text-slate-300 tracking-tight uppercase">{items.length} Total</span>
+            <span className="text-[13px] font-black text-slate-700 dark:text-slate-300 tracking-tight uppercase">{activeCount} Total</span>
           </div>
         </div>
       </div>
@@ -1023,6 +1087,41 @@ export function EmployeesPage() {
             <span className="text-lg">✓</span><span>{successMsg}</span>
           </div>
         )}
+
+        {/* ── FILTER ROLES ── */}
+        <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
+          <div className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">Service Roles</div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setRoleFilter("")}
+              className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+                roleFilter === ""
+                  ? "bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800/50 dark:text-indigo-300"
+                  : "bg-white border-stroke text-slate-600 dark:bg-slate-950 dark:border-slate-700 dark:text-slate-400"
+              }`}
+            >
+              All Roles
+            </button>
+            {availableRoles.map(r => {
+              const active = roleFilter === r.id;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setRoleFilter(active ? "" : r.id)}
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+                    active
+                      ? "bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800/50 dark:text-indigo-300"
+                      : "bg-white border-stroke text-slate-600 dark:bg-slate-950 dark:border-slate-700 dark:text-slate-400"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
         <Card title="Create Employee">
           <form className="flex flex-col gap-6" onSubmit={createEmployee}>
@@ -1113,6 +1212,32 @@ export function EmployeesPage() {
                     <div className="flex flex-col gap-1">
                       <label className="fieldLabel">Tax Category</label>
                       <input className="input" value={taxCategory} onChange={e => setTaxCategory(e.target.value)} placeholder="e.g. Regular" />
+                    </div>
+                  </div>
+
+                  {/* Service Roles */}
+                  <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-xl p-5 mt-6">
+                    <div className="font-black text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-4">
+                      Service Roles (Optional)
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {availableRoles.map(r => {
+                        const active = serviceRoles.includes(r.id)
+                        return (
+                          <button
+                            key={r.id}
+                            type="button"
+                            onClick={() => setServiceRoles(prev => active ? prev.filter(x => x !== r.id) : [...prev, r.id])}
+                            className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+                              active
+                                ? "bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800/50 dark:text-indigo-300"
+                                : "bg-white border-stroke text-slate-600 dark:bg-slate-950 dark:border-slate-700 dark:text-slate-400"
+                            }`}
+                          >
+                            {r.label}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
 
@@ -1240,7 +1365,7 @@ export function EmployeesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stroke dark:divide-slate-800">
-                  {items.map((e) => (
+                  {items.filter(e => !roleFilter || (e.service_roles && e.service_roles.includes(roleFilter))).map((e) => (
                     <tr key={e.id} className="hover:bg-bg dark:hover:bg-slate-800/30 transition-colors">
                       <td className="px-6 py-5 font-bold text-slate-900 dark:text-white">{e.employee_id}</td>
                       <td className="px-6 py-5 text-slate-600 dark:text-slate-400">
@@ -1332,7 +1457,11 @@ export function EmployeesPage() {
       {showEditModal && editingEmployee && (
         <EditEmployeeModal
           employee={editingEmployee}
-          onClose={() => { if (!savingEdit) { setShowEditModal(false); setEditingEmployee(null) } }}
+          availableRoles={availableRoles}
+          onClose={() => {
+            setShowEditModal(false)
+            setEditingEmployee(null)
+          }}
           onSave={saveEdit}
           saving={savingEdit}
         />

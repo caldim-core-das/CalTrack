@@ -122,28 +122,28 @@ def sync_task_lifecycle_to_service_request(task, actor=None):
             # 3. COMPLETED task
             elif task.status == Task.Status.COMPLETED:
                 if sr.status != ServiceRequest.Status.FEEDBACK_PENDING:
-                    # Move sequentially through state machine transitions
-                    current_status = sr.status
-                    if current_status == ServiceRequest.Status.ASSIGNED:
-                        apply_transition(sr, ServiceRequest.Status.ACCEPTED)
-                        current_status = ServiceRequest.Status.ACCEPTED
-                    if current_status == ServiceRequest.Status.ACCEPTED:
-                        apply_transition(sr, ServiceRequest.Status.IN_PROGRESS)
-                        current_status = ServiceRequest.Status.IN_PROGRESS
-                    if current_status == ServiceRequest.Status.IN_PROGRESS:
-                        apply_transition(sr, ServiceRequest.Status.COMPLETED)
-                        current_status = ServiceRequest.Status.COMPLETED
-                    if current_status == ServiceRequest.Status.COMPLETED:
-                        apply_transition(sr, ServiceRequest.Status.AWAITING_VERIFICATION)
-                        current_status = ServiceRequest.Status.AWAITING_VERIFICATION
-                    if current_status == ServiceRequest.Status.AWAITING_VERIFICATION:
-                        apply_transition(sr, ServiceRequest.Status.VERIFIED)
-                        current_status = ServiceRequest.Status.VERIFIED
-                    if current_status == ServiceRequest.Status.VERIFIED:
-                        apply_transition(sr, ServiceRequest.Status.FEEDBACK_PENDING)
-                    
+                    # Step through states dynamically — handles any starting status
+                    from service_requests.state_machine import ALLOWED_TRANSITIONS
+                    S = ServiceRequest.Status
+                    COMPLETION_PATH = [
+                        S.ASSIGNED, S.ACCEPTED, S.IN_PROGRESS,
+                        S.COMPLETED, S.AWAITING_VERIFICATION, S.VERIFIED, S.FEEDBACK_PENDING,
+                    ]
+                    max_steps = 10
+                    while sr.status != S.FEEDBACK_PENDING and max_steps > 0:
+                        max_steps -= 1
+                        allowed = ALLOWED_TRANSITIONS.get(sr.status, set())
+                        next_step = None
+                        for candidate in COMPLETION_PATH:
+                            if candidate in allowed:
+                                next_step = candidate
+                                break
+                        if next_step is None:
+                            break
+                        apply_transition(sr, next_step)
+
                     sr.save(update_fields=["status", "updated_at"])
-                    
+
                 job = _get_or_create_job()
                 if job:
                     job.status = EmployeeJob.Status.COMPLETED
@@ -153,6 +153,7 @@ def sync_task_lifecycle_to_service_request(task, actor=None):
 
                 feedback, _ = ServiceFeedback.objects.get_or_create(service_request=sr)
                 transaction.on_commit(lambda: _send_feedback_link_safe(sr, str(feedback.feedback_token)))
+
 
             # 4. IN_PROGRESS task
             elif task.status == Task.Status.IN_PROGRESS:
@@ -189,16 +190,10 @@ def _send_feedback_link_safe(sr, token_str):
     import logging
     logger = logging.getLogger(__name__)
     try:
-        from service_requests.notifications import send_work_completion_email
-        send_work_completion_email(sr)
+        from service_requests.notifications import send_completion_and_feedback_email
+        send_completion_and_feedback_email(sr, token_str)
     except Exception as exc:
-        logger.error(f"Failed to auto-send work completion email: {exc}")
-
-    try:
-        from service_requests.notifications import send_feedback_link
-        send_feedback_link(sr, token_str)
-    except Exception as exc:
-        logger.error(f"Failed to auto-send feedback link: {exc}")
+        logger.error(f"Failed to auto-send completion+feedback email: {exc}")
 
 
 class IsAdmin(IsAuthenticated):

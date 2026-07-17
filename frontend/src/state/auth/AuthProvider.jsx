@@ -34,8 +34,6 @@ export function AuthProvider({ children }) {
       console.log("DEBUG: apiFetchMe raw response:", JSON.stringify(me))
     } catch (e) {
       console.error("DEBUG: apiFetchMe exception:", e)
-    } catch (e) {
-      // Silent error logging or handling
     }
 
     if (me?.username && me?.role) {
@@ -53,6 +51,7 @@ export function AuthProvider({ children }) {
         language:  me.language   ?? "en",
         avatar_url:me.avatar_url ?? null,
         two_fa_enabled: me.two_fa_enabled ?? false,
+        employee_roles: me.employee_roles ?? [],
       }
       setUser(u)
       if (me.company_name) {
