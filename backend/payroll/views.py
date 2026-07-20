@@ -203,9 +203,23 @@ class PayrollRecordViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=["post"])
     def send_invoice_email(self, request):
-        record_data = request.data.get("record", {})
+        import json
+        
+        # Parse the record from FormData
+        record_raw = request.data.get("record", {})
+        if isinstance(record_raw, str):
+            try:
+                record_data = json.loads(record_raw)
+            except Exception:
+                record_data = {}
+        else:
+            record_data = record_raw
+
         custom_notes = request.data.get("notes", "")
         company_name = request.data.get("company_name", "Caltrack Technologies Ltd")
+        
+        # Get the uploaded PDF file
+        pdf_file = request.FILES.get("pdf_file")
         
         # Determine the target email address
         is_dummy = record_data.get("id") == "DUMMY-INV-PREVIEW-999"
@@ -324,6 +338,14 @@ class PayrollRecordViewSet(viewsets.ReadOnlyModelViewSet):
             [email_address]
         )
         email.attach_alternative(html_content, "text/html")
+        
+        # --- PDF Generation ---
+        if pdf_file:
+            email.attach(
+                pdf_file.name or f"Invoice_{record_data.get('employee_name', 'Employee').replace(' ', '_')}.pdf",
+                pdf_file.read(),
+                "application/pdf"
+            )
         
         try:
             email.send(fail_silently=False)

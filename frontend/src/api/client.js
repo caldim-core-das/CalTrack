@@ -73,6 +73,7 @@ async function _executeRequest(path, init = {}, attemptRefresh = true) {
     const res = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       credentials: "include",               // always send auth cookies
+      cache: "no-store",                    // prevent aggressive browser caching
       headers,
       body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
     })

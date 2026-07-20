@@ -10,6 +10,9 @@ import { useAuth } from "../../state/auth/useAuth.js"
 import { useRole } from "../../state/auth/useRole.js"
 import { verifyFaces, loadFaceModels, hasFace } from "../../utils/faceVerify.js"
 import { NotificationService } from "../../utils/notifications.js"
+import { findOpenLog, findOpenBreak, formatDuration, useLiveClock, useElapsed, useBreakTimer } from "../../hooks/useTimeTracking.js"
+import { calculateDistance, getPosition, useLocationTracker } from "../../hooks/useLocation.js"
+import ActiveSessionBar from "../components/ActiveSessionBar.jsx"
 
 import {
   Camera,
@@ -71,39 +74,13 @@ const AuditLedger = lazy(() => import("./AuditLedger.jsx"))
 
 // ─── GPS helpers ──────────────────────────────────────────────
 const DAILY_TARGET_HRS = 8
-const GPS_TIMEOUT_MS = 25000
-const TARGET_ACCURACY_M = 30
-
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371e3; // metres
-  const φ1 = lat1 * Math.PI / 180;
-  const φ2 = lat2 * Math.PI / 180;
-  const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lon2 - lon1) * Math.PI / 180;
-
-  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) *
-    Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return Math.round(R * c);
-}
-
-function findOpenLog(logs) { return logs.find((l) => !l.clock_out) ?? null }
-function findOpenBreak(log) {
-  if (!log?.breaks) return null
-  return log.breaks.find((b) => !b.break_end) ?? null
-}
 
 async function downloadLogPdf(id) {
   try {
-    // credentials: "include" sends the httpOnly auth cookie automatically
     const res = await fetch(`${API_BASE_URL}/time/logs/${id}/download_pdf/`, {
       credentials: "include",
     });
-
     if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-
     const blob = await res.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -119,112 +96,11 @@ async function downloadLogPdf(id) {
   }
 }
 
-function formatDuration(seconds) {
-  if (!seconds && seconds !== 0) return "--:--:--"
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  const s = seconds % 60
-  return [h, m, s].map(v => String(v).padStart(2, "0")).join(":")
-}
-
 function formatHrMin(seconds) {
   if (!seconds) return "0h 0m"
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   return `${h}h ${m}m`
-}
-
-export function getPosition(onProgress) {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) { reject(new Error("Geolocation not supported.")); return }
-    let watchId = null, best = null
-    const cleanup = () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId) }
-    const timer = setTimeout(() => { cleanup(); best ? resolve(best) : reject(new Error("GPS timed out.")) }, GPS_TIMEOUT_MS)
-    watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const fix = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) }
-        if (onProgress) onProgress(fix.accuracy)
-        if (!best || fix.accuracy < best.accuracy) best = fix
-        if (fix.accuracy <= TARGET_ACCURACY_M) { clearTimeout(timer); cleanup(); resolve(fix) }
-      },
-      (err) => { clearTimeout(timer); cleanup(); best ? resolve(best) : reject(err) },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: GPS_TIMEOUT_MS }
-    )
-  })
-}
-
-// ─── Hooks ─────────────────────────────────────────────────────
-function useLiveClock() {
-  const [time, setTime] = useState(() => new Date())
-  useEffect(() => {
-    const id = setInterval(() => setTime(new Date()), 1000)
-    return () => clearInterval(id)
-  }, [])
-  return time
-}
-
-function useElapsed(clockInStr) {
-  const [elapsed, setElapsed] = useState(0)
-  useEffect(() => {
-    if (!clockInStr) { setElapsed(0); return }
-    const start = new Date(clockInStr).getTime()
-    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)))
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [clockInStr])
-  return elapsed
-}
-
-function useBreakTimer(openBreak) {
-  const [breakElapsed, setBreakElapsed] = useState(0)
-  useEffect(() => {
-    if (!openBreak?.break_start) { setBreakElapsed(0); return }
-    const start = new Date(openBreak.break_start).getTime()
-    const tick = () => setBreakElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)))
-    tick()
-    const id = setInterval(tick, 1000)
-    return () => clearInterval(id)
-  }, [openBreak?.break_start])
-  return breakElapsed
-}
-
-function useLocationTracker(isClockedIn) {
-  const isFetching = useRef(false)
-  const lastPos = useRef(null)
-
-  useEffect(() => {
-    if (!isClockedIn) return;
-
-    const reportLocation = async () => {
-      if (isFetching.current) return
-      isFetching.current = true
-      try {
-        const pos = await getPosition()
-        if (pos) {
-          // Only update if location changed significantly (> 10m) or it's first time
-          const dist = lastPos.current ? calculateDistance(pos.lat, pos.lon, lastPos.current.lat, lastPos.current.lon) : 999
-
-          if (dist > 10) {
-            await apiRequest("/live-locations/update/", {
-              method: "POST",
-              json: { lat: pos.lat, lng: pos.lon }
-            })
-            lastPos.current = pos
-          }
-        }
-      } catch (err) {
-        console.debug("[LiveTracking] Report failed:", err)
-      } finally {
-        isFetching.current = false
-      }
-    }
-
-    reportLocation()
-    // Every 5 minutes (reduced frequency to save DB connections and battery)
-    const id = setInterval(reportLocation, 300000)
-    return () => clearInterval(id)
-  }, [isClockedIn])
 }
 
 /**
@@ -2103,32 +1979,23 @@ return (
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {openLog && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#0f172a", borderRadius: 16, padding: "6px 6px 6px 16px", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }}>
-                <div>
-                  <div style={{ fontSize: 9, fontWeight: 900, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", lineHeight: 1 }}>{openBreak ? `On Break (${openBreak.break_type?.toUpperCase()})` : openLog.task ? "Working Time" : "Active Session"}</div>
-                  <div style={{ fontSize: 20, fontWeight: 900, color: "white", letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums", lineHeight: 1.2 }}>{openBreak ? formatDuration(breakElapsed) : formatDuration(elapsed)}</div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {!openBreak ? (
-                    <>
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.07)", borderRadius: 10, padding: "4px 8px", border: "1px solid rgba(255,255,255,0.1)" }}>
-                        <Coffee size={12} style={{ color: "#94a3b8" }} />
-                        <select value={breakType} onChange={(e) => setBreakType(e.target.value)} disabled={busy || !canModify} style={{ background: "transparent", color: "#e2e8f0", fontSize: 11, fontWeight: 700, border: "none", outline: "none", cursor: (busy || !canModify) ? "not-allowed" : "pointer", padding: "2px 0" }}>
-                          <option value="tea" style={{ background: "#1e293b" }}>☕ Tea</option>
-                          <option value="lunch" style={{ background: "#1e293b" }}>🍱 Lunch</option>
-                          <option value="other" style={{ background: "#1e293b" }}>💤 Other</option>
-                        </select>
-                      </div>
-                      <button onClick={() => action("/time/break/start/")} disabled={busy || !canModify} title="Start Break" style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", display: "flex", alignItems: "center", justifycontent: "center", cursor: (busy || !canModify) ? "not-allowed" : "pointer", opacity: (busy || !canModify) ? 0.5 : 1 }}><Coffee size={15} /></button>
-                      <button onClick={() => setPanelOpen(true)} title="Job Photo" style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", display: "flex", alignItems: "center", justifycontent: "center", cursor: "pointer" }}><Camera size={15} /></button>
-                      <button onClick={handleClockOut} disabled={busy || !canModify} title="Clock Out" style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", display: "flex", alignItems: "center", justifycontent: "center", cursor: (busy || !canModify) ? "not-allowed" : "pointer", opacity: (busy || !canModify) ? 0.5 : 1 }}><Square size={13} fill="currentColor" /></button>
-                      <button onClick={handleSOS} disabled={sosSending || !canModify} title="SOS" style={{ padding: "6px 10px", borderRadius: 10, background: sosConfirmed ? "#059669" : "#E94560", color: "white", border: "none", fontWeight: 900, fontSize: 10, cursor: (sosSending || !canModify) ? "not-allowed" : "pointer", letterSpacing: "0.06em", opacity: (sosSending || !canModify) ? 0.5 : 1, boxShadow: sosConfirmed ? "none" : "0 0 0 3px rgba(233,69,96,0.3)", animation: !sosConfirmed && !sosSending && canModify ? "sosPulse 2s infinite" : "none" }}>{sosConfirmed ? "✓ SENT" : sosSending ? "…" : "SOS"}</button>
-                    </>
-                  ) : (
-                    <button onClick={() => action("/time/break/end/")} disabled={busy || !canModify} style={{ padding: "8px 16px", borderRadius: 10, background: "linear-gradient(135deg, #10b981, #059669)", color: "white", border: "none", fontSize: 11, fontWeight: 900, cursor: (busy || !canModify) ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, boxShadow: "0 2px 10px rgba(16,185,129,0.4)", opacity: (busy || !canModify) ? 0.5 : 1 }}><Play size={13} /> RESUME</button>
-                  )}
-                </div>
-              </div>
+              <ActiveSessionBar
+                openLog={openLog}
+                openBreak={openBreak}
+                elapsed={elapsed}
+                breakElapsed={breakElapsed}
+                busy={busy}
+                canModify={canModify}
+                breakType={breakType}
+                setBreakType={setBreakType}
+                onStartBreak={() => action("/time/break/start/")}
+                onEndBreak={() => action("/time/break/end/")}
+                onClockOut={handleClockOut}
+                onJobPhoto={() => setPanelOpen(true)}
+                onSOS={handleSOS}
+                sosSending={sosSending}
+                sosConfirmed={sosConfirmed}
+              />
             )}
             {!openLog && (
               <button onClick={() => setPanelOpen(true)} disabled={busy || !canModify} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 22px", borderRadius: 14, background: (busy || !canModify) ? "var(--tp-suspense-color)" : "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "white", border: "none", fontSize: 13, fontWeight: 900, cursor: (busy || !canModify) ? "not-allowed" : "pointer", boxShadow: (busy || !canModify) ? "none" : "0 4px 18px rgba(99,102,241,0.4)", transition: "all 0.2s", opacity: (busy || !canModify) ? 0.6 : 1, letterSpacing: "0.02em" }}><Clock size={18} /> START SHIFT</button>

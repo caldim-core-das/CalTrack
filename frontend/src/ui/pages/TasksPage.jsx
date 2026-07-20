@@ -17,7 +17,9 @@ import { useAuth } from "../../state/auth/useAuth.js"
 import { useRole } from "../../state/auth/useRole.js"
 import { Pill, Button, Card, Input, Select, TextArea } from "../components/kit.jsx"
 import { ClipboardList, Clock, CheckCircle2, AlertCircle, MapPin, Calendar as CalIcon, Play, Save, Trash2, Tag, Loader2, Paperclip, User, Flag, ListChecks, Plus, X, Building2, Camera, ThumbsUp, ThumbsDown, RefreshCw, UserCheck, AlertTriangle, DollarSign, Battery, Wifi, ShieldAlert, Sparkles, Navigation, Upload, Activity, Search, ChevronRight, ChevronDown, Phone, Car, Wrench, MessageSquare, Compass, MoreHorizontal, Hammer, ChevronLeft } from "lucide-react"
-import { SelfieCapture, getPosition } from "./TimePage.jsx"
+import { SelfieCapture } from "./TimePage.jsx"
+import { getPosition, useLocationTracker } from "../../hooks/useLocation.js"
+import ActiveSessionContainer from "../components/ActiveSessionContainer.jsx"
 import { verifyFaces } from "../../utils/faceVerify.js"
 import { CATEGORY_TO_ROLES_MAP } from "../../utils/roles.js"
 
@@ -1857,6 +1859,13 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                     duration: task.work_started_at ? getStepDuration(task.work_started_at, task.completed_at, task.travel_status === "working") : null,
                     time: getWorkTimeStr()
                   },
+                  { 
+                    key: "done",      
+                    icon: <CheckCircle2 size={16} />, 
+                    label: "Completed",
+                    duration: null,
+                    time: formatTime(task.completed_at)
+                  }
                 ]
                 let curIdx = 0;
                 if (task.status === "completed" || task.travel_status === "done") {
@@ -2654,11 +2663,45 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
 
                     {/* ── COMPLETE WORK ── Visible for working state ── */}
                     {task.travel_status === "working" && (
-                      <div className="mt-3 p-5 rounded-3xl bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 flex flex-col gap-5 shadow-sm">
-                        <div className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                          <CheckCircle2 size={16} className="text-indigo-605 text-indigo-600" />
-                          <span>Complete Work Action</span>
+                      <>
+                        {/* Customer Details Box */}
+                        <div className="mt-3 p-5 rounded-3xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col gap-3 shadow-sm">
+                          <div className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2 mb-2">
+                            <User size={16} className="text-indigo-600" />
+                            <span>Customer Details</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Client Name</div>
+                              <div className="text-sm font-black text-slate-800 dark:text-white">{task.client_name || "N/A"}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Contact</div>
+                              <div className="text-sm font-black text-slate-800 dark:text-white">{task.client_contact_number || "N/A"}</div>
+                            </div>
+                            {task.client_company_name && (
+                              <div className="col-span-2">
+                                <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Company</div>
+                                <div className="text-sm font-black text-slate-800 dark:text-white">{task.client_company_name}</div>
+                              </div>
+                            )}
+                            <div className="col-span-2">
+                              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Job Address</div>
+                              <div className="text-sm font-bold text-slate-700 dark:text-slate-300">{task.job_address || "No address provided"}</div>
+                            </div>
+                          </div>
                         </div>
+
+                        {/* Active Session Timer & Actions */}
+                        <ActiveSessionContainer task={task} />
+
+                        {/* Complete Work Form */}
+                        <div className="mt-5 p-5 rounded-3xl bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 flex flex-col gap-5 shadow-sm">
+                          <div className="text-xs font-black text-slate-800 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                            <CheckCircle2 size={16} className="text-indigo-605 text-indigo-600" />
+                            <span>Complete Work Action</span>
+                          </div>
 
                         {/* End Photo Requirement */}
                         <div className="flex flex-col gap-2">
@@ -2826,8 +2869,9 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                           <CheckCircle2 size={16} />
                           <span>{localBusy ? "Submitting…" : "Submit & Finish"}</span>
                           {!localBusy && <ChevronRight size={16} />}
-                        </button>
-                      </div>
+                          </button>
+                        </div>
+                      </>
                     )}
                   </>
                 )}
@@ -4455,7 +4499,7 @@ function AdminTasksTable({ tasks, employees, availableEmployees, jobSites, onRef
                       <Pill tone="good">✅ Verified</Pill>
                     ) : t.face_match_status === "failed" ? (
                       <Pill tone="bad">🔴 Failed</Pill>
-                    ) : t.face_match_status === "skipped" ? (
+                    ) : t.face_match_status === "skipped" || (t.status === "completed" && !t.end_photo) ? (
                       <Pill tone="neutral">⚪ Skipped</Pill>
                     ) : t.face_match_status === "pending" ? (
                       <Pill tone="warn">🟡 Pending</Pill>
@@ -4767,6 +4811,7 @@ function AdminTaskDetailPanel({ task, employees, availableEmployees, jobSites, o
                   { key: "on_the_way", icon: "🚗", label: "On The Way", time: formatTime(task.started_at) },
                   { key: "reached_site", icon: "📍", label: "Reached Site", time: formatTime(task.reached_site_at) },
                   { key: "working", icon: "🔨", label: "Working", time: getWorkTimeStr() },
+                  { key: "done", icon: "🎉", label: "Completed", time: formatTime(task.completed_at) },
                 ]
                 let curIdx = 0;
                 if (task.status === "completed" || task.travel_status === "done") {
@@ -4872,13 +4917,13 @@ function AdminTaskDetailPanel({ task, employees, availableEmployees, jobSites, o
                     }}>
                       🔴 Verification Failed
                     </span>
-                  ) : task.face_match_status === "skipped" ? (
+                  ) : task.face_match_status === "skipped" || (task.status === "completed" && !task.end_photo) ? (
                     <span style={{
                       padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 900,
                       background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1",
                       display: "inline-flex", alignItems: "center", gap: 4
                     }}>
-                      ⚪ Verification Skipped
+                      ⚪ Verification Skipped / No End Photo
                     </span>
                   ) : (
                     <span style={{
@@ -5745,6 +5790,10 @@ function EmployeeTasksPage({ tasks, handleAction, busy, onRefresh }) {
     }, 30000)
     return () => clearInterval(interval)
   }, [onRefresh])
+
+  // Continue live tracking when any task is actively being worked on
+  const hasWorkingTask = tasks.some(t => t.travel_status === "working")
+  useLocationTracker(hasWorkingTask)
 
   // Detect new jobs after refresh
   useEffect(() => {

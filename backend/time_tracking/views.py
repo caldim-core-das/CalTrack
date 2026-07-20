@@ -194,6 +194,8 @@ class ClockInView(APIView):
                     task.status = Task.Status.IN_PROGRESS
                     if not task.started_at:
                         task.started_at = now
+                    if time_log.clock_in_photo and not task.start_photo:
+                        task.start_photo = time_log.clock_in_photo
                     task.save()
             except Exception as e:
                 print(f"Error linking task: {e}")
@@ -302,6 +304,20 @@ class ClockOutView(APIView):
                 task.completed_at = timezone.now()
                 if not task.started_at:
                     task.started_at = time_log.clock_in
+                
+                # Carry over face match and photo to task
+                if time_log.face_match_status:
+                    if time_log.face_match_status == 'matched':
+                        task.face_match_status = 'verified'
+                    elif time_log.face_match_status in ['mismatch', 'no_face']:
+                        task.face_match_status = 'failed'
+                    else:
+                        task.face_match_status = time_log.face_match_status
+                if time_log.face_match_score is not None:
+                    task.face_match_percentage = time_log.face_match_score
+                if time_log.clock_out_photo:
+                    task.end_photo = time_log.clock_out_photo
+                
                 task.save()
         except (AttributeError, Exception):
             pass
@@ -623,8 +639,23 @@ class TimeLogApprovalView(APIView):
             time_log.status = 'approved'
             time_log.approved_by = request.user
             time_log.admin_notes = request.data.get("admin_notes", "")
-            time_log.face_match_status = 'matched'
-            time_log.save(update_fields=['status', 'approved_by', 'admin_notes', 'face_match_status'])
+            time_log.save(update_fields=['status', 'approved_by', 'admin_notes'])
+            
+            # Sync to the Task model
+            try:
+                task = time_log.task
+                if task:
+                    if time_log.face_match_status:
+                        task.face_match_status = 'verified' if time_log.face_match_status == 'matched' else time_log.face_match_status
+                    if time_log.face_match_score is not None:
+                        task.face_match_percentage = time_log.face_match_score
+                    if time_log.clock_in_photo and not task.start_photo:
+                        task.start_photo = time_log.clock_in_photo
+                    if time_log.clock_out_photo and not task.end_photo:
+                        task.end_photo = time_log.clock_out_photo
+                    task.save(update_fields=['face_match_status', 'face_match_percentage', 'start_photo', 'end_photo'])
+            except (AttributeError, Exception):
+                pass
         
         elif action == "reject":
             time_log.status = 'rejected'

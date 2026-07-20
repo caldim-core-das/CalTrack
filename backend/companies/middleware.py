@@ -121,9 +121,11 @@ class CompanyMiddleware(MiddlewareMixin):
         # ── Step 2.7: Dev-only fallback to first tenant when DEBUG is True ─────────
         if not company and settings.DEBUG:
             from companies.models import Company
-            company = Company.objects.exclude(schema_name='public').first()
+            company = Company.objects.filter(schema_name='caldim_2').first()
+            if not company:
+                company = Company.objects.exclude(schema_name='public').first()
             if company:
-                print(f"DEBUG: CompanyMiddleware - Dev fallback to first tenant: {company.schema_name}")
+                print(f"DEBUG: CompanyMiddleware - Dev fallback to tenant: {company.schema_name}")
 
         # ── Step 3: Switch the DB schema to this company's tenant ───────────────
         if company:
