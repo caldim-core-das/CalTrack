@@ -48,10 +48,14 @@ async function getDescriptor(imageSrc) {
     }
     img.onerror = () => resolve(null)
     
-    // Bypass browser cache for crossOrigin requests to prevent Canvas CORS errors
+    // Handle relative URLs returned by backend (e.g. /media/time_logs/...)
     let finalSrc = imageSrc
-    if (imageSrc && imageSrc.startsWith('http')) {
-      finalSrc = imageSrc + (imageSrc.includes('?') ? '&' : '?') + 'cors=' + Date.now()
+    if (imageSrc && imageSrc.startsWith('/')) {
+      finalSrc = import.meta.env.VITE_API_URL.replace('/api/v1', '') + imageSrc
+    }
+    // Bypass browser cache for crossOrigin requests to prevent Canvas CORS errors
+    if (finalSrc && finalSrc.startsWith('http')) {
+      finalSrc = finalSrc + (finalSrc.includes('?') ? '&' : '?') + 'cors=' + Date.now()
     }
     img.src = finalSrc
   })

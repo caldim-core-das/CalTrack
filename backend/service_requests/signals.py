@@ -51,6 +51,16 @@ def recalculate_employee_performance(employee):
                 "feedback_pending", "feedback_received", "closed"
             ]
         ).count()
+    # Phase 3 enhancement: The frontend Job Queue uses `Task` models as the operational unit.
+    # So we pull true `Task` counts and override if it has more completed jobs or total assigned.
+    from tasks.models import Task
+    task_total = Task.objects.filter(assigned_to=employee.user).count()
+    task_completed = Task.objects.filter(assigned_to=employee.user, status=Task.Status.COMPLETED).count()
+    
+    # We use the system that reflects the most accurate (highest) completion count
+    if task_completed > completed_count or task_total > total_assigned:
+        total_assigned = max(task_total, total_assigned)
+        completed_count = max(task_completed, completed_count)
 
     completion_rate = (completed_count / total_assigned * 100) if total_assigned else 0
 

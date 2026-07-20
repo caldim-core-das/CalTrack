@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
+import html2pdf from "html2pdf.js"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useRole } from "../../state/auth/useRole.js"
 import { useAuth } from "../../state/auth/useAuth.js"
@@ -206,13 +207,33 @@ export function EmployeeInvoiceHubModal({ record, autoPrint = false, onClose, in
   const handleEmail = async () => {
     try {
       setIsEmailing(true)
+
+      const element = document.getElementById("print-area")
+      if (!element) {
+        throw new Error("Invoice template not found for rendering.")
+      }
+
+      // Generate PDF Blob using html2pdf
+      const pdfOptions = {
+        margin: 0,
+        filename: `Invoice_${record.employee_name}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }
+
+      const pdfBlob = await html2pdf().set(pdfOptions).from(element).output('blob')
+
+      // Append to FormData
+      const fd = new FormData()
+      fd.append("record", JSON.stringify(record))
+      fd.append("notes", termsNotes)
+      fd.append("company_name", companyName)
+      fd.append("pdf_file", pdfBlob, `Invoice_${record.employee_name}.pdf`)
+
       const res = await apiRequest("/payroll/records/send_invoice_email/", {
         method: "POST",
-        json: {
-          record: record,
-          notes: termsNotes,
-          company_name: companyName
-        }
+        body: fd
       })
       if (res && (res.success || res.message)) {
         setEmailSent(true)

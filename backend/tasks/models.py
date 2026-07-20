@@ -96,6 +96,7 @@ class Task(models.Model):
 
     # Scheduling
     due_date         = models.DateField(default=timezone.localdate)
+    preferred_time   = models.CharField(max_length=100, blank=True, help_text="Preferred time of day for the task (e.g. 10:00 AM - 12:00 PM)")
     estimated_hours  = models.DecimalField(max_digits=5, decimal_places=2, default=1.00)
 
     # Location
@@ -119,6 +120,7 @@ class Task(models.Model):
     
     # Client details
     client_name      = models.CharField(max_length=200, blank=True, help_text="Customer/client name.")
+    client_type      = models.CharField(max_length=100, blank=True, help_text="Type of customer (e.g., VIP, Corporate, Regular)")
     client_company_name = models.CharField(max_length=200, blank=True)
     client_contact_number = models.CharField(max_length=50, blank=True)
     client_alternate_number = models.CharField(max_length=50, blank=True)

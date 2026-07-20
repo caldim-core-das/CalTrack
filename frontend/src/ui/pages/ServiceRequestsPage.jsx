@@ -27,6 +27,8 @@ function Toast({ message, type = "success", onDismiss }) {
 /* ─── Constants ──────────────────────────────────────────────────────────── */
 const STATUS_META = {
   new_request: { label: "New", color: "#3B82F6", bg: "#EFF6FF", border: "#BFDBFE" },
+  confirmed: { label: "Confirmed", color: "#0EA5E9", bg: "#E0F2FE", border: "#BAE6FD" },
+  waiting_for_payment: { label: "Awaiting Pay", color: "#EAB308", bg: "#FEFCE8", border: "#FEF08A" },
   reviewed: { label: "Reviewed", color: "#6366F1", bg: "#EEF2FF", border: "#C7D2FE" },
   assigned: { label: "Assigned", color: "#8B5CF6", bg: "#F5F3FF", border: "#DDD6FE" },
   accepted: { label: "Accepted", color: "#F59E0B", bg: "#FFFBEB", border: "#FDE68A" },
@@ -39,6 +41,7 @@ const STATUS_META = {
   closed: { label: "Closed", color: "#475569", bg: "#F1F5F9", border: "#CBD5E1" },
   rejected: { label: "Rejected", color: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
   rework_requested: { label: "Rework", color: "#DC2626", bg: "#FEF2F2", border: "#FCA5A5" },
+  on_the_way: { label: "On The Way", color: "#06B6D4", bg: "#ECFEFF", border: "#A5F3FC" },
 }
 
 const PRIORITY_META = {
@@ -55,8 +58,8 @@ const CAT_EMOJIS = {
 }
 
 const PIPELINE_ORDER = [
-  "new_request", "reviewed", "assigned", "accepted",
-  "in_progress", "completed", "awaiting_verification",
+  "new_request", "confirmed", "waiting_for_payment", "reviewed", "assigned", "accepted",
+  "on_the_way", "in_progress", "completed", "awaiting_verification",
   "verified", "feedback_pending", "feedback_received", "closed",
 ]
 
@@ -615,10 +618,14 @@ export function ServiceRequestsPage() {
                     <div className="sr-desc-card" style={{ marginBottom: 15 }}>
                       <div className="sr-info-card-title"><ClipboardCheck size={13} /> Booking Details</div>
 
-                      {detail.preferred_time && (
+                      {(detail.preferred_date || detail.preferred_time) && (
                         <div className="sr-info-row" style={{ marginBottom: 15 }}>
-                          <span className="sr-info-key"><Clock size={11} /> Preferred Time</span>
-                          <span className="sr-info-val sr-info-val--sm">{detail.preferred_time}</span>
+                          <span className="sr-info-key"><Clock size={11} /> Preferred Schedule</span>
+                          <span className="sr-info-val sr-info-val--sm">
+                            {detail.preferred_date ? new Date(detail.preferred_date).toLocaleDateString("en-IN", { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : ""} 
+                            {detail.preferred_date && detail.preferred_time ? " at " : ""}
+                            {detail.preferred_time}
+                          </span>
                         </div>
                       )}
 
@@ -640,7 +647,7 @@ export function ServiceRequestsPage() {
                                     {item.categoryName && <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{item.categoryName}</div>}
                                   </td>
                                   <td style={{ padding: "10px 0", textAlign: "center", color: "#475569" }}>{item.quantity}</td>
-                                  <td style={{ padding: "10px 0", textAlign: "right", color: "#475569" }}>${item.price}</td>
+                                  <td style={{ padding: "10px 0", textAlign: "right", color: "#475569" }}>₹{item.price}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -649,9 +656,26 @@ export function ServiceRequestsPage() {
                       )}
 
                       {(detail.total_amount > 0 || parsedCart.length > 0) && (
-                        <div className="sr-info-row" style={{ borderTop: "1px solid #e2e8f0", paddingTop: 12, justifyContent: "space-between" }}>
-                          <span className="sr-info-key" style={{ fontWeight: 600, color: "#1e293b", fontSize: "0.95rem" }}>Total Amount</span>
-                          <span className="sr-info-val" style={{ fontWeight: 700, color: "#7C3AED", fontSize: "1.05rem" }}>${detail.total_amount || 0}</span>
+                        <div className="sr-info-row" style={{ borderTop: "1px solid #e2e8f0", paddingTop: 12, justifyContent: "space-between", alignItems: "flex-end" }}>
+                          <div>
+                            <div className="sr-info-key" style={{ fontWeight: 600, color: "#1e293b", fontSize: "0.95rem" }}>Total Amount</div>
+                            {detail.payment_method && (
+                              <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4, display: "flex", gap: 6, alignItems: "center" }}>
+                                <span style={{ textTransform: "uppercase", fontWeight: 700, color: "#475569" }}>{detail.payment_method}</span>
+                                {detail.payment_status && (
+                                  <span style={{ 
+                                    padding: "2px 6px", borderRadius: 4, fontSize: "0.65rem", fontWeight: 800, textTransform: "uppercase",
+                                    background: detail.payment_status === "completed" || detail.payment_status === "processing" ? "#dcfce7" : "#fef9c3",
+                                    color: detail.payment_status === "completed" || detail.payment_status === "processing" ? "#166534" : "#854d0e",
+                                    border: `1px solid ${detail.payment_status === "completed" || detail.payment_status === "processing" ? "#bbf7d0" : "#fef08a"}`
+                                  }}>
+                                    {detail.payment_status === "processing" ? "Paid" : detail.payment_status}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <span className="sr-info-val" style={{ fontWeight: 800, color: "#7C3AED", fontSize: "1.15rem" }}>₹{Number(detail.total_amount || 0).toLocaleString('en-IN')}</span>
                         </div>
                       )}
                     </div>

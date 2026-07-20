@@ -11,7 +11,7 @@ import { ZonesPanel } from "./locations/ZonesPanel.jsx"
 import { AssignmentsPanel } from "./locations/AssignmentsPanel.jsx"
 import { MapOverview } from "./locations/MapOverview.jsx"
 import { GeofenceEditorModal } from "./locations/GeofenceEditorModal.jsx"
-import { getPosition } from "./TimePage.jsx"
+import { getPosition } from "../../hooks/useLocation.js"
 
 /* ── Fix default Leaflet icons ────────────────────────────────── */
 delete L.Icon.Default.prototype._getIconUrl
