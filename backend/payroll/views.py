@@ -149,6 +149,46 @@ def _calc_uk_work_hours(employee, start, end, compliance_rules):
     return regular.quantize(Decimal("0.01")), overtime.quantize(Decimal("0.01"))
 
 
+def _calc_india_work_hours(employee, start, end, compliance_rules):
+    qs = TimeLog.objects.filter(
+        employee=employee, work_date__gte=start, work_date__lte=end
+    ).prefetch_related("breaks")
+
+    daily_map = {}
+    weekly_map = {}
+    for log in qs:
+        hours = Decimal(str(round(log.worked_seconds() / 3600, 4)))
+        daily_map.setdefault(log.work_date, Decimal("0"))
+        daily_map[log.work_date] += hours
+        y, w, _ = log.work_date.isocalendar()
+        weekly_map.setdefault((y, w), Decimal("0"))
+        weekly_map[(y, w)] += hours
+
+    daily_ot_thresh = compliance_rules.get("daily_ot_threshold") or Decimal("9")
+    weekly_ot_thresh = compliance_rules.get("overtime_threshold") or Decimal("48")
+
+    total_regular = Decimal("0")
+    total_daily_ot = Decimal("0")
+
+    for d, dh in daily_map.items():
+        if dh > daily_ot_thresh:
+            total_regular += daily_ot_thresh
+            total_daily_ot += dh - daily_ot_thresh
+        else:
+            total_regular += dh
+
+    weekly_ot = Decimal("0")
+    for wk, wh in weekly_map.items():
+        if wh > weekly_ot_thresh:
+            weekly_ot += wh - weekly_ot_thresh
+
+    effective_ot = max(total_daily_ot, weekly_ot)
+    total_hours = sum(daily_map.values())
+    effective_reg = max(Decimal("0"), total_hours - effective_ot)
+
+    return effective_reg.quantize(Decimal("0.01")), effective_ot.quantize(Decimal("0.01"))
+
+
 def _calc_uk_paye(gross_period, period_days, employee):
     weeks_in_period = max(Decimal("1"), Decimal(str(period_days)) / Decimal("7"))
     annualise = Decimal("52") / weeks_in_period
@@ -285,6 +325,11 @@ class PayrollRecordViewSet(viewsets.ReadOnlyModelViewSet):
         
         subject = f"Your Payroll Invoice - {company_name}"
         
+        # Get company's currency symbol dynamically based on region
+        curr_symbol = "$"
+        if hasattr(request, "company") and request.company and request.company.region:
+            curr_symbol = request.company.region.currency_symbol
+        
         html_content = f"""
         <html>
           <body style="font-family: Arial, sans-serif; color: #333; background: #f8fafc; padding: 20px;">
@@ -300,7 +345,7 @@ class PayrollRecordViewSet(viewsets.ReadOnlyModelViewSet):
                 <table style="width: 100%; font-size: 14px;">
                   <tr>
                     <td style="color: #64748b; padding: 4px 0;"><strong>Hourly Rate:</strong></td>
-                    <td style="text-align: right; font-weight: bold;">£{record_data.get("hourly_rate")}</td>
+                    <td style="text-align: right; font-weight: bold;">{curr_symbol}{record_data.get("hourly_rate")}</td>
                   </tr>
                   <tr>
                     <td style="color: #64748b; padding: 4px 0;"><strong>Hours Worked:</strong></td>
@@ -308,11 +353,11 @@ class PayrollRecordViewSet(viewsets.ReadOnlyModelViewSet):
                   </tr>
                   <tr>
                     <td style="color: #64748b; padding: 4px 0;"><strong>Gross Pay:</strong></td>
-                    <td style="text-align: right; font-weight: bold; color: #1e3a8a;">£{record_data.get("gross_pay")}</td>
+                    <td style="text-align: right; font-weight: bold; color: #1e3a8a;">{curr_symbol}{record_data.get("gross_pay")}</td>
                   </tr>
                   <tr style="border-top: 1px solid #e2e8f0;">
                     <td style="color: #64748b; padding: 8px 0 4px 0;"><strong>Net Pay:</strong></td>
-                    <td style="text-align: right; font-weight: bold; font-size: 16px; color: #059669; padding: 8px 0 4px 0;">£{record_data.get("net_pay")}</td>
+                    <td style="text-align: right; font-weight: bold; font-size: 16px; color: #059669; padding: 8px 0 4px 0;">{curr_symbol}{record_data.get("net_pay")}</td>
                   </tr>
                 </table>
               </div>
@@ -420,6 +465,42 @@ class PayrollGenerateView(APIView):
             # If daily OT state: overtime_hours IS daily_ot (already 1.5x rates apply)
             net = gross
 
+        elif country == "IN":
+            regular_hours, overtime_hours = _calc_india_work_hours(
+                employee, start, end, compliance_rules
+            )
+            daily_ot_hours = Decimal("0")
+            double_time_hours = Decimal("0")
+            ot_mult = compliance_rules["overtime_multiplier"]
+
+            gross = (
+                (regular_hours + paid_leave_hours) * hourly_rate
+                + overtime_hours * hourly_rate * ot_mult
+            )
+
+            # India EPF: 12% of basic salary (50% of gross), capped at Rs 15000/month basic (prorated for period)
+            period_days = (end - start).days + 1
+            max_basic_for_period = Decimal("15000") * Decimal(str(period_days)) / Decimal("30")
+            basic_salary = min(gross * Decimal("0.5"), max_basic_for_period)
+            epf_employee = (basic_salary * Decimal("0.12")).quantize(Decimal("0.01"))
+            epf_employer = (basic_salary * Decimal("0.12")).quantize(Decimal("0.01"))
+
+            # Professional Tax: Rs 200/month prorated
+            professional_tax = (Decimal("200") * Decimal(str(period_days)) / Decimal("30")).quantize(Decimal("0.01"))
+
+            # ESIC: 0.75% employee, 3.25% employer if monthly gross <= Rs 21000
+            gross_monthly = gross * Decimal("30") / Decimal(str(period_days))
+            esic_employee = Decimal("0")
+            esic_employer = Decimal("0")
+            if gross_monthly <= Decimal("21000"):
+                esic_employee = (gross * Decimal("0.0075")).quantize(Decimal("0.01"))
+                esic_employer = (gross * Decimal("0.0325")).quantize(Decimal("0.01"))
+
+            gratuity_accrual = (basic_salary * Decimal("0.0481")).quantize(Decimal("0.01"))
+
+            # India deductions from gross to get net
+            net = max(Decimal("0"), gross - epf_employee - professional_tax - esic_employee)
+
         else:
             regular_hours, overtime_hours = _calc_uk_work_hours(
                 employee, start, end, compliance_rules
@@ -469,6 +550,16 @@ class PayrollGenerateView(APIView):
             "mileage_trip_count": trip_count,
             "mileage_reimbursement": float(mileage_reimbursement),
         }
+        if country == "IN":
+            extras.update({
+                "india_epf_employee": float(epf_employee),
+                "india_epf_employer": float(epf_employer),
+                "india_esic_employee": float(esic_employee),
+                "india_esic_employer": float(esic_employer),
+                "india_professional_tax": float(professional_tax),
+                "india_gratuity_accrual": float(gratuity_accrual),
+                "india_basic_salary": float(basic_salary.quantize(Decimal("0.01"))),
+            })
 
         record, _ = PayrollRecord.objects.update_or_create(
             period=period,

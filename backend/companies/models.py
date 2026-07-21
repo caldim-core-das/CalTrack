@@ -11,6 +11,7 @@ class Region(models.Model):
     class Code(models.TextChoices):
         US = "US", "United States"
         UK = "UK", "United Kingdom"
+        IN = "IN", "India"
 
     code = models.CharField(max_length=2, unique=True, choices=Code.choices)
     name = models.CharField(max_length=100)
@@ -69,6 +70,7 @@ class Company(TenantMixin):
     class PrimaryCountry(models.TextChoices):
         US = "US", "United States"
         UK = "UK", "United Kingdom"
+        IN = "IN", "India"
 
     primary_country = models.CharField(
         max_length=2,

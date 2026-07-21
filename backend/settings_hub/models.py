@@ -138,7 +138,7 @@ class TeamInvite(models.Model):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="employee")
     region = models.CharField(
         max_length=2,
-        choices=[("US", "United States"), ("UK", "United Kingdom")],
+        choices=[("US", "United States"), ("UK", "United Kingdom"), ("IN", "India")],
         blank=True, null=True
     )
     default_state = models.CharField(max_length=100, blank=True, null=True)

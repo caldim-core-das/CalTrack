@@ -226,6 +226,7 @@ export function LoginPage() {
   }
 
   const googleLoginHandler = useGoogleLogin({
+    flow: "implicit",
     onSuccess: async (tr) => {
       setLoading(true)
       try { 
@@ -235,7 +236,10 @@ export function LoginPage() {
       catch (err) { setError(extractAuthError(err, "Google login failed.")) }
       finally { setLoading(false) }
     },
-    onError: () => setError("Google login failed.")
+    onError: (err) => {
+      console.error("Google OAuth error:", err)
+      setError(err?.error_description || err?.error || "Google login failed. Please try again.")
+    }
   })
 
   const handleRetryAuth = () => {

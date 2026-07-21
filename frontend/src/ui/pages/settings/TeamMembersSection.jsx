@@ -83,18 +83,56 @@ export default function TeamMembersSection({ showToast, SectionHeader }) {
 
   const handleInvite = async () => {
     if (!inviteForm.email) { showToast("Email is required.", "error"); return }
-    setInviting(true)
-    try {
-      const res = await apiRequest("/settings/team/invites/", { method: "POST", json: inviteForm })
-      showToast(res?.message || "Invite sent.")
-      setInvites(prev => [res.data || res, ...prev])
-      setInviteForm({ email: "", role: "employee" })
-      setShowInviteForm(false)
-    } catch (err) {
-      showToast(err?.body?.message || "Failed to send invite.", "error")
-    } finally {
-      setInviting(false)
+    const emailsList = inviteForm.email
+      .split(/[,\n]/)
+      .map(e => e.trim())
+      .filter(e => e && e.includes("@"))
+
+    if (emailsList.length === 0) {
+      showToast("Please enter at least one valid email address.", "error")
+      return
     }
+
+    const maxAdmins = 10
+    const maxEmployees = 200
+
+    if (["admin", "manager"].includes(inviteForm.role) && emailsList.length > maxAdmins) {
+      showToast(`You can invite a maximum of ${maxAdmins} administrators/managers at a time.`, "error")
+      return
+    }
+    if (inviteForm.role === "employee" && emailsList.length > maxEmployees) {
+      showToast(`You can invite a maximum of ${maxEmployees} employees at a time.`, "error")
+      return
+    }
+
+    setInviting(true)
+    let succeeded = 0
+    let failed = 0
+    let lastError = ""
+
+    for (const email of emailsList) {
+      try {
+        const res = await apiRequest("/settings/team/invites/", {
+          method: "POST",
+          json: { email, role: inviteForm.role }
+        })
+        setInvites(prev => [res.data || res, ...prev])
+        succeeded++
+      } catch (err) {
+        failed++
+        lastError = err?.body?.message || err?.message || "Failed to invite."
+      }
+    }
+
+    if (succeeded > 0) {
+      showToast(`Successfully sent ${succeeded} invite(s).` + (failed > 0 ? ` (${failed} failed)` : ""))
+    } else {
+      showToast(`Failed to send invites: ${lastError}`, "error")
+    }
+
+    setInviteForm({ email: "", role: "employee" })
+    setShowInviteForm(false)
+    setInviting(false)
   }
 
   const handleRoleChange = async (memberId, newRole) => {
@@ -179,41 +217,44 @@ export default function TeamMembersSection({ showToast, SectionHeader }) {
         {showInviteForm && isAdmin && (
           <div className="mt-8 p-8 bg-slate-50 dark:bg-slate-950/40 rounded-3xl border border-dashed border-stroke dark:border-slate-800 animate-fadeUp">
             <h4 className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-6">Send Invitation</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-end">
-              <div className="lg:col-span-1">
-                <Input
-                  label="Email Address"
-                  type="email"
-                  placeholder="colleague@company.com"
+            <div className="space-y-6">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Email Addresses (separated by commas or newlines)</label>
+                <textarea
+                  placeholder="e.g. colleague1@company.com, colleague2@company.com"
                   value={inviteForm.email}
                   onChange={e => setInviteForm(p => ({ ...p, email: e.target.value }))}
-                  icon={<Mail size={16} />}
+                  className="w-full min-h-[80px] p-4 rounded-xl border border-stroke dark:border-slate-800 bg-bg dark:bg-slate-950/60 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-vertical"
+                  disabled={inviting}
                 />
               </div>
-              <div className="lg:col-span-1">
-                <Select
-                  label="Select Role"
-                  value={inviteForm.role}
-                  onChange={e => setInviteForm(p => ({ ...p, role: e.target.value }))}
-                  options={[
-                    { label: "Employee", value: "employee" },
-                    { label: "Manager", value: "manager" },
-                    { label: "Admin", value: "admin" }
-                  ]}
-                />
-              </div>
-              <div className="flex gap-3">
-                <Button onClick={handleInvite} disabled={inviting || !inviteForm.email} className="flex-1 h-[52px]">
-                  {inviting ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} className="mr-2" />}
-                  Send Invite
-                </Button>
-                <Button variant="ghost" onClick={() => setShowInviteForm(false)} className="h-[52px] px-6">Cancel</Button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                <div>
+                  <Select
+                    label="Select Role"
+                    value={inviteForm.role}
+                    onChange={e => setInviteForm(p => ({ ...p, role: e.target.value }))}
+                    disabled={inviting}
+                    options={[
+                      { label: "Employee (Max 200)", value: "employee" },
+                      { label: "Manager (Max 10)", value: "manager" },
+                      { label: "Admin (Max 10)", value: "admin" }
+                    ]}
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <Button onClick={handleInvite} disabled={inviting || !inviteForm.email.trim()} className="flex-1 h-[52px]">
+                    {inviting ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} className="mr-2" />}
+                    Send Invites
+                  </Button>
+                  <Button variant="ghost" onClick={() => setShowInviteForm(false)} disabled={inviting} className="h-[52px] px-6">Cancel</Button>
+                </div>
               </div>
             </div>
             {user?.company_country && (
               <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 12, display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: 14 }}>ℹ️</span> This employee will join under your company's region: 
-                <strong style={{ color: "var(--fg)" }}>{user.company_country === "UK" ? "🇬🇧 United Kingdom" : "🇺🇸 United States"}</strong>
+                <strong style={{ color: "var(--fg)" }}>{user.company_country === "UK" ? "🇬🇧 United Kingdom" : user.company_country === "IN" ? "🇮🇳 India" : "🇺🇸 United States"}</strong>
               </div>
             )}
           </div>

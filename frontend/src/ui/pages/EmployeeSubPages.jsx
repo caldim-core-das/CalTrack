@@ -1023,144 +1023,391 @@ export function RejectedEmployeesPage() {
 
 // 4. Document Vault Page
 export function DocumentVaultPage() {
-  const [vault, setVault] = useState([])
-  const [viewingDocument, setViewingDocument] = useState(null)
-  const [expandedEmployee, setExpandedEmployee] = useState(null)
+  const [allDossiers, setAllDossiers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
+  const [viewingDocument, setViewingDocument] = useState(null) // { label, data }
 
   useEffect(() => {
     async function load() {
-      let savedDossier = localStorage.getItem("caltrack_activation_dossier")
+      setLoading(true)
       try {
-        const backendDossier = await apiFetchRegistrationDossier()
-        if (backendDossier && backendDossier.regForm?.fullName) {
-          savedDossier = JSON.stringify(backendDossier)
-          localStorage.setItem("caltrack_activation_dossier", savedDossier)
-        }
-      } catch (e) {}
-
-      if (savedDossier) {
-        try {
-          const parsed = JSON.parse(savedDossier)
-          if (parsed.regForm && parsed.docForm) {
-            const fresh = [
-              { name: parsed.regForm.fullName, type: "Aadhaar Card", file: parsed.docForm.aadhaarFile || "aadhaar_scan.pdf", fileData: parsed.docForm.aadhaarFileFileData, check: "OCR Approved (99%)" },
-              { name: parsed.regForm.fullName, type: "PAN Card", file: parsed.docForm.panFile || "pan_scan.pdf", fileData: parsed.docForm.panFileFileData, check: "OCR Approved (98%)" },
-              { name: parsed.regForm.fullName, type: "Driving License", file: parsed.docForm.drivingLicenseFile || "driving_license.pdf", fileData: parsed.docForm.drivingLicenseFileFileData, check: "OCR Approved (99%)" },
-            ]
-            setVault(fresh)
-            return
-          }
-        } catch (e) {}
+        const { apiFetchRegistrationDossiers } = await import("../../api/authService.js")
+        const [pending, approved, rejected] = await Promise.all([
+          apiFetchRegistrationDossiers("pending"),
+          apiFetchRegistrationDossiers("approved"),
+          apiFetchRegistrationDossiers("rejected"),
+        ])
+        const all = [
+          ...(pending || []).map(d => ({ ...d, _status: "pending" })),
+          ...(approved || []).map(d => ({ ...d, _status: "approved" })),
+          ...(rejected || []).map(d => ({ ...d, _status: "rejected" })),
+        ]
+        setAllDossiers(all)
+        if (all.length > 0 && !selectedEmployee) setSelectedEmployee(all[0])
+      } catch (e) {
+        console.error("Failed to load dossiers for document vault", e)
+      } finally {
+        setLoading(false)
       }
-      setVault([])
     }
     load()
   }, [])
 
-  const groupedVault = Object.entries(
-    vault.reduce((acc, curr) => {
-      if (!acc[curr.name]) acc[curr.name] = []
-      acc[curr.name].push(curr)
-      return acc
-    }, {})
-  )
+  const filtered = allDossiers.filter(d => {
+    const name = (d.regForm?.fullName || d.email || "").toLowerCase()
+    const matchSearch = !search || name.includes(search.toLowerCase())
+    const matchStatus = statusFilter === "all" || d._status === statusFilter
+    return matchSearch && matchStatus
+  })
+
+  const statusColor = s => s === "approved" ? "text-emerald-600 bg-emerald-50 border-emerald-200" : s === "rejected" ? "text-rose-600 bg-rose-50 border-rose-200" : "text-amber-600 bg-amber-50 border-amber-200"
+  const statusLabel = s => s === "approved" ? "✓ Approved" : s === "rejected" ? "✕ Rejected" : "⏳ Pending"
+
+  const docs = selectedEmployee ? [
+    { label: "Aadhaar Card", icon: "🪪", key: "aadhaar", fileKey: "aadhaarFile", dataKey: "aadhaarFileFileData", color: "indigo" },
+    { label: "PAN Card", icon: "📋", key: "pan", fileKey: "panFile", dataKey: "panFileFileData", color: "violet" },
+    { label: "Driving License", icon: "🚗", key: "license", fileKey: "drivingLicenseFile", dataKey: "drivingLicenseFileFileData", color: "blue" },
+  ] : []
 
   return (
-    <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-bg overflow-y-auto p-10 space-y-8">
-      <div>
-        <h1 className="text-2xl professional-title text-slate-900 dark:text-white flex items-center gap-3">
-          <FolderOpen className="text-blue-600 dark:text-blue-500" size={24} />
-          Document Vault
-        </h1>
-        <p className="text-[10px] professional-subtitle text-slate-500 dark:text-slate-500 uppercase tracking-widest mt-1">
-          Secure storage repo for OCR and selfie biometric files.
-        </p>
+    <div className="flex h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 dark:bg-slate-950 overflow-hidden font-sans">
+
+      {/* ── LEFT: Employee List ── */}
+      <div className="w-[300px] shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col">
+        {/* Header */}
+        <div className="px-5 pt-5 pb-3 border-b border-slate-100 dark:border-slate-800 shrink-0">
+          <div className="flex items-center gap-2 mb-3">
+            <FolderOpen size={18} className="text-blue-600" />
+            <h2 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-tight">Document Vault</h2>
+          </div>
+          {/* Search */}
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search employee..."
+            className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950/40 text-xs font-semibold text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-blue-400 transition"
+          />
+          {/* Status Filter */}
+          <div className="flex gap-1.5 mt-2">
+            {["all", "pending", "approved", "rejected"].map(s => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`text-[9px] font-black uppercase px-2 py-1 rounded-full border transition-all ${statusFilter === s ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500 border-transparent"}`}
+              >
+                {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Employee Cards */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {loading ? (
+            <div className="flex items-center justify-center py-16 text-slate-400">
+              <svg className="animate-spin w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              <span className="text-xs font-bold">Loading...</span>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400">
+              <FolderOpen size={32} className="opacity-30 mb-2" />
+              <p className="text-xs font-bold">No employees found</p>
+            </div>
+          ) : filtered.map((d, i) => {
+            const name = d.regForm?.fullName || d.email || "Unknown"
+            const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
+            const isSelected = selectedEmployee?.id === d.id
+            return (
+              <button
+                key={d.id || i}
+                onClick={() => setSelectedEmployee(d)}
+                className={`w-full text-left p-3 rounded-2xl border transition-all ${isSelected ? "border-blue-400 bg-blue-50 dark:bg-blue-900/20 shadow-sm ring-2 ring-blue-400/20" : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-blue-200 hover:shadow-sm"}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-black text-sm shrink-0">
+                    {d.regForm?.profilePic
+                      ? <img src={d.regForm.profilePic} alt={name} className="w-full h-full object-cover rounded-xl" />
+                      : initials}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-black text-slate-900 dark:text-white truncate">{name}</div>
+                    <div className="text-[9px] text-slate-400 font-mono truncate">{d.email || d.regForm?.email || "—"}</div>
+                  </div>
+                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full border shrink-0 ${statusColor(d._status)}`}>
+                    {statusLabel(d._status)}
+                  </span>
+                </div>
+                {/* Doc count */}
+                <div className="mt-2 flex gap-1.5">
+                  {["🪪", "📋", "🚗"].map((icon, idx) => {
+                    const hasDoc = [d.docForm?.aadhaarFile, d.docForm?.panFile, d.docForm?.drivingLicenseFile][idx]
+                    return (
+                      <span key={idx} className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${hasDoc ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-slate-100 border-slate-200 text-slate-400"}`}>
+                        {icon} {hasDoc ? "✓" : "—"}
+                      </span>
+                    )
+                  })}
+                </div>
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      <Card title="Document Ledger">
-        <div className="overflow-x-auto w-full">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-stroke dark:border-slate-800 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                <th className="py-4">Employee</th>
-                <th className="py-4">Document Type</th>
-                <th className="py-4">Filename</th>
-                <th className="py-4">AI Verification Check</th>
-                <th className="py-4">Security</th>
-                <th className="py-4 text-right pr-6">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stroke/50 dark:divide-slate-800/50">
-              {groupedVault.map(([empName, docs], idx) => (
-                <React.Fragment key={idx}>
-                  <tr 
-                    className="text-sm font-semibold text-slate-700 dark:text-slate-350 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50" 
-                    onClick={() => setExpandedEmployee(expandedEmployee === empName ? null : empName)}
-                  >
-                    <td className="py-4 font-black text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
-                      {expandedEmployee === empName ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                      {empName}
-                    </td>
-                    <td className="py-4 text-xs font-bold text-slate-500" colSpan={5}>
-                      {docs.length} Document(s)
-                    </td>
-                  </tr>
-                  {expandedEmployee === empName && docs.map((d, dIdx) => (
-                    <tr key={`${idx}-${dIdx}`} className="text-sm font-semibold text-slate-700 dark:text-slate-350 bg-slate-50/50 dark:bg-slate-900/20">
-                      <td className="py-4 pl-10 text-xs text-slate-400">↳</td>
-                      <td className="py-4 text-xs font-bold text-slate-500">{d.type}</td>
-                      <td className="py-4 font-mono text-xs text-blue-500">{d.file}</td>
-                      <td className="py-4 text-xs">{d.check}</td>
-                      <td className="py-4">
-                        <Pill tone="good">Encrypted</Pill>
-                      </td>
-                      <td className="py-4 text-right pr-6">
-                        <div className="flex justify-end gap-2">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); setViewingDocument({ file: d.file, data: d.fileData }); }} 
-                            className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
-                            title="View Document"
-                          >
-                            <Eye size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      {/* ── RIGHT: Document Detail ── */}
+      <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
+        {!selectedEmployee ? (
+          <div className="flex flex-col items-center justify-center h-full text-slate-400">
+            <FolderOpen size={48} className="opacity-20 mb-3" />
+            <p className="text-sm font-black uppercase tracking-widest">Select an employee to view documents</p>
+          </div>
+        ) : (
+          <div className="p-8 space-y-6 max-w-5xl mx-auto">
+            {/* Employee Header */}
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+              <div className="flex items-center gap-5">
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shrink-0 overflow-hidden shadow-lg">
+                  {selectedEmployee.regForm?.profilePic
+                    ? <img src={selectedEmployee.regForm.profilePic} alt="Profile" className="w-full h-full object-cover" />
+                    : <span className="text-white font-black text-2xl">
+                        {(selectedEmployee.regForm?.fullName || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+                      </span>
+                  }
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h1 className="text-xl font-black text-slate-900 dark:text-white">
+                      {selectedEmployee.regForm?.fullName || selectedEmployee.email || "Unknown Employee"}
+                    </h1>
+                    <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${statusColor(selectedEmployee._status)}`}>
+                      {statusLabel(selectedEmployee._status)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 text-[10px]">
+                    {[
+                      ["Email", selectedEmployee.regForm?.email || selectedEmployee.email || "—"],
+                      ["Phone", selectedEmployee.regForm?.phone || "—"],
+                      ["Location", selectedEmployee.regForm?.address || "—"],
+                      ["Submitted", selectedEmployee.created_at ? new Date(selectedEmployee.created_at).toLocaleDateString() : "—"],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <span className="block text-[8px] text-slate-400 font-black uppercase tracking-wider mb-0.5">{label}</span>
+                        <span className="text-slate-700 dark:text-slate-300 font-semibold truncate block">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-      {/* ── VIEW DOCUMENT MODAL ── */}
+            {/* ── DOCUMENT CARDS ── */}
+            <div>
+              <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <FileText size={14} className="text-blue-500" /> Identity Documents
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {docs.map(({ label, icon, fileKey, dataKey, color }) => {
+                  const fileName = selectedEmployee.docForm?.[fileKey]
+                  const fileData = selectedEmployee.docForm?.[dataKey]
+                  const hasFile = !!fileName || !!fileData
+                  const isImage = fileData?.startsWith("data:image")
+                  const isPdf = fileData?.startsWith("data:application/pdf") || fileName?.toLowerCase().endsWith(".pdf")
+
+                  return (
+                    <div key={fileKey} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all group">
+                      {/* Document Preview */}
+                      <div className="relative h-44 bg-slate-100 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+                        {isImage ? (
+                          <img
+                            src={fileData}
+                            alt={label}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : isPdf ? (
+                          <div className="flex flex-col items-center gap-2 text-slate-400">
+                            <span className="text-4xl">📄</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider">PDF Document</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 text-slate-300 dark:text-slate-600">
+                            <span className="text-5xl opacity-60">{icon}</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Not Uploaded</span>
+                          </div>
+                        )}
+                        {/* Overlay */}
+                        {hasFile && (
+                          <div className="absolute inset-0 bg-slate-950/0 group-hover:bg-slate-950/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <button
+                              onClick={() => setViewingDocument({ label, data: fileData, fileName })}
+                              className="bg-white text-slate-900 font-black text-xs px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 hover:bg-blue-50 transition"
+                            >
+                              <Eye size={14} /> View Full Document
+                            </button>
+                          </div>
+                        )}
+                        {/* Status badge */}
+                        <div className={`absolute top-2 left-2 text-[8px] font-black px-2 py-0.5 rounded-full border ${hasFile ? "bg-emerald-50 border-emerald-300 text-emerald-700" : "bg-slate-200 border-slate-300 text-slate-500"}`}>
+                          {hasFile ? "✓ Uploaded" : "Not Uploaded"}
+                        </div>
+                      </div>
+                      {/* Card Footer */}
+                      <div className="p-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <div className="text-[8px] text-slate-400 font-black uppercase tracking-wider">{icon} Document Type</div>
+                            <div className="text-sm font-black text-slate-900 dark:text-white mt-0.5">{label}</div>
+                            <div className="text-[10px] font-mono text-slate-400 truncate mt-0.5 max-w-[140px]">{fileName || "—"}</div>
+                          </div>
+                          {hasFile && (
+                            <button
+                              onClick={() => setViewingDocument({ label, data: fileData, fileName })}
+                              className="h-9 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-colors shrink-0"
+                            >
+                              <Eye size={12} /> View
+                            </button>
+                          )}
+                        </div>
+                        {hasFile && (
+                          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-1.5 text-[9px] font-bold text-emerald-600">
+                            <ShieldCheck size={11} />
+                            <span>Encrypted &amp; Verified</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* ── REGISTRATION FORM DATA ── */}
+            {selectedEmployee.regForm && (
+              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                <h2 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <Users size={14} className="text-indigo-500" /> Registration Details
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+                  {[
+                    ["Full Name", selectedEmployee.regForm.fullName],
+                    ["Email", selectedEmployee.regForm.email],
+                    ["Phone", selectedEmployee.regForm.phone],
+                    ["Address", selectedEmployee.regForm.address],
+                    ["Date of Birth", selectedEmployee.regForm.dateOfBirth],
+                    ["Aadhaar No.", selectedEmployee.regForm.aadhaarNumber ? `••••••${selectedEmployee.regForm.aadhaarNumber.slice(-4)}` : "—"],
+                    ["PAN No.", selectedEmployee.regForm.panNumber || "—"],
+                    ["DL No.", selectedEmployee.regForm.drivingLicenseNumber || "—"],
+                    ["Trust Score", `${selectedEmployee.trustScore || 100}%`],
+                  ].map(([label, value]) => (
+                    <div key={label} className="bg-slate-50 dark:bg-slate-950/30 rounded-xl p-3 border border-slate-100 dark:border-slate-800">
+                      <span className="block text-[8px] text-slate-400 font-black uppercase tracking-wider mb-0.5">{label}</span>
+                      <span className="text-slate-800 dark:text-slate-200 font-bold break-all">{value || "—"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── ADMIN CLEARANCE ── */}
+            {selectedEmployee.adminClearance?.status && (
+              <div className={`rounded-2xl border p-5 ${selectedEmployee._status === "approved" ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/10 dark:border-emerald-800" : "bg-rose-50 border-rose-200 dark:bg-rose-900/10 dark:border-rose-800"}`}>
+                <div className="text-xs font-black uppercase tracking-wider mb-1 flex items-center gap-2">
+                  <ShieldCheck size={14} className={selectedEmployee._status === "approved" ? "text-emerald-600" : "text-rose-600"} />
+                  <span className={selectedEmployee._status === "approved" ? "text-emerald-700" : "text-rose-700"}>
+                    Admin Decision — {selectedEmployee._status === "approved" ? "APPROVED" : "REJECTED"}
+                  </span>
+                </div>
+                {selectedEmployee.adminClearance.remarks && (
+                  <p className={`text-xs font-semibold mt-1 ${selectedEmployee._status === "approved" ? "text-emerald-700" : "text-rose-700"}`}>
+                    Remarks: "{selectedEmployee.adminClearance.remarks}"
+                  </p>
+                )}
+                {selectedEmployee.adminClearance.reasonCategory && (
+                  <p className="text-[10px] font-bold text-slate-500 mt-0.5">Category: {selectedEmployee.adminClearance.reasonCategory}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── FULL-SCREEN DOCUMENT VIEWER MODAL ── */}
       {viewingDocument && createPortal(
-        <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl p-6 flex flex-col space-y-6">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 className="text-sm font-black uppercase tracking-wider text-slate-850 dark:text-white">
-                View Document: {viewingDocument.file}
-              </h3>
-              <button onClick={() => setViewingDocument(null)} className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
-                <X size={18} />
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm"
+          onClick={() => setViewingDocument(null)}
+        >
+          <div
+            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
+                  <Eye size={16} className="text-blue-600" />
+                </div>
+                <div>
+                  <div className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Document Preview</div>
+                  <div className="text-sm font-black text-slate-900 dark:text-white">{viewingDocument.label}</div>
+                  {viewingDocument.fileName && (
+                    <div className="text-[10px] font-mono text-slate-400 mt-0.5">{viewingDocument.fileName}</div>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingDocument(null)}
+                className="w-9 h-9 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition"
+              >
+                <X size={16} />
               </button>
             </div>
-            
-            <div className="bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-100 dark:border-slate-800 w-full h-[60vh] flex items-center justify-center overflow-hidden">
-               {viewingDocument.data?.startsWith('data:application/pdf') || viewingDocument.file?.toLowerCase().endsWith('.pdf') ? (
-                  <iframe src={viewingDocument.data || viewingDocument.file} className="w-full h-full" title="Document Viewer" />
-               ) : viewingDocument.data ? (
-                  <img src={viewingDocument.data} alt="Document" className="max-w-full max-h-full object-contain" />
-               ) : (
-                  <div className="text-slate-400 font-bold uppercase tracking-widest text-sm">Document not found</div>
-               )}
+
+            {/* Document Content */}
+            <div className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-950/50 flex items-center justify-center p-6">
+              {viewingDocument.data?.startsWith("data:image") ? (
+                <div className="max-w-3xl w-full bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow overflow-hidden p-2">
+                  <img
+                    src={viewingDocument.data}
+                    alt={viewingDocument.label}
+                    className="w-full h-auto object-contain rounded-xl max-h-[65vh]"
+                  />
+                </div>
+              ) : viewingDocument.data?.startsWith("data:application/pdf") ? (
+                <div className="w-full h-[65vh] bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow overflow-hidden">
+                  <iframe
+                    src={viewingDocument.data}
+                    title={viewingDocument.label}
+                    className="w-full h-full rounded-2xl"
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-4 text-slate-400">
+                  <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center">
+                    <FileText size={40} className="text-slate-300 dark:text-slate-600" />
+                  </div>
+                  <div className="text-center">
+                    <p className="font-black text-slate-600 dark:text-slate-400 text-sm uppercase tracking-wider">No Preview Available</p>
+                    <p className="text-xs text-slate-400 mt-1">This document has not been uploaded or cannot be previewed.</p>
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex justify-end pt-3 border-t border-slate-100 dark:border-slate-800">
-              <Button onClick={() => setViewingDocument(null)} className="h-10 px-5 font-bold">
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0 bg-white dark:bg-slate-900">
+              <div className="flex items-center gap-2 text-[10px] font-bold text-emerald-600">
+                <ShieldCheck size={13} />
+                <span>Encrypted &amp; Securely Stored</span>
+              </div>
+              <button
+                onClick={() => setViewingDocument(null)}
+                className="px-5 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl font-black text-xs hover:bg-slate-700 dark:hover:bg-slate-100 transition"
+              >
                 Close
-              </Button>
+              </button>
             </div>
           </div>
         </div>,

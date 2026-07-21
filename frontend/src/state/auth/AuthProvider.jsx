@@ -52,6 +52,9 @@ export function AuthProvider({ children }) {
         avatar_url:me.avatar_url ?? null,
         two_fa_enabled: me.two_fa_enabled ?? false,
         employee_roles: me.employee_roles ?? [],
+        companyCountry: me.company_country ?? "US",
+        companyCurrency: me.company_currency ?? "USD",
+        companyCurrencySymbol: me.company_currency_symbol ?? "$",
       }
       setUser(u)
       if (me.company_name) {

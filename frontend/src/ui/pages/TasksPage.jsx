@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, memo, useMemo } from "react"
 import { createPortal } from "react-dom"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMap } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
@@ -1015,6 +1015,11 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
   const [faceVerifyStatus, setFaceVerifyStatus] = useState(null) // 'verifying', 'matched', 'mismatch', 'no_face', 'skipped'
   const [faceVerifyError, setFaceVerifyError] = useState("")
   const [showEndSelfieCamera, setShowEndSelfieCamera] = useState(false)
+  const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(task.payment_status === "paid")
+
+  useEffect(() => {
+    setIsPaymentConfirmed(task.payment_status === "paid")
+  }, [task.payment_status])
 
   async function performFaceMatching(endingPhotoPreview) {
     setFaceVerifyStatus("verifying")
@@ -1149,11 +1154,15 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     if (!faceVerifyStatus && task.start_photo) {
       alert("Please capture or upload an ending photo to verify identity."); return;
     }
+    if (!isPaymentConfirmed) {
+      alert("Please complete the payment collection step before completing work."); return;
+    }
     const payload = { 
       notes: note, 
       require_fd: true,
       face_match_percentage: faceVerifyScore ?? 0,
-      face_match_status: faceVerifyStatus === 'matched' ? 'verified' : (faceVerifyStatus === 'skipped' ? 'skipped' : 'failed')
+      face_match_status: faceVerifyStatus === 'matched' ? 'verified' : (faceVerifyStatus === 'skipped' ? 'skipped' : 'failed'),
+      collect_payment: isPaymentConfirmed
     }
     if (afterPhoto) payload.photo = afterPhoto
     onAction(task.id, "complete", payload)
@@ -2819,6 +2828,131 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                           </div>
                         </div>
 
+                        {/* ── PAYMENT COLLECTION SECTION ── */}
+                        {(() => {
+                          // Determine the booking payment method – show ONLY that method, not a toggle
+                          const bookingPayMethod = (task.payment_method || "cod").toLowerCase()
+                          const isCod = bookingPayMethod === "cod"
+                          const isUpi = bookingPayMethod === "upi" || bookingPayMethod === "online" || bookingPayMethod === "scan"
+
+                          return (
+                            <div className="flex flex-col gap-3 p-4 rounded-2xl border bg-white dark:bg-slate-950 shadow-sm" style={{ border: "1.5px solid #e2e8f0" }}>
+                              {/* Header */}
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Payment Collection *</div>
+                                  <div className={`mt-0.5 text-[11px] font-black flex items-center gap-1.5 ${isCod ? "text-emerald-700" : "text-blue-600"}`}>
+                                    {isCod ? "💵 Cash on Delivery (COD)" : "📱 UPI / Online Payment"}
+                                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-black border ${isCod ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-blue-50 border-blue-200 text-blue-700"}`}>
+                                      CUSTOMER BOOKING METHOD
+                                    </span>
+                                  </div>
+                                </div>
+                                {isPaymentConfirmed ? (
+                                  <span className="text-emerald-600 font-extrabold text-[10px] uppercase flex items-center gap-1 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-full">
+                                    ✓ Verified
+                                  </span>
+                                ) : (
+                                  <span className="text-amber-600 font-extrabold text-[10px] uppercase bg-amber-50 border border-amber-200 px-2 py-1 rounded-full">Pending</span>
+                                )}
+                              </div>
+
+                              {/* COD Display */}
+                              {isCod && (
+                                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/10 rounded-xl border border-emerald-200 dark:border-emerald-800 flex flex-col gap-2">
+                                  <div className="flex justify-between items-center text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    <span>Amount to Collect:</span>
+                                    <span className="font-black text-emerald-700 text-base">₹{task.total_amount || 1500}</span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 font-semibold leading-relaxed">
+                                    Collect cash from the customer before completing the job. Once received, confirm below.
+                                  </div>
+                                  {isPaymentConfirmed ? (
+                                    <div className="mt-1 p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 rounded-xl text-center text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2">
+                                      ✅ Cash Received &amp; Confirmed
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsPaymentConfirmed(true)}
+                                      className="mt-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors shadow-sm flex items-center justify-center gap-2"
+                                    >
+                                      💵 Mark Cash Collected
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* UPI / QR Display */}
+                              {isUpi && (
+                                <div className="p-3 bg-blue-50 dark:bg-blue-950/10 rounded-xl border border-blue-200 dark:border-blue-800 flex flex-col items-center gap-3">
+                                  <div className="w-full flex justify-between items-center text-xs font-bold text-slate-700 dark:text-slate-300">
+                                    <span>Amount to Pay:</span>
+                                    <span className="font-black text-blue-700 text-base">₹{task.total_amount || 1500}</span>
+                                  </div>
+                                  {/* QR Code SVG */}
+                                  <div className="p-3 bg-white rounded-xl border border-slate-200 flex flex-col items-center shadow-sm">
+                                    <svg width="110" height="110" viewBox="0 0 120 120" className="text-slate-900">
+                                      <rect x="0" y="0" width="30" height="30" fill="currentColor" />
+                                      <rect x="5" y="5" width="20" height="20" fill="white" />
+                                      <rect x="10" y="10" width="10" height="10" fill="currentColor" />
+                                      <rect x="90" y="0" width="30" height="30" fill="currentColor" />
+                                      <rect x="95" y="5" width="20" height="20" fill="white" />
+                                      <rect x="100" y="10" width="10" height="10" fill="currentColor" />
+                                      <rect x="0" y="90" width="30" height="30" fill="currentColor" />
+                                      <rect x="5" y="95" width="20" height="20" fill="white" />
+                                      <rect x="10" y="100" width="10" height="10" fill="currentColor" />
+                                      <rect x="40" y="5" width="10" height="10" fill="currentColor" />
+                                      <rect x="60" y="15" width="15" height="15" fill="currentColor" />
+                                      <rect x="45" y="45" width="30" height="30" fill="currentColor" />
+                                      <rect x="50" y="50" width="20" height="20" fill="white" />
+                                      <rect x="55" y="55" width="10" height="10" fill="currentColor" />
+                                      <rect x="15" y="45" width="10" height="15" fill="currentColor" />
+                                      <rect x="95" y="45" width="15" height="10" fill="currentColor" />
+                                      <rect x="10" y="70" width="15" height="10" fill="currentColor" />
+                                      <rect x="40" y="95" width="10" height="15" fill="currentColor" />
+                                      <rect x="70" y="95" width="15" height="10" fill="currentColor" />
+                                      <rect x="95" y="90" width="10" height="10" fill="currentColor" />
+                                    </svg>
+                                    <div className="text-[9px] font-bold text-blue-500 mt-1.5 uppercase tracking-wider">📱 Scan to Pay via UPI</div>
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 font-semibold text-center leading-relaxed">
+                                    Ask the customer to scan this QR code. Once payment is confirmed by the customer, click verify below.
+                                  </div>
+                                  {isPaymentConfirmed ? (
+                                    <div className="w-full p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 rounded-xl text-center text-xs font-black uppercase tracking-wider flex items-center justify-center gap-2">
+                                      ✅ UPI Payment Verified
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsPaymentConfirmed(true)}
+                                      className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-colors shadow-sm flex items-center justify-center gap-2"
+                                    >
+                                      📱 Verify UPI Payment Done
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Fallback if unknown method */}
+                              {!isCod && !isUpi && (
+                                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-500 font-semibold text-center">
+                                  Payment method: <strong className="text-slate-700">{task.payment_method || "Not Specified"}</strong>
+                                  <br />Please confirm payment receipt with the customer.
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsPaymentConfirmed(true)}
+                                    className="mt-2 w-full py-2.5 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-colors"
+                                  >
+                                    Confirm Payment Received
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
+
                         {/* Work Summary Notes */}
                         <div className="flex flex-col gap-2">
                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Work Summary Notes</label>
@@ -2839,31 +2973,32 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                             localBusy || 
                             busy || 
                             faceVerifyStatus === "verifying" || 
-                            (task.start_photo && faceVerifyStatus !== "matched" && faceVerifyStatus !== "skipped")
+                            (task.start_photo && faceVerifyStatus !== "matched" && faceVerifyStatus !== "skipped") ||
+                            !isPaymentConfirmed
                           }
                           style={{
                             width: "100%",
                             padding: "15px 0",
                             borderRadius: 14,
                             border: "none",
-                            background: (!task.start_photo || faceVerifyStatus === "matched" || faceVerifyStatus === "skipped")
+                            background: ((!task.start_photo || faceVerifyStatus === "matched" || faceVerifyStatus === "skipped") && isPaymentConfirmed)
                               ? "linear-gradient(135deg, #059669 0%, #047857 100%)"
                               : "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)",
                             color: "#fff",
                             fontSize: 13,
                             fontWeight: 900,
-                            cursor: (localBusy || busy) ? "not-allowed" : "pointer",
+                            cursor: (localBusy || busy || !isPaymentConfirmed) ? "not-allowed" : "pointer",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             gap: 10,
                             letterSpacing: "0.06em",
                             textTransform: "uppercase",
-                            boxShadow: (!task.start_photo || faceVerifyStatus === "matched" || faceVerifyStatus === "skipped")
+                            boxShadow: ((!task.start_photo || faceVerifyStatus === "matched" || faceVerifyStatus === "skipped") && isPaymentConfirmed)
                               ? "0 6px 20px rgba(5,150,105,0.4)"
                               : "0 4px 12px rgba(100,116,139,0.2)",
                             transition: "all 0.25s ease",
-                            opacity: (localBusy || busy) ? 0.6 : 1,
+                            opacity: (localBusy || busy || !isPaymentConfirmed) ? 0.6 : 1,
                           }}
                         >
                           <CheckCircle2 size={16} />
@@ -3097,9 +3232,19 @@ function DeclinedTasksPanel({ declinedTasks, availableEmployees, onReassigned })
                   >
                     <option value="">— Reassign to —</option>
                     {sortedEmployees.filter(emp => {
-                      if (!task.category || !CATEGORY_TO_ROLES_MAP[task.category]) return true;
+                      const category = task.category;
+                      let allowedRoles = null;
+                      if (category) {
+                        if (category === "electrician") allowedRoles = ["electrician"];
+                        else if (category === "plumber") allowedRoles = ["plumber"];
+                        else if (category === "carpenter") allowedRoles = ["carpenter"];
+                        else if (category === "hvac") allowedRoles = ["ac_technician"];
+                        else if (category === "cleaning") allowedRoles = ["cleaning"];
+                        else if (category === "maintenance") allowedRoles = ["handyman"];
+                        else if (category === "repair") allowedRoles = ["appliance_technician", "handyman", "painter"];
+                      }
+                      if (!allowedRoles) return true;
                       const empRoles = emp.service_roles || [];
-                      const allowedRoles = CATEGORY_TO_ROLES_MAP[task.category];
                       return empRoles.some(r => allowedRoles.includes(r));
                     }).map(emp => {
                       const avail = emp.current_availability || "offline"
@@ -3196,8 +3341,31 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
       appliance_repair: "repair",
       security: "other",
       general: "maintenance",
+      "1": "cleaning",
+      "2": "plumber",
+      "3": "electrician",
+      "4": "carpenter",
+      "5": "hvac",
+      "6": "other",
+      "7": "repair",
+      "8": "repair",
+      "9": "other",
+      "10": "maintenance",
     }
-    set("category", catMap[selected.service_category] || "other")
+    const catKey = String(selected.service_category || "").toLowerCase()
+    const displayKey = String(selected.service_category_display || "").toLowerCase()
+    
+    let resolvedCategory = "other"
+    if (catKey.includes("electrical") || displayKey.includes("electrical")) resolvedCategory = "electrician"
+    else if (catKey.includes("plumbing") || displayKey.includes("plumbing")) resolvedCategory = "plumber"
+    else if (catKey.includes("carpentry") || displayKey.includes("carpentry")) resolvedCategory = "carpenter"
+    else if (catKey.includes("hvac") || catKey.includes("ac") || displayKey.includes("hvac") || displayKey.includes("ac")) resolvedCategory = "hvac"
+    else if (catKey.includes("cleaning") || displayKey.includes("cleaning")) resolvedCategory = "cleaning"
+    else if (catKey.includes("maintenance") || displayKey.includes("maintenance") || catKey.includes("general") || displayKey.includes("general")) resolvedCategory = "maintenance"
+    else if (catKey.includes("appliance") || displayKey.includes("appliance") || catKey.includes("paint") || displayKey.includes("paint")) resolvedCategory = "repair"
+    else resolvedCategory = catMap[catKey] || catMap[displayKey] || "other"
+
+    set("category", resolvedCategory)
 
     // Map priority
     const priorityMap = {
@@ -3259,8 +3427,19 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
       ? [...availableEmployees]
       : [...employees];
 
-    if (form.category && CATEGORY_TO_ROLES_MAP[form.category]) {
-      const allowedRoles = CATEGORY_TO_ROLES_MAP[form.category];
+    const category = form.category;
+    let allowedRoles = null;
+    if (category) {
+      if (category === "electrician") allowedRoles = ["electrician"];
+      else if (category === "plumber") allowedRoles = ["plumber"];
+      else if (category === "carpenter") allowedRoles = ["carpenter"];
+      else if (category === "hvac") allowedRoles = ["ac_technician"];
+      else if (category === "cleaning") allowedRoles = ["cleaning"];
+      else if (category === "maintenance") allowedRoles = ["handyman"];
+      else if (category === "repair") allowedRoles = ["appliance_technician", "handyman", "painter"];
+    }
+
+    if (allowedRoles) {
       list = list.filter(emp => {
         const empRoles = emp.service_roles || [];
         return empRoles.some(r => allowedRoles.includes(r));
@@ -3307,7 +3486,7 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
       const ORDER = { available: 0, busy: 1, on_break: 2, on_leave: 3, offline: 4 };
       return (ORDER[a.current_availability] ?? 5) - (ORDER[b.current_availability] ?? 5);
     });
-  }, [availableEmployees, employees, workflowData]);
+  }, [availableEmployees, employees, workflowData, form.category]);
 
   // 1. Dynamic Address Autocomplete
   useEffect(() => {
@@ -5208,15 +5387,21 @@ function AdminTaskDetailPanel({ task, employees, availableEmployees, jobSites, o
 }
 
 // ─── ADMIN LAYOUT ────────────────────────────────────────────
-function AdminTasksPage({ tasks, employees, availableEmployees, jobSites, declinedTasks, loadTasks }) {
+function AdminTasksPage({ tasks, employees, availableEmployees, jobSites, declinedTasks, loadTasks, defaultStatus = "all" }) {
   const isDark = useDarkMode()
   const [open, setOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState(null)
   const [search, setSearch] = useState("")
-  const [filterStatus, setFilterStatus] = useState("all")
+  const [filterStatus, setFilterStatus] = useState(defaultStatus)
   const [filterPriority, setFilterPriority] = useState("all")
   const [filterEmployee, setFilterEmployee] = useState("all")
   const modalRef = useRef(null)
+
+  useEffect(() => {
+    if (defaultStatus) {
+      setFilterStatus(defaultStatus)
+    }
+  }, [defaultStatus])
 
   const suspended = tasks.filter(t => t.status === "suspended")
   const delayed = suspended.filter(t => t.resume_deadline && new Date() > new Date(t.resume_deadline))
@@ -5933,6 +6118,8 @@ export function TasksPage() {
   const { user } = useAuth()
   const { isAdmin } = useRole()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const defaultStatus = searchParams.get("status") || "all"
 
   const [tasks, setTasks] = useState([])
   const [employees, setEmployees] = useState([])
@@ -6119,6 +6306,7 @@ export function TasksPage() {
             declinedTasks={declinedTasks}
             jobSites={jobSites}
             loadTasks={loadTasks}
+            defaultStatus={defaultStatus}
           />
         ) : (
           <EmployeeTasksPage tasks={tasks} handleAction={handleAction} busy={busy} onRefresh={loadTasks} />

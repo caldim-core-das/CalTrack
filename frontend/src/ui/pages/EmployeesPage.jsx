@@ -29,13 +29,14 @@ function ExemptBadge({ status }) {
   )
 }
 
-function EditEmployeeModal({ employee, availableRoles, onClose, onSave, saving }) {
+function EditEmployeeModal({ employee, availableRoles, onClose, onSave, saving, error }) {
+  const { user } = useAuth()
   const [email, setEmail] = useState(employee.user?.email || "")
   const [firstName, setFirstName] = useState(employee.user?.first_name || "")
   const [lastName, setLastName] = useState(employee.user?.last_name || "")
   const [title, setTitle] = useState(employee.title || "")
   const [hourlyRate, setHourlyRate] = useState(employee.hourly_rate ?? "")
-  const [country, setCountry] = useState(employee.country || "US")
+  const [country, setCountry] = useState(employee.country || user?.companyCountry || "US")
   const [state, setState] = useState(employee.state || "")
   const [exemptStatus, setExemptStatus] = useState(employee.exempt_status || "non_exempt")
   const [weeklySalary, setWeeklySalary] = useState(employee.weekly_salary ?? "")
@@ -182,22 +183,28 @@ function EditEmployeeModal({ employee, availableRoles, onClose, onSave, saving }
                   >
                     <option value="US">🇺🇸 United States</option>
                     <option value="UK">🇬🇧 United Kingdom</option>
+                    <option value="IN">🇮🇳 India</option>
                   </select>
                 </div>
 
-                {country === "US" ? (
+                {["US", "IN"].includes(country) && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em] ml-1">
+                      {country === "US" ? "State (2-letter code)" : "State / UT"}
+                    </label>
+                    <input
+                      className="w-full h-11 px-4 rounded-xl border border-stroke dark:border-slate-800 bg-bg dark:bg-slate-950/60 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                      value={state}
+                      onChange={e => setState(e.target.value.toUpperCase())}
+                      maxLength={2}
+                      placeholder={country === "US" ? "e.g. CA" : "e.g. MH"}
+                      disabled={saving}
+                    />
+                  </div>
+                )}
+
+                {country === "US" && (
                   <>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em] ml-1">State (2-letter code)</label>
-                      <input
-                        className="w-full h-11 px-4 rounded-xl border border-stroke dark:border-slate-800 bg-bg dark:bg-slate-950/60 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                        value={state}
-                        onChange={e => setState(e.target.value.toUpperCase())}
-                        maxLength={2}
-                        placeholder="e.g. CA"
-                        disabled={saving}
-                      />
-                    </div>
                     <div className="flex flex-col gap-2">
                       <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">Exempt Status</label>
                       <select
@@ -224,7 +231,9 @@ function EditEmployeeModal({ employee, availableRoles, onClose, onSave, saving }
                       />
                     </div>
                   </>
-                ) : (
+                )}
+
+                {country === "UK" && (
                   <>
                     <div className="flex flex-col gap-1">
                       <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.15em] ml-1">Tax Code</label>
@@ -233,6 +242,7 @@ function EditEmployeeModal({ employee, availableRoles, onClose, onSave, saving }
                         value={ukTaxCode}
                         onChange={e => setUkTaxCode(e.target.value)}
                         disabled={saving}
+                        placeholder="e.g. 1257L"
                       />
                     </div>
                     <div className="flex flex-col gap-2">
@@ -272,6 +282,11 @@ function EditEmployeeModal({ employee, availableRoles, onClose, onSave, saving }
           </div>
         </div>
 
+        {error && (
+          <div className="px-8 py-3.5 bg-rose-50 text-rose-700 border-t border-stroke dark:border-slate-800 text-xs font-semibold flex items-center gap-2">
+            <AlertCircle size={14} /> {error}
+          </div>
+        )}
         <div className="px-8 py-6 border-t border-stroke dark:border-slate-800 bg-surface dark:bg-slate-900/60 flex justify-end gap-3">
           <Button variant="ghost" type="button" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button type="button" onClick={submit} disabled={saving}>
@@ -826,7 +841,7 @@ export function EmployeesPage() {
   const [title, setTitle] = useState("")
   const [hourlyRate, setHourlyRate] = useState("")
   const [department, setDepartment] = useState("")
-  const [currency, setCurrency] = useState("USD")
+  const [currency, setCurrency] = useState(user?.companyCurrency || "USD")
   const [payrollGroup, setPayrollGroup] = useState("")
   const [taxCategory, setTaxCategory] = useState("")
   const [serviceRoles, setServiceRoles] = useState([])
@@ -836,8 +851,8 @@ export function EmployeesPage() {
   const [roleFilter, setRoleFilter] = useState("")
 
   // Compliance fields
-  const [country, setCountry] = useState("US")
-  const [state, setState] = useState("")
+  const [country, setCountry] = useState(user?.companyCountry || "US")
+  const [state, setState] = useState(user?.companyCountry === "IN" ? "MH" : (user?.companyCountry === "US" ? "NY" : ""))
   const [dateOfBirth, setDateOfBirth] = useState("")
   const [exemptStatus, setExemptStatus] = useState("non_exempt")
   const [weeklySalary, setWeeklySalary] = useState("")
@@ -845,6 +860,17 @@ export function EmployeesPage() {
   const [ukNiCategory, setUkNiCategory] = useState("A")
   const [rolledUpHolidayPay, setRolledUpHolidayPay] = useState(false)
   const [showComplianceFields, setShowComplianceFields] = useState(false)
+
+  // Update defaults when user object loads
+  useEffect(() => {
+    if (user) {
+      if (!currency || currency === "USD") setCurrency(user.companyCurrency || "USD")
+      if (!country || country === "US") {
+        setCountry(user.companyCountry || "US")
+        setState(user.companyCountry === "IN" ? "MH" : (user.companyCountry === "US" ? "NY" : ""))
+      }
+    }
+  }, [user])
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState(null)
   const [savingEdit, setSavingEdit] = useState(false)
@@ -888,7 +914,7 @@ export function EmployeesPage() {
         title: data.title || "",
         hourly_rate: data.hourly_rate === "" || data.hourly_rate === null || typeof data.hourly_rate === "undefined" ? 0 : Number(data.hourly_rate),
         country: data.country || null,
-        state: data.country === "US" ? (data.state || null) : null,
+        state: ["US", "IN"].includes(data.country) ? (data.state || null) : null,
         exempt_status: data.country === "US" ? (data.exempt_status || "non_exempt") : null,
         weekly_salary: data.country === "US" ? (data.weekly_salary === "" || data.weekly_salary === null || typeof data.weekly_salary === "undefined" ? null : Number(data.weekly_salary)) : null,
         uk_tax_code: data.country === "UK" ? (data.uk_tax_code || null) : null,
@@ -1020,9 +1046,9 @@ export function EmployeesPage() {
       // Reset form
       setEmployeeId(""); setUsername(""); setPassword(""); setEmail("")
       setFirstName(""); setLastName(""); setTitle(""); setHourlyRate("")
-      setCountry("US"); setState(""); setDateOfBirth(""); setExemptStatus("non_exempt")
+      setCountry(user?.companyCountry || "US"); setState(user?.companyCountry === "IN" ? "MH" : (user?.companyCountry === "US" ? "NY" : "")); setDateOfBirth(""); setExemptStatus("non_exempt")
       setWeeklySalary(""); setUkTaxCode("1257L"); setUkNiCategory("A"); setRolledUpHolidayPay(false)
-      setDepartment(""); setCurrency("USD"); setPayrollGroup(""); setTaxCategory("")
+      setDepartment(""); setCurrency(user?.companyCurrency || "USD"); setPayrollGroup(""); setTaxCategory("")
       setServiceRoles([])
 
       fireSparkleFromEl(submitBtnRef.current)
@@ -1176,15 +1202,17 @@ export function EmployeesPage() {
                         <option value="AE">🇦🇪 UAE</option>
                       </select>
                     </div>
-                    {country === "US" && (
+                    {["US", "IN"].includes(country) && (
                       <div className="flex flex-col gap-1">
-                        <label className="fieldLabel">State (2-letter code)</label>
+                        <label className="fieldLabel">
+                          {country === "US" ? "State (2-letter code)" : "State / UT"}
+                        </label>
                         <input
                           className="input"
                           value={state}
                           onChange={e => setState(e.target.value.toUpperCase())}
                           maxLength={2}
-                          placeholder="e.g. CA, NY, TX"
+                          placeholder={country === "US" ? "e.g. CA, NY, TX" : "e.g. MH, KA"}
                         />
                       </div>
                     )}
@@ -1374,11 +1402,11 @@ export function EmployeesPage() {
                       </td>
                       <td className="px-6 py-5 text-slate-700 dark:text-slate-300">{e.title || "—"}</td>
                       <td className="px-6 py-5 text-right font-black text-slate-900 dark:text-white">
-                        {e.country === "UK" ? "£" : "$"}{e.hourly_rate}/hr
+                        {e.country === "UK" ? "£" : e.country === "IN" ? "₹" : "$"}{e.hourly_rate}/hr
                       </td>
                       <td className="px-6 py-5">
                         <div className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                          {e.country === "UK" ? "🇬🇧 UK" : e.country === "US" ? "🇺🇸 US" : (e.country || "—")}
+                          {e.country === "UK" ? "🇬🇧 UK" : e.country === "US" ? "🇺🇸 US" : e.country === "IN" ? "🇮🇳 IN" : (e.country || "—")}
                         </div>
                         {e.state && <div className="text-[10px] text-slate-500 dark:text-slate-500 uppercase font-bold">{e.state}</div>}
                       </td>
@@ -1461,9 +1489,11 @@ export function EmployeesPage() {
           onClose={() => {
             setShowEditModal(false)
             setEditingEmployee(null)
+            setError("")
           }}
           onSave={saveEdit}
           saving={savingEdit}
+          error={error}
         />
       )}
       {historyEmployee && (

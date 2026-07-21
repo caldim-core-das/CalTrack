@@ -69,6 +69,10 @@ const TimePage = lazy(() =>
   import("./pages/TimePage.jsx").then(m => ({ default: m.TimePage }))
 )
 
+const AuditLedgerPage = lazy(() =>
+  import("./pages/AuditLedgerPage.jsx")
+)
+
 const SettingsPage = lazy(() =>
   import("./pages/SettingsPage.jsx").then(m => ({ default: m.SettingsPage }))
 )
@@ -376,6 +380,7 @@ export function App() {
               </Route>
               <Route path={routes.scheduling} element={<SchedulingPage />} />
               <Route path={routes.employees} element={<EmployeesPage />} />
+              <Route path={routes.audit_ledger} element={<AuditLedgerPage />} />
               <Route element={<RequireModulePermission module="reports" action="view" />}>
                 <Route path={routes.reports} element={<ReportsPage />} />
               </Route>
@@ -389,6 +394,12 @@ export function App() {
               <Route path={routes.employees_training} element={<TrainingRecordsPage />} />
               <Route path={routes.admin_service_requests} element={<ServiceRequestsPage />} />
               <Route path={routes.admin_feedback} element={<FeedbackManagementPage />} />
+              <Route path="/customers/list" element={<ServiceRequestsPage />} />
+              <Route path="/customers/bookings" element={<ServiceRequestsPage />} />
+              <Route path="/customers/payments" element={<ServiceRequestsPage />} />
+              <Route path="/customers/documents" element={<ServiceRequestsPage />} />
+              <Route path="/customers/complaints" element={<FeedbackManagementPage />} />
+              <Route path="/customers/reviews" element={<FeedbackManagementPage />} />
             </Route>
 
             {/* ── Admin-only settings (employees redirected to /settings/profile) ── */}

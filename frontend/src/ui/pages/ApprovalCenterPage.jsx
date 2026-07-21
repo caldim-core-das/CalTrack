@@ -152,8 +152,10 @@ export function ApprovalCenterPage() {
   // ── Tab state ──────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("pending") // "pending" | "approved" | "rejected"
 
-  // ── Dossiers state (pending employee registration) ──────────────────────────
+  // ── Dossiers state (employee registration dossiers) ──────────────────────────
   const [pendingDossiers, setPendingDossiers] = useState([])
+  const [approvedDossiers, setApprovedDossiers] = useState([])
+  const [rejectedDossiers, setRejectedDossiers] = useState([])
   const [dossiersLoading, setDossiersLoading] = useState(true)
 
   // ── Approved employees from DB ─────────────────────────────────────────────
@@ -176,10 +178,15 @@ export function ApprovalCenterPage() {
   // ── Fetch dossiers ──────────────────────────────────────────────────────────
   const loadDossiers = useCallback(async () => {
     try {
-      // Import the list fetching function
       const { apiFetchRegistrationDossiers } = await import("../../api/authService.js")
-      const dossiers = await apiFetchRegistrationDossiers("pending")
-      setPendingDossiers(dossiers || [])
+      const pending = await apiFetchRegistrationDossiers("pending")
+      setPendingDossiers(pending || [])
+      
+      const approved = await apiFetchRegistrationDossiers("approved")
+      setApprovedDossiers(approved || [])
+      
+      const rejected = await apiFetchRegistrationDossiers("rejected")
+      setRejectedDossiers(rejected || [])
     } catch (e) {
       console.error("Failed to load dossiers", e)
     } finally {
@@ -216,13 +223,13 @@ export function ApprovalCenterPage() {
     return pendingDossiers.map(d => {
       const statusLabel = "Pending Review"
       return {
-        id: d.id, // We use the database ID here
+        id: d.id,
         name: d.regForm?.fullName || d.email || "—",
         phone: d.regForm?.phone || "—",
         email: d.regForm?.email || d.email || "—",
         location: d.regForm?.address || "—",
         regDate: d.regForm?.regDate || d.created_at || "—",
-        trustScore: d.trustScore || 0,
+        trustScore: d.trustScore || 100,
         status: statusLabel,
         dossierStatus: "pending",
         regForm: d.regForm,
@@ -235,16 +242,72 @@ export function ApprovalCenterPage() {
     })
   }, [pendingDossiers])
 
-  const activeEmployee = viewingEmployee || (pendingQueue.length > 0 ? pendingQueue[0] : null)
+  const approvedQueue = useMemo(() => {
+    return approvedDossiers.map(d => {
+      const statusLabel = "Approved"
+      return {
+        id: d.id,
+        name: d.regForm?.fullName || d.email || "—",
+        phone: d.regForm?.phone || "—",
+        email: d.regForm?.email || d.email || "—",
+        location: d.regForm?.address || "—",
+        regDate: d.regForm?.regDate || d.created_at || "—",
+        trustScore: d.trustScore || 100,
+        status: statusLabel,
+        dossierStatus: "approved",
+        regForm: d.regForm,
+        docForm: d.docForm,
+        academyState: d.academyState,
+        interviewState: d.interviewState,
+        adminClearance: d.adminClearance,
+        rawDossier: d
+      }
+    })
+  }, [approvedDossiers])
+
+  const rejectedQueue = useMemo(() => {
+    return rejectedDossiers.map(d => {
+      const statusLabel = "Rejected"
+      return {
+        id: d.id,
+        name: d.regForm?.fullName || d.email || "—",
+        phone: d.regForm?.phone || "—",
+        email: d.regForm?.email || d.email || "—",
+        location: d.regForm?.address || "—",
+        regDate: d.regForm?.regDate || d.created_at || "—",
+        trustScore: d.trustScore || 100,
+        status: statusLabel,
+        dossierStatus: "rejected",
+        regForm: d.regForm,
+        docForm: d.docForm,
+        academyState: d.academyState,
+        interviewState: d.interviewState,
+        adminClearance: d.adminClearance,
+        rawDossier: d
+      }
+    })
+  }, [rejectedDossiers])
+
+  const currentQueue = useMemo(() => {
+    if (activeTab === "approved") return approvedQueue
+    if (activeTab === "rejected") return rejectedQueue
+    return pendingQueue
+  }, [activeTab, pendingQueue, approvedQueue, rejectedQueue])
+
+  const activeEmployee = viewingEmployee || (currentQueue.length > 0 ? currentQueue[0] : null)
+
+  useEffect(() => {
+    setViewingEmployee(null)
+  }, [activeTab])
 
   // ── Metrics ────────────────────────────────────────────────────────────────
   const metrics = useMemo(() => {
     return {
       pending: pendingQueue.length,
-      approved: approvedEmployees.length,
-      rejected: 0,
+      approved: approvedEmployees.length + approvedQueue.length,
+      rejected: rejectedQueue.length,
     }
-  }, [pendingQueue, approvedEmployees])
+  }, [pendingQueue, approvedEmployees, approvedQueue, rejectedQueue])
 
   // ── Approve/Reject handlers ────────────────────────────────────────────────
   async function confirmApprove() {
@@ -302,6 +365,8 @@ export function ApprovalCenterPage() {
   // ── Tab config ─────────────────────────────────────────────────────────────
   const tabs = [
     { id: "pending", label: "Pending Review", icon: Clock, count: metrics.pending, color: "amber" },
+    { id: "approved", label: "Approved Queue", icon: UserCheck, count: metrics.approved, color: "emerald" },
+    { id: "rejected", label: "Rejected Queue", icon: UserX, count: metrics.rejected, color: "rose" },
   ]
 
   // ─── Main Render ─────────────────────────────────────────────────────────────
@@ -313,10 +378,10 @@ export function ApprovalCenterPage() {
         <div>
           <h1 className="text-xl font-extrabold text-slate-900 dark:text-white flex items-center gap-2 uppercase tracking-tight">
             <Award className="text-indigo-600 dark:text-indigo-500" size={22} />
-            Pending Review
+            Registration Management
           </h1>
           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
-            Review and process pending employee registration dossiers.
+            Review and process employee registration dossiers.
           </p>
         </div>
         <Button variant="ghost" onClick={() => { loadDossiers(); loadApprovedEmployees() }} className="flex gap-2 text-xs">
@@ -325,16 +390,38 @@ export function ApprovalCenterPage() {
       </div>
 
       {/* ── METRICS GRID ── */}
-      <div className="grid grid-cols-1 gap-5 px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 px-8 py-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shrink-0">
         <div
           onClick={() => setActiveTab("pending")}
-          className={`rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all border ${activeTab === "pending" ? "bg-amber-50 dark:bg-amber-900/10 border-amber-300 dark:border-amber-700 shadow-sm" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800 hover:border-slate-300"}`}
+          className={`rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all border ${activeTab === "pending" ? "bg-amber-50 dark:bg-amber-900/10 border-amber-300 dark:border-amber-700 shadow-sm" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800 hover:border-slate-350"}`}
         >
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pending Review</span>
             <span className="text-2xl font-black text-amber-500 mt-1 block">{metrics.pending}</span>
           </div>
-          <Clock size={28} className="text-amber-400/40" />
+          <Clock size={28} className="text-amber-500/40" />
+        </div>
+
+        <div
+          onClick={() => setActiveTab("approved")}
+          className={`rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all border ${activeTab === "approved" ? "bg-emerald-50 dark:bg-emerald-900/10 border-emerald-300 dark:border-emerald-700 shadow-sm" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800 hover:border-slate-350"}`}
+        >
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Approved Queue</span>
+            <span className="text-2xl font-black text-emerald-500 mt-1 block">{metrics.approved}</span>
+          </div>
+          <UserCheck size={28} className="text-emerald-500/40" />
+        </div>
+
+        <div
+          onClick={() => setActiveTab("rejected")}
+          className={`rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all border ${activeTab === "rejected" ? "bg-rose-50 dark:bg-rose-900/10 border-rose-300 dark:border-rose-700 shadow-sm" : "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800 hover:border-slate-350"}`}
+        >
+          <div>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Rejected Queue</span>
+            <span className="text-2xl font-black text-rose-500 mt-1 block">{metrics.rejected}</span>
+          </div>
+          <UserX size={28} className="text-rose-500/40" />
         </div>
       </div>
 
@@ -367,67 +454,79 @@ export function ApprovalCenterPage() {
 
       {/* ── TAB CONTENT ── */}
       <div className="flex-1 overflow-hidden">
+        <div className="flex h-full overflow-hidden">
+          {/* Left Queue List */}
+          <div className="w-[300px] border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 overflow-y-auto p-5 space-y-4">
+            <h2 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
+              {activeTab === "pending" ? <Clock size={12} /> : activeTab === "approved" ? <UserCheck size={12} /> : <UserX size={12} />}
+              {activeTab === "pending" ? "Registration Queue" : activeTab === "approved" ? "Approved Queue" : "Rejected Queue"}
+            </h2>
 
-        {/* PENDING TAB */}
-        {activeTab === "pending" && (
-          <div className="flex h-full overflow-hidden">
-            {/* Left: Queue */}
-            <div className="w-[300px] border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col shrink-0 overflow-y-auto p-5 space-y-4">
-              <h2 className="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-2">
-                <Clock size={12} /> Registration Queue
-              </h2>
-
-              {dossiersLoading ? (
-                <div className="flex items-center justify-center py-8 text-slate-400">
-                  <Loader2 size={20} className="animate-spin mr-2" />
-                  <span className="text-xs">Loading...</span>
-                </div>
-              ) : pendingQueue.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400 space-y-2">
-                  <ClipboardList size={32} className="opacity-30" />
-                  <p className="text-xs font-bold uppercase tracking-wider">No Pending Applications</p>
-                  <p className="text-[10px] font-semibold opacity-70">
-                    Waiting for employees to complete registration.
-                  </p>
-                </div>
-              ) : pendingQueue.map((emp) => (
-                <div key={emp.id} className={`p-4 rounded-2xl border transition-all ${activeEmployee?.id === emp.id ? 'border-amber-400 dark:border-amber-600 bg-amber-100/50 dark:bg-amber-900/20 shadow-md ring-2 ring-amber-400/20' : 'border-amber-200 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-900/5 shadow-sm'}`}>
-                  <div className="flex justify-between items-start gap-1 mb-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-black text-slate-900 dark:text-white truncate">{emp.name}</div>
-                      <div className="text-[10px] font-mono text-slate-500 mt-0.5">{emp.id}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">{emp.email}</div>
-                    </div>
-                    <Pill tone="warn">{emp.status}</Pill>
+            {dossiersLoading ? (
+              <div className="flex items-center justify-center py-8 text-slate-400">
+                <Loader2 size={20} className="animate-spin mr-2" />
+                <span className="text-xs">Loading...</span>
+              </div>
+            ) : currentQueue.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400 space-y-2">
+                <ClipboardList size={32} className="opacity-30" />
+                <p className="text-xs font-bold uppercase tracking-wider">No Dossiers Available</p>
+                <p className="text-[10px] font-semibold opacity-70">
+                  {activeTab === "pending" ? "Waiting for registration." : activeTab === "approved" ? "No approved dossiers found." : "No rejected dossiers found."}
+                </p>
+              </div>
+            ) : currentQueue.map((emp) => (
+              <div key={emp.id} className={`p-4 rounded-2xl border transition-all ${activeEmployee?.id === emp.id ? (
+                activeTab === 'pending' ? 'border-amber-400 dark:border-amber-600 bg-amber-100/50 dark:bg-amber-900/20 shadow-md ring-2 ring-amber-400/20' :
+                activeTab === 'approved' ? 'border-emerald-400 dark:border-emerald-600 bg-emerald-100/50 dark:bg-emerald-900/20 shadow-md ring-2 ring-emerald-400/20' :
+                'border-rose-400 dark:border-rose-600 bg-rose-100/50 dark:bg-rose-900/20 shadow-md ring-2 ring-rose-400/20'
+              ) : (
+                activeTab === 'pending' ? 'border-amber-200 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-900/5 shadow-sm' :
+                activeTab === 'approved' ? 'border-emerald-200 dark:border-emerald-800/40 bg-emerald-50/50 dark:bg-emerald-900/5 shadow-sm' :
+                'border-rose-205 dark:border-rose-800/40 bg-rose-50/50 dark:bg-rose-900/5 shadow-sm'
+              )}`}>
+                <div className="flex justify-between items-start gap-1 mb-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-black text-slate-900 dark:text-white truncate">{emp.name}</div>
+                    <div className="text-[10px] font-mono text-slate-500 mt-0.5">{emp.id}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{emp.email}</div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 border-t border-amber-200/60 dark:border-amber-800/30 pt-2 mt-1">
-                    <div>
-                      <span className="block text-[8px] text-slate-400 font-bold uppercase">Submitted</span>
-                      {emp.regDate}
-                    </div>
-                    <div>
-                      <span className="block text-[8px] text-slate-400 font-bold uppercase">Trust Score</span>
-                      <span className="text-emerald-600 font-black">{emp.trustScore}%</span>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setViewingEmployee(emp)}
-                    className={`w-full mt-3 h-9 font-bold border transition-all ${activeEmployee?.id === emp.id ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600' : 'bg-white dark:bg-slate-800 border-amber-200 dark:border-amber-800/40'}`}
-                  >
-                    <Eye size={12} className="mr-1.5" /> {activeEmployee?.id === emp.id ? 'Viewing Details' : 'Review Dossier'}
-                  </Button>
+                  <Pill tone={activeTab === 'pending' ? 'warn' : activeTab === 'approved' ? 'good' : 'bad'}>{emp.status}</Pill>
                 </div>
-              ))}
-            </div>
+                <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-500 border-t border-slate-200/60 dark:border-slate-800/30 pt-2 mt-1">
+                  <div>
+                    <span className="block text-[8px] text-slate-400 font-bold uppercase">Submitted</span>
+                    {emp.regDate}
+                  </div>
+                  <div>
+                    <span className="block text-[8px] text-slate-400 font-bold uppercase">Trust Score</span>
+                    <span className="text-emerald-600 font-black">{emp.trustScore}%</span>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  onClick={() => setViewingEmployee(emp)}
+                  className={`w-full mt-3 h-9 font-bold border transition-all ${activeEmployee?.id === emp.id ? (
+                    activeTab === 'pending' ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600' :
+                    activeTab === 'approved' ? 'bg-emerald-500 text-white border-emerald-600 hover:bg-emerald-600' :
+                    'bg-rose-500 text-white border-rose-600 hover:bg-rose-600'
+                  ) : 'bg-white dark:bg-slate-800 border-slate-205 dark:border-slate-800/45'}`}
+                >
+                  <Eye size={12} className="mr-1.5" /> {activeEmployee?.id === emp.id ? 'Viewing Details' : 'Review Dossier'}
+                </Button>
+              </div>
+            ))}
+          </div>
 
-            {/* Right: Dossier Detail */}
-            <div className="flex-grow flex flex-col bg-slate-50 dark:bg-slate-950 relative overflow-hidden">
-              {pendingQueue.length > 0 ? (
-                <>
-                  <DossierContent emp={activeEmployee} />
-                  {/* Decision Panel */}
-                  <div className="absolute bottom-0 inset-x-0 h-20 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-10 flex items-center justify-between z-20">
+          {/* Right: Dossier Detail */}
+          <div className="flex-grow flex flex-col bg-slate-50 dark:bg-slate-950 relative overflow-hidden">
+            {activeEmployee ? (
+              <>
+                <DossierContent emp={activeEmployee} setShowDocModal={setShowDocModal} />
+                
+                {/* Decision / Status Panel */}
+                {activeTab === "pending" && (
+                  <div className="absolute bottom-0 inset-x-0 h-20 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-10 flex items-center justify-between z-20 shrink-0">
                     <span className="text-xs font-black uppercase text-slate-400 tracking-widest font-mono">Final Decision Panel</span>
                     <div className="flex gap-3">
                       <Button
@@ -445,28 +544,44 @@ export function ApprovalCenterPage() {
                       </Button>
                     </div>
                   </div>
-                </>
-              ) : (
-                <div className="flex-grow flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-4">
-                  <div className="w-20 h-20 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center shadow-sm">
-                    <CheckCircle2 size={36} className="text-emerald-400" />
+                )}
+
+                {activeTab === "approved" && (
+                  <div className="absolute bottom-0 inset-x-0 h-20 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-10 flex items-center justify-between z-20 shrink-0">
+                    <span className="text-xs font-black uppercase text-emerald-600 tracking-widest font-mono">✓ Dossier Approved</span>
+                    <span className="text-xs font-bold text-slate-500">This employee registration has been approved. Account invitation details sent.</span>
                   </div>
-                  <div className="space-y-1.5">
-                    <h3 className="text-sm font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 font-mono">Queue Cleared</h3>
-                    <p className="text-xs text-slate-500 max-w-sm">
-                      No registration dossiers are currently awaiting admin clearance.
-                      {metrics.approved > 0 && ` View ${metrics.approved} approved employee(s) in the Approved tab.`}
-                    </p>
+                )}
+
+                {activeTab === "rejected" && (
+                  <div className="absolute bottom-0 inset-x-0 h-20 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] px-10 flex items-center justify-between z-20 shrink-0">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-black uppercase text-rose-600 tracking-widest font-mono">✕ Dossier Rejected</span>
+                      <span className="text-[10px] font-bold text-slate-500 mt-0.5 font-mono">
+                        Category: {activeEmployee.rawDossier?.adminClearance?.reasonCategory || "Failed Verification"}
+                      </span>
+                    </div>
+                    <span className="text-xs font-bold text-slate-500 italic max-w-md truncate">
+                      "{activeEmployee.rawDossier?.adminClearance?.remarks || "No remarks provided"}"
+                    </span>
                   </div>
+                )}
+              </>
+            ) : (
+              <div className="flex-grow flex flex-col items-center justify-center p-8 text-center text-slate-400 space-y-4">
+                <div className="w-20 h-20 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-center shadow-sm">
+                  <CheckCircle2 size={36} className="text-slate-300" />
                 </div>
-              )}
-            </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 font-mono">No Dossier Selected</h3>
+                  <p className="text-xs text-slate-505 text-slate-500 max-w-sm">
+                    Select a dossier from the left list to review and verify their details and credentials.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-
-        {/* APPROVED TAB (Removed) */}
-
-        {/* REJECTED TAB (Removed) */}
+        </div>
       </div>
 
       {/* ── DOSSIER REVIEW MODAL ── */}
@@ -495,7 +610,7 @@ export function ApprovalCenterPage() {
                 </Button>
               </div>
             </div>
-            <DossierContent emp={activeEmployee} inModal />
+            <DossierContent emp={activeEmployee} inModal setShowDocModal={setShowDocModal} />
           </div>
         </div>,
         document.body

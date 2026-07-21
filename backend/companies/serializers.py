@@ -73,9 +73,9 @@ class CompanySerializer(serializers.ModelSerializer):
         primary_country = data.get("primary_country", getattr(self.instance, "primary_country", None))
         default_state = data.get("default_state", getattr(self.instance, "default_state", None))
 
-        if primary_country == "US" and not default_state:
+        if primary_country in ["US", "IN"] and not default_state:
             raise serializers.ValidationError(
-                {"default_state": "Default state is required for US-based companies."}
+                {"default_state": f"Default state is required for {primary_country}-based companies."}
             )
         return data
 

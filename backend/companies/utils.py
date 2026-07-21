@@ -217,6 +217,33 @@ def get_compliance_rules(region):
             },
         }
 
+    elif country == "IN":
+        return {
+            "name": "India Compliance / EPF ({})".format(state if state else "Federal"),
+            "country": "IN",
+            "state": state,
+            "overtime_threshold": Decimal("48"),
+            "overtime_multiplier": Decimal("2.0"),
+            "daily_ot_threshold": Decimal("9"),
+            "daily_ot_multiplier": Decimal("2.0"),
+            "double_time_threshold": None,
+            "double_time_multiplier": None,
+            "minimum_wage": Decimal("150.00"),
+            "break_law": {
+                "break_threshold_hours": 5,
+                "break_minutes": 30,
+                "rest_between_shifts_hours": 11,
+                "meal_break_minutes": 30,
+                "meal_break_threshold_hours": 5,
+                "rest_break_minutes": 15,
+                "rest_break_per_hours": 4,
+                "paid_rest_breaks": False,
+            },
+            "wtr": None,
+            "tax_bands": None,
+            "ni": None,
+        }
+
     return {
         "name": "Default",
         "country": country,
@@ -331,6 +358,8 @@ def check_wage_floor(hourly_rate, region, age=None):
     state   = (region.get("state") or "").upper()
     if country == "UK":
         floor = Decimal(str(get_uk_nmw_for_age(age)))
+    elif country == "IN":
+        floor = Decimal("150.00")
     else:
         floor = Decimal(str(US_STATE_MINIMUM_WAGES.get(state, US_FEDERAL_MINIMUM_WAGE)))
     shortfall = max(Decimal("0"), floor - rate)

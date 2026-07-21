@@ -5,13 +5,40 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement,
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, Filler)
 
 export function BarChart({ data, options }) {
-  return <Bar data={data} options={options} />
+  const mergedOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    ...options
+  }
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <Bar data={data} options={mergedOptions} />
+    </div>
+  )
 }
 
 export function LineChart({ data, options }) {
-  return <Line data={data} options={options} />
+  const mergedOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    ...options
+  }
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <Line data={data} options={mergedOptions} />
+    </div>
+  )
 }
 
 export function DoughnutChart({ data, options }) {
-  return <Doughnut data={data} options={options} />
+  const mergedOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    ...options
+  }
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <Doughnut data={data} options={mergedOptions} />
+    </div>
+  )
 }

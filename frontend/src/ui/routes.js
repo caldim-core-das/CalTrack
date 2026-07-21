@@ -62,4 +62,5 @@ export const routes = {
   admin_feedback: "/admin/feedback",
   employee_jobs: "/employee/jobs",
   employee_feedback: "/employee/feedback",
+  audit_ledger: "/audit-ledger",
 }

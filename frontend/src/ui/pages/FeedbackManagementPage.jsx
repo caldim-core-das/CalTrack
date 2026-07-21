@@ -2,8 +2,11 @@ import React, { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Star, MessageSquare, User, Calendar, ThumbsUp, ThumbsDown, Filter, RefreshCw, AlertCircle, TrendingUp, CheckCircle, BarChart3 } from "lucide-react"
 import { apiRequest } from "../../api/client.js"
+import { useLocation } from "react-router-dom"
 
 export function FeedbackManagementPage() {
+  const location = useLocation()
+  const isComplaintsView = location.pathname === "/customers/complaints"
   const [feedbackList, setFeedbackList] = useState([])
   const [metrics, setMetrics] = useState(null)
   const [employees, setEmployees] = useState([])
@@ -15,6 +18,10 @@ export function FeedbackManagementPage() {
   const [employeeId, setEmployeeId] = useState("")
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
+
+  const displayedList = isComplaintsView
+    ? feedbackList.filter(fb => fb.rating <= 2 || fb.issue_resolved === false)
+    : feedbackList
 
   const loadFeedbackData = async () => {
     setLoading(true)
@@ -79,9 +86,13 @@ export function FeedbackManagementPage() {
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 leading-tight">Feedback & Performance Reviews</h1>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 leading-tight">
+            {isComplaintsView ? "Customer Complaints Center" : "Feedback & Performance Reviews"}
+          </h1>
           <p className="text-xs font-semibold text-slate-500 mt-1">
-            Monitor overall client satisfaction, technician performance reviews, and ticket resolution feedback.
+            {isComplaintsView
+              ? "Review poor ratings, client complaints, and unresolved service tickets."
+              : "Monitor overall client satisfaction, technician performance reviews, and ticket resolution feedback."}
           </p>
         </div>
         <button
@@ -245,13 +256,13 @@ export function FeedbackManagementPage() {
             <AlertCircle className="w-10 h-10 text-red-500/80 mx-auto" />
             <div className="text-xs font-bold text-slate-500">{error}</div>
           </div>
-        ) : (!Array.isArray(feedbackList) || feedbackList.length === 0) ? (
+        ) : (!Array.isArray(displayedList) || displayedList.length === 0) ? (
           <div className="p-12 text-center text-xs font-bold text-slate-500 uppercase tracking-widest italic">
             No customer feedback logs found matching filters.
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {feedbackList.map((fb, idx) => (
+            {displayedList.map((fb, idx) => (
               <div key={fb.id || idx} className="p-5 flex flex-col md:flex-row justify-between gap-4 items-start hover:bg-slate-50/50 transition-colors">
                 
                 {/* Customer, Service request info */}

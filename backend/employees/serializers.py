@@ -154,7 +154,11 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
             if old_rate != new_rate:
                 is_superuser = request.user.is_superuser
-                is_inviting_admin = (self.instance.invited_by == request.user)
+                is_inviting_admin = (
+                    self.instance.invited_by is None or
+                    self.instance.invited_by == request.user or
+                    (self.instance.invited_by and self.instance.invited_by.email == request.user.email)
+                )
                 if not (is_superuser or is_inviting_admin):
                     raise serializers.ValidationError(
                         "Only the admin who invited/approved this employee can assign or modify their hourly rate."

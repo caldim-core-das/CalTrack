@@ -59,8 +59,14 @@ class CompanyCreateView(views.APIView):
                 frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:5173')
 
                 with tenant_context(company):
-                    for email in invites:
-                        email = email.strip()
+                    for item in invites:
+                        if isinstance(item, dict):
+                            email = item.get("email", "").strip()
+                            role = item.get("role", "employee").strip()
+                        else:
+                            email = str(item).strip()
+                            role = "employee"
+
                         if not email:
                             continue
                         
@@ -71,7 +77,7 @@ class CompanyCreateView(views.APIView):
                             company=company,
                             invited_by=user,
                             email=email,
-                            role="employee", # Default role for invited colleagues
+                            role=role,
                         )
                         
                         invite_link = f"{frontend_url}/accept-invite?token={invite.token}&org={company.schema_name}"

@@ -21,7 +21,7 @@ function useDarkMode() {
   return isDark
 }
 
-const fmt = (n, curr = "$") => `${curr}${Number(n || 0).toFixed(2)}`
+const fmt = (n, curr = (typeof window !== "undefined" ? window.__currencySymbol : null) || "$") => `${curr}${Number(n || 0).toFixed(2)}`
 const fmtH = (n) => `${Number(n || 0).toFixed(2)}h`
 const fmtId = (v) => { if (!v) return "—"; const m = /^EMP(\d+)$/i.exec(String(v).replace(/\s+/g, "")); return m ? `EMP ${m[1].padStart(3, "0")}` : v }
 
@@ -70,6 +70,10 @@ const savePref = (key, value) => {
 
 export function EmployeeInvoiceHubModal({ record, autoPrint = false, onClose, inline = false }) {
   const isDark = useDarkMode()
+  const { user } = useAuth()
+  if (user?.companyCurrencySymbol) {
+    window.__currencySymbol = user.companyCurrencySymbol;
+  }
   const isDummy = record?.id === "DUMMY-INV-PREVIEW-999"
   // Customizer state
   const [theme, setTheme] = useState(() => loadPref("theme", "modern_slate"))
@@ -171,12 +175,13 @@ export function EmployeeInvoiceHubModal({ record, autoPrint = false, onClose, in
 
   if (!record) return null
 
+  const isIN = record.region?.includes("India") || record.region?.includes("IN")
   const isUK = record.region?.includes("UK")
-  const curr = isUK ? "£" : "$"
+  const curr = isIN ? "₹" : isUK ? "£" : "$"
   const gross = Number(record.gross_pay || 0)
   const net = Number(record.net_pay || 0)
-  const tax = Number(record.uk_income_tax || 0)
-  const empNI = Number(record.uk_employee_ni || 0)
+  const tax = isIN ? Number(record.extras?.india_professional_tax || 0) : Number(record.uk_income_tax || 0)
+  const empNI = isIN ? Number(record.extras?.india_epf_employee || 0) + Number(record.extras?.india_esic_employee || 0) : Number(record.uk_employee_ni || 0)
   const deductions = tax + empNI
 
 
@@ -427,9 +432,16 @@ export function EmployeeInvoiceHubModal({ record, autoPrint = false, onClose, in
     Number(record.paid_leave_hours) > 0 && { desc: "Paid Leave coverage", hours: record.paid_leave_hours, rate: record.hourly_rate, total: Number(record.paid_leave_hours) * Number(record.hourly_rate) },
   ].filter(Boolean)
 
+  const epfVal = record.extras?.india_epf_employee
+  const esicVal = record.extras?.india_esic_employee
+  const ptVal = record.extras?.india_professional_tax
+
   const deductionItems = [
     Number(record.uk_income_tax) > 0 && { desc: "Income Tax (PAYE)", total: record.uk_income_tax },
     Number(record.uk_employee_ni) > 0 && { desc: "National Insurance (EE)", total: record.uk_employee_ni },
+    isIN && epfVal > 0 && { desc: "Employees' Provident Fund (EPF)", total: epfVal },
+    isIN && esicVal > 0 && { desc: "Employees' State Insurance (ESIC)", total: esicVal },
+    isIN && ptVal > 0 && { desc: "Professional Tax (PT)", total: ptVal },
   ].filter(Boolean)
 
   const printStyle = `
@@ -1780,6 +1792,9 @@ export function PayrollPage() {
   const isDark = useDarkMode()
   const { isAdmin } = useRole()
   const { user } = useAuth()
+  if (user?.companyCurrencySymbol) {
+    window.__currencySymbol = user.companyCurrencySymbol;
+  }
   const [records, setRecords] = useState([])
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
@@ -2167,10 +2182,10 @@ export function PayrollPage() {
                           {Number(r.double_time_hours) > 0 ? fmtH(r.double_time_hours) : "—"}
                         </td>
                         <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b" }}>
-                          {isUK && Number(r.uk_income_tax) > 0 ? fmt(r.uk_income_tax, "£") : "—"}
+                          {isUK && Number(r.uk_income_tax) > 0 ? fmt(r.uk_income_tax, "£") : (r.employee_country === "IN" && Number(r.extras?.india_professional_tax) > 0 ? fmt(r.extras.india_professional_tax, "₹") : "—")}
                         </td>
                         <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b" }}>
-                          {isUK && Number(r.uk_employee_ni) > 0 ? fmt(r.uk_employee_ni, "£") : "—"}
+                          {isUK && Number(r.uk_employee_ni) > 0 ? fmt(r.uk_employee_ni, "£") : (r.employee_country === "IN" && Number(r.extras?.india_epf_employee) > 0 ? fmt(r.extras.india_epf_employee, "₹") : "—")}
                         </td>
                         <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: Number(r.holiday_hours_accrued) > 0 ? (isDark ? "#34d399" : "#059669") : (isDark ? "#4b5563" : "#cbd5e1") }}>
                           {Number(r.holiday_hours_accrued) > 0 ? fmtH(r.holiday_hours_accrued) : "—"}
