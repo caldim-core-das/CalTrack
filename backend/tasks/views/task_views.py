@@ -666,6 +666,14 @@ class EmployeeTaskActionView(APIView):
                 if not task.started_at:
                     task.started_at = task.completed_at
                 
+                # Check for payment collection from the frontend
+                collect_payment = request.data.get("collect_payment")
+                if collect_payment and task.service_request:
+                    task.service_request.payment_status = "paid"
+                    if hasattr(task.service_request, 'payment_collected_at'):
+                        task.service_request.payment_collected_at = timezone.now()
+                    task.service_request.save()
+                
                 face_match_pct = request.data.get("face_match_percentage")
                 face_match_status = request.data.get("face_match_status")
 

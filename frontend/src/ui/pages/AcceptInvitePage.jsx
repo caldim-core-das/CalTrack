@@ -154,13 +154,15 @@ export function AcceptInvitePage() {
                 Your Operating Region
               </div>
               <div style={{ fontSize: 24, marginBottom: 6 }}>
-                {inviteData.region === "UK" ? "🇬🇧" : "🇺🇸"}
-                {inviteData.region === "UK" ? " United Kingdom" : " United States"}
+                {inviteData.region === "UK" ? "🇬🇧" : inviteData.region === "IN" ? "🇮🇳" : "🇺🇸"}
+                {inviteData.region === "UK" ? " United Kingdom" : inviteData.region === "IN" ? " India" : " United States"}
                 {inviteData.default_state && ` · ${inviteData.default_state}`}
               </div>
               <div style={{ fontSize: 12, color: "var(--muted)" }}>
                 {inviteData.region === "UK"
                   ? "WTR 48-hr cap · PAYE Tax · NI Contributions · 28 days statutory leave"
+                  : inviteData.region === "IN"
+                  ? "EPF + Gratuity + ESIC · 15 days statutory leave · 48-hr weekly OT rules"
                   : "FLSA overtime rules · Minimum wage per state · No statutory leave"}
               </div>
             </div>

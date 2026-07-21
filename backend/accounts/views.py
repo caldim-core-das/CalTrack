@@ -112,16 +112,27 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             username = username.strip()
             attrs[self.username_field] = username
 
-            # If the provided username looks like an email, try to resolve it to a username
+            # If the provided username looks like an email, try to resolve it to a username.
+            # Prefer active accounts (is_active=True) over deactivated duplicates.
             if "@" in username:
                 User = get_user_model()
-                user = User.objects.filter(email__iexact=username).first()
+                user = (
+                    User.objects.filter(email__iexact=username, is_active=True, role="admin").first()
+                    or User.objects.filter(email__iexact=username, is_active=True).exclude(role="customer").first()
+                    or User.objects.filter(email__iexact=username, is_active=True).first()
+                    or User.objects.filter(email__iexact=username).first()
+                )
                 if user:
                     attrs[self.username_field] = user.username
 
         if (not username) and isinstance(email, str) and email.strip():
             User = get_user_model()
-            user = User.objects.filter(email__iexact=email.strip()).first()
+            user = (
+                User.objects.filter(email__iexact=email.strip(), is_active=True, role="admin").first()
+                or User.objects.filter(email__iexact=email.strip(), is_active=True).exclude(role="customer").first()
+                or User.objects.filter(email__iexact=email.strip(), is_active=True).first()
+                or User.objects.filter(email__iexact=email.strip()).first()
+            )
             if user:
                 attrs[self.username_field] = user.username
 
@@ -311,11 +322,16 @@ class GoogleLoginView(APIView):
         User = get_user_model()
         email_clean = email.strip()
         
-        # Prioritize the account that already has a company assigned
-        user = User.objects.filter(email__iexact=email_clean, company__isnull=False).first()
-        if not user:
-            # Fallback to any account with this email
-            user = User.objects.filter(email__iexact=email_clean).first()
+        # Priority: active admin with company > active non-customer with company >
+        # any active with company > any with company > any active > any
+        user = (
+            User.objects.filter(email__iexact=email_clean, company__isnull=False, is_active=True, role="admin").first()
+            or User.objects.filter(email__iexact=email_clean, company__isnull=False, is_active=True).exclude(role="customer").first()
+            or User.objects.filter(email__iexact=email_clean, company__isnull=False, is_active=True).first()
+            or User.objects.filter(email__iexact=email_clean, company__isnull=False).first()
+            or User.objects.filter(email__iexact=email_clean, is_active=True).first()
+            or User.objects.filter(email__iexact=email_clean).first()
+        )
 
         # Check if there is a pending team invitation for this email across all companies
         invite = None

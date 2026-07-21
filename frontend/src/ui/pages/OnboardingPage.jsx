@@ -28,6 +28,16 @@ const REGIONS = [
     compliance: "WTR 48-hr cap + NI/PAYE",
     defaultState: null,
   },
+  {
+    code: "IN",
+    name: "India",
+    flag: "🇮🇳",
+    currency: "INR (₹)",
+    payroll: "Monthly payroll",
+    leave: "15 days statutory leave",
+    compliance: "EPF + Gratuity + ESIC",
+    defaultState: "MH",
+  },
 ]
 
 export function OnboardingPage() {
@@ -50,26 +60,44 @@ export function OnboardingPage() {
   const [startTrial, setStartTrial] = useState(true)
 
   // Step 4
-  const [emails, setEmails] = useState(["", "", ""])
+  const [adminEmails, setAdminEmails] = useState([""])
+  const [employeeBulkEmails, setEmployeeBulkEmails] = useState("")
 
   const selectedRegion = REGIONS.find(r => r.code === region)
 
-  const step1Valid = orgName.trim() && region && (region !== "US" || defaultState.trim())
+  const step1Valid = orgName.trim() && region && (!["US", "IN"].includes(region) || defaultState.trim())
 
   const handleCreateCompany = async () => {
     setLoading(true)
     setError("")
     try {
-      const validEmails = emails.map(e => e.trim()).filter(e => e)
+      const validAdmins = adminEmails.map(e => e.trim()).filter(e => e)
+      const validEmployees = employeeBulkEmails
+        .split(/[,\n]/)
+        .map(e => e.trim())
+        .filter(e => e && e.includes("@"))
+
+      if (validAdmins.length > 10) {
+        throw new Error("You can invite a maximum of 10 administrators.")
+      }
+      if (validEmployees.length > 200) {
+        throw new Error("You can invite a maximum of 200 employees.")
+      }
+
+      const formattedInvites = [
+        ...validAdmins.map(email => ({ email, role: "admin" })),
+        ...validEmployees.map(email => ({ email, role: "employee" }))
+      ]
+
       const payload = {
         company_name: orgName.trim(),
         primary_country: region,
         team_size: teamSize,
         selected_modules: modules,
-        invites: validEmails,
+        invites: formattedInvites,
         start_trial: startTrial,
       }
-      if (region === "US" && defaultState.trim()) {
+      if (["US", "IN"].includes(region) && defaultState.trim()) {
         payload.default_state = defaultState.trim()
       }
       await apiRequest("/company/create", { method: "POST", json: payload })
@@ -77,9 +105,9 @@ export function OnboardingPage() {
     } catch (err) {
       setLoading(false)
       const msg =
+        err?.message ||
         err?.body?.detail ||
         (err?.body && typeof err.body === "object" ? Object.values(err.body).flat()[0] : null) ||
-        err?.message ||
         "Failed to create organization."
       setError(msg)
     }
@@ -131,7 +159,7 @@ export function OnboardingPage() {
             <span style={{ color: "#a5a6f6", fontStyle: "italic" }}>Seamless work.</span>
           </h1>
           <p style={{ fontSize: 18, color: "rgba(255,255,255,0.7)", maxWidth: 400, lineHeight: 1.6 }}>
-            Set up your organization in just three steps and unlock automated workforce management — built for UK &amp; US compliance.
+            Set up your organization in just three steps and unlock automated workforce management — built for US, UK &amp; India compliance.
           </p>
         </div>
 
@@ -228,18 +256,18 @@ export function OnboardingPage() {
               </div>
 
               {/* ── Region Selector ── */}
-              <div className="field" style={{ marginBottom: region === "US" ? 16 : 28 }}>
+              <div className="field" style={{ marginBottom: ["US", "IN"].includes(region) ? 16 : 28 }}>
                 <label className="fieldLabel" style={{ fontSize: 11, letterSpacing: 1 }}>OPERATING REGION</label>
                 <p style={{ color: "var(--muted)", fontSize: 12, marginBottom: 12, marginTop: 4 }}>
                   Sets your compliance rules, currency, payroll cycle, and statutory leave.
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
                   {REGIONS.map(r => {
                     const selected = region === r.code
                     return (
                       <div
                         key={r.code}
-                        onClick={() => { setRegion(r.code); if (r.code !== "US") setDefaultState("") }}
+                        onClick={() => { setRegion(r.code); if (r.code !== "US" && r.code !== "IN") setDefaultState("") }}
                         style={{
                           border: selected ? "2px solid #5d5fef" : "1.5px solid var(--stroke2)",
                           background: selected ? "#eff0fe" : "var(--surface)",
@@ -264,14 +292,16 @@ export function OnboardingPage() {
                 </div>
               </div>
 
-              {/* US state (only shown when US is selected) */}
-              {region === "US" && (
+              {/* State (only shown when US or IN is selected) */}
+              {["US", "IN"].includes(region) && (
                 <div className="field" style={{ marginBottom: 28, animation: "fadeUp 0.25s ease both" }}>
-                  <label className="fieldLabel" style={{ fontSize: 11, letterSpacing: 1 }}>DEFAULT STATE</label>
+                  <label className="fieldLabel" style={{ fontSize: 11, letterSpacing: 1 }}>
+                    {region === "US" ? "DEFAULT STATE" : "DEFAULT STATE / UNION TERRITORY"}
+                  </label>
                   <input
                     type="text"
                     className="input"
-                    placeholder="e.g. California, New York"
+                    placeholder={region === "US" ? "e.g. California, New York" : "e.g. Maharashtra, Karnataka"}
                     value={defaultState}
                     onChange={e => setDefaultState(e.target.value)}
                     style={{ fontSize: 15, padding: "14px 16px", borderRadius: 12 }}
@@ -301,20 +331,20 @@ export function OnboardingPage() {
           {step === 2 && (
             <div style={{ animation: "fadeUp 0.4s ease both" }}>
               <div style={{ display: "inline-flex", padding: "6px 12px", borderRadius: 20, background: "#eff0fe", color: "#5d5fef", fontSize: 11, fontWeight: 800, letterSpacing: 0.5, marginBottom: 24 }}>
-                <Workflow size={14} style={{ marginRight: 6 }} /> MODULE SELECTION
+                <Workflow size={14} style={{ marginRight: 6 }} /> ORGANIZATION MOTIVE / PRIORITY IDENTIFICATION
               </div>
               <h2 style={{ fontSize: 32, fontWeight: 800, fontFamily: "var(--font-display)", letterSpacing: -1, margin: "0 0 12px 0", color: "var(--fg)" }}>
-                What are you looking to solve?
+                Identify your organization's motive &amp; priorities
               </h2>
               <p style={{ color: "var(--muted)", fontSize: 14, marginBottom: 32 }}>
-                Select the modules you want to enable. You can always change them later in Settings.
+                Select the modules that align with your business objectives. You can customize them anytime in settings.
               </p>
 
               <div style={{ display: "grid", gap: 16, marginBottom: 32 }}>
                 {[
                   { id: "time", label: "Time Tracking", sub: "Clock in/out, timesheets, and approvals.", icon: <Clock size={20} /> },
-                  { id: "leaves", label: "Leave Management", sub: region === "UK" ? "28 days statutory leave, holidays, accruals." : "Time-off tracking, holidays, accruals.", icon: <CalendarDays size={20} /> },
-                  { id: "payroll", label: "Payroll Engine", sub: region === "UK" ? "PAYE, NI, payslips, monthly runs." : "FLSA-compliant OT, payslips, bi-weekly runs.", icon: <Banknote size={20} /> },
+                  { id: "leaves", label: "Leave Management", sub: region === "UK" ? "28 days statutory leave, holidays, accruals." : region === "IN" ? "15 days statutory leave, holidays, accruals." : "Time-off tracking, holidays, accruals.", icon: <CalendarDays size={20} /> },
+                  { id: "payroll", label: "Payroll Engine", sub: region === "UK" ? "PAYE, NI, payslips, monthly runs." : region === "IN" ? "EPF, Gratuity & ESIC, payslips, monthly runs." : "FLSA-compliant OT, payslips, bi-weekly runs.", icon: <Banknote size={20} /> },
                 ].map(mod => {
                   const isSel = modules.includes(mod.id)
                   return (
@@ -441,31 +471,55 @@ export function OnboardingPage() {
                 QuickTIMS works best when your team is united in one place. Add their emails, or skip and do it later.
               </p>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
-                {emails.map((email, i) => (
-                  <input
-                    key={i}
-                    type="email"
-                    className="input"
-                    placeholder={`e.g. colleague${i + 1}@example.com`}
-                    value={email}
-                    onChange={e => {
-                      const newEmails = [...emails]
-                      newEmails[i] = e.target.value
-                      setEmails(newEmails)
-                    }}
-                    style={{ fontSize: 15, padding: "14px 16px", borderRadius: 12 }}
-                  />
-                ))}
+              {/* Invite Admins */}
+              <div style={{ marginBottom: 28 }}>
+                <label className="fieldLabel" style={{ fontSize: 11, letterSpacing: 1, marginBottom: 8, display: "block" }}>
+                  INVITE ADMINISTRATORS (MAX 10)
+                </label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {adminEmails.map((email, i) => (
+                    <input
+                      key={i}
+                      type="email"
+                      className="input"
+                      placeholder={`e.g. admin${i + 1}@example.com`}
+                      value={email}
+                      onChange={e => {
+                        const newEmails = [...adminEmails]
+                        newEmails[i] = e.target.value
+                        setAdminEmails(newEmails)
+                      }}
+                      style={{ fontSize: 15, padding: "14px 16px", borderRadius: 12 }}
+                    />
+                  ))}
+                </div>
+                {adminEmails.length < 10 && (
+                  <button 
+                    className="btn btnGhost" 
+                    onClick={() => setAdminEmails([...adminEmails, ""])}
+                    style={{ fontSize: 12, fontWeight: 800, color: "#5d5fef", marginTop: 10, padding: 0, border: "none", background: "none", cursor: "pointer" }}
+                  >
+                    + ADD ADMINISTRATOR
+                  </button>
+                )}
               </div>
 
-              <button 
-                className="btn btnGhost" 
-                onClick={() => setEmails([...emails, ""])}
-                style={{ fontSize: 13, fontWeight: 800, color: "#5d5fef", marginBottom: 32 }}
-              >
-                + ADD MORE
-              </button>
+              {/* Invite Employees */}
+              <div style={{ marginBottom: 32 }}>
+                <label className="fieldLabel" style={{ fontSize: 11, letterSpacing: 1, marginBottom: 8, display: "block" }}>
+                  INVITE EMPLOYEES (MAX 200)
+                </label>
+                <p style={{ color: "var(--muted)", fontSize: 12, marginBottom: 10 }}>
+                  Enter emails separated by commas or newlines.
+                </p>
+                <textarea
+                  className="input"
+                  placeholder="e.g. employee1@example.com, employee2@example.com"
+                  value={employeeBulkEmails}
+                  onChange={e => setEmployeeBulkEmails(e.target.value)}
+                  style={{ fontSize: 15, padding: "14px 16px", borderRadius: 12, minHeight: 120, fontFamily: "sans-serif", resize: "vertical" }}
+                />
+              </div>
 
               {/* Summary strip */}
               <div style={{ padding: "14px 18px", borderRadius: 12, background: "var(--bg)", border: "1px solid var(--stroke2)", marginBottom: 24, display: "flex", gap: 20, fontSize: 12, color: "var(--muted)" }}>

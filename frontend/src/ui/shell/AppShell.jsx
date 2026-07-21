@@ -25,44 +25,81 @@ import {
   Users, BarChart3, MapPin, Settings, Search, LogOut,
   ChevronLeft, ChevronRight, Rocket, ShieldAlert, Globe, Package, Award,
   FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Car, X,
-  Wrench, MessageSquare
+  Wrench, MessageSquare, UserCheck, Activity, ArrowUpRight
 } from "lucide-react"
 
-const ALL_NAV_ITEMS = [
+const ADMIN_NAV_ITEMS = [
   { label: "Get Started", to: routes.get_started, icon: <Rocket size={20} />, color: "#0EA5E9", adminOnly: true },
-  { label: "Dashboard", to: routes.dashboard, icon: <Home size={20} />, color: "#10B981" },
-  { label: "Service Requests", to: routes.admin_service_requests, icon: <Wrench size={20} />, color: "#6366F1", adminOnly: true },
-  { label: "Feedback Logs", to: routes.admin_feedback, icon: <MessageSquare size={20} />, color: "#F59E0B", adminOnly: true },
-  { label: "Feedback", to: routes.employee_feedback, icon: <MessageSquare size={20} />, color: "#F59E0B", employeeOnly: true },
-  { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1", employeeOnly: true },
-  { label: "Locations", to: routes.locations, icon: <MapPin size={20} />, color: "#8B5CF6", adminOnly: true, module: "locations" },
-  { label: "Live Tracking", to: routes.live_locations, icon: <MapPin size={20} />, color: "#EF4444", adminOnly: true, module: "live_location" },
+  {
+    label: "Dashboard",
+    to: routes.dashboard,
+    icon: <Home size={20} />,
+    color: "#10B981",
+    children: [
+      { label: "Employee View", to: "/?view=employee", icon: <Users size={16} />, color: "#10B981" },
+      { label: "Customer View", to: "/?view=customer", icon: <MessageSquare size={16} />, color: "#6366F1" },
+    ]
+  },
+  {
+    label: "Customers",
+    to: "/customers/bookings",
+    icon: <MessageSquare size={20} />,
+    color: "#6366F1",
+    adminOnly: true,
+    children: [
+      { label: "Customer List", to: "/customers/list", icon: <Users size={16} />, color: "#6366F1" },
+      { label: "Bookings", to: "/customers/bookings", icon: <CalendarDays size={16} />, color: "#38BDF8" },
+      { label: "Payments", to: "/customers/payments", icon: <Banknote size={16} />, color: "#10B981" },
+      { label: "Complaints", to: "/customers/complaints", icon: <ShieldAlert size={16} />, color: "#EF4444" },
+      { label: "Reviews", to: "/customers/reviews", icon: <Award size={16} />, color: "#F59E0B" },
+      { label: "Documents", to: "/customers/documents", icon: <FolderOpen size={16} />, color: "#3B82F6" },
+    ]
+  },
   {
     label: "Employees",
-    to: routes.employees,
+    to: "/employees",
     icon: <Users size={20} />,
     color: "#D946EF",
     adminOnly: true,
     children: [
-      { label: "Dashboard", to: routes.employees_dashboard, icon: <Home size={16} />, color: "#10B981" },
-      { label: "Employee Directory", to: routes.employees, icon: <Users size={16} />, color: "#D946EF" },
-      { label: "Pending Approvals", to: routes.employees_pending, icon: <FileText size={16} />, color: "#F59E0B" },
-      { label: "Approved Employees", to: routes.employees_approved, icon: <CheckCircle size={16} />, color: "#10B981" },
-      { label: "Rejected Employees", to: routes.employees_rejected, icon: <XCircle size={16} />, color: "#EF4444" },
-      { label: "Document Vault", to: routes.employees_documents, icon: <FolderOpen size={16} />, color: "#3B82F6" },
-      { label: "Training Records", to: routes.employees_training, icon: <GraduationCap size={16} />, color: "#8B5CF6" },
-      { label: "Settings", to: routes.settings, icon: <Settings size={16} />, color: "#64748B" },
+      { label: "Employee List", to: "/employees", icon: <Users size={16} />, color: "#D946EF" },
+      { label: "Recruitment", to: "/employees/pending", icon: <FileText size={16} />, color: "#F59E0B" },
+      { label: "Verification", to: "/employees/documents", icon: <FolderOpen size={16} />, color: "#3B82F6" },
+      { label: "Attendance", to: "/time", icon: <Clock size={16} />, color: "#F59E0B" },
+      { label: "Audit Ledger", to: "/audit-ledger", icon: <FileText size={16} />, color: "#3B82F6" },
+      { label: "Leave", to: "/leaves", icon: <CalendarDays size={16} />, color: "#EC4899" },
+      { label: "Performance", to: "/employees/training", icon: <GraduationCap size={16} />, color: "#8B5CF6" },
+      { label: "Payroll", to: "/payroll", icon: <Banknote size={16} />, color: "#6366F1" },
+      { label: "Compliance", to: "/compliance", icon: <ShieldAlert size={16} />, color: "#2563EB" },
     ]
   },
+  {
+    label: "Work Orders",
+    to: "/tasks",
+    icon: <CheckSquare size={20} />,
+    color: "#14B8A6",
+    children: [
+      { label: "Pending", to: "/tasks?status=pending", icon: <Clock size={16} />, color: "#F59E0B" },
+      { label: "Assigned", to: "/tasks?status=assigned", icon: <UserCheck size={16} />, color: "#38BDF8" },
+      { label: "In Progress", to: "/tasks?status=in_progress", icon: <Activity size={16} />, color: "#14B8A6" },
+      { label: "Completed", to: "/tasks?status=completed", icon: <CheckCircle size={16} />, color: "#10B981" },
+      { label: "Cancelled", to: "/tasks?status=cancelled", icon: <XCircle size={16} />, color: "#EF4444" },
+      { label: "Reassigned", to: "/tasks?status=reassigned", icon: <ArrowUpRight size={16} />, color: "#8B5CF6" },
+    ]
+  },
+  { label: "Organization", to: "/settings/organization", icon: <Globe size={20} />, color: "#38BDF8", adminOnly: true },
+  { label: "Reports", to: "/reports", icon: <BarChart3 size={20} />, color: "#FACC15", adminOnly: true },
+  { label: "Settings", to: "/settings", icon: <Settings size={20} />, color: "#64748B" },
+]
+
+const EMPLOYEE_NAV_ITEMS = [
+  { label: "Dashboard", to: routes.dashboard, icon: <Home size={20} />, color: "#10B981" },
+  { label: "Feedback", to: routes.employee_feedback, icon: <MessageSquare size={20} />, color: "#F59E0B" },
+  { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1" },
   { label: "Jobs", to: routes.tasks, icon: <CheckSquare size={20} />, color: "#14B8A6" },
   { label: "Leaves", to: routes.leaves, icon: <CalendarDays size={20} />, color: "#EC4899" },
-  { label: "Payroll", to: routes.payroll, icon: <Banknote size={20} />, color: "#6366F1", adminOnly: true, module: "payroll" },
-  { label: "Scheduling", to: routes.scheduling, icon: <CalendarRange size={20} />, color: "#38BDF8", adminOnly: true },
   { label: "Time", to: routes.time, icon: <Clock size={20} />, color: "#F59E0B", module: "attendance" },
   { label: "Mileage", to: routes.mileage, icon: <Car size={20} />, color: "#EF4444" },
-  { label: "Inventory", to: routes.inventory, icon: <Package size={20} />, color: "#10B981", adminOnly: true },
-  { label: "Reports", to: routes.reports, icon: <BarChart3 size={20} />, color: "#FACC15", adminOnly: true, module: "reports" },
-  { label: "Compliance", to: routes.compliance, icon: <ShieldAlert size={20} />, color: "#2563EB", adminOnly: true },
   { label: "Settings", to: routes.settings, icon: <Settings size={20} />, color: "#64748B" },
 ]
 
@@ -261,12 +298,8 @@ export function AppShell() {
   const items = useMemo(() => {
     if (!user) return []
     const isAdminUser = user.role === "admin" || user.role === "manager"
-    return ALL_NAV_ITEMS.filter(item => {
-      if (item.adminOnly && !isAdminUser) return false
-      if (item.employeeOnly && isAdminUser) return false
-      return true
-      return hasModuleAccess(user, item)
-    })
+    const navSource = isAdminUser ? ADMIN_NAV_ITEMS : EMPLOYEE_NAV_ITEMS
+    return navSource.filter(item => hasModuleAccess(user, item))
   }, [user])
 
   useEffect(() => {
@@ -281,7 +314,16 @@ export function AppShell() {
   }, [user, dispatch])
 
   useEffect(() => {
-    const parent = items.find(item => item.children && location.pathname.startsWith(item.to))
+    const parent = items.find(item => {
+      if (!item.children) return false
+      if (item.to === "/") {
+        return location.pathname === "/"
+      }
+      if (item.to === "/customers/bookings") {
+        return location.pathname.startsWith("/customers")
+      }
+      return location.pathname.startsWith(item.to)
+    })
     if (parent) {
       setDrillDownParent(parent)
     } else {

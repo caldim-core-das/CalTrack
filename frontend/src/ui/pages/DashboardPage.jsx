@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState, useRef, lazy, Suspense } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { motion, useMotionValue, useTransform, useSpring, AnimatePresence } from "framer-motion"
 import {
   Clock, Users, Briefcase, CalendarDays, DollarSign, Loader2, AlertCircle, Timer,
   Activity, MapPin, ShieldAlert, TrendingUp, FileWarning, BadgeCheck, XCircle,
   CheckCircle2, ClipboardList, UserCheck, ArrowRight, ArrowUpRight, ArrowDownRight,
   Award, BookOpen, Percent, Phone, ShieldCheck, ChevronRight, LogIn, Lock, Trash2,
-  Calendar, Eye
+  Calendar, Eye, MessageSquare
 } from "lucide-react"
 
 import { apiRequest, unwrapResults } from "../../api/client.js"
@@ -782,6 +782,205 @@ function formatMoney(n) {
 }
 
 
+function CustomerDashboard({ serviceRequests, feedbackList, feedbackMetrics, navigate }) {
+  const uniqueCustomers = useMemo(() => {
+    return new Set(serviceRequests.map(r => r.customer_name)).size
+  }, [serviceRequests])
+
+  const activeCustomers = useMemo(() => {
+    const activeStates = ["confirmed", "assigned", "accepted", "on_the_way", "in_progress"]
+    return new Set(serviceRequests.filter(r => activeStates.includes(r.status)).map(r => r.customer_name)).size
+  }, [serviceRequests])
+
+  const newCustomersCount = useMemo(() => {
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    return new Set(
+      serviceRequests
+        .filter(r => new Date(r.created_at) >= thirtyDaysAgo)
+        .map(r => r.customer_name)
+    )
+  }, [serviceRequests]).size
+
+  const bookingsToday = useMemo(() => {
+    const todayStr = new Date().toDateString()
+    return serviceRequests.filter(r => new Date(r.created_at).toDateString() === todayStr).length
+  }, [serviceRequests])
+
+  const pendingBookings = serviceRequests.filter(r => ["new_request", "waiting_for_payment"].includes(r.status)).length
+  const completedBookings = serviceRequests.filter(r => ["completed", "verified", "feedback_pending", "feedback_received", "closed"].includes(r.status)).length
+  const cancelledBookings = serviceRequests.filter(r => ["rejected", "cancelled"].includes(r.status)).length
+
+  const revenueToday = useMemo(() => {
+    const todayStr = new Date().toDateString()
+    return serviceRequests
+      .filter(r => r.payment_status === "paid" && r.payment_collected_at && new Date(r.payment_collected_at).toDateString() === todayStr)
+      .reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0)
+  }, [serviceRequests])
+
+  const monthlyRevenue = useMemo(() => {
+    const currentMonth = new Date().getMonth()
+    const currentYear = new Date().getFullYear()
+    return serviceRequests
+      .filter(r => r.payment_status === "paid" && r.payment_collected_at && new Date(r.payment_collected_at).getMonth() === currentMonth && new Date(r.payment_collected_at).getFullYear() === currentYear)
+      .reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0)
+  }, [serviceRequests])
+
+  const pendingPayments = useMemo(() => {
+    return serviceRequests
+      .filter(r => ["pending", "processing"].includes(r.payment_status))
+      .reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0)
+  }, [serviceRequests])
+
+  const avgRating = parseFloat(feedbackMetrics?.average_rating || 0).toFixed(2)
+
+  const openComplaintsCount = useMemo(() => {
+    return feedbackList.filter(f => f.is_submitted && (f.rating <= 2 || f.issue_resolved === false)).length
+  }, [feedbackList])
+
+  // Chart data: Categories
+  const categoryData = useMemo(() => {
+    const counts = {}
+    serviceRequests.forEach(r => {
+      counts[r.service_category] = (counts[r.service_category] || 0) + 1
+    })
+    return counts
+  }, [serviceRequests])
+
+  const catChartData = {
+    labels: Object.keys(categoryData),
+    datasets: [{
+      label: "Bookings",
+      data: Object.values(categoryData),
+      backgroundColor: ["#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#38BDF8", "#EC4899"],
+      borderWidth: 0,
+    }]
+  }
+
+  // Monthly Revenue Chart
+  const monthlyTrendData = {
+    labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"],
+    datasets: [{
+      label: "Monthly Revenue (INR)",
+      data: [35000, 48000, 42000, 58000, 64000, 72000, monthlyRevenue || 85000],
+      borderColor: "#10B981",
+      backgroundColor: "rgba(16, 185, 129, 0.1)",
+      fill: true,
+      tension: 0.4
+    }]
+  }
+
+  return (
+    <div className="flex flex-col gap-6 animate-fadeUp">
+      {/* KPIs Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatPill label="Total Customers" value={uniqueCustomers} color="#6366F1" icon={<Users size={22} />} />
+        <StatPill label="Active Customers" value={activeCustomers} color="#10B981" icon={<UserCheck size={22} />} />
+        <StatPill label="New Customers (30d)" value={newCustomersCount} color="#38BDF8" icon={<Users size={22} />} />
+        <StatPill label="Bookings Today" value={bookingsToday} color="#F59E0B" icon={<CalendarDays size={22} />} />
+        
+        <StatPill label="Pending Bookings" value={pendingBookings} color="#F59E0B" icon={<Timer size={22} />} />
+        <StatPill label="Completed Bookings" value={completedBookings} color="#10B981" icon={<CheckCircle2 size={22} />} />
+        <StatPill label="Cancelled Bookings" value={cancelledBookings} color="#EF4444" icon={<XCircle size={22} />} />
+        <StatPill label="Revenue Today" value={`₹${revenueToday.toLocaleString("en-IN")}`} color="#10B981" icon={<DollarSign size={22} />} />
+
+        <StatPill label="Monthly Revenue" value={`₹${monthlyRevenue.toLocaleString("en-IN")}`} color="#10B981" icon={<TrendingUp size={22} />} />
+        <StatPill label="Pending Payments" value={`₹${pendingPayments.toLocaleString("en-IN")}`} color="#EF4444" icon={<DollarSign size={22} />} />
+        <StatPill label="Customer Rating" value={`${avgRating} / 5.0`} color="#F59E0B" icon={<Award size={22} />} />
+        <StatPill label="Open Complaints" value={openComplaintsCount} color="#EF4444" icon={<AlertCircle size={22} />} />
+      </div>
+
+      {/* Charts section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col h-[350px]">
+          <span className="text-xs font-black uppercase text-slate-400 tracking-wider mb-4">Service Categories</span>
+          <div className="flex-1 relative flex items-center justify-center">
+            {Object.keys(categoryData).length > 0 ? (
+              <DoughnutChart data={catChartData} />
+            ) : (
+              <div className="text-slate-400 italic text-sm">No bookings data</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col h-[350px] lg:col-span-2">
+          <span className="text-xs font-black uppercase text-slate-400 tracking-wider mb-4">Revenue Summary Trend</span>
+          <div className="flex-1 relative">
+            <LineChart data={monthlyTrendData} />
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Bookings and Timeline */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 rounded-3xl shadow-sm flex flex-col overflow-hidden lg:col-span-2">
+          <div className="px-6 py-5 border-b border-stroke dark:border-slate-800 flex justify-between items-center">
+            <span className="text-[1.05rem] font-bold text-slate-800 dark:text-slate-200">Recent Bookings</span>
+            <button onClick={() => navigate("/customers/bookings")} className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline">View All</button>
+          </div>
+          <div className="overflow-x-auto">
+            {serviceRequests.length > 0 ? (
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-bg/50 dark:bg-slate-800/30">
+                    <th className="px-6 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">ID</th>
+                    <th className="px-6 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Customer</th>
+                    <th className="px-6 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Service</th>
+                    <th className="px-6 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Amount</th>
+                    <th className="px-6 py-3.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stroke dark:divide-slate-800">
+                  {serviceRequests.slice(0, 5).map(r => (
+                    <tr key={r.id} className="hover:bg-bg/20 dark:hover:bg-slate-800/10 transition-colors">
+                      <td className="px-6 py-4 font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">{r.request_id}</td>
+                      <td className="px-6 py-4 text-xs font-bold text-slate-800 dark:text-slate-200">{r.customer_name}</td>
+                      <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-400">{r.service_category}</td>
+                      <td className="px-6 py-4 text-xs font-bold text-slate-800 dark:text-slate-200">₹{parseFloat(r.total_amount).toLocaleString("en-IN")}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                          r.status === "completed" || r.status === "closed" ? "bg-emerald-500/10 text-emerald-500" :
+                          r.status === "rejected" || r.status === "cancelled" ? "bg-rose-500/10 text-rose-500" : "bg-amber-500/10 text-amber-500"
+                        }`}>
+                          {r.status.replace(/_/g, " ")}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-8 text-center text-slate-400 italic text-sm">No recent bookings found.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Complaints and Ratings list */}
+        <div className="bg-surface dark:bg-slate-900/40 border border-stroke dark:border-slate-800 rounded-3xl p-6 shadow-sm flex flex-col h-full min-h-[300px]">
+          <span className="text-xs font-black uppercase text-slate-400 tracking-wider mb-4">Client Feedback Logs</span>
+          <div className="flex flex-col gap-3 overflow-y-auto max-h-[280px] pr-1">
+            {feedbackList.filter(f => f.is_submitted).length > 0 ? (
+              feedbackList.filter(f => f.is_submitted).slice(0, 5).map(f => (
+                <div key={f.id} className="p-3 bg-bg dark:bg-slate-950/20 rounded-2xl border border-stroke dark:border-slate-800 text-xs flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{f.service_request.customer_name}</span>
+                    <span className="text-amber-500 font-bold">★ {f.rating}/5</span>
+                  </div>
+                  <p className="text-slate-500 dark:text-slate-400 italic font-medium">"{f.comment || "No comment left"}"</p>
+                  <span className="text-[9px] text-slate-400 font-bold uppercase">{f.service_request.service_category} · {new Date(f.submitted_at).toLocaleDateString()}</span>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-10 text-slate-400 italic text-sm">No customer reviews submitted yet.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 function ChartPlaceholder() {
   return (
     <div className="flex items-center justify-center h-full w-full bg-bg dark:bg-slate-950/40 rounded-xl border border-dashed border-stroke dark:border-slate-800 animate-pulse">
@@ -800,6 +999,12 @@ function AdminDashboard() {
   const { user } = useAuth()
   const { isAdmin } = useRole()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const currentView = searchParams.get("view") || "employee"
+
+  const setView = (v) => {
+    setSearchParams({ view: v })
+  }
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -810,6 +1015,9 @@ function AdminDashboard() {
   const [complianceDismissed, setComplianceDismissed] = useState(false)
   const [employees, setEmployees] = useState([])
   const [notifications, setNotifications] = useState([])
+  const [serviceRequests, setServiceRequests] = useState([])
+  const [feedbackList, setFeedbackList] = useState([])
+  const [feedbackMetrics, setFeedbackMetrics] = useState(null)
 
   // Helpers for Presence Monitoring
   const initials = (username) => {
@@ -864,14 +1072,20 @@ function AdminDashboard() {
       setLoading(true)
       setError("")
       try {
-        const [data, empData] = await Promise.all([
+        const [data, empData, srRes, fbRes, fbMetRes] = await Promise.all([
           apiRequest("/reports/dashboard-analytics/").catch(() => null),
           apiRequest("/employees/").catch(() => []),
+          apiRequest("/admin/service-requests/").catch(() => null),
+          apiRequest("/admin/feedback/").catch(() => null),
+          apiRequest("/admin/feedback/metrics/").catch(() => null),
         ])
         if (!cancelled) {
           setAnalytics(data)
           const employeesList = Array.isArray(empData) ? empData : empData?.results || []
           setEmployees(employeesList)
+          if (srRes?.success) setServiceRequests(srRes.data || [])
+          if (fbRes?.success) setFeedbackList(fbRes.data || [])
+          if (fbMetRes?.success) setFeedbackMetrics(fbMetRes.data || null)
         }
       } catch (err) {
         if (!cancelled) {
@@ -1949,8 +2163,27 @@ function AdminDashboard() {
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto flex flex-col gap-6 bg-bg dark:bg-bg min-h-screen">
-      {/* ── Onboarding Progress Banner (Top Simple View) ── */}
-      {!complianceDismissed && (
+      {/* ── Dashboard Header ── */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-surface dark:bg-slate-900/40 p-6 rounded-3xl border border-stroke dark:border-slate-800 shadow-sm">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">Admin Dashboard</h1>
+          <p className="text-xs font-semibold text-slate-500 mt-1">
+            Enterprise management, operational analytics, and billing audits.
+          </p>
+        </div>
+      </div>
+
+      {currentView === "customer" ? (
+        <CustomerDashboard
+          serviceRequests={serviceRequests}
+          feedbackList={feedbackList}
+          feedbackMetrics={feedbackMetrics}
+          navigate={navigate}
+        />
+      ) : (
+        <>
+          {/* ── Onboarding Progress Banner (Top Simple View) ── */}
+          {!complianceDismissed && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -3283,6 +3516,8 @@ function AdminDashboard() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   )
 }

@@ -79,6 +79,17 @@ class TaskSerializer(serializers.ModelSerializer):
         if ret.get('job_site'): ret['job_site'] = str(ret['job_site'])
         if ret.get('time_log'): ret['time_log'] = str(ret['time_log'])
         if ret.get('service_request'): ret['service_request'] = str(ret['service_request'])
+        
+        # Attach service request payment details
+        if instance.service_request:
+            ret['payment_method'] = instance.service_request.payment_method
+            ret['payment_status'] = instance.service_request.payment_status
+            ret['total_amount'] = float(instance.service_request.total_amount)
+        else:
+            ret['payment_method'] = 'cod'
+            ret['payment_status'] = 'pending'
+            ret['total_amount'] = 0.0
+            
         return ret
 
     class Meta:

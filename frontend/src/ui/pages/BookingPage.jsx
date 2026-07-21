@@ -22,6 +22,8 @@ import { CalTrackLogo } from "../components/CalTrackLogo.jsx"
 import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, useMapEvents } from "react-leaflet";
 
+let BOOKING_CURRENCY_SYMBOL = "₹";
+
 /* ─────────────────────────────────────────────────────────────────────────
    DATA
    ───────────────────────────────────────────────────────────────────────── */
@@ -236,7 +238,7 @@ function SummaryBar({ category, cart, date, time, step }) {
       </span>
       {cart && cart.length > 0 && <>
         <ChevronRight size={12} style={{ color: "#cbd5e1" }} />
-        <span style={{ color: "#7C3AED" }}>{totalItems} item{totalItems > 1 ? 's' : ''} · ₹{totalPrice}</span>
+        <span style={{ color: "#7C3AED" }}>{totalItems} item{totalItems > 1 ? 's' : ''} · {BOOKING_CURRENCY_SYMBOL}{totalPrice}</span>
       </>}
       {date && <>
         <ChevronRight size={12} style={{ color: "#cbd5e1" }} />
@@ -638,7 +640,7 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
    ───────────────────────────────────────────────────────────────────────── */
 
 function StepPackage({ category, selectedPackage, onSelect, onNext, onBack, packagesData }) {
-  const packages = (packagesData && packagesData[category?.id]) || PACKAGES[category?.id] || []
+  const packages = ((packagesData && packagesData[category?.id]) || PACKAGES[category?.id] || []).map(p => ({ ...p, priceStr: BOOKING_CURRENCY_SYMBOL + p.price }))
 
   return (
     <div className="uc-step-page">
@@ -1284,7 +1286,7 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
               cart.map((c, i) => (
                 <div key={i} className="uc-price-row">
                   <span>{c.quantity}x {c.name}</span>
-                  <span>₹{c.price * c.quantity}</span>
+                  <span>{BOOKING_CURRENCY_SYMBOL}{c.price * c.quantity}</span>
                 </div>
               ))
             ) : (
@@ -1303,7 +1305,7 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
             </div>
             <div className="uc-price-total">
               <span>Total</span>
-              <span>₹{totalPrice}</span>
+              <span>{BOOKING_CURRENCY_SYMBOL}{totalPrice}</span>
             </div>
             <div style={{ textAlign: "center", fontSize: "0.68rem", color: "#94a3b8", marginTop: "0.25rem" }}>
               Pay at doorstep · No advance required
@@ -1425,7 +1427,7 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
 
   const options = [
     { id: "cash", icon: "💵", label: "Cash on Service", sub: "Pay after service is completed", badge: "Most Popular", badgeColor: "#10B981", detail: ["No upfront payment", "Pay only on completion", "Any denomination accepted"] },
-    { id: "online", icon: "💳", label: "Pay Online", sub: "UPI, Cards, Net Banking", badge: "Instant", badgeColor: "#7C3AED", detail: ["100% secure & encrypted", "Instant confirmation", "Invoice emailed immediately"] },
+    { id: "online", icon: "📱", label: "Pay via UPI", sub: "Google Pay, PhonePe, Paytm, BHIM", badge: "Instant", badgeColor: "#7C3AED", detail: ["100% secure & encrypted", "Instant confirmation", "Invoice emailed immediately"] },
   ].filter(o => allowedMethods.includes(o.id))
 
   if (showOnlineSheet) {
@@ -1436,31 +1438,19 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
           <div style={{ background: 'linear-gradient(135deg,#7C3AED,#4F46E5)', borderRadius: '28px 28px 0 0', padding: '1.5rem 1.75rem 1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Secure Payment</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'white', marginTop: 2 }}>₹{total.toLocaleString('en-IN')}</div>
+                <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Secure UPI Payment</div>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: 'white', marginTop: 2 }}>{BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()}</div>
               </div>
               <div style={{ background: 'rgba(255,255,255,0.15)', padding: '4px 12px', borderRadius: 99, fontSize: '0.7rem', fontWeight: 800, color: 'white', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <Lock size={11} /> SSL Secured
               </div>
             </div>
-            {payPhase === null && (
-              <div style={{ display: 'flex', gap: 6, marginTop: '1rem' }}>
-                {[{ id: 'upi', l: 'UPI' }, { id: 'card', l: 'Card' }, { id: 'netbanking', l: 'Net Banking' }, { id: 'wallet', l: 'Wallets' }].map(t => (
-                  <button key={t.id} onClick={() => setPayTab(t.id)}
-                    style={{
-                      padding: '5px 14px', borderRadius: 99, border: 'none', cursor: 'pointer', fontSize: '0.72rem', fontWeight: 800, transition: 'all 0.2s',
-                      background: payTab === t.id ? 'white' : 'rgba(255,255,255,0.18)', color: payTab === t.id ? '#7C3AED' : 'rgba(255,255,255,0.85)'
-                    }}>{t.l}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
           <div style={{ padding: '1.5rem 1.75rem' }}>
             {payPhase === 'processing' && (
               <div style={{ textAlign: 'center', padding: '2rem 0' }}>
                 <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} style={{ display: 'inline-block', marginBottom: '1.5rem' }}><RefreshCw size={48} color="#7C3AED" /></motion.div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Processing Payment…</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Processing UPI Payment…</div>
                 <div style={{ color: '#64748b', fontSize: '0.85rem' }}>Please do not close this window</div>
               </div>
             )}
@@ -1472,7 +1462,7 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
                 </motion.div>
                 <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Payment Successful! 🎉</div>
                 <div style={{ color: '#64748b', fontSize: '0.85rem' }}>Your booking is now confirmed</div>
-                <div style={{ marginTop: '1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.78rem', color: '#166534', fontWeight: 600 }}>✅ Amount ₹{total.toLocaleString('en-IN')} debited successfully</div>
+                <div style={{ marginTop: '1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.78rem', color: '#166534', fontWeight: 600 }}>✅ Amount {BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()} debited successfully</div>
               </div>
             )}
             {payPhase === 'failed' && (
@@ -1483,7 +1473,7 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
                 <button onClick={() => setPayPhase(null)} style={{ padding: '0.75rem 2rem', background: 'linear-gradient(135deg,#7C3AED,#4F46E5)', color: 'white', fontWeight: 800, border: 'none', borderRadius: 12, cursor: 'pointer' }}>Try Again</button>
               </div>
             )}
-            {payPhase === null && payTab === 'upi' && (
+            {payPhase === null && (
               <>
                 <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#374151', display: 'block', marginBottom: 6 }}>Enter UPI ID</label>
                 <div style={{ display: 'flex', alignItems: 'center', border: `2px solid ${upiId ? '#7C3AED' : '#e2e8f0'}`, borderRadius: 12, overflow: 'hidden', marginBottom: '0.75rem' }}>
@@ -1499,59 +1489,13 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
                 </div>
                 <button onClick={handleOnlinePayment} disabled={!upiId}
                   style={{ width: '100%', padding: '1rem', background: upiId ? 'linear-gradient(135deg,#7C3AED,#4F46E5)' : '#e2e8f0', color: upiId ? 'white' : '#94a3b8', fontWeight: 800, fontSize: '0.95rem', border: 'none', borderRadius: 14, cursor: upiId ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                  <Lock size={15} /> Pay ₹{total.toLocaleString('en-IN')}
+                  <Lock size={15} /> Pay {BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()}
                 </button>
               </>
-            )}
-            {payPhase === null && payTab === 'card' && (
-              <>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-                  <div><label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>Card Number</label>
-                    <input value={cardNum} onChange={e => setCardNum(e.target.value.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim())} placeholder="1234 5678 9012 3456"
-                      style={{ width: '100%', border: '2px solid #e2e8f0', borderRadius: 10, padding: '0.8rem 1rem', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} />
-                  </div>
-                  <div><label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>Name on Card</label>
-                    <input value={cardName} onChange={e => setCardName(e.target.value)} placeholder="John Doe"
-                      style={{ width: '100%', border: '2px solid #e2e8f0', borderRadius: 10, padding: '0.8rem 1rem', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} />
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    <div style={{ flex: 1 }}><label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>Expiry</label>
-                      <input value={cardExp} onChange={e => setCardExp(e.target.value.replace(/\D/g, '').slice(0, 4).replace(/(.{2})/, '$1/'))} placeholder="MM/YY"
-                        style={{ width: '100%', border: '2px solid #e2e8f0', borderRadius: 10, padding: '0.8rem 1rem', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} />
-                    </div>
-                    <div style={{ flex: 1 }}><label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#374151', display: 'block', marginBottom: 4 }}>CVV</label>
-                      <input value={cardCvv} onChange={e => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 3))} placeholder="•••" type="password"
-                        style={{ width: '100%', border: '2px solid #e2e8f0', borderRadius: 10, padding: '0.8rem 1rem', fontSize: '0.9rem', outline: 'none', boxSizing: 'border-box' }} />
-                    </div>
-                  </div>
-                </div>
-                <button onClick={handleOnlinePayment} disabled={cardNum.length < 19 || !cardName || cardExp.length < 5 || cardCvv.length < 3}
-                  style={{ width: '100%', padding: '1rem', background: (cardNum.length >= 19 && cardName && cardExp.length >= 5 && cardCvv.length >= 3) ? 'linear-gradient(135deg,#7C3AED,#4F46E5)' : '#e2e8f0', color: (cardNum.length >= 19 && cardName && cardExp.length >= 5 && cardCvv.length >= 3) ? 'white' : '#94a3b8', fontWeight: 800, fontSize: '0.95rem', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                  <Lock size={15} /> Pay ₹{total.toLocaleString('en-IN')}
-                </button>
-              </>
-            )}
-            {payPhase === null && payTab === 'netbanking' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '1rem' }}>
-                {['SBI', 'HDFC', 'ICICI', 'Axis', 'Kotak', 'Yes Bank', 'PNB', 'BOB'].map(bank => (
-                  <button key={bank} onClick={() => { setUpiId(bank); handleOnlinePayment(); }}
-                    style={{ padding: '0.85rem', border: '2px solid #e2e8f0', borderRadius: 12, cursor: 'pointer', background: 'white', fontWeight: 700, fontSize: '0.82rem', color: '#374151' }}>{bank}</button>
-                ))}
-              </div>
-            )}
-            {payPhase === null && payTab === 'wallet' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', marginBottom: '1rem' }}>
-                {[{ name: 'Paytm Wallet', icon: '🟢' }, { name: 'Amazon Pay', icon: '🟠' }, { name: 'MobiKwik', icon: '🔵' }, { name: 'Freecharge', icon: '🟣' }].map(w => (
-                  <button key={w.name} onClick={handleOnlinePayment}
-                    style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.9rem 1rem', border: '2px solid #e2e8f0', borderRadius: 12, cursor: 'pointer', background: 'white', fontWeight: 700, fontSize: '0.88rem', color: '#374151' }}>
-                    <span style={{ fontSize: '1.3rem' }}>{w.icon}</span>{w.name}<ChevronRight size={16} style={{ marginLeft: 'auto', color: '#94a3b8' }} />
-                  </button>
-                ))}
-              </div>
             )}
             {payPhase === null && (
-              <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                <Shield size={11} /> 256-bit SSL · PCI DSS Compliant
+              <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                <Shield size={11} /> 256-bit SSL · UPI Encryption
               </div>
             )}
           </div>
@@ -1568,7 +1512,7 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
         <div style={{ padding: '1.75rem 1.75rem 0' }}>
           <div style={{ width: 40, height: 4, background: '#e2e8f0', borderRadius: 99, margin: '0 auto 1.5rem' }} />
           <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.3rem', fontWeight: 900, color: '#0f172a' }}>Choose Payment Method</h3>
-          <p style={{ margin: '0 0 1.25rem', color: '#64748b', fontSize: '0.85rem' }}>Total: <strong style={{ color: '#7C3AED', fontSize: '1.05rem' }}>₹{total.toLocaleString('en-IN')}</strong></p>
+          <p style={{ margin: '0 0 1.25rem', color: '#64748b', fontSize: '0.85rem' }}>Total: <strong style={{ color: '#7C3AED', fontSize: '1.05rem' }}>{BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()}</strong></p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0 1.75rem', marginBottom: '1.25rem' }}>
           {options.map(opt => (
@@ -1603,7 +1547,7 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
           <button onClick={handleConfirm} disabled={confirming}
             style={{ width: '100%', padding: '1rem', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', fontWeight: 800, fontSize: '1rem', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 20px rgba(124,58,237,0.3)' }}>
             {confirming ? <><RefreshCw size={16} className="spin-icon" /> Processing…</> :
-              selected === 'online' ? <><CreditCard size={16} /> Continue to Pay ₹{total.toLocaleString('en-IN')}</> :
+              selected === 'online' ? <><CreditCard size={16} /> Continue to Pay {BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()}</> :
                 <><CheckCheck size={16} /> Confirm Booking</>}
           </button>
           <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
@@ -1808,7 +1752,7 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
             { label: 'Date', value: displayDate },
             { label: 'Time', value: displayTime },
             { label: 'Address', value: formData?.address, span: true },
-            { label: 'Total Amount', value: `₹${totalPrice}`, highlight: true },
+            { label: 'Total Amount', value: `${BOOKING_CURRENCY_SYMBOL}${totalPrice}`, highlight: true },
           ].map((r, i) => (
             <div key={i} style={{ ...(r.span ? { gridColumn: '1/-1' } : {}), background: '#f8fafc', borderRadius: 10, padding: '0.5rem 0.75rem' }}>
               <div style={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase' }}>{r.label}</div>
@@ -2057,8 +2001,8 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
   ]
 
   const mockBookings = [
-    { id: "BK482910", service: "AC Servicing", date: "Aug 15, 2026", status: "Completed", amount: "₹899" },
-    { id: "BK483122", service: "Deep Cleaning", date: "Sep 02, 2026", status: "Upcoming", amount: "₹2,499" },
+    { id: "BK482910", service: "AC Servicing", date: "Aug 15, 2026", status: "Completed", amount: BOOKING_CURRENCY_SYMBOL + "899" },
+    { id: "BK483122", service: "Deep Cleaning", date: "Sep 02, 2026", status: "Upcoming", amount: BOOKING_CURRENCY_SYMBOL + "2,499" },
   ]
 
   const renderTabContent = () => {
@@ -2208,15 +2152,45 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <h3 style={{ margin: '0 0 1.5rem', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>Payment Methods</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 16, padding: '1.25rem', display: 'flex', alignItems: 'center', gap: 16, background: 'white', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-                <div style={{ width: 56, height: 36, background: '#1e293b', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.8rem', fontWeight: 900, fontStyle: 'italic' }}>VISA</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>•••• •••• •••• 4242</div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 2 }}>Expires 12/28</div>
+              {/* COD Info */}
+              <div style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: 16,
+                padding: '20px',
+                background: 'white',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                display: 'flex',
+                gap: 16,
+                alignItems: 'center'
+              }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#10B98115', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>💵</div>
+                <div>
+                  <h4 style={{ margin: '0 0 4px', color: '#0f172a', fontSize: '1rem', fontWeight: 800 }}>Cash on Service (COD)</h4>
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                    Pay securely in cash directly to our service professional after the job is successfully completed.
+                  </p>
                 </div>
-                <button style={{ fontSize: '0.8rem', padding: '6px 14px', borderRadius: 8, border: '1px solid #fee2e2', color: '#ef4444', background: '#fef2f2', fontWeight: 700, cursor: 'pointer' }}>Remove</button>
               </div>
-              <button style={{ padding: '1.25rem', border: '2px dashed #cbd5e1', borderRadius: 16, background: '#f8fafc', color: '#7C3AED', fontWeight: 800, fontSize: '1rem', cursor: 'pointer' }}>+ Add New Card / UPI</button>
+
+              {/* UPI Info */}
+              <div style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: 16,
+                padding: '20px',
+                background: 'white',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+                display: 'flex',
+                gap: 16,
+                alignItems: 'center'
+              }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#7C3AED15', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>📱</div>
+                <div>
+                  <h4 style={{ margin: '0 0 4px', color: '#0f172a', fontSize: '1rem', fontWeight: 800 }}>UPI Payments</h4>
+                  <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                    Pay instantly online via Google Pay, PhonePe, Paytm, or BHIM during the checkout process.
+                  </p>
+                </div>
+              </div>
             </div>
           </motion.div>
         )
@@ -2237,7 +2211,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                 <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#cbd5e1', marginTop: 6 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>Promo Code Applied</div>
-                  <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: 6, lineHeight: 1.5 }}>You successfully saved ₹100 on your last Deep Cleaning booking!</div>
+                  <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: 6, lineHeight: 1.5 }}>You successfully saved {BOOKING_CURRENCY_SYMBOL}100 on your last Deep Cleaning booking!</div>
                   <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 8, fontWeight: 600 }}>1 week ago</div>
                 </div>
               </div>
@@ -2499,6 +2473,9 @@ export function BookingPage() {
           setCategoriesData(cats)
         }
         if (svcRes.success) {
+          if (svcRes.currency_symbol) {
+            BOOKING_CURRENCY_SYMBOL = svcRes.currency_symbol;
+          }
           const pkgs = {}
           svcRes.data.forEach(s => {
             const cid = s.category.toString()
@@ -2507,7 +2484,7 @@ export function BookingPage() {
               id: s.id.toString(),
               name: s.name,
               price: parseFloat(s.price),
-              priceStr: "₹" + s.price,
+              priceStr: BOOKING_CURRENCY_SYMBOL + s.price,
               duration: s.duration || "1 hr",
               payment_policy: s.payment_policy,
               image: s.image || "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&q=80&fit=crop",
@@ -2716,14 +2693,14 @@ export function BookingPage() {
                             <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: 2 }}>{c.categoryName}</div>
                           </div>
                         </div>
-                        <div style={{ fontWeight: 800, color: '#1e293b' }}>₹{c.price * c.quantity}</div>
+                        <div style={{ fontWeight: 800, color: '#1e293b' }}>{BOOKING_CURRENCY_SYMBOL}{c.price * c.quantity}</div>
                       </div>
                     ))}
 
                     <div style={{ height: 1, background: '#e2e8f0', margin: '0.5rem 0' }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', fontWeight: 800, color: '#1e293b', margin: '0.8rem 0' }}>
                       <span>Total Items : {cart.reduce((a, c) => a + c.quantity, 0)}</span>
-                      <span>Total Price : ₹{cart.reduce((a, c) => a + (c.price * c.quantity), 0)}</span>
+                      <span>Total Price : {BOOKING_CURRENCY_SYMBOL}{cart.reduce((a, c) => a + (c.price * c.quantity), 0)}</span>
                     </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
@@ -2855,7 +2832,7 @@ export function BookingPage() {
               <div className="uc-step-container">
                 <StepConfirm
                   category={category}
-                  pkg={cart[0] || { name: "Multiple Items", priceStr: "₹" + cart.reduce((a, c) => a + (c.price * c.quantity), 0) }}
+                  pkg={cart[0] || { name: "Multiple Items", priceStr: BOOKING_CURRENCY_SYMBOL + cart.reduce((a, c) => a + (c.price * c.quantity), 0) }}
                   cart={cart}
                   date={selDate}
                   time={selTime}
@@ -2900,7 +2877,7 @@ export function BookingPage() {
 function PackageModal({ category, cart, setCart, onClose, onCheckout, packagesData }) {
   const [activeTab, setActiveTab] = useState(0)
   const [activeFilter, setActiveFilter] = useState("All")
-  const packages = (packagesData && packagesData[category?.id]) || PACKAGES[category?.id] || []
+  const packages = ((packagesData && packagesData[category?.id]) || PACKAGES[category?.id] || []).map(p => ({ ...p, priceStr: BOOKING_CURRENCY_SYMBOL + p.price }))
   const relatedServices = packages.slice(0, 4);
 
   const filteredPackages = packages.filter(p => {
@@ -3016,7 +2993,7 @@ function PackageModal({ category, cart, setCart, onClose, onCheckout, packagesDa
                   />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b', lineHeight: 1.2, marginBottom: '0.2rem' }}>{s.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>{s.priceStr || '₹499'} • {s.duration || '1 hr'}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>{s.priceStr || (BOOKING_CURRENCY_SYMBOL + '499')} • {s.duration || '1 hr'}</div>
 
                     {getCartCount(s.id) > 0 ? (
                       <div className="uc-swiggy-qty" style={{ width: 80, height: 28, fontSize: '0.8rem' }}>
@@ -3063,7 +3040,7 @@ function PackageModal({ category, cart, setCart, onClose, onCheckout, packagesDa
           >
             <div className="uc-cart-bar-left">
               <span className="uc-cart-bar-items">{cart.reduce((a, c) => a + c.quantity, 0)} items</span>
-              <span className="uc-cart-bar-price">₹{cart.reduce((a, c) => a + (c.price * c.quantity), 0)}</span>
+              <span className="uc-cart-bar-price">{BOOKING_CURRENCY_SYMBOL}{cart.reduce((a, c) => a + (c.price * c.quantity), 0)}</span>
             </div>
             <button className="uc-cart-bar-btn" onClick={onCheckout}>
               Proceed to Checkout <ChevronRight size={16} />

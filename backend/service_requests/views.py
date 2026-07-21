@@ -81,12 +81,27 @@ class CatalogServiceListView(APIView):
     def get(self, request):
         from .models import CatalogService
         from .serializers import CatalogServiceSerializer
+        from django.db import connection
         cat_id = request.GET.get('category_id')
         qs = CatalogService.objects.all().order_by('name')
         if cat_id:
             qs = qs.filter(category_id=cat_id)
         data = CatalogServiceSerializer(qs, many=True).data
-        return Response({"success": True, "data": data})
+        
+        # Determine currency from company tenant region
+        tenant = getattr(request, 'tenant', None) or getattr(connection, 'tenant', None)
+        currency = "USD"
+        currency_symbol = "$"
+        if tenant and getattr(tenant, 'region', None):
+            currency = tenant.region.currency
+            currency_symbol = tenant.region.currency_symbol
+            
+        return Response({
+            "success": True, 
+            "data": data,
+            "currency": currency,
+            "currency_symbol": currency_symbol
+        })
 
 class BookingCreateView(APIView):
     """

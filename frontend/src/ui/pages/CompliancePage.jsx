@@ -904,10 +904,55 @@ function HealthCard({ title, subtitle, status, detail, children }) {
   )
 }
 
+function IndiaEPFPanel() {
+  return (
+    <Card>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 10, background: "#fffbeb", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Sparkles color="#d97706" size={22} />
+        </div>
+        <div>
+          <h3 style={{ fontSize: 16, fontWeight: 800, color: "var(--fg)" }}>Indian Statutory Compliance Rules</h3>
+          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>EPF, ESIC, Professional Tax, and Gratuity configurations</div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
+        <div style={{ border: "1.5px solid var(--stroke2)", padding: 18, borderRadius: 12, background: "var(--bg)" }}>
+          <div style={{ fontWeight: 800, fontSize: 13, color: "var(--fg)", marginBottom: 12 }}>Employees' Provident Fund (EPF)</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+            <span style={{ fontWeight: 700, color: "var(--fg)" }}>Employee Contribution:</span> 12% of basic salary.<br />
+            <span style={{ fontWeight: 700, color: "var(--fg)" }}>Employer Contribution:</span> 12% of basic salary.<br />
+            <span style={{ fontWeight: 700, color: "var(--fg)" }}>Statutory Cap:</span> Capped at ₹15,000 basic salary per month (Max ₹1,800/month contribution).
+          </div>
+        </div>
+
+        <div style={{ border: "1.5px solid var(--stroke2)", padding: 18, borderRadius: 12, background: "var(--bg)" }}>
+          <div style={{ fontWeight: 800, fontSize: 13, color: "var(--fg)", marginBottom: 12 }}>Employees' State Insurance (ESIC)</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+            <span style={{ fontWeight: 700, color: "var(--fg)" }}>Employee Contribution:</span> 0.75% of gross pay.<br />
+            <span style={{ fontWeight: 700, color: "var(--fg)" }}>Employer Contribution:</span> 3.25% of gross pay.<br />
+            <span style={{ fontWeight: 700, color: "var(--fg)" }}>Eligibility Threshold:</span> Applicable to employees earning gross monthly salary up to ₹21,000.
+          </div>
+        </div>
+
+        <div style={{ border: "1.5px solid var(--stroke2)", padding: 18, borderRadius: 12, background: "var(--bg)" }}>
+          <div style={{ fontWeight: 800, fontSize: 13, color: "var(--fg)", marginBottom: 12 }}>Professional Tax & Gratuity</div>
+          <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+            <span style={{ fontWeight: 700, color: "var(--fg)" }}>Professional Tax (PT):</span> State-level tax, typically ₹200/month.<br />
+            <span style={{ fontWeight: 700, color: "var(--fg)" }}>Gratuity Accrual:</span> 4.81% of basic salary (15 days wage for each year of service).
+          </div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
 function ComplianceOverviewPanel({ onNavigate }) {
   const { user } = useAuth()
   const isUK = user?.company_country === "UK"
   const isUS = user?.company_country === "US"
+  const isIN = user?.company_country === "IN"
 
   const [otData, setOtData]       = useState(null)
   const [wageData, setWageData]   = useState(null)
@@ -970,6 +1015,27 @@ function ComplianceOverviewPanel({ onNavigate }) {
       detail: ukBreaching > 0 ? `${ukBreaching} employee${ukBreaching !== 1 ? "s" : ""} breaching 48hr average` : "All employees within WTR limit",
     },
     {
+      id: "india-ot",
+      title: "Overtime Compliance (India)",
+      subtitle: "Factories Act 48hr weekly / 9hr daily cap",
+      status: "ok",
+      detail: "Double rate (2.0x) applied to overtime hours",
+    },
+    {
+      id: "india-epf",
+      title: "EPF & ESIC (India)",
+      subtitle: "12% EPF (capped at Rs 15000 basic) + ESIC",
+      status: "ok",
+      detail: "Contributions calculated automatically during payroll",
+    },
+    {
+      id: "india-breaks",
+      title: "Break Interval (India)",
+      subtitle: "Interval of rest of at least 30 mins after 5 hours",
+      status: "info",
+      detail: "Enforced at clock-in / clock-out",
+    },
+    {
       id: "breaks",
       title: "Break Compliance",
       subtitle: "CA · WA · OR · CO · IL + UK 11hr rest rule",
@@ -1007,6 +1073,7 @@ function ComplianceOverviewPanel({ onNavigate }) {
   ].filter(c => {
     if (c.id === "uk-wtr" || c.id === "rtw" || c.id === "paye") return isUK
     if (c.id === "flsa") return isUS
+    if (c.id && c.id.startsWith("india-")) return isIN
     return true
   })
 
@@ -1187,6 +1254,7 @@ function ExemptStatusPanel() {
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "flsa",     label: "FLSA & OT" },
+  { id: "india-epf", label: "EPF & ESIC (India)" },
   { id: "breaks",   label: "Break Compliance" },
   { id: "uk-wtr",   label: "UK · WTR" },
   { id: "rtw",      label: "Right to Work" },
@@ -1201,10 +1269,12 @@ export function CompliancePage() {
 
   const isUK = user?.company_country === "UK"
   const isUS = user?.company_country === "US"
+  const isIN = user?.company_country === "IN"
 
   const filteredTabs = TABS.filter(t => {
     if (t.id === "uk-wtr" || t.id === "rtw" || t.id === "paye") return isUK
     if (t.id === "flsa") return isUS
+    if (t.id === "india-epf") return isIN
     return true
   })
 
@@ -1247,7 +1317,7 @@ export function CompliancePage() {
             </h1>
             <div className="flex items-center gap-3 mt-2">
               <span className="text-[10px] professional-subtitle text-[var(--muted)]">
-                US FLSA · UK WTR · PAYE/NI · Right to Work · Audit Trail
+                US FLSA · UK WTR · India Statutory (EPF/ESIC) · Audit Trail
               </span>
             </div>
           </div>
@@ -1294,6 +1364,9 @@ export function CompliancePage() {
 
       {/* Break Compliance tab */}
       {tab === "breaks" && <BreakCompliancePanel />}
+
+      {/* India EPF tab */}
+      {tab === "india-epf" && <IndiaEPFPanel />}
 
       {/* UK WTR tab */}
       {tab === "uk-wtr" && (

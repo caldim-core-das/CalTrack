@@ -9,6 +9,7 @@ import {
   CheckCheck, Ban, Repeat2, ThumbsUp, Send, Copy
 } from "lucide-react"
 import { apiRequest } from "../../api/client.js"
+import { useLocation } from "react-router-dom"
 import { CATEGORY_TO_ROLES_MAP, TECHNICIAN_ROLES } from "../../utils/roles.js"
 
 /* ─── Toast ─────────────────────────────────────────────────────────────── */
@@ -202,6 +203,8 @@ function EmployeePicker({ employees, onAssign, loading }) {
 
 /* ─── Main Component ─────────────────────────────────────────────────────── */
 export function ServiceRequestsPage() {
+  const location = useLocation()
+  const path = location.pathname
   const [requests, setRequests] = useState([])
   const [allRequests, setAllRequests] = useState([])
   const [employees, setEmployees] = useState([])
@@ -360,6 +363,204 @@ export function ServiceRequestsPage() {
   }
 
   /* ── Render ── */
+  /* ── Render ── */
+  if (path === "/customers/list") {
+    const customersData = []
+    const customerMap = {}
+    allRequests.forEach(r => {
+      if (!customerMap[r.customer_name]) {
+        customerMap[r.customer_name] = {
+          name: r.customer_name,
+          email: r.email || "—",
+          phone: r.phone || "—",
+          bookingsCount: 0,
+          totalSpent: 0,
+          lastBookingDate: r.created_at,
+        }
+        customersData.push(customerMap[r.customer_name])
+      }
+      const c = customerMap[r.customer_name]
+      c.bookingsCount++
+      c.totalSpent += parseFloat(r.total_amount || 0)
+      if (new Date(r.created_at) > new Date(c.lastBookingDate)) {
+        c.lastBookingDate = r.created_at
+      }
+    })
+
+    return (
+      <div className="p-6 md:p-8 space-y-6 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen">
+        <SrStyles />
+        <div>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white leading-tight">Customer Directory</h1>
+          <p className="text-xs font-semibold text-slate-500 mt-1">
+            List of registered customers, bookings frequency, and total service spent.
+          </p>
+        </div>
+
+        <div className="bg-surface dark:bg-slate-900/40 rounded-3xl border border-stroke dark:border-slate-800 shadow-sm overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-bg/50 dark:bg-slate-800/30">
+                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-wider">Customer Name</th>
+                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-wider">Contact</th>
+                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-wider">Bookings</th>
+                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-wider">Total Revenue</th>
+                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-wider">Last Booking</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stroke dark:divide-slate-800">
+              {customersData.length > 0 ? (
+                customersData.map((c, i) => (
+                  <tr key={i} className="hover:bg-bg/20 dark:hover:bg-slate-800/10 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 flex items-center justify-center font-bold">
+                          {c.name.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="font-bold text-slate-800 dark:text-slate-200">{c.name}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-xs">
+                      <div>📧 {c.email}</div>
+                      <div className="text-slate-400 mt-0.5">📞 {c.phone}</div>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-bold">{c.bookingsCount} bookings</td>
+                    <td className="px-6 py-4 text-xs font-extrabold text-slate-800 dark:text-slate-200">₹{c.totalSpent.toLocaleString("en-IN")}</td>
+                    <td className="px-6 py-4 text-xs text-slate-500">{new Date(c.lastBookingDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="p-8 text-center text-slate-400 italic text-sm">No customers registered yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  if (path === "/customers/payments") {
+    const paidRequests = allRequests.filter(r => r.payment_status === "paid")
+    const totalCollected = paidRequests.reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0)
+    const totalPending = allRequests.filter(r => ["pending", "processing"].includes(r.payment_status)).reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0)
+
+    return (
+      <div className="p-6 md:p-8 space-y-6 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen">
+        <SrStyles />
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white leading-tight">Customer Payments Ledger</h1>
+            <p className="text-xs font-semibold text-slate-500 mt-1">
+              Verify client transactions, booking bills, and collected revenue details.
+            </p>
+          </div>
+        </div>
+
+        {/* Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-6 bg-surface dark:bg-slate-900/40 rounded-3xl border border-stroke dark:border-slate-800 shadow-sm">
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total Revenue Collected</span>
+            <h2 className="text-3xl font-black text-slate-900 dark:text-white mt-2">₹{totalCollected.toLocaleString("en-IN")}</h2>
+          </div>
+          <div className="p-6 bg-surface dark:bg-slate-900/40 rounded-3xl border border-stroke dark:border-slate-800 shadow-sm">
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Pending Payments</span>
+            <h2 className="text-3xl font-black text-slate-900 dark:text-white mt-2">₹{totalPending.toLocaleString("en-IN")}</h2>
+          </div>
+          <div className="p-6 bg-surface dark:bg-slate-900/40 rounded-3xl border border-stroke dark:border-slate-800 shadow-sm">
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Transactions Count</span>
+            <h2 className="text-3xl font-black text-slate-900 dark:text-white mt-2">{allRequests.length}</h2>
+          </div>
+        </div>
+
+        <div className="bg-surface dark:bg-slate-900/40 rounded-3xl border border-stroke dark:border-slate-800 shadow-sm overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-bg/50 dark:bg-slate-800/30">
+                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-wider">Transaction ID</th>
+                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-wider">Customer</th>
+                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-wider">Amount</th>
+                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-wider">Method</th>
+                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-4 text-xs font-black text-slate-400 uppercase tracking-wider">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stroke dark:divide-slate-800">
+              {allRequests.length > 0 ? (
+                allRequests.map((r, i) => (
+                  <tr key={i} className="hover:bg-bg/20 dark:hover:bg-slate-800/10 transition-colors">
+                    <td className="px-6 py-4 font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">{r.transaction_id || `TXN-${r.request_id}`}</td>
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-slate-800 dark:text-slate-200">{r.customer_name}</div>
+                      <div className="text-[10px] text-slate-400">{r.email}</div>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-extrabold text-slate-800 dark:text-slate-200">₹{parseFloat(r.total_amount || 0).toLocaleString("en-IN")}</td>
+                    <td className="px-6 py-4 text-xs font-bold">{r.payment_method || "COD"}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                        r.payment_status === "paid" || r.payment_status === "collected" ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"
+                      }`}>
+                        {r.payment_status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-xs text-slate-500">{new Date(r.created_at).toLocaleDateString("en-IN")}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="p-8 text-center text-slate-400 italic text-sm">No transaction records found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  if (path === "/customers/documents") {
+    return (
+      <div className="p-6 md:p-8 space-y-6 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen">
+        <SrStyles />
+        <div>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white leading-tight">Customer Invoice Vault</h1>
+          <p className="text-xs font-semibold text-slate-500 mt-1">
+            Access client billing documents, generated receipt invoices, and proof logs.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {allRequests.map((r) => (
+            <div key={r.id} className="p-5 bg-surface dark:bg-slate-900/40 rounded-3xl border border-stroke dark:border-slate-800 shadow-sm flex flex-col gap-4">
+              <div className="flex justify-between items-start">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600">
+                  <FileText size={20} />
+                </div>
+                <span className="text-[10px] font-mono font-bold text-slate-400">{r.request_id}</span>
+              </div>
+              <div>
+                <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">{r.customer_name}</h3>
+                <p className="text-xs text-slate-500 mt-1 font-semibold">{r.service_category}</p>
+                <div className="text-sm font-extrabold text-slate-800 dark:text-slate-200 mt-2">₹{parseFloat(r.total_amount || 0).toLocaleString("en-IN")}</div>
+              </div>
+              <div className="flex gap-2.5 pt-2 border-t border-stroke dark:border-slate-800">
+                <a
+                  href={`/api/settings/invoices/download/?request_id=${r.id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex-1 text-center py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-500/10"
+                >
+                  Download Invoice
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="sr-root">
       <SrStyles />
