@@ -87,6 +87,18 @@ const ADMIN_NAV_ITEMS = [
       { label: "Reassigned", to: "/tasks?status=reassigned", icon: <ArrowUpRight size={16} />, color: "#8B5CF6" },
     ]
   },
+  {
+    label: "Locations & Tracking",
+    to: "/live-locations",
+    icon: <MapPin size={20} />,
+    color: "#EC4899",
+    adminOnly: true,
+    children: [
+      { label: "Live GPS Map", to: "/live-locations", icon: <Activity size={16} />, color: "#EC4899" },
+      { label: "Work Sites & Geofences", to: "/locations", icon: <MapPin size={16} />, color: "#38BDF8" },
+      { label: "Location Settings", to: "/settings/location", icon: <Settings size={16} />, color: "#64748B" },
+    ]
+  },
   { label: "Organization", to: "/settings/organization", icon: <Globe size={20} />, color: "#38BDF8", adminOnly: true },
   { label: "Reports", to: "/reports", icon: <BarChart3 size={20} />, color: "#FACC15", adminOnly: true },
   { label: "Settings", to: "/settings", icon: <Settings size={20} />, color: "#64748B" },

@@ -394,7 +394,10 @@ class BreakEndView(APIView):
 
 
 class TimesheetView(APIView):
-    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "view")]
+    def get_permissions(self):
+        if self.request.user and getattr(self.request.user, "role", None) == "employee":
+            return [permissions.IsAuthenticated()]
+        return [permissions.IsAuthenticated(), RequireModuleAccess("attendance", "view")]
 
     def get(self, request):
         return self._handle_get(request)

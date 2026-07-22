@@ -391,3 +391,145 @@ def calculate_uk_48hr_average(weekly_hours_list):
         "limit":          limit,
         "headroom_hours": round(max(0, limit - avg), 2),
     }
+
+
+# ---------------------------------------------------------------------------
+# Payroll Config Resolution — Individual > Group > None
+# ---------------------------------------------------------------------------
+
+def get_employee_payroll_config(employee):
+    """
+    Resolves the effective payroll config for an employee.
+    Priority chain:
+      1. Individual EmployeePayrollConfig (employee-specific override)
+      2. Group EmployeePayrollConfig (from employee's payroll_group)
+      3. None (caller uses region defaults)
+
+    Returns: EmployeePayrollConfig instance or None
+    """
+    from payroll.models import EmployeePayrollConfig
+
+    # 1. Check individual config
+    try:
+        config = EmployeePayrollConfig.objects.get(employee=employee)
+        config._source = "individual"
+        return config
+    except EmployeePayrollConfig.DoesNotExist:
+        pass
+
+    # 2. Check group config
+    group = getattr(employee, "payroll_group", None)
+    if group:
+        try:
+            config = EmployeePayrollConfig.objects.get(group=group)
+            config._source = "group"
+            return config
+        except EmployeePayrollConfig.DoesNotExist:
+            pass
+
+    return None
+
+
+# ---------------------------------------------------------------------------
+# India Service Payout Engine
+# ---------------------------------------------------------------------------
+
+def calc_india_service_payout(total_service_revenue, config=None):
+    """
+    Calculate India employee payout from service revenue.
+
+    Args:
+        total_service_revenue: Total ₹ from completed service bookings in period
+        config: EmployeePayrollConfig instance (or None for defaults)
+
+    Returns dict with full breakdown:
+        service_revenue, employee_gross, company_share, platform_fee,
+        pf_deduction, esi_deduction, tds_deduction,
+        total_deductions, net_pay, breakdown_lines[]
+    """
+    revenue = Decimal(str(total_service_revenue))
+
+    # Use config values or defaults
+    emp_pct      = Decimal(str(config.employee_share_pct if config else 80))
+    co_pct       = Decimal(str(config.company_share_pct  if config else 10))
+    plat_type    = getattr(config, "platform_fee_type", "percentage") if config else "percentage"
+    plat_val     = Decimal(str(config.platform_fee_value if config else 5))
+    pf_enabled   = config.pf_enabled   if config else True
+    pf_pct       = Decimal(str(config.pf_pct   if config else 12))
+    esi_enabled  = config.esi_enabled  if config else True
+    esi_pct      = Decimal(str(config.esi_pct  if config else Decimal("0.75")))
+    tds_enabled  = config.tds_enabled  if config else False
+    tds_rate     = Decimal(str(config.tds_rate if config else 10))
+
+    # ── Revenue split ──────────────────────────────────────────────────────
+    employee_gross = (revenue * emp_pct / Decimal("100")).quantize(Decimal("0.01"))
+    company_share  = (revenue * co_pct  / Decimal("100")).quantize(Decimal("0.01"))
+
+    if plat_type == "fixed":
+        platform_fee = plat_val.quantize(Decimal("0.01"))
+    else:
+        platform_fee = (revenue * plat_val / Decimal("100")).quantize(Decimal("0.01"))
+
+    # ── Statutory deductions from employee_gross ───────────────────────────
+    pf_deduction  = (employee_gross * pf_pct  / Decimal("100")).quantize(Decimal("0.01")) if pf_enabled  else Decimal("0")
+    esi_deduction = (employee_gross * esi_pct / Decimal("100")).quantize(Decimal("0.01")) if esi_enabled else Decimal("0")
+    tds_deduction = (employee_gross * tds_rate / Decimal("100")).quantize(Decimal("0.01")) if tds_enabled else Decimal("0")
+
+    # ── Custom deductions/bonuses ──────────────────────────────────────────
+    custom_deduction_total = Decimal("0")
+    custom_bonus_total     = Decimal("0")
+    custom_lines = []
+
+    if config:
+        for item in (config.custom_deductions or []):
+            if not item.get("enabled", True):
+                continue
+            val = Decimal(str(item.get("value", 0)))
+            if item.get("type") == "percentage":
+                val = (employee_gross * val / Decimal("100")).quantize(Decimal("0.01"))
+            custom_deduction_total += val
+            custom_lines.append({"label": item.get("name", "Deduction"), "amount": float(val), "type": "deduction"})
+
+        for item in (config.custom_bonuses or []):
+            if not item.get("enabled", True):
+                continue
+            val = Decimal(str(item.get("value", 0)))
+            if item.get("type") == "percentage":
+                val = (employee_gross * val / Decimal("100")).quantize(Decimal("0.01"))
+            custom_bonus_total += val
+            custom_lines.append({"label": item.get("name", "Bonus"), "amount": float(val), "type": "bonus"})
+
+    total_deductions = (pf_deduction + esi_deduction + tds_deduction + custom_deduction_total).quantize(Decimal("0.01"))
+    net_pay = (employee_gross - total_deductions + custom_bonus_total).quantize(Decimal("0.01"))
+
+    breakdown_lines = [
+        {"label": "Service Revenue (Total)", "amount": float(revenue), "type": "revenue"},
+        {"label": f"Employee Share ({emp_pct}%)", "amount": float(employee_gross), "type": "earning"},
+        {"label": f"Company Share ({co_pct}%)",  "amount": float(company_share),   "type": "company"},
+        {"label": f"Platform Fee ({'fixed ₹' if plat_type == 'fixed' else str(plat_val) + '%'})",
+         "amount": float(platform_fee), "type": "platform"},
+    ]
+    if pf_enabled:
+        breakdown_lines.append({"label": f"PF Deduction ({pf_pct}%)", "amount": float(pf_deduction), "type": "deduction"})
+    if esi_enabled:
+        breakdown_lines.append({"label": f"ESI Deduction ({esi_pct}%)", "amount": float(esi_deduction), "type": "deduction"})
+    if tds_enabled:
+        breakdown_lines.append({"label": f"TDS ({tds_rate}%)", "amount": float(tds_deduction), "type": "deduction"})
+    breakdown_lines.extend(custom_lines)
+    breakdown_lines.append({"label": "Net Pay", "amount": float(net_pay), "type": "net"})
+
+    return {
+        "service_revenue":       float(revenue),
+        "employee_gross":        float(employee_gross),
+        "company_share":         float(company_share),
+        "platform_fee":          float(platform_fee),
+        "pf_deduction":          float(pf_deduction),
+        "esi_deduction":         float(esi_deduction),
+        "tds_deduction":         float(tds_deduction),
+        "custom_deductions":     float(custom_deduction_total),
+        "custom_bonuses":        float(custom_bonus_total),
+        "total_deductions":      float(total_deductions),
+        "net_pay":               float(net_pay),
+        "breakdown":             breakdown_lines,
+        "config_source":         getattr(config, "_source", "default") if config else "default",
+    }

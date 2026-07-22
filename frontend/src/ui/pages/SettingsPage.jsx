@@ -9,7 +9,7 @@ import {
   User, Shield, Palette, Bell, CreditCard, Users2, Plug,
   Building2, Database, AlertTriangle, ShieldCheck, RefreshCcw,
   CheckCircle2, X, Save, ChevronRight, FileText, Calendar,
-  Info, XCircle,
+  Info, XCircle, Banknote, MapPin,
 } from "lucide-react"
 
 /* ── Lazy section imports ─────────────────────────────────────── */
@@ -31,6 +31,8 @@ const PrivacyDataSection = lazy(() => import("./settings/PrivacyDataSection.jsx"
 const DangerZoneSection = lazy(() => import("./settings/DangerZoneSection.jsx"))
 const AccessControlSection = lazy(() => import("./settings/AccessControlSection.jsx"))
 const CatalogSettingsSection = lazy(() => import("./settings/CatalogSettingsSection.jsx"))
+const PayrollSettingsSection = lazy(() => import("./settings/PayrollSettingsSection.jsx").then(m => ({ default: m.PayrollSettingsSection })))
+const LocationsSettingsSection = lazy(() => import("./LocationsSettingsPage.jsx").then(m => ({ default: m.LocationsSettingsPage })))
 
 /* ── Helpers ─────────────────────────────────────────────────── */
 function Toast({ message, type = "success", onDismiss }) {
@@ -180,6 +182,20 @@ const TABS = [
     to: routes.settings_rbac,
   },
   {
+    id: "payroll",
+    label: "Payroll Settings",
+    subtitle: "Configure payroll groups, employee pay rules, and region-specific compliance.",
+    icon: <Banknote size={15} />,
+    adminOnly: true,
+  },
+  {
+    id: "location",
+    label: "Locations & Geofencing",
+    subtitle: "Manage work sites, office locations, GPS boundaries, and geofence radius.",
+    icon: <MapPin size={15} />,
+    adminOnly: true,
+  },
+  {
     id: "danger",
     label: "Danger Zone",
     subtitle: "Transfer ownership, delete workspace, and irreversible actions.",
@@ -290,6 +306,8 @@ export function SettingsPage({ section: sectionProp }) {
               {activeSection === "organization" && <WorkspaceSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "data" && <PrivacyDataSection showToast={showToast} SectionHeader={SectionHeader} />}
               {activeSection === "catalog" && <CatalogSettingsSection showToast={showToast} SectionHeader={SectionHeader} />}
+              {activeSection === "payroll" && <PayrollSettingsSection SectionHeader={SectionHeader} />}
+              {activeSection === "location" && <LocationsSettingsSection />}
               {activeSection === "rbac" && <AccessControlSection />}
               {activeSection === "danger" && <DangerZoneSection showToast={showToast} SectionHeader={SectionHeader} />}
             </Suspense>

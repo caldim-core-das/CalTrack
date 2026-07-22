@@ -44,7 +44,13 @@ class Employee(models.Model):
     state = models.CharField(max_length=100, blank=True, null=True)
     department = models.CharField(max_length=100, blank=True, null=True)
     currency = models.CharField(max_length=10, blank=True, null=True)
-    payroll_group = models.CharField(max_length=100, blank=True, null=True)
+    payroll_group = models.ForeignKey(
+        'payroll.PayrollGroup',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="employees",
+        help_text="Payroll group for bulk config — individual config overrides this"
+    )
     tax_category = models.CharField(max_length=100, blank=True, null=True)
     bank_details = models.JSONField(default=dict, blank=True)
     service_roles = models.JSONField(default=list, blank=True)

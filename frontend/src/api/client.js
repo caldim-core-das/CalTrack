@@ -64,8 +64,23 @@ export async function apiRequest(path, init = {}, attemptRefresh = true) {
 }
 
 async function _executeRequest(path, init = {}, attemptRefresh = true) {
+  const method = (init.method || "GET").toUpperCase()
   const headers = new Headers(init.headers ?? {})
-  if (!headers.has("Content-Type") && init.json !== undefined) {
+  let body = init.body
+
+  if (init.json !== undefined) {
+    body = JSON.stringify(init.json)
+    if (!headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json")
+    }
+  } else if (body && typeof body === "object" && !(body instanceof FormData) && !(body instanceof Blob) && !(body instanceof ArrayBuffer)) {
+    body = JSON.stringify(body)
+    if (!headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json")
+    }
+  } else if (body instanceof FormData) {
+    headers.delete("Content-Type")
+  } else if (["POST", "PUT", "PATCH"].includes(method) && !headers.has("Content-Type") && !(body instanceof FormData) && !(body instanceof Blob)) {
     headers.set("Content-Type", "application/json")
   }
 
@@ -75,7 +90,7 @@ async function _executeRequest(path, init = {}, attemptRefresh = true) {
       credentials: "include",               // always send auth cookies
       cache: "no-store",                    // prevent aggressive browser caching
       headers,
-      body: init.json !== undefined ? JSON.stringify(init.json) : init.body,
+      body,
     })
 
     // 401 — try a silent token refresh then replay the original request once

@@ -423,26 +423,41 @@ export function EmployeeInvoiceHubModal({ record, autoPrint = false, onClose, in
     }
   }
 
-  // Breakdown items
-  const invoiceItems = [
-    { desc: "Regular Hours worked", hours: record.regular_hours, rate: record.hourly_rate, total: Number(record.regular_hours || 0) * Number(record.hourly_rate || 0) },
-    Number(record.overtime_hours) > 0 && { desc: "Overtime hours (1.5× rate)", hours: record.overtime_hours, rate: Number(record.hourly_rate) * 1.5, total: Number(record.overtime_hours) * Number(record.hourly_rate) * 1.5 },
-    Number(record.daily_ot_hours) > 0 && { desc: "Daily Overtime (1.5× rate)", hours: record.daily_ot_hours, rate: Number(record.hourly_rate) * 1.5, total: Number(record.daily_ot_hours) * Number(record.hourly_rate) * 1.5 },
-    Number(record.double_time_hours) > 0 && { desc: "Double Time hours (2× rate)", hours: record.double_time_hours, rate: Number(record.hourly_rate) * 2, total: Number(record.double_time_hours) * Number(record.hourly_rate) * 2 },
-    Number(record.paid_leave_hours) > 0 && { desc: "Paid Leave coverage", hours: record.paid_leave_hours, rate: record.hourly_rate, total: Number(record.paid_leave_hours) * Number(record.hourly_rate) },
-  ].filter(Boolean)
+  // Breakdown items based on Payroll Settings
+  const bd = record.breakdown || {}
+  const isIndiaRecord = isIN || record.employee_country === "IN" || record.currency === "INR" || record.country === "India"
 
-  const epfVal = record.extras?.india_epf_employee
-  const esicVal = record.extras?.india_esic_employee
-  const ptVal = record.extras?.india_professional_tax
+  const invoiceItems = isIndiaRecord
+    ? (bd.breakdown
+        ? bd.breakdown.filter(b => b.type === "revenue" || b.type === "earning" || b.type === "bonus").map(b => ({ desc: b.label, hours: "—", rate: "—", total: b.amount }))
+        : [
+            { desc: "Service Revenue", hours: "—", rate: "—", total: bd.service_revenue || record.gross_salary || 0 },
+            { desc: "Employee Share", hours: "—", rate: "—", total: bd.employee_gross || record.gross_salary || 0 },
+          ])
+    : [
+        { desc: "Regular Hours worked", hours: record.regular_hours, rate: record.hourly_rate, total: Number(record.regular_hours || 0) * Number(record.hourly_rate || 0) },
+        Number(record.overtime_hours) > 0 && { desc: "Overtime hours (1.5× rate)", hours: record.overtime_hours, rate: Number(record.hourly_rate) * 1.5, total: Number(record.overtime_hours) * Number(record.hourly_rate) * 1.5 },
+        Number(record.daily_ot_hours) > 0 && { desc: "Daily Overtime (1.5× rate)", hours: record.daily_ot_hours, rate: Number(record.hourly_rate) * 1.5, total: Number(record.daily_ot_hours) * Number(record.hourly_rate) * 1.5 },
+        Number(record.double_time_hours) > 0 && { desc: "Double Time hours (2× rate)", hours: record.double_time_hours, rate: Number(record.hourly_rate) * 2, total: Number(record.double_time_hours) * Number(record.hourly_rate) * 2 },
+        Number(record.paid_leave_hours) > 0 && { desc: "Paid Leave coverage", hours: record.paid_leave_hours, rate: record.hourly_rate, total: Number(record.paid_leave_hours) * Number(record.hourly_rate) },
+      ].filter(Boolean)
 
-  const deductionItems = [
-    Number(record.uk_income_tax) > 0 && { desc: "Income Tax (PAYE)", total: record.uk_income_tax },
-    Number(record.uk_employee_ni) > 0 && { desc: "National Insurance (EE)", total: record.uk_employee_ni },
-    isIN && epfVal > 0 && { desc: "Employees' Provident Fund (EPF)", total: epfVal },
-    isIN && esicVal > 0 && { desc: "Employees' State Insurance (ESIC)", total: esicVal },
-    isIN && ptVal > 0 && { desc: "Professional Tax (PT)", total: ptVal },
-  ].filter(Boolean)
+  const epfVal = record.extras?.india_epf_employee || bd.pf_deduction
+  const esicVal = record.extras?.india_esic_employee || bd.esi_deduction
+  const ptVal = record.extras?.india_professional_tax || bd.tds_deduction
+
+  const deductionItems = isIndiaRecord
+    ? (bd.breakdown
+        ? bd.breakdown.filter(b => b.type === "deduction").map(b => ({ desc: b.label, total: b.amount }))
+        : [
+            Number(epfVal) > 0 && { desc: "Employees' Provident Fund (PF)", total: epfVal },
+            Number(esicVal) > 0 && { desc: "Employees' State Insurance (ESI)", total: esicVal },
+            Number(ptVal) > 0 && { desc: "Tax Deducted at Source (TDS)", total: ptVal },
+          ].filter(Boolean))
+    : [
+        Number(record.uk_income_tax) > 0 && { desc: "Income Tax (PAYE)", total: record.uk_income_tax },
+        Number(record.uk_employee_ni) > 0 && { desc: "National Insurance (EE)", total: record.uk_employee_ni },
+      ].filter(Boolean)
 
   const printStyle = `
     /* Custom Scrollbars for Invoice Studio */
@@ -1195,7 +1210,7 @@ export function EmployeeInvoiceHubModal({ record, autoPrint = false, onClose, in
                       {record.wage_floor_compliant ? "WAGE COMPLIANT" : "WAGE EXEMPT"}
                     </div>
                     <div style={{ fontSize: 11, color: colors.paperTextMuted, marginTop: 16 }}>
-                      <div><strong style={{ color: colors.paperText }}>Invoice No:</strong> INV-{record.id?.slice(-6).toUpperCase() || "PAYROLL"}</div>
+                      <div><strong style={{ color: colors.paperText }}>Invoice No:</strong> INV-{String(record.id || "").slice(-6).toUpperCase() || "PAYROLL"}</div>
                       <div><strong style={{ color: colors.paperText }}>Period Date:</strong> {record.period?.start_date} → {record.period?.end_date}</div>
                       <div><strong style={{ color: colors.paperText }}>Generated At:</strong> {new Date().toLocaleDateString()}</div>
                     </div>
@@ -1389,7 +1404,7 @@ export function EmployeeInvoiceHubModal({ record, autoPrint = false, onClose, in
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: colors.paperTextMuted, marginTop: 24, fontWeight: 700, borderTop: `1.5px solid ${colors.paperBorder}`, paddingTop: 10 }}>
                 <span>Support: support@caltrack.com</span>
                 <span>Corporate Web: www.caltrack.com</span>
-                <span>System Hash: {record.id?.slice(0, 12) || "SECURE_PAYROLL_DOC"}</span>
+                <span>System Hash: {String(record.id || "").slice(0, 12) || "SECURE_PAYROLL_DOC"}</span>
               </div>
             </div>
 
@@ -1795,34 +1810,57 @@ export function PayrollPage() {
   if (user?.companyCurrencySymbol) {
     window.__currencySymbol = user.companyCurrencySymbol;
   }
+
+  // ── Region detection ──────────────────────────────────────────
+  const rawCountry = user?.companyCountry || user?.company_country || user?.companyRegion || user?.primaryCountry || "US"
+  const orgRegion  = (rawCountry === "IN" || rawCountry === "India") ? "IN" : (rawCountry === "UK" || rawCountry === "United Kingdom") ? "UK" : "US"
+  const isIndia    = orgRegion === "IN"
+  const isUK       = orgRegion === "UK"
+  const regionMeta = {
+    IN: { label: "India",         flag: "🇮🇳", currency: "₹", code: "INR", color: "#f97316", subtitle: "India Region — Service revenue split & statutory deductions (PF, ESI, TDS)." },
+    US: { label: "United States", flag: "🇺🇸", currency: "$", code: "USD", color: "#3b82f6", subtitle: "US Region — FLSA overtime, CA/AK daily OT & hourly payroll." },
+    UK: { label: "United Kingdom",flag: "🇬🇧", currency: "£", code: "GBP", color: "#8b5cf6", subtitle: "UK Region — PAYE Income Tax, National Insurance & WTR holiday accrual." },
+  }
+  const meta = regionMeta[orgRegion] || regionMeta.US
+  const curr = meta.currency
+
   const [records, setRecords] = useState([])
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [selected, setSelected] = useState(null)
-  
+
   const [filterEmp, setFilterEmp] = useState("")
   const [sortField, setSortField] = useState("generated_at")
   const [sortDir, setSortDir] = useState("desc")
-  const [regionFilter, setRegionFilter] = useState(user?.company_country || "all")
   const [hoveredRow, setHoveredRow] = useState(null)
 
   const [dateFilterMode, setDateFilterMode] = useState("all")
   const [filterStartDate, setFilterStartDate] = useState("")
   const [filterEndDate, setFilterEndDate] = useState("")
-  
+
+  // India-specific: month/year vs custom date range picker
+  const now = new Date()
+  const [indiaMonth, setIndiaMonth] = useState(now.getMonth() + 1)
+  const [indiaYear,  setIndiaYear]  = useState(now.getFullYear())
+  const [indiaDateMode, setIndiaDateMode] = useState("month") // "month" | "custom"
+
   const [activeEmployees, setActiveEmployees] = useState([])
   const [loadingActiveEmps, setLoadingActiveEmps] = useState(false)
-  
+
   const [generateEmpId, setGenerateEmpId] = useState("all")
   const [generateRegion, setGenerateRegion] = useState("all")
+
+  // India payroll uses PayrollGeneration (dynamic-generate endpoint)
+  // US/UK payroll uses PayrollRecord (generate endpoint)
 
   async function load() {
     setLoading(true); setError("")
     try {
       const [rRes, eRes] = await Promise.all([
-        apiRequest("/payroll/records/"),
+        // India uses PayrollGeneration records via dynamic-generate API; US/UK use PayrollRecord via records API
+        isIndia ? apiRequest("/payroll/dynamic-generate/") : apiRequest("/payroll/records/"),
         isAdmin ? apiRequest("/employees/") : Promise.resolve({ results: [] }),
       ])
       setRecords(unwrapResults(rRes))
@@ -1906,25 +1944,51 @@ export function PayrollPage() {
     if (e) e.preventDefault()
     setSubmitting(true)
     setError("")
-    
-    if (!filterStartDate || !filterEndDate) {
-      setError("Please select a valid date range to generate payroll.")
-      setSubmitting(false)
-      return
-    }
 
     try {
-      if (generateEmpId === "all") {
-        const toGenerate = activeEmployees.length > 0 ? activeEmployees : employees
-        const results = await Promise.allSettled(toGenerate.map(emp => 
-          apiRequest("/payroll/generate/", { method: "POST", json: { employee: emp.id, start: filterStartDate, end: filterEndDate } })
-        ))
-        const failed = results.filter(r => r.status === "rejected")
-        if (failed.length > 0) {
-          setError(`Generated with ${failed.length} errors. Some records may already exist.`)
+      if (isIndia) {
+        // ── India: service revenue split via india-generate ──────
+        const empIds = generateEmpId === "all"
+          ? employees.map(emp => emp.id)
+          : [parseInt(generateEmpId)]
+
+        const payload = { employee_ids: empIds }
+        if (indiaDateMode === "custom" && filterStartDate && filterEndDate) {
+          payload.start_date = filterStartDate
+          payload.end_date = filterEndDate
+        } else {
+          payload.month = indiaMonth
+          payload.year = indiaYear
+        }
+
+        const res = await apiRequest("/payroll/india-generate/", {
+          method: "POST",
+          json: payload
+        })
+        if (res.errors > 0) {
+          setError(`Generated ${res.generated} records with ${res.errors} errors.`)
+        } else {
+          load()
         }
       } else {
-        await apiRequest("/payroll/generate/", { method: "POST", json: { employee: generateEmpId, start: filterStartDate, end: filterEndDate } })
+        // ── US/UK: hours-based generate ─────────────────────────
+        if (!filterStartDate || !filterEndDate) {
+          setError("Please select a valid date range to generate payroll.")
+          setSubmitting(false)
+          return
+        }
+        if (generateEmpId === "all") {
+          const toGenerate = activeEmployees.length > 0 ? activeEmployees : employees
+          const results = await Promise.allSettled(toGenerate.map(emp =>
+            apiRequest("/payroll/generate/", { method: "POST", json: { employee: emp.id, start: filterStartDate, end: filterEndDate } })
+          ))
+          const failed = results.filter(r => r.status === "rejected")
+          if (failed.length > 0) {
+            setError(`Generated with ${failed.length} errors. Some records may already exist.`)
+          }
+        } else {
+          await apiRequest("/payroll/generate/", { method: "POST", json: { employee: generateEmpId, start: filterStartDate, end: filterEndDate } })
+        }
       }
       await load()
     } catch (err) {
@@ -1936,16 +2000,25 @@ export function PayrollPage() {
 
   const filtered = useMemo(() => {
     let list = [...records]
+
+    // Strictly restrict list to the Organization's region
+    if (isIndia) {
+      list = list.filter(r => (r.country === "India" || r.country === "IN" || r.currency === "INR" || r.employee_country === "IN" || !r.region))
+    } else if (isUK) {
+      list = list.filter(r => (r.region?.toUpperCase().includes("UK") || r.employee_country === "UK" || r.currency === "GBP"))
+    } else {
+      list = list.filter(r => (r.region?.toUpperCase().includes("US") || r.employee_country === "US" || r.currency === "USD" || !r.region))
+    }
+
     if (filterEmp) {
-      list = list.filter(r => r.employee?.toLowerCase().includes(filterEmp.toLowerCase()) || r.employee_name?.toLowerCase().includes(filterEmp.toLowerCase()))
+      list = list.filter(r =>
+        (r.employee && String(r.employee).toLowerCase().includes(filterEmp.toLowerCase())) ||
+        (r.employee_name && String(r.employee_name).toLowerCase().includes(filterEmp.toLowerCase())) ||
+        (r.employee_id_code && String(r.employee_id_code).toLowerCase().includes(filterEmp.toLowerCase()))
+      )
     }
-    if (regionFilter === "US") {
-      list = list.filter(r => r.region?.toUpperCase().includes("US"))
-    } else if (regionFilter === "UK") {
-      list = list.filter(r => r.region?.toUpperCase().includes("UK"))
-    }
-    
-    if (dateFilterMode !== "all" && filterStartDate && filterEndDate) {
+
+    if (!isIndia && dateFilterMode !== "all" && filterStartDate && filterEndDate) {
       list = list.filter(r => {
         const pStart = r.period?.start_date
         const pEnd = r.period?.end_date
@@ -1956,17 +2029,19 @@ export function PayrollPage() {
 
     list.sort((a, b) => {
       let av = a[sortField] ?? "", bv = b[sortField] ?? ""
-      if (sortField === "gross_pay" || sortField === "net_pay") { av = Number(av); bv = Number(bv) }
+      if (sortField === "gross_pay" || sortField === "net_pay" || sortField === "gross_salary" || sortField === "net_salary") {
+        av = Number(av); bv = Number(bv)
+      }
       return sortDir === "asc" ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1)
     })
     return list
-  }, [records, filterEmp, regionFilter, sortField, sortDir, dateFilterMode, filterStartDate, filterEndDate])
+  }, [records, filterEmp, sortField, sortDir, dateFilterMode, filterStartDate, filterEndDate, isIndia, isUK])
 
-  const totalGross = filtered.reduce((s, r) => s + Number(r.gross_pay || 0), 0)
-  const totalNet = filtered.reduce((s, r) => s + Number(r.net_pay || 0), 0)
+  const totalGross  = filtered.reduce((s, r) => s + Number(r.gross_pay || r.gross_salary || 0), 0)
+  const totalNet    = filtered.reduce((s, r) => s + Number(r.net_pay || r.net_salary || 0), 0)
   const totalRegHrs = filtered.reduce((s, r) => s + Number(r.regular_hours || 0), 0)
-  const uniqueEmps = new Set(filtered.map(r => r.employee)).size
-  const flagged = filtered.filter(r => !r.wage_floor_compliant).length
+  const uniqueEmps  = new Set(filtered.map(r => r.employee || r.employee_id_code)).size
+  const flagged     = filtered.filter(r => !r.wage_floor_compliant).length
 
   function toggleSort(f) {
     if (sortField === f) setSortDir(d => d === "asc" ? "desc" : "asc")
@@ -1984,18 +2059,29 @@ export function PayrollPage() {
     background: sortField === field ? (isDark ? "#1f2937" : "#f1f5f9") : "transparent",
   })
 
+  const tableColumns = isIndia
+    ? [["Employee","employee"],["Period","month"],["Service Revenue","gross_salary"],["Emp Share","employee_gross"],["Config","config_source"],["PF","pf"],["ESI","esi"],["TDS","tds"],["Net Pay","net_salary"],["Status","status"]]
+    : [["Employee","employee"],["Period","period"],["Region","region"],["Rate/hr","hourly_rate"],["Gross","gross_pay"],["Net Pay","net_pay"],["Reg Hrs","regular_hours"],["OT Hrs","overtime_hours"],["Daily OT","daily_ot_hours"],["2× Time","double_time_hours"],["Tax","uk_income_tax"],["Emp NI","uk_employee_ni"],["Holiday","holiday_hours_accrued"],["Status","wage_floor_compliant"]]
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: isDark ? "#0B111D" : "#f8fafc", overflow: "auto" }}>
       <div style={{ background: isDark ? "#111827" : "#ffffff", borderBottom: `1.5px solid ${isDark ? "#1f2937" : "#e2e8f0"}`, padding: "18px 32px", position: "relative" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: isDark ? "#1f2937" : "#f5f3ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Banknote size={20} color={isDark ? "#818cf8" : "#4f46e5"} />
-          </div>
-          <div>
-            <h1 style={{ fontSize: 18, fontWeight: 900, color: isDark ? "#f9fafb" : "#0f172a", margin: 0, letterSpacing: "-0.02em" }}>Payroll</h1>
-            <p style={{ color: isDark ? "#9ca3af" : "#64748b", fontSize: 12, fontWeight: 500, margin: 0, marginTop: 1 }}>
-              Transparent pay — regular, overtime, leave, and deductions all reconciled.
-            </p>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: isDark ? "#1f2937" : "#f5f3ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Banknote size={20} color={meta.color} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <h1 style={{ fontSize: 18, fontWeight: 900, color: isDark ? "#f9fafb" : "#0f172a", margin: 0, letterSpacing: "-0.02em" }}>Payroll</h1>
+                <span style={{ fontSize: 11, fontWeight: 800, color: meta.color, background: `${meta.color}15`, border: `1.5px solid ${meta.color}35`, borderRadius: 6, padding: "2px 8px" }}>
+                  {meta.flag} {meta.label} Organization
+                </span>
+              </div>
+              <p style={{ color: isDark ? "#9ca3af" : "#64748b", fontSize: 12, fontWeight: 500, margin: 0, marginTop: 1 }}>
+                {meta.subtitle}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -2008,49 +2094,112 @@ export function PayrollPage() {
         )}
 
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${flagged > 0 ? 5 : 4}, 1fr)`, gap: 12 }}>
-          <KpiCard icon={regionFilter === "UK" ? <span style={{ fontSize: 18, fontWeight: 900, color: "#818cf8" }}>£</span> : <DollarSign size={20} />} label="Total Gross" value={`${regionFilter === "UK" ? "£" : "$"}${totalGross.toFixed(2)}`} sub={regionFilter === "all" ? "All regions" : `${regionFilter} Region`} color="#4f46e5" />
-          <KpiCard icon={regionFilter === "UK" ? <span style={{ fontSize: 18, fontWeight: 900, color: "#34d399" }}>£</span> : <TrendingUp size={20} />} label="Total Net Pay" value={`${regionFilter === "UK" ? "£" : "$"}${totalNet.toFixed(2)}`} sub="After deductions" color="#059669" />
+          <KpiCard
+            icon={<span style={{ fontSize: 18, fontWeight: 900, color: meta.color }}>{curr}</span>}
+            label="Total Gross"
+            value={`${curr}${totalGross.toFixed(2)}`}
+            sub={`${meta.flag} ${meta.label}`}
+            color={meta.color}
+          />
+          <KpiCard
+            icon={<TrendingUp size={20} />}
+            label="Total Net Pay"
+            value={`${curr}${totalNet.toFixed(2)}`}
+            sub="After deductions"
+            color="#059669"
+          />
           <KpiCard icon={<Users size={20} />} label="Employees Paid" value={uniqueEmps} sub={`${filtered.length} records active`} color="#2563eb" />
-          <KpiCard icon={<Clock size={20} />} label="Regular Hours" value={fmtH(totalRegHrs)} sub="Across filtered records" color="#f59e0b" />
+          {isIndia
+            ? <KpiCard icon={<span style={{ fontSize: 14, fontWeight: 900, color: "#f97316" }}>₹</span>} label="Avg Net Pay" value={`₹${uniqueEmps > 0 ? (totalNet / uniqueEmps).toFixed(0) : 0}`} sub="Per employee" color="#f97316" />
+            : <KpiCard icon={<Clock size={20} />} label="Regular Hours" value={fmtH(totalRegHrs)} sub="Across filtered records" color="#f59e0b" />
+          }
           {flagged > 0 && <KpiCard icon={<AlertTriangle size={20} />} label="Wage Violations" value={flagged} sub="Below minimum wage" color="#dc2626" />}
         </div>
 
         {isAdmin && (
           <div style={{ background: isDark ? "#1e293b" : "#ffffff", border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}`, borderRadius: 12, padding: "20px 24px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ background: isDark ? "#312e81" : "#e0e7ff", padding: "8px", borderRadius: "8px" }}>
-                  <Banknote size={18} color={isDark ? "#818cf8" : "#4f46e5"} />
+                  <Banknote size={18} color={meta.color} />
                 </div>
-                <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: isDark ? "#f8fafc" : "#0f172a" }}>Generate Payroll</h2>
+                <div>
+                  <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: isDark ? "#f8fafc" : "#0f172a" }}>
+                    {isIndia ? `Generate Payroll ${meta.flag}` : "Generate Payroll"}
+                  </h2>
+                  {isIndia && (
+                    <div style={{ fontSize: 11, color: isDark ? "#9ca3af" : "#64748b", marginTop: 2 }}>
+                      India service revenue split — uses per-employee config from Payroll Settings
+                    </div>
+                  )}
+                </div>
               </div>
-              <FilterDropdown 
-                options={[
-                  { value: "today", label: "Today" },
-                  { value: "week", label: "This Week" },
-                  { value: "month", label: "This Month" },
-                  { value: "custom", label: "Custom Date Range" },
-                  { value: "all", label: "All Payroll" }
-                ]}
-                value={dateFilterMode}
-                onChange={setDateFilterMode}
-                isDark={isDark}
-              />
+              {isIndia ? (
+                <div style={{ display: "flex", background: isDark ? "#0f172a" : "#f1f5f9", padding: 3, borderRadius: 8, gap: 4, border: `1px solid ${isDark ? "#334155" : "#e2e8f0"}` }}>
+                  <button onClick={() => setIndiaDateMode("month")}
+                    style={{ padding: "5px 14px", borderRadius: 6, fontSize: 11, fontWeight: 800, border: "none", cursor: "pointer", background: indiaDateMode === "month" ? (isDark ? "#1e293b" : "#fff") : "transparent", color: indiaDateMode === "month" ? meta.color : (isDark ? "#94a3b8" : "#64748b"), boxShadow: indiaDateMode === "month" ? "0 1px 3px rgba(0,0,0,0.1)" : "none", transition: "all 0.2s" }}>
+                    🗓️ Monthly
+                  </button>
+                  <button onClick={() => setIndiaDateMode("custom")}
+                    style={{ padding: "5px 14px", borderRadius: 6, fontSize: 11, fontWeight: 800, border: "none", cursor: "pointer", background: indiaDateMode === "custom" ? (isDark ? "#1e293b" : "#fff") : "transparent", color: indiaDateMode === "custom" ? meta.color : (isDark ? "#94a3b8" : "#64748b"), boxShadow: indiaDateMode === "custom" ? "0 1px 3px rgba(0,0,0,0.1)" : "none", transition: "all 0.2s" }}>
+                    📆 Date Range
+                  </button>
+                </div>
+              ) : (
+                <FilterDropdown
+                  options={[
+                    { value: "today", label: "Today" },
+                    { value: "week", label: "This Week" },
+                    { value: "month", label: "This Month" },
+                    { value: "custom", label: "Custom Date Range" },
+                    { value: "all", label: "All Payroll" }
+                  ]}
+                  value={dateFilterMode}
+                  onChange={setDateFilterMode}
+                  isDark={isDark}
+                />
+              )}
             </div>
 
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 24, alignItems: "flex-end" }}>
-              <div style={{ display: "flex", gap: 12, flex: 1, minWidth: 260 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>Start Date</label>
-                  <input type="date" value={filterStartDate} onChange={handleDateChange(setFilterStartDate)}
-                    style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", transition: "all 0.2s" }} className="focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end" }}>
+
+              {/* India: month/year or date range picker */}
+              {isIndia && indiaDateMode === "month" ? (
+                <>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>Month</label>
+                    <select value={indiaMonth} onChange={e => setIndiaMonth(parseInt(e.target.value))}
+                      style={{ padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", cursor: "pointer" }}>
+                      {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m, i) => (
+                        <option key={i+1} value={i+1}>{m}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>Year</label>
+                    <select value={indiaYear} onChange={e => setIndiaYear(parseInt(e.target.value))}
+                      style={{ padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", cursor: "pointer" }}>
+                      {[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                /* Date range (for US/UK or India custom date range) */
+                <div style={{ display: "flex", gap: 12, flex: 1, minWidth: 260 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>Start Date</label>
+                    <input type="date" value={filterStartDate} onChange={handleDateChange(setFilterStartDate)}
+                      style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", transition: "all 0.2s" }} className="focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>End Date</label>
+                    <input type="date" value={filterEndDate} onChange={handleDateChange(setFilterEndDate)}
+                      style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", transition: "all 0.2s" }} className="focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                  </div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>End Date</label>
-                  <input type="date" value={filterEndDate} onChange={handleDateChange(setFilterEndDate)}
-                    style={{ width: "100%", padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", transition: "all 0.2s" }} className="focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
-                </div>
-              </div>
+              )}
 
               <div style={{ flex: 2, minWidth: 280 }}>
                 <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>Target Employee</label>
@@ -2058,14 +2207,14 @@ export function PayrollPage() {
                   <select value={generateEmpId} onChange={e => setGenerateEmpId(e.target.value)}
                     style={{ flex: 1, padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", cursor: "pointer" }}>
                     <option value="all">All Active Employees</option>
-                    {activeEmployees.map(emp => (
+                    {(isIndia ? employees : activeEmployees).map(emp => (
                       <option key={emp.id} value={emp.id} style={{ background: isDark ? "#0f172a" : "#fff" }}>
                         {emp.user?.first_name || emp.user?.username} ({emp.employee_id})
                       </option>
                     ))}
                   </select>
 
-                  {dateFilterMode === "custom" && (
+                  {!isIndia && dateFilterMode === "custom" && (
                     <button onClick={loadActiveEmployees} disabled={loadingActiveEmps || !filterStartDate || !filterEndDate}
                       style={{ padding: "0 16px", background: isDark ? "#334155" : "#f8fafc", color: isDark ? "#cbd5e1" : "#475569", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, transition: "all 0.2s" }}
                       className="hover:bg-slate-200 dark:hover:bg-slate-700">
@@ -2076,11 +2225,15 @@ export function PayrollPage() {
                 </div>
               </div>
 
-              <button onClick={generatePayroll} disabled={submitting || (generateEmpId === "all" && activeEmployees.length === 0)}
-                style={{ padding: "0 24px", background: "#4f46e5", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, boxShadow: "0 2px 6px rgba(79, 70, 229, 0.25)", height: "42px", opacity: (submitting || (generateEmpId === "all" && activeEmployees.length === 0)) ? 0.7 : 1 }}
-                className="hover:bg-indigo-600 transition-colors">
+              <button onClick={generatePayroll} disabled={submitting}
+                style={{ padding: "0 24px", background: isIndia ? "linear-gradient(135deg,#ea580c,#f97316)" : "#4f46e5", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 8, boxShadow: isIndia ? "0 2px 6px rgba(249,115,22,0.3)" : "0 2px 6px rgba(79,70,229,0.25)", height: "42px", opacity: submitting ? 0.7 : 1 }}
+                className="hover:opacity-90 transition-opacity">
                 {submitting ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
-                {generateEmpId === "all" ? "Batch Generate" : "Generate"}
+                {isIndia
+                  ? (indiaDateMode === "custom"
+                      ? `Generate ₹ Payroll — ${filterStartDate || "Start"} → ${filterEndDate || "End"}`
+                      : `Generate ₹ Payroll — ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][indiaMonth-1]} ${indiaYear}`)
+                  : (generateEmpId === "all" ? "Batch Generate" : "Generate")}
               </button>
             </div>
           </div>
@@ -2089,16 +2242,15 @@ export function PayrollPage() {
         <div style={{ background: isDark ? "#111827" : "#fff", border: `1px solid ${isDark ? "#1f2937" : "#e2e8f0"}`, borderRadius: 16, boxShadow: isDark ? "0 4px 20px rgba(0,0,0,0.2)" : "0 2px 12px rgba(0,0,0,0.01)", overflow: "hidden" }}>
           <div style={{ padding: "16px 20px", borderBottom: `1px solid ${isDark ? "#1f2937" : "#f1f5f9"}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: isDark ? "#f9fafb" : "#0f172a", display: "flex", alignItems: "center", gap: 8 }}>
-              <FileText size={15} style={{ color: isDark ? "#818cf8" : "#4f46e5" }} /> Payroll Records
+              <FileText size={15} style={{ color: meta.color }} /> Payroll Records
               <span style={{ fontSize: 10, background: isDark ? "#312e81" : "#ede9fe", color: isDark ? "#c084fc" : "#7c3aed", fontWeight: 800, padding: "2px 8px", borderRadius: 6 }}>{filtered.length}</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <select value={regionFilter} onChange={e => setRegionFilter(e.target.value)}
-                style={{ padding: "6px 12px", border: `1px solid ${isDark ? "#374151" : "#cbd5e1"}`, borderRadius: 8, fontSize: 12, color: isDark ? "#f9fafb" : "#0f172a", background: isDark ? "#1f2937" : "#fff", outline: "none", fontWeight: 600, cursor: "pointer" }}>
-                <option value="all" style={{ background: isDark ? "#1f2937" : "#fff" }}>🌐 All Regions</option>
-                <option value="US" style={{ background: isDark ? "#1f2937" : "#fff" }}>🇺🇸 US Payroll</option>
-                <option value="UK" style={{ background: isDark ? "#1f2937" : "#fff" }}>🇬🇧 UK Payroll</option>
-              </select>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {/* Region-locked badge (no dropdown switching) */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 8, background: `${meta.color}15`, border: `1.5px solid ${meta.color}35`, fontSize: 12, fontWeight: 800, color: meta.color }}>
+                <span>{meta.flag}</span>
+                <span>{meta.label} Payroll ({meta.code})</span>
+              </div>
               <input placeholder="Search employee…" value={filterEmp} onChange={e => setFilterEmp(e.target.value)}
                 style={{ padding: "6px 12px", border: `1px solid ${isDark ? "#374151" : "#cbd5e1"}`, borderRadius: 8, fontSize: 12, color: isDark ? "#f9fafb" : "#0f172a", background: isDark ? "#1f2937" : "#fff", outline: "none", width: 160 }} />
             </div>
@@ -2117,14 +2269,7 @@ export function PayrollPage() {
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ borderBottom: `1.5px solid ${isDark ? "#1f2937" : "#f1f5f9"}` }}>
-                    {[
-                      ["Employee", "employee"], ["Period", "period"], ["Region", "region"],
-                      ["Rate/hr", "hourly_rate"], ["Gross", "gross_pay"], ["Net Pay", "net_pay"],
-                      ["Reg Hrs", "regular_hours"], ["OT Hrs", "overtime_hours"],
-                      ["Daily OT", "daily_ot_hours"], ["2× Time", "double_time_hours"],
-                      ["Tax", "uk_income_tax"], ["Emp NI", "uk_employee_ni"], ["Holiday", "holiday_hours_accrued"],
-                      ["Status", "wage_floor_compliant"],
-                    ].map(([lbl, field]) => (
+                    {tableColumns.map(([lbl, field]) => (
                       <th key={field} style={thStyle(field)} onClick={() => toggleSort(field)}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{lbl} <SortIcon field={field} /></span>
                       </th>
@@ -2133,93 +2278,141 @@ export function PayrollPage() {
                 </thead>
                 <tbody>
                   {filtered.map(r => {
-                    let curr = "$"
+                    let rowCurr = curr
                     if (r.employee_currency) {
                       const cMap = { INR: "₹", GBP: "£", EUR: "€", SGD: "S$", AED: "د.إ", USD: "$" }
-                      curr = cMap[r.employee_currency] || r.employee_currency + " "
+                      rowCurr = cMap[r.employee_currency] || r.employee_currency + " "
+                    } else if (r.currency) {
+                      const cMap = { INR: "₹", GBP: "£", EUR: "€", USD: "$" }
+                      rowCurr = cMap[r.currency] || curr
                     } else if (r.employee_country) {
                       const cMap = { IN: "₹", UK: "£", DE: "€", SG: "S$", AE: "د.إ", US: "$" }
-                      curr = cMap[r.employee_country] || "$"
+                      rowCurr = cMap[r.employee_country] || curr
                     } else if (r.region?.includes("UK")) {
-                      curr = "£"
+                      rowCurr = "£"
                     }
-                    const isUK = r.region?.includes("UK") || r.employee_country === "UK"
-                    
+                    const rowIsUK = r.region?.includes("UK") || r.employee_country === "UK"
+
+                    // India breakdown fields from breakdown JSON
+                    const bd = r.breakdown || {}
+                    const empShare  = bd.employee_gross ?? r.gross_salary ?? r.gross_pay
+                    const pfAmt     = bd.pf_deduction  ?? 0
+                    const esiAmt    = bd.esi_deduction ?? 0
+                    const tdsAmt    = bd.tds_deduction ?? 0
+                    const netAmt    = bd.net_pay ?? r.net_salary ?? r.net_pay
+                    const svcRev    = bd.service_revenue ?? r.gross_salary ?? r.gross_pay
+                    const cfgSrc    = r.config_snapshot?.source || bd.config_source || "default"
+                    const cfgColor  = cfgSrc === "individual" ? "#4f46e5" : cfgSrc === "group" ? "#16a34a" : "#64748b"
+                    const cfgLabel  = cfgSrc === "individual" ? "INDIVIDUAL" : cfgSrc === "group" ? "GROUP" : "DEFAULT"
+
+                    // Period display for India (date range if available, else month/year)
+                    const periodDisplay = isIndia
+                      ? (bd.start_date && bd.end_date
+                          ? `${bd.start_date} → ${bd.end_date}`
+                          : `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][(r.month||1)-1]} ${r.year || ""}`)
+                      : null
+
                     return (
                       <tr key={r.id} onClick={() => setSelected(r)}
                         style={{ borderBottom: `1px solid ${isDark ? "#1f2937" : "#f1f5f9"}`, cursor: "pointer", transition: "background 0.15s" }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.background = isDark ? "#1f2937" : "#f8fafc"
-                          setHoveredRow(r.id)
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.background = "transparent"
-                          setHoveredRow(null)
-                        }}>
+                        onMouseEnter={e => { e.currentTarget.style.background = isDark ? "#1f2937" : "#f8fafc"; setHoveredRow(r.id) }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "transparent"; setHoveredRow(null) }}>
+
+                        {/* Employee */}
                         <td style={{ padding: "14px 14px" }}>
-                          <div style={{ fontSize: 13, fontWeight: 900, color: isDark ? "#f9fafb" : "#0f172a" }}>{fmtId(r.employee)}</div>
+                          <div style={{ fontSize: 13, fontWeight: 900, color: isDark ? "#f9fafb" : "#0f172a" }}>{fmtId(r.employee || r.employee_id_code)}</div>
                           <div style={{ fontSize: 10, fontWeight: 700, color: isDark ? "#6b7280" : "#94a3b8", textTransform: "uppercase", marginTop: 2 }}>{r.employee_name}</div>
                         </td>
-                        <td style={{ padding: "14px 14px" }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b", whiteSpace: "nowrap" }}>{r.period?.start_date}</div>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b" }}>{r.period?.end_date}</div>
-                        </td>
-                        <td style={{ padding: "14px 14px" }}>
-                          <span style={{ fontSize: 10, fontWeight: 800, color: isDark ? "#818cf8" : "#4f46e5", textTransform: "uppercase", letterSpacing: "0.06em" }}>{r.employee_country || r.region || "—"}</span>
-                          {r.is_exempt && <div style={{ fontSize: 9, fontWeight: 800, color: isDark ? "#34d399" : "#059669", textTransform: "uppercase", marginTop: 2 }}>FLSA EXEMPT</div>}
-                        </td>
-                        <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b" }}>{fmt(r.hourly_rate, curr)}</td>
-                        <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 13, fontWeight: 900, color: isDark ? "#f9fafb" : "#0f172a" }}>{fmt(r.gross_pay, curr)}</td>
-                        <td style={{ padding: "14px 14px", textAlign: "right" }}>
-                          <span style={{ fontSize: 13, fontWeight: 900, color: isDark ? "#34d399" : "#059669", background: isDark ? "rgba(52,211,153,0.1)" : "#ecfdf5", padding: "4px 10px", borderRadius: 8 }}>{fmt(r.net_pay, curr)}</span>
-                        </td>
-                        <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isDark ? "#cbd5e1" : "#475569" }}>{fmtH(r.regular_hours)}</td>
-                        <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 800, color: Number(r.overtime_hours) > 0 ? "#d97706" : (isDark ? "#4b5563" : "#cbd5e1") }}>{fmtH(r.overtime_hours)}</td>
-                        <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 800, color: Number(r.daily_ot_hours) > 0 ? "#ea580c" : (isDark ? "#4b5563" : "#cbd5e1") }}>
-                          {Number(r.daily_ot_hours) > 0 ? fmtH(r.daily_ot_hours) : "—"}
-                        </td>
-                        <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 800, color: Number(r.double_time_hours) > 0 ? "#dc2626" : (isDark ? "#4b5563" : "#cbd5e1") }}>
-                          {Number(r.double_time_hours) > 0 ? fmtH(r.double_time_hours) : "—"}
-                        </td>
-                        <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b" }}>
-                          {isUK && Number(r.uk_income_tax) > 0 ? fmt(r.uk_income_tax, "£") : (r.employee_country === "IN" && Number(r.extras?.india_professional_tax) > 0 ? fmt(r.extras.india_professional_tax, "₹") : "—")}
-                        </td>
-                        <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b" }}>
-                          {isUK && Number(r.uk_employee_ni) > 0 ? fmt(r.uk_employee_ni, "£") : (r.employee_country === "IN" && Number(r.extras?.india_epf_employee) > 0 ? fmt(r.extras.india_epf_employee, "₹") : "—")}
-                        </td>
-                        <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: Number(r.holiday_hours_accrued) > 0 ? (isDark ? "#34d399" : "#059669") : (isDark ? "#4b5563" : "#cbd5e1") }}>
-                          {Number(r.holiday_hours_accrued) > 0 ? fmtH(r.holiday_hours_accrued) : "—"}
-                        </td>
-                        <td style={{ padding: "14px 14px", textAlign: "center", position: "relative" }}>
-                          {r.wage_floor_compliant
-                            ? <CheckCircle2 size={16} style={{ color: isDark ? "#34d399" : "#059669" }} />
-                            : <span style={{ fontSize: 9, fontWeight: 800, background: isDark ? "rgba(220,38,38,0.1)" : "#fef2f2", color: "#dc2626", border: `1px solid ${isDark ? "rgba(220,38,38,0.2)" : "#fecaca"}`, padding: "3px 8px", borderRadius: 5, textTransform: "uppercase" }}>MIN WAGE ⚠</span>}
 
-                          {hoveredRow === r.id && (
-                            <div style={{
-                              position: "absolute",
-                              right: "14px",
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
-                              color: "#fff",
-                              padding: "4px 10px",
-                              borderRadius: 8,
-                              fontSize: 10,
-                              fontWeight: 800,
-                              whiteSpace: "nowrap",
-                              boxShadow: "0 4px 12px rgba(79, 70, 229, 0.25)",
-                              zIndex: 10,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 5,
-                              pointerEvents: "none",
-                              animation: "fadeInLeft 0.15s ease-out"
-                            }}>
-                              <Eye size={10} /> View Invoice
-                            </div>
-                          )}
-                        </td>
+                        {isIndia ? (
+                          <>
+                            {/* Period: date range or month/year */}
+                            <td style={{ padding: "14px 14px", fontSize: 11, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b", whiteSpace: "nowrap" }}>{periodDisplay}</td>
+                            {/* Service Revenue */}
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 13, fontWeight: 900, color: isDark ? "#f9fafb" : "#0f172a" }}>₹{Number(svcRev||0).toFixed(2)}</td>
+                            {/* Employee Share */}
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 13, fontWeight: 900, color: isDark ? "#34d399" : "#059669", background: isDark ? "rgba(52,211,153,0.05)" : "#f0fdf4" }}>
+                              ₹{Number(empShare||0).toFixed(2)}
+                            </td>
+                            {/* Config source */}
+                            <td style={{ padding: "14px 14px", textAlign: "center" }}>
+                              <span style={{ fontSize: 9, fontWeight: 800, color: cfgColor, background: `${cfgColor}18`, border: `1px solid ${cfgColor}30`, borderRadius: 5, padding: "2px 7px", textTransform: "uppercase", letterSpacing: "0.05em" }} title={`Applied config source: ${cfgLabel}`}>
+                                {cfgLabel}
+                              </span>
+                            </td>
+                            {/* PF */}
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: Number(pfAmt) > 0 ? "#dc2626" : (isDark ? "#4b5563" : "#cbd5e1") }}>
+                              {Number(pfAmt) > 0 ? `-₹${Number(pfAmt).toFixed(2)}` : "—"}
+                            </td>
+                            {/* ESI */}
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: Number(esiAmt) > 0 ? "#dc2626" : (isDark ? "#4b5563" : "#cbd5e1") }}>
+                              {Number(esiAmt) > 0 ? `-₹${Number(esiAmt).toFixed(2)}` : "—"}
+                            </td>
+                            {/* TDS */}
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: Number(tdsAmt) > 0 ? "#dc2626" : (isDark ? "#4b5563" : "#cbd5e1") }}>
+                              {Number(tdsAmt) > 0 ? `-₹${Number(tdsAmt).toFixed(2)}` : "—"}
+                            </td>
+                            {/* Net Pay */}
+                            <td style={{ padding: "14px 14px", textAlign: "right" }}>
+                              <span style={{ fontSize: 13, fontWeight: 900, color: isDark ? "#34d399" : "#059669", background: isDark ? "rgba(52,211,153,0.1)" : "#ecfdf5", padding: "4px 10px", borderRadius: 8 }}>₹{Number(netAmt||0).toFixed(2)}</span>
+                            </td>
+                            {/* Status */}
+                            <td style={{ padding: "14px 14px", textAlign: "center", position: "relative" }}>
+                              <span style={{ fontSize: 9, fontWeight: 800, background: isDark ? "rgba(52,211,153,0.1)" : "#ecfdf5", color: isDark ? "#34d399" : "#059669", border: `1px solid ${isDark ? "rgba(52,211,153,0.2)" : "#bbf7d0"}`, padding: "3px 8px", borderRadius: 5, textTransform: "uppercase" }}>
+                                {r.status || "Generated"}
+                              </span>
+                              {hoveredRow === r.id && (
+                                <div style={{ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", background: "linear-gradient(135deg,#ea580c,#f97316)", color: "#fff", padding: "4px 10px", borderRadius: 8, fontSize: 10, fontWeight: 800, whiteSpace: "nowrap", boxShadow: "0 4px 12px rgba(249,115,22,0.25)", zIndex: 10, display: "flex", alignItems: "center", gap: 5, pointerEvents: "none", animation: "fadeInLeft 0.15s ease-out" }}>
+                                  <Eye size={10} /> View Payslip
+                                </div>
+                              )}
+                            </td>
+                          </>
+                        ) : (
+                          // US/UK columns
+                          <>
+                            <td style={{ padding: "14px 14px" }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b", whiteSpace: "nowrap" }}>{r.period?.start_date}</div>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b" }}>{r.period?.end_date}</div>
+                            </td>
+                            <td style={{ padding: "14px 14px" }}>
+                              <span style={{ fontSize: 10, fontWeight: 800, color: isDark ? "#818cf8" : "#4f46e5", textTransform: "uppercase", letterSpacing: "0.06em" }}>{r.employee_country || r.region || "—"}</span>
+                              {r.is_exempt && <div style={{ fontSize: 9, fontWeight: 800, color: isDark ? "#34d399" : "#059669", textTransform: "uppercase", marginTop: 2 }}>FLSA EXEMPT</div>}
+                            </td>
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b" }}>{fmt(r.hourly_rate, rowCurr)}</td>
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 13, fontWeight: 900, color: isDark ? "#f9fafb" : "#0f172a" }}>{fmt(r.gross_pay, rowCurr)}</td>
+                            <td style={{ padding: "14px 14px", textAlign: "right" }}>
+                              <span style={{ fontSize: 13, fontWeight: 900, color: isDark ? "#34d399" : "#059669", background: isDark ? "rgba(52,211,153,0.1)" : "#ecfdf5", padding: "4px 10px", borderRadius: 8 }}>{fmt(r.net_pay, rowCurr)}</span>
+                            </td>
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isDark ? "#cbd5e1" : "#475569" }}>{fmtH(r.regular_hours)}</td>
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 800, color: Number(r.overtime_hours) > 0 ? "#d97706" : (isDark ? "#4b5563" : "#cbd5e1") }}>{fmtH(r.overtime_hours)}</td>
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 800, color: Number(r.daily_ot_hours) > 0 ? "#ea580c" : (isDark ? "#4b5563" : "#cbd5e1") }}>
+                              {Number(r.daily_ot_hours) > 0 ? fmtH(r.daily_ot_hours) : "—"}
+                            </td>
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 800, color: Number(r.double_time_hours) > 0 ? "#dc2626" : (isDark ? "#4b5563" : "#cbd5e1") }}>
+                              {Number(r.double_time_hours) > 0 ? fmtH(r.double_time_hours) : "—"}
+                            </td>
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b" }}>
+                              {rowIsUK && Number(r.uk_income_tax) > 0 ? fmt(r.uk_income_tax, "£") : (r.employee_country === "IN" && Number(r.extras?.india_professional_tax) > 0 ? fmt(r.extras.india_professional_tax, "₹") : "—")}
+                            </td>
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b" }}>
+                              {rowIsUK && Number(r.uk_employee_ni) > 0 ? fmt(r.uk_employee_ni, "£") : "—"}
+                            </td>
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 12, fontWeight: 700, color: Number(r.holiday_hours_accrued) > 0 ? (isDark ? "#34d399" : "#059669") : (isDark ? "#4b5563" : "#cbd5e1") }}>
+                              {Number(r.holiday_hours_accrued) > 0 ? fmtH(r.holiday_hours_accrued) : "—"}
+                            </td>
+                            <td style={{ padding: "14px 14px", textAlign: "center", position: "relative" }}>
+                              {r.wage_floor_compliant
+                                ? <CheckCircle2 size={16} style={{ color: isDark ? "#34d399" : "#059669" }} />
+                                : <span style={{ fontSize: 9, fontWeight: 800, background: isDark ? "rgba(220,38,38,0.1)" : "#fef2f2", color: "#dc2626", border: `1px solid ${isDark ? "rgba(220,38,38,0.2)" : "#fecaca"}`, padding: "3px 8px", borderRadius: 5, textTransform: "uppercase" }}>MIN WAGE ⚠</span>}
+                              {hoveredRow === r.id && (
+                                <div style={{ position: "absolute", right: "14px", top: "50%", transform: "translateY(-50%)", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", color: "#fff", padding: "4px 10px", borderRadius: 8, fontSize: 10, fontWeight: 800, whiteSpace: "nowrap", boxShadow: "0 4px 12px rgba(79, 70, 229, 0.25)", zIndex: 10, display: "flex", alignItems: "center", gap: 5, pointerEvents: "none", animation: "fadeInLeft 0.15s ease-out" }}>
+                                  <Eye size={10} /> View Invoice
+                                </div>
+                              )}
+                            </td>
+                          </>
+                        )}
                       </tr>
                     )
                   })}

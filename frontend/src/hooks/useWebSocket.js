@@ -92,7 +92,9 @@ export function useWebSocket(path, { onMessage, onConnect, onDisconnect } = {}) 
       clearTimeout(reconnectRef.current)
       if (wsRef.current) {
         wsRef.current.onclose = null // prevent reconnect on intentional close
-        wsRef.current.close(1000, "component unmounted")
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.close(1000, "component unmounted")
+        }
       }
     }
   }, [connect])
