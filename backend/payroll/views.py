@@ -635,7 +635,9 @@ class PayrollRuleViewSet(viewsets.ModelViewSet):
 class DynamicPayrollGenerateView(APIView):
     def get_permissions(self):
         if self.request.method == 'GET':
-            return [permissions.IsAuthenticated(), IsAdminRole(), RequireModuleAccess("payroll", "view")]
+            if self.request.user and getattr(self.request.user, "role", None) == "employee":
+                return [permissions.IsAuthenticated()]
+            return [permissions.IsAuthenticated(), RequireModuleAccess("payroll", "view")]
         return [permissions.IsAuthenticated(), IsAdminRole(), RequireModuleAccess("payroll", "modify")]
 
     def get(self, request):
@@ -643,7 +645,11 @@ class DynamicPayrollGenerateView(APIView):
         year = request.query_params.get("year")
         country = request.query_params.get("country")
         
-        qs = PayrollGeneration.objects.filter(company=request.company).select_related("employee", "employee__user").order_by("-created_at")
+        qs = PayrollGeneration.objects.filter(company=request.company).select_related("employee", "employee__user").order_by("-year", "-month", "-generated_date")
+        
+        if not is_admin_role(request.user):
+            qs = qs.filter(employee__user=request.user)
+
         if month:
             qs = qs.filter(month=month)
         if year:
@@ -749,3 +755,344 @@ class PayslipView(APIView):
         records = PayrollGeneration.objects.filter(employee=employee, company=request.company).order_by("-year", "-month")
         serializer = PayrollGenerationSerializer(records, many=True)
         return Response(serializer.data)
+
+
+# ── Payroll Group ViewSet ──────────────────────────────────────────────────
+
+from .models import PayrollGroup, EmployeePayrollConfig
+from .serializers import PayrollGroupSerializer, EmployeePayrollConfigSerializer
+from companies.utils import get_employee_payroll_config, calc_india_service_payout
+
+
+class PayrollGroupViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for named payroll groups (e.g. "Field Engineers", "Office Staff").
+    Admin creates groups, assigns employees to them for bulk config.
+    """
+    serializer_class = PayrollGroupSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get_queryset(self):
+        return PayrollGroup.objects.filter(company=self.request.company, is_active=True)
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.company, created_by=self.request.user)
+
+    @action(detail=True, methods=["post"], url_path="assign-employees")
+    def assign_employees(self, request, pk=None):
+        """
+        POST /api/payroll/groups/{id}/assign-employees/
+        Body: {"employee_ids": [1, 2, 3], "replace": false}
+        Assigns employees to this group (optionally replacing existing assignment).
+        """
+        group = self.get_object()
+        employee_ids = request.data.get("employee_ids", [])
+        replace = request.data.get("replace", False)
+
+        employees = Employee.objects.filter(
+            id__in=employee_ids,
+            company=request.company
+        )
+        if not employees.exists():
+            return Response({"detail": "No valid employees found."}, status=400)
+
+        if replace:
+            # Remove employees from this group who aren't in the new list
+            Employee.objects.filter(
+                payroll_group=group, company=request.company
+            ).exclude(id__in=employee_ids).update(payroll_group=None)
+
+        employees.update(payroll_group=group)
+
+        return Response({
+            "detail": f"{employees.count()} employees assigned to group '{group.name}'.",
+            "group_id": group.id,
+            "group_name": group.name,
+            "employee_count": group.employees.filter(is_active=True).count(),
+        })
+
+    @action(detail=True, methods=["get"], url_path="employees")
+    def group_employees(self, request, pk=None):
+        """GET /api/payroll/groups/{id}/employees/ — list employees in this group"""
+        group = self.get_object()
+        from employees.serializers import EmployeeSerializer
+        qs = Employee.objects.filter(payroll_group=group, company=request.company, is_active=True)
+        from rest_framework.pagination import PageNumberPagination
+        paginator = PageNumberPagination()
+        paginator.page_size = 50
+        page = paginator.paginate_queryset(qs, request)
+        serializer = EmployeeSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+
+# ── Employee Payroll Config ViewSet ────────────────────────────────────────
+
+class EmployeePayrollConfigViewSet(viewsets.ModelViewSet):
+    """
+    CRUD for per-employee or per-group payroll configuration.
+    Supports India service split, PF/ESI/TDS toggles, US/UK OT settings.
+    """
+    serializer_class = EmployeePayrollConfigSerializer
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get_queryset(self):
+        qs = EmployeePayrollConfig.objects.filter(company=self.request.company)
+        # Filter by type
+        config_type = self.request.query_params.get("type")  # "employee" | "group"
+        if config_type == "employee":
+            qs = qs.filter(employee__isnull=False)
+        elif config_type == "group":
+            qs = qs.filter(group__isnull=False)
+        return qs.select_related("employee__user", "group")
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.company, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+    @action(detail=False, methods=["get"], url_path=r"resolve/(?P<employee_id>[^/.]+)")
+    def resolve(self, request, employee_id=None):
+        """
+        GET /api/payroll/configs/resolve/{employee_id}/
+        Returns the effective config for an employee (individual → group → default).
+        """
+        employee = Employee.objects.filter(
+            employee_id=employee_id, company=request.company
+        ).first()
+        if not employee:
+            return Response({"detail": "Employee not found."}, status=404)
+
+        config = get_employee_payroll_config(employee)
+        if config:
+            ser = EmployeePayrollConfigSerializer(config)
+            return Response({"config": ser.data, "source": getattr(config, "_source", "individual")})
+
+        # Return region defaults
+        from companies.utils import resolve_region
+        region = resolve_region(employee, request.company)
+        country = region.get("country", "US")
+        defaults = {
+            "source": "default",
+            "region": country,
+            "employee_share_pct": "80.00" if country == "IN" else None,
+            "company_share_pct": "10.00" if country == "IN" else None,
+            "platform_fee_value": "5.00" if country == "IN" else None,
+            "platform_fee_type": "percentage",
+            "pf_enabled": True if country == "IN" else False,
+            "pf_pct": "12.00",
+            "esi_enabled": True if country == "IN" else False,
+            "esi_pct": "0.75",
+            "tds_enabled": False,
+            "tds_rate": "10.00",
+            "ot_multiplier": "1.5" if country == "US" else "1.0",
+            "weekly_ot_threshold": "40.00" if country == "US" else "48.00",
+            "daily_ot_threshold": "8.00",
+            "service_split_enabled": True if country == "IN" else False,
+            "pay_frequency": "monthly" if country == "IN" else "biweekly",
+        }
+        return Response({"config": defaults, "source": "default"})
+
+
+# ── Payroll Region Summary ────────────────────────────────────────────────
+
+class PayrollRegionSummaryView(APIView):
+    """
+    GET /api/payroll/region-summary/
+    Returns a summary of payroll data grouped by region for the org dashboard.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get(self, request):
+        company = request.company
+        region_code = getattr(company.region, "code", None) or company.primary_country or "US"
+
+        # Employee counts
+        total_employees = Employee.objects.filter(company=company, is_active=True).count()
+        employees_with_group = Employee.objects.filter(company=company, is_active=True, payroll_group__isnull=False).count()
+        employees_with_individual_config = EmployeePayrollConfig.objects.filter(
+            company=company, employee__isnull=False
+        ).count()
+
+        # Group counts
+        total_groups = PayrollGroup.objects.filter(company=company, is_active=True).count()
+
+        # Recent payroll generations
+        from django.db.models import Sum, Avg
+        recent_payrolls = PayrollGeneration.objects.filter(company=company).order_by("-year", "-month")
+        total_net = recent_payrolls.aggregate(total=Sum("net_salary"))["total"] or 0
+        avg_net = recent_payrolls.aggregate(avg=Avg("net_salary"))["avg"] or 0
+
+        # Currency from region
+        currency_symbol = "₹" if region_code == "IN" else ("£" if region_code == "UK" else "$")
+        currency_code = "INR" if region_code == "IN" else ("GBP" if region_code == "UK" else "USD")
+
+        return Response({
+            "region": region_code,
+            "currency_symbol": currency_symbol,
+            "currency_code": currency_code,
+            "total_employees": total_employees,
+            "employees_with_group": employees_with_group,
+            "employees_with_individual_config": employees_with_individual_config,
+            "employees_on_default_config": total_employees - employees_with_group - employees_with_individual_config,
+            "total_groups": total_groups,
+            "total_net_payroll": float(total_net),
+            "avg_net_pay_per_employee": float(avg_net),
+        })
+
+
+# ── India Payroll Generation ───────────────────────────────────────────────
+
+class IndiaPayrollGenerateView(APIView):
+    """
+    POST /api/payroll/india-generate/
+    Generates India region payroll based on service revenue split for a period.
+    Body: {employee_ids: [...], month: 7, year: 2026}
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def post(self, request):
+        company = request.company
+        region_code = getattr(company.region, "code", None) or company.primary_country
+        if region_code != "IN":
+            return Response({"detail": "India payroll generation is only for India-region organizations."}, status=400)
+
+        employee_ids = request.data.get("employee_ids", [])
+        month = request.data.get("month")
+        year = request.data.get("year")
+        start_date_str = request.data.get("start_date")
+        end_date_str = request.data.get("end_date")
+
+        from datetime import datetime, date
+        import calendar
+
+        if start_date_str and end_date_str:
+            try:
+                period_start = datetime.strptime(start_date_str, "%Y-%m-%d").date()
+                period_end = datetime.strptime(end_date_str, "%Y-%m-%d").date()
+                month = period_start.month
+                year = period_start.year
+            except Exception:
+                return Response({"detail": "Invalid start_date or end_date format (expected YYYY-MM-DD)."}, status=400)
+        elif month and year:
+            try:
+                month, year = int(month), int(year)
+                last_day = calendar.monthrange(year, month)[1]
+                period_start = date(year, month, 1)
+                period_end = date(year, month, last_day)
+            except (TypeError, ValueError):
+                return Response({"detail": "month and year must be valid integers."}, status=400)
+        else:
+            return Response({"detail": "Either start_date and end_date OR month and year are required."}, status=400)
+
+        # If no employee_ids provided, generate for all active employees
+        qs = Employee.objects.filter(company=company, is_active=True)
+        if employee_ids:
+            qs = qs.filter(id__in=employee_ids)
+
+        if not qs.exists():
+            return Response({"detail": "No employees found."}, status=404)
+
+        results = []
+        errors = []
+
+        for employee in qs.select_related("user", "payroll_group"):
+            try:
+
+                # Sum service requests & customer bookings assigned to this employee
+                service_revenue = Decimal("0")
+                try:
+                    from django.db.models import Sum as DSum, Q
+                    from service_requests.models import ServiceRequest
+                    sr_qs = ServiceRequest.objects.filter(
+                        assigned_employee=employee,
+                    ).filter(
+                        Q(preferred_date__gte=period_start, preferred_date__lte=period_end) |
+                        Q(created_at__date__gte=period_start, created_at__date__lte=period_end)
+                    ).exclude(status__in=["rejected", "cancelled"])
+                    
+                    sr_total = sr_qs.aggregate(total=DSum("total_amount"))["total"]
+                    if sr_total:
+                        service_revenue += Decimal(str(sr_total))
+
+                    # If no service_requests total found, check completed tasks
+                    if service_revenue == Decimal("0"):
+                        from tasks.models import Task
+                        t_qs = Task.objects.filter(
+                            assigned_to=employee.user,
+                            status="completed",
+                            created_at__date__gte=period_start,
+                            created_at__date__lte=period_end,
+                        )
+                        t_total = t_qs.aggregate(total=DSum("billed_hours"))["total"]
+                        if t_total:
+                            service_revenue += Decimal(str(t_total))
+                except Exception as exc:
+                    pass
+
+                # Resolve config
+                config = get_employee_payroll_config(employee)
+
+                # Calculate payout
+                payout = calc_india_service_payout(service_revenue, config)
+
+                # Build config snapshot for audit
+                config_snapshot = {}
+                if config:
+                    config_snapshot = {
+                        "employee_share_pct": float(config.employee_share_pct),
+                        "company_share_pct": float(config.company_share_pct),
+                        "platform_fee_type": config.platform_fee_type,
+                        "platform_fee_value": float(config.platform_fee_value),
+                        "pf_enabled": config.pf_enabled,
+                        "pf_pct": float(config.pf_pct),
+                        "esi_enabled": config.esi_enabled,
+                        "esi_pct": float(config.esi_pct),
+                        "tds_enabled": config.tds_enabled,
+                        "tds_rate": float(config.tds_rate),
+                        "source": payout.get("config_source", "default"),
+                    }
+
+                # Save/update PayrollGeneration record
+                record, created = PayrollGeneration.objects.update_or_create(
+                    employee=employee,
+                    month=month,
+                    year=year,
+                    company=company,
+                    defaults={
+                        "payroll_group": employee.payroll_group,
+                        "gross_salary": Decimal(str(payout["employee_gross"])),
+                        "deductions": Decimal(str(payout["total_deductions"])),
+                        "net_salary": Decimal(str(payout["net_pay"])),
+                        "currency": "INR",
+                        "country": "India",
+                        "breakdown": payout,
+                        "config_snapshot": config_snapshot,
+                        "status": "Generated",
+                    }
+                )
+                results.append({
+                    "employee_id": employee.employee_id,
+                    "employee_name": employee.user.get_full_name() or employee.user.username,
+                    "service_revenue": payout["service_revenue"],
+                    "employee_gross": payout["employee_gross"],
+                    "total_deductions": payout["total_deductions"],
+                    "net_pay": payout["net_pay"],
+                    "config_source": payout["config_source"],
+                    "created": created,
+                })
+
+            except Exception as exc:
+                errors.append({"employee_id": getattr(employee, "employee_id", "?"), "error": str(exc)})
+
+        return Response({
+            "generated": len(results),
+            "errors": len(errors),
+            "results": results,
+            "error_details": errors,
+            "month": month,
+            "year": year,
+            "currency": "INR",
+            "currency_symbol": "₹",
+        }, status=201 if results else 400)
+
