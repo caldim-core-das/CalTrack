@@ -116,6 +116,12 @@ class Employee(models.Model):
     def is_flsa_exempt(self):
         return self.exempt_status == self.ExemptStatus.EXEMPT
 
+    def save(self, *args, **kwargs):
+        if self.company_id and getattr(self.company, 'primary_country', None):
+            if not self.country or self.country != self.company.primary_country:
+                self.country = self.company.primary_country
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.employee_id} - {self.user.get_full_name() or self.user.username}"
 

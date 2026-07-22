@@ -16,6 +16,9 @@ class UserSerializer(serializers.ModelSerializer):
     company_country = serializers.SerializerMethodField()
     company_currency = serializers.SerializerMethodField()
     company_currency_symbol = serializers.SerializerMethodField()
+    company_region = serializers.SerializerMethodField()
+    companyCountry = serializers.SerializerMethodField()
+    primaryCountry = serializers.SerializerMethodField()
     employee_roles = serializers.SerializerMethodField()
 
     class Meta:
@@ -23,8 +26,8 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             "id", "username", "email", "first_name", "last_name", "role",
             "company", "company_name", "company_domain", "company_schema", "bio", "phone", "timezone", "language",
-            "avatar_url", "two_fa_enabled", "company_permissions", "employee_country", "company_country", "employee_roles",
-            "company_currency", "company_currency_symbol"
+            "avatar_url", "two_fa_enabled", "company_permissions", "employee_country", "company_country", "company_region",
+            "companyCountry", "primaryCountry", "employee_roles", "company_currency", "company_currency_symbol"
         )
 
     def get_company_permissions(self, obj):
@@ -64,6 +67,18 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.company.primary_country if obj.company else None
         except Exception:
             return None
+
+    def get_company_region(self, obj):
+        try:
+            return obj.company.primary_country if obj.company else None
+        except Exception:
+            return None
+
+    def get_companyCountry(self, obj):
+        return self.get_company_country(obj)
+
+    def get_primaryCountry(self, obj):
+        return self.get_company_country(obj)
 
     def get_company_name(self, obj):
         try:

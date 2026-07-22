@@ -271,14 +271,14 @@ function ConfigEditor({ config, region, onSave, onCancel, loading }) {
 
 export function PayrollSettingsSection({ SectionHeader }) {
   const { user } = useAuth()
-  const region   = user?.companyRegion || user?.primaryCountry || "IN"
-  const meta     = REGION_META[region] || REGION_META.IN
+  const [summary, setSummary]     = useState(null)
+  const region   = summary?.region || user?.companyCountry || user?.company_country || user?.companyRegion || user?.primaryCountry || "US"
+  const meta     = REGION_META[region] || REGION_META.US
 
   const [tab, setTab]             = useState("groups")
   const [groups, setGroups]       = useState([])
   const [configs, setConfigs]     = useState([])
   const [employees, setEmployees] = useState([])
-  const [summary, setSummary]     = useState(null)
   const [loading, setLoading]     = useState(true)
   const [saving, setSaving]       = useState(false)
   const [error, setError]         = useState(null)
