@@ -641,11 +641,14 @@ class DynamicPayrollGenerateView(APIView):
         return [permissions.IsAuthenticated(), IsAdminRole(), RequireModuleAccess("payroll", "modify")]
 
     def get(self, request):
+        company = getattr(request, "company", None)
+        if not company:
+            return Response([])
         month = request.query_params.get("month")
         year = request.query_params.get("year")
         country = request.query_params.get("country")
         
-        qs = PayrollGeneration.objects.filter(company=request.company).select_related("employee", "employee__user").order_by("-year", "-month", "-generated_date")
+        qs = PayrollGeneration.objects.filter(company=company).select_related("employee", "employee__user").order_by("-year", "-month", "-generated_date")
         
         if not is_admin_role(request.user):
             qs = qs.filter(employee__user=request.user)

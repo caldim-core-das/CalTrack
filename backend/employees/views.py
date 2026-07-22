@@ -13,13 +13,10 @@ from .serializers import EmployeeCreateSerializer, EmployeeSerializer
 
 class EmployeeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
-        if not hasattr(self.request, 'company'):
+        company = getattr(self.request, 'company', None)
+        if not company:
             return Employee.objects.none()
-        qs = Employee.objects.select_related("user").filter(company=self.request.company)
-        if self.request.user.role in ("admin", "manager") and not self.request.user.is_superuser:
-            from django.db.models import Q
-            qs = qs.filter(Q(invited_by=self.request.user) | Q(invited_by__isnull=True))
-        return qs.order_by("employee_id")
+        return Employee.objects.select_related("user").filter(company=company).order_by("employee_id")
 
     def get_permissions(self):
         if self.action in {"list", "create", "update", "partial_update", "destroy"}:

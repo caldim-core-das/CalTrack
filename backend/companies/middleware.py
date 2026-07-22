@@ -49,11 +49,18 @@ class CompanyMiddleware(MiddlewareMixin):
                 from rest_framework_simplejwt.tokens import AccessToken
                 token = AccessToken(token_str)
                 company_id = token.get('company_id')
+                user_id = token.get('user_id')
                 if company_id:
                     from companies.models import Company
                     company = Company.objects.filter(id=company_id).first()
-                    if company:
-                        print(f"DEBUG: CompanyMiddleware - Found company via JWT: {company.schema_name}")
+                elif user_id:
+                    from django.contrib.auth import get_user_model
+                    User = get_user_model()
+                    u = User.objects.filter(id=user_id).first()
+                    if u and u.company:
+                        company = u.company
+                if company:
+                    print(f"DEBUG: CompanyMiddleware - Found company via JWT: {company.schema_name}")
             except Exception as e:
                 print(f"DEBUG: CompanyMiddleware - JWT token read failed: {e}")
 
@@ -118,14 +125,10 @@ class CompanyMiddleware(MiddlewareMixin):
             if tenant.schema_name != 'public':
                 company = tenant
 
-        # ── Step 2.7: Dev-only fallback to first tenant when DEBUG is True ─────────
-        if not company and settings.DEBUG:
-            from companies.models import Company
-            company = Company.objects.filter(schema_name='caldim_2').first()
-            if not company:
-                company = Company.objects.exclude(schema_name='public').first()
-            if company:
-                print(f"DEBUG: CompanyMiddleware - Dev fallback to tenant: {company.schema_name}")
+        # ── Step 2.7: Strictly keep public or user company — no cross-tenant fallback ──
+        if not company:
+            # Keep company as None for public requests so cross-tenant leakage never occurs
+            pass
 
         # ── Step 3: Switch the DB schema to this company's tenant ───────────────
         if company:

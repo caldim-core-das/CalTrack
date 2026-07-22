@@ -52,7 +52,10 @@ export function AuthProvider({ children }) {
         avatar_url:me.avatar_url ?? null,
         two_fa_enabled: me.two_fa_enabled ?? false,
         employee_roles: me.employee_roles ?? [],
-        companyCountry: me.company_country ?? "US",
+        companyCountry: me.company_country ?? me.companyCountry ?? "US",
+        company_country: me.company_country ?? me.companyCountry ?? "US",
+        companyRegion: me.company_region ?? me.company_country ?? me.companyCountry ?? "US",
+        primaryCountry: me.primaryCountry ?? me.company_country ?? me.companyCountry ?? "US",
         companyCurrency: me.company_currency ?? "USD",
         companyCurrencySymbol: me.company_currency_symbol ?? "$",
       }

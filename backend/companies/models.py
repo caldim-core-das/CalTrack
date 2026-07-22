@@ -148,8 +148,8 @@ class Company(TenantMixin):
                 i += 1
             self.schema_name = schema
 
-        # Auto-assign region from primary_country if not explicitly set
-        if self.primary_country and not self.region_id:
+        # Auto-assign region from primary_country
+        if self.primary_country and (not self.region or self.region.code != self.primary_country):
             try:
                 self.region = Region.objects.get(code=self.primary_country)
             except Region.DoesNotExist:

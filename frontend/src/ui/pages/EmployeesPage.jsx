@@ -841,18 +841,15 @@ export function EmployeesPage() {
   const [title, setTitle] = useState("")
   const [hourlyRate, setHourlyRate] = useState("")
   const [department, setDepartment] = useState("")
-  const [currency, setCurrency] = useState(user?.companyCurrency || "USD")
+  const [currency, setCurrency] = useState(user?.companyCurrency || user?.company_currency || "USD")
   const [payrollGroup, setPayrollGroup] = useState("")
   const [taxCategory, setTaxCategory] = useState("")
-  const [serviceRoles, setServiceRoles] = useState([])
-
-  // Dynamic roles
-  const [availableRoles, setAvailableRoles] = useState(TECHNICIAN_ROLES)
-  const [roleFilter, setRoleFilter] = useState("")
-
+  
   // Compliance fields
-  const [country, setCountry] = useState(user?.companyCountry || "US")
-  const [state, setState] = useState(user?.companyCountry === "IN" ? "MH" : (user?.companyCountry === "US" ? "NY" : ""))
+  const orgCountry = user?.companyCountry || user?.company_country || user?.companyRegion || user?.primaryCountry || "US"
+  const orgRegion  = (orgCountry === "IN" || orgCountry === "India") ? "IN" : (orgCountry === "UK" || orgCountry === "United Kingdom") ? "UK" : "US"
+  const [country, setCountry] = useState(orgCountry)
+  const [state, setState] = useState(orgCountry === "IN" ? "MH" : (orgCountry === "US" ? "NY" : ""))
   const [dateOfBirth, setDateOfBirth] = useState("")
   const [exemptStatus, setExemptStatus] = useState("non_exempt")
   const [weeklySalary, setWeeklySalary] = useState("")
@@ -861,13 +858,25 @@ export function EmployeesPage() {
   const [rolledUpHolidayPay, setRolledUpHolidayPay] = useState(false)
   const [showComplianceFields, setShowComplianceFields] = useState(false)
 
+  // Dynamic roles
+  const [availableRoles, setAvailableRoles] = useState(TECHNICIAN_ROLES)
+  const [serviceRoles, setServiceRoles] = useState([])
+  const [roleFilter, setRoleFilter] = useState("")
+
+  // India Statutory Payroll Customizations
+  const [epfRate, setEpfRate] = useState("12")
+  const [esicApplicable, setEsicApplicable] = useState("yes")
+  const [tdsRate, setTdsRate] = useState("10")
+  const [professionalTax, setProfessionalTax] = useState("200")
+
   // Update defaults when user object loads
   useEffect(() => {
     if (user) {
-      if (!currency || currency === "USD") setCurrency(user.companyCurrency || "USD")
+      const cCountry = user?.companyCountry || user?.company_country || "US"
+      if (!currency || currency === "USD") setCurrency(user.companyCurrency || user.company_currency || "USD")
       if (!country || country === "US") {
-        setCountry(user.companyCountry || "US")
-        setState(user.companyCountry === "IN" ? "MH" : (user.companyCountry === "US" ? "NY" : ""))
+        setCountry(cCountry)
+        setState(cCountry === "IN" ? "MH" : (cCountry === "US" ? "NY" : ""))
       }
     }
   }, [user])
@@ -1166,7 +1175,9 @@ export function EmployeesPage() {
               <Input label="First name" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
               <Input label="Last name" value={lastName} onChange={(e) => setLastName(e.target.value)} />
               <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-              <Input label="Hourly rate" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} placeholder="e.g. 18.50" />
+              {orgRegion !== "IN" && (
+                <Input label="Hourly rate" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} placeholder="e.g. 18.50" />
+              )}
             </div>
 
             {/* Compliance accordion */}
@@ -1269,8 +1280,65 @@ export function EmployeesPage() {
                     </div>
                   </div>
 
+                  {/* India Statutory Payroll */}
+                  {orgRegion === "IN" && (
+                    <div className="bg-amber-50/50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-xl p-5">
+                      <div className="font-black text-[11px] text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        🇮🇳 Custom India Statutory Payroll &amp; Deduction Config
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-4">
+                        <div className="flex flex-col gap-1">
+                          <label className="fieldLabel">EPF Rate (%)</label>
+                          <input
+                            className="input font-bold"
+                            type="number"
+                            value={epfRate}
+                            onChange={e => setEpfRate(e.target.value)}
+                            placeholder="12"
+                            step="0.1"
+                          />
+                          <div className="text-[10px] text-slate-500 mt-1 uppercase font-bold">Standard 12% EPF Basic Contribution</div>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">ESIC Coverage</label>
+                          <select
+                            value={esicApplicable}
+                            onChange={e => setEsicApplicable(e.target.value)}
+                            className="w-full h-11 px-4 rounded-xl border border-stroke dark:border-slate-800 bg-bg dark:bg-slate-950/60 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none"
+                          >
+                            <option value="yes">Covered (0.75% EE / 3.25% ER)</option>
+                            <option value="no">Exempt (Gross &gt; ₹21,000)</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="fieldLabel">TDS Tax Rate (%)</label>
+                          <input
+                            className="input font-bold"
+                            type="number"
+                            value={tdsRate}
+                            onChange={e => setTdsRate(e.target.value)}
+                            placeholder="10"
+                            step="0.1"
+                          />
+                          <div className="text-[10px] text-slate-500 mt-1 uppercase font-bold">Income Tax Slab Deduction Rate</div>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="fieldLabel">Professional Tax (₹)</label>
+                          <input
+                            className="input font-bold"
+                            type="number"
+                            value={professionalTax}
+                            onChange={e => setProfessionalTax(e.target.value)}
+                            placeholder="200"
+                          />
+                          <div className="text-[10px] text-slate-500 mt-1 uppercase font-bold">Monthly State PT (Default ₹200)</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* US FLSA classification */}
-                  {country === "US" && (
+                  {orgRegion === "US" && (
                     <div className="bg-blue-50/50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-xl p-5">
                       <div className="font-black text-[11px] text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-4">
                         🇺🇸 US FLSA Classification
@@ -1314,7 +1382,7 @@ export function EmployeesPage() {
                   )}
 
                   {/* UK payroll */}
-                  {country === "UK" && (
+                  {orgRegion === "UK" && (
                     <div className="bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800 rounded-xl p-5">
                       <div className="font-black text-[11px] text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-4">
                         🇬🇧 UK PAYE &amp; NI Settings
@@ -1343,7 +1411,7 @@ export function EmployeesPage() {
                         </div>
                         <div className="flex flex-col gap-1">
                           <label className="fieldLabel">Rolled-up Holiday Pay</label>
-                          <div style={{ display: "flex", alignItems: "center", gap: 10, height: 40 }}>
+                          <div style={{ display: "flex", items: "center", gap: 10, height: 40 }}>
                             <input
                               type="checkbox"
                               id="rolledUp"
@@ -1384,10 +1452,13 @@ export function EmployeesPage() {
                     <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">ID</th>
                     <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">User</th>
                     <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">Title</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest text-right">Rate</th>
+                    {orgRegion !== "IN" && (
+                      <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest text-right">Rate</th>
+                    )}
                     <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">Region</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">Classification</th>
-                    <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">UK Payroll</th>
+                    <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">
+                      {orgRegion === "IN" ? "🇮🇳 Statutory Compliance" : orgRegion === "UK" ? "🇬🇧 UK Payroll & WTR" : "🇺🇸 FLSA Classification"}
+                    </th>
                     <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest text-right">Status</th>
                     <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest text-right">Actions</th>
                   </tr>
@@ -1401,17 +1472,35 @@ export function EmployeesPage() {
                         {(e.user?.email || e.email) && <div className="text-[11px] opacity-60 font-medium">{e.user?.email || e.email}</div>}
                       </td>
                       <td className="px-6 py-5 text-slate-700 dark:text-slate-300">{e.title || "—"}</td>
-                      <td className="px-6 py-5 text-right font-black text-slate-900 dark:text-white">
-                        {e.country === "UK" ? "£" : e.country === "IN" ? "₹" : "$"}{e.hourly_rate}/hr
-                      </td>
+                      {orgRegion !== "IN" && (
+                        <td className="px-6 py-5 text-right font-black text-slate-900 dark:text-white">
+                          {((e.country || orgRegion) === "UK" ? "£" : "$")}{Number(e.hourly_rate || 0).toFixed(2)}/hr
+                        </td>
+                      )}
                       <td className="px-6 py-5">
                         <div className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                          {e.country === "UK" ? "🇬🇧 UK" : e.country === "US" ? "🇺🇸 US" : e.country === "IN" ? "🇮🇳 IN" : (e.country || "—")}
+                          {(e.country || orgRegion) === "UK" ? "🇬🇧 UK" : (e.country || orgRegion) === "US" ? "🇺🇸 US" : "🇮🇳 IN"}
                         </div>
                         {e.state && <div className="text-[10px] text-slate-500 dark:text-slate-500 uppercase font-bold">{e.state}</div>}
                       </td>
                       <td className="px-6 py-5">
-                        {e.country === "US" ? (
+                        {orgRegion === "IN" ? (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">EPF: 12% | ESIC: 0.75%</span>
+                            <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest">TDS: 10% Statutory</span>
+                          </div>
+                        ) : orgRegion === "UK" ? (
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-xs font-black text-slate-800 dark:text-slate-200">Tax: {e.uk_tax_code || "1257L"}</span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-500 font-bold uppercase">NI Cat: {e.uk_ni_category || "A"}</span>
+                            {e.rolled_up_holiday_pay && (
+                              <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-widest">Rolled-up holiday</span>
+                            )}
+                            {e.wtr_opt_out_active && (
+                              <span className="text-[9px] text-amber-600 dark:text-amber-400 font-black uppercase tracking-widest">48hr opt-out</span>
+                            )}
+                          </div>
+                        ) : (
                           <div className="flex flex-col gap-1.5">
                             <ExemptBadge status={e.exempt_status} />
                             {e.weekly_salary && (
@@ -1421,21 +1510,7 @@ export function EmployeesPage() {
                               <span className="text-[9px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest">{e.flsa_duties_category}</span>
                             )}
                           </div>
-                        ) : <span className="text-slate-400 dark:text-slate-600 italic text-xs">N/A</span>}
-                      </td>
-                      <td className="px-6 py-5">
-                        {e.country === "UK" ? (
-                          <div className="flex flex-col gap-1.5">
-                            <span className="text-xs font-black text-slate-800 dark:text-slate-200">Tax: {e.uk_tax_code || "—"}</span>
-                            <span className="text-[10px] text-slate-500 dark:text-slate-500 font-bold uppercase">NI Cat: {e.uk_ni_category || "—"}</span>
-                            {e.rolled_up_holiday_pay && (
-                              <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-widest">Rolled-up holiday</span>
-                            )}
-                            {e.wtr_opt_out_active && (
-                              <span className="text-[9px] text-amber-600 dark:text-amber-400 font-black uppercase tracking-widest">48hr opt-out</span>
-                            )}
-                          </div>
-                        ) : <span className="text-slate-400 dark:text-slate-600 italic text-xs">N/A</span>}
+                        )}
                       </td>
                       <td className="px-6 py-5 text-right">
                         <Pill tone={e.is_active ? "good" : "bad"}>{e.is_active ? "active" : "inactive"}</Pill>
