@@ -362,3 +362,11 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "True") == "True"
 
+# ── Auth Cookies ──────────────────────────────────────────────────────────────
+AUTH_COOKIE = "access_token"
+AUTH_COOKIE_REFRESH = "refresh_token"
+AUTH_COOKIE_SECURE = False
+AUTH_COOKIE_SAMESITE = "Lax"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+
+

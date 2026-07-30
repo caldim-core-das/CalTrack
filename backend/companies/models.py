@@ -123,6 +123,16 @@ class Company(TenantMixin):
         default=ShiftEnforcementMode.WARN,
     )
 
+    class RescheduleRejectionStrategy(models.TextChoices):
+        AUTO_REASSIGN           = "auto_reassign",           "Auto Reassign Technician"
+        SUGGEST_ALTERNATE_SLOTS = "suggest_alternate_slots", "Suggest Alternate Slots"
+
+    reschedule_rejection_strategy = models.CharField(
+        max_length=30,
+        choices=RescheduleRejectionStrategy.choices,
+        default=RescheduleRejectionStrategy.AUTO_REASSIGN,
+    )
+
     allowed_countries = models.JSONField(default=list, blank=True)
     team_size = models.CharField(max_length=100, blank=True, null=True)
     selected_modules = models.JSONField(default=list, blank=True)

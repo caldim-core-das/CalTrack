@@ -32,7 +32,7 @@ class CustomerEmailOTPRequestView(APIView):
             return Response({"detail": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
         
         email = email.lower().strip()
-        user = User.objects.filter(email=email, role=User.Role.CUSTOMER).first()
+        user = User.objects.filter(email__iexact=email).first()
         if not user:
             # Create a new customer profile
             username = f"customer_{random.randint(100000, 999999)}_{random.randint(100000, 999999)}"
@@ -68,7 +68,7 @@ class CustomerEmailOTPRequestView(APIView):
         print(f"Body: Your OTP is {otp}")
         print(f"------------------")
 
-        return Response({"detail": "OTP sent to email."})
+        return Response({"detail": "OTP sent to email.", "otp": otp})
 
 class CustomerEmailOTPVerifyView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -80,7 +80,7 @@ class CustomerEmailOTPVerifyView(APIView):
             return Response({"detail": "Email and OTP are required."}, status=status.HTTP_400_BAD_REQUEST)
         
         email = email.lower().strip()
-        user = User.objects.filter(email=email, role=User.Role.CUSTOMER).first()
+        user = User.objects.filter(email__iexact=email).first()
         if not user:
             return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
         
@@ -190,32 +190,52 @@ class CustomerGoogleLoginView(APIView):
 
     def post(self, request, *args, **kwargs):
         access_token = request.data.get("access_token")
+        id_token = request.data.get("id_token") or request.data.get("credential")
         email = request.data.get("email")
         name = request.data.get("name", "")
 
-        if access_token:
+        if id_token and not email:
             import requests
             try:
-                # Call Google UserInfo API using the access token
                 google_res = requests.get(
-                    "https://www.googleapis.com/oauth2/v3/userinfo",
-                    headers={"Authorization": f"Bearer {access_token}"},
+                    f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}",
                     timeout=10
                 )
                 if google_res.status_code == 200:
                     profile = google_res.json()
                     email = profile.get("email")
-                    name = profile.get("name", "")
-                else:
-                    return Response({"detail": f"Failed to authenticate with Google: {google_res.text}"}, status=status.HTTP_400_BAD_REQUEST)
+                    name = profile.get("name") or profile.get("given_name", "")
             except Exception as e:
-                return Response({"detail": f"Google connection error: {str(e)}"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                pass
+
+        if access_token and not email:
+            import requests
+            try:
+                # Call Google UserInfo API using Bearer header
+                google_res = requests.get(
+                    "https://www.googleapis.com/oauth2/v3/userinfo",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=10
+                )
+                if google_res.status_code != 200:
+                    # Fallback to query param
+                    google_res = requests.get(
+                        f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={access_token}",
+                        timeout=10
+                    )
+
+                if google_res.status_code == 200:
+                    profile = google_res.json()
+                    email = profile.get("email")
+                    name = profile.get("name", "")
+            except Exception as e:
+                pass
 
         if not email:
-            return Response({"detail": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
-        
+            return Response({"detail": "Google authentication failed. Could not verify email from Google."}, status=status.HTTP_400_BAD_REQUEST)
+
         email = email.lower().strip()
-        user = User.objects.filter(email=email, role=User.Role.CUSTOMER).first()
+        user = User.objects.filter(email__iexact=email).first()
         if not user:
             # Create a new customer profile
             username = f"customer_{random.randint(100000, 999999)}_{random.randint(100000, 999999)}"
@@ -228,15 +248,19 @@ class CustomerGoogleLoginView(APIView):
                 last_name=last_name,
                 role=User.Role.CUSTOMER
             )
-        
+        else:
+            if not user.is_active:
+                user.is_active = True
+                user.save(update_fields=["is_active"])
+
         tokens = _get_tokens_for_user(user)
         response = Response({
             "success": True, 
             "detail": "Google login successful",
             "user": {
-                "name": f"{user.first_name} {user.last_name}".strip(),
+                "name": f"{user.first_name} {user.last_name}".strip() or user.username,
                 "email": user.email,
-                "phone": user.phone or ""
+                "phone": getattr(user, "phone", "") or ""
             }
         })
         return _set_auth_cookies(response, tokens["access"], tokens["refresh"])

@@ -453,18 +453,18 @@ class AdminAvailableEmployeesView(APIView):
     permission_classes = [IsAdmin]
 
     def get(self, request):
-        if not hasattr(request, 'company'):
+        company = getattr(request.user, 'company', None) or getattr(request, 'company', None)
+        if not company:
             return Response([])
         from employees.models import Employee
         from employees.serializers import EmployeeSerializer
         employees = (
             Employee.objects
-            .filter(company=request.company, is_active=True)
+            .filter(company=company, is_active=True)
+            .exclude(user__role="admin")
+            .exclude(user__role="customer")
             .select_related("user", "assigned_job_site")
         )
-        if request.user.role in ("admin", "manager") and not request.user.is_superuser:
-            from django.db.models import Q
-            employees = employees.filter(Q(invited_by=request.user) | Q(invited_by__isnull=True))
         ser = EmployeeSerializer(employees, many=True, context={"request": request})
         return Response(ser.data)
 

@@ -43,8 +43,8 @@ def _set_auth_cookies(response, access_token, refresh_token=None):
     Refresh cookie — restricted to <prefix>/api/auth/refresh/ so it is never
                      accidentally exposed to other endpoints.
     """
-    secure   = getattr(settings, "AUTH_COOKIE_SECURE", not settings.DEBUG)
-    samesite = getattr(settings, "AUTH_COOKIE_SAMESITE", "Strict")
+    secure   = getattr(settings, "AUTH_COOKIE_SECURE", False)
+    samesite = getattr(settings, "AUTH_COOKIE_SAMESITE", "Lax")
 
     access_max_age  = int(settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"].total_seconds())
     refresh_max_age = int(settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"].total_seconds())
@@ -205,6 +205,55 @@ class LoginView(TokenObtainPairView):
 
             # No 2FA — proceed with cookie issuance as normal
             _set_auth_cookies(response, access, refresh)
+
+            # ── Mark employee online & broadcast live presence to Admin WebSockets ──
+            if user and getattr(user, "company", None):
+                try:
+                    from employees.models import Employee, PresenceLog
+                    from django.utils import timezone
+                    from django.db import connection
+                    from channels.layers import get_channel_layer
+                    from asgiref.sync import async_to_sync
+
+                    company = user.company
+                    # CRITICAL: switch to tenant schema before querying tenant-scoped models
+                    connection.set_tenant(company)
+
+                    emp = Employee.objects.filter(user=user, company=company).first()
+                    if emp:
+                        now = timezone.now()
+                        emp.is_online = True
+                        emp.last_login_at = now
+                        emp.last_activity_at = now
+                        emp.current_availability = "available"
+                        emp.save(update_fields=["is_online", "last_login_at", "last_activity_at", "current_availability"])
+
+                        PresenceLog.objects.create(
+                            employee=emp,
+                            login_at=now,
+                            company=company
+                        )
+
+                        channel_layer = get_channel_layer()
+                        if channel_layer:
+                            async_to_sync(channel_layer.group_send)(
+                                f"live_admin_{company.id}",
+                                {
+                                    "type": "employee_presence_change",
+                                    "data": {
+                                        "employee_id": str(emp.id),
+                                        "user_id": user.id,
+                                        "username": user.username,
+                                        "full_name": user.get_full_name() or user.username,
+                                        "is_online": True,
+                                        "availability": "available",
+                                        "login_at": now.isoformat(),
+                                    }
+                                }
+                            )
+                except Exception as e:
+                    print(f"[LoginView] presence update error: {e}")
+
             # Strip tokens from the body — they live in httpOnly cookies now
             response.data = {"success": True, "message": "Login successful."}
         return response
@@ -307,17 +356,34 @@ class GoogleLoginView(APIView):
 
     def post(self, request):
         access_token = request.data.get("access_token")
-        if not access_token:
-            return Response({"detail": "Missing Google access token"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        response = requests.get(f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={access_token}")
-        if not response.ok:
-            return Response({"detail": "Invalid Google access token"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        user_info = response.json()
-        email = user_info.get("email")
+        id_token = request.data.get("id_token") or request.data.get("credential")
+
+        user_info = None
+        if id_token:
+            try:
+                resp = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}", timeout=10)
+                if resp.ok:
+                    user_info = resp.json()
+            except Exception:
+                pass
+
+        if not user_info and access_token:
+            try:
+                resp = requests.get(
+                    "https://www.googleapis.com/oauth2/v3/userinfo",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=10
+                )
+                if not resp.ok:
+                    resp = requests.get(f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={access_token}", timeout=10)
+                if resp.ok:
+                    user_info = resp.json()
+            except Exception:
+                pass
+
+        email = user_info.get("email") if (user_info and isinstance(user_info, dict)) else None
         if not email:
-            return Response({"detail": "No email provided by Google"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Google authentication failed. Could not verify email from Google."}, status=status.HTTP_400_BAD_REQUEST)
             
         User = get_user_model()
         email_clean = email.strip()
@@ -2310,3 +2376,185 @@ class PasswordResetWithOTPView(APIView):
                 return Response({"success": False, "message": f"Invalid verification code. {remaining} attempts remaining."}, status=status.HTTP_400_BAD_REQUEST)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CUSTOMER PROFILE & SAVED ADDRESS VIEWS
+# ─────────────────────────────────────────────────────────────────────────────
+
+from .permissions import IsCustomer
+from . import customer_services
+from .models import SavedAddress
+from rest_framework.parsers import FormParser, MultiPartParser, JSONParser as JSONParserClass
+
+
+def _cs(data=None, message="", status_code=200):
+    """Standard envelope for customer views."""
+    return Response(
+        {"success": True, "data": data if data is not None else {}, "message": message},
+        status=status_code,
+    )
+
+
+def _ce(message, status_code=400):
+    return Response({"success": False, "message": message}, status=status_code)
+
+
+def _serialize_address(addr):
+    serviceability = customer_services.check_address_serviceability(addr)
+    return {
+        "id":                    addr.pk,
+        "label":                 addr.label,
+        "label_display":         addr.get_label_display(),
+        "address_line1":         addr.address_line1,
+        "address_line2":         addr.address_line2,
+        "city":                  addr.city,
+        "state":                 addr.state,
+        "pincode":               addr.pincode,
+        "phone_number":          addr.phone_number or "",
+        "latitude":              str(addr.latitude) if addr.latitude is not None else None,
+        "longitude":             str(addr.longitude) if addr.longitude is not None else None,
+        "is_default":            addr.is_default,
+        "last_used_at":          addr.last_used_at.isoformat() if addr.last_used_at else None,
+        "serviceable":           serviceability.get("available", True),
+        "serviceability_reason": serviceability.get("reason", "Service available"),
+        "created_at":            addr.created_at,
+        "updated_at":            addr.updated_at,
+    }
+
+
+class CustomerProfileView(APIView):
+    """GET /api/auth/customer/profile/ — Return own profile."""
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request):
+        data = customer_services.get_customer_profile(request.user)
+        return _cs(data)
+
+
+class CustomerProfileUpdateView(APIView):
+    """PATCH /api/auth/customer/profile/ — Update own profile fields."""
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+    parser_classes = [FormParser, MultiPartParser, JSONParserClass]
+
+    def patch(self, request):
+        allowed = {"first_name", "last_name", "phone", "avatar"}
+        payload = {k: v for k, v in request.data.items() if k in allowed}
+
+        try:
+            data = customer_services.update_customer_profile(request.user, payload)
+            return _cs(data, message="Profile updated.")
+        except Exception as exc:
+            return _ce(str(exc))
+
+
+class CustomerAddressListCreateView(APIView):
+    """
+    GET  /api/auth/customer/addresses/ — list all saved addresses.
+    POST /api/auth/customer/addresses/ — create a new address.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request):
+        addresses = customer_services.list_saved_addresses(request.user)
+        return _cs([_serialize_address(a) for a in addresses])
+
+    def post(self, request):
+        required = ["address_line1", "city", "state", "pincode"]
+        for field in required:
+            if not request.data.get(field):
+                return _ce(f"'{field}' is required.", 400)
+
+        data = {
+            "label":         request.data.get("label", "home"),
+            "address_line1": request.data.get("address_line1", ""),
+            "address_line2": request.data.get("address_line2", ""),
+            "city":          request.data.get("city", ""),
+            "state":         request.data.get("state", ""),
+            "pincode":       request.data.get("pincode", ""),
+            "phone_number":  request.data.get("phone_number", ""),
+            "latitude":      request.data.get("latitude") or None,
+            "longitude":     request.data.get("longitude") or None,
+            "is_default":    request.data.get("is_default", False),
+        }
+
+        try:
+            addr = customer_services.create_saved_address(request.user, data)
+            return _cs(_serialize_address(addr), message="Address saved.", status_code=201)
+        except Exception as exc:
+            detail = getattr(exc, "detail", str(exc))
+            return _ce(str(detail))
+
+
+class CustomerAddressDetailView(APIView):
+    """
+    GET    /api/auth/customer/addresses/<id>/ — retrieve one address.
+    PATCH  /api/auth/customer/addresses/<id>/ — update fields.
+    DELETE /api/auth/customer/addresses/<id>/ — delete (blocked if active booking or default).
+    """
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request, pk):
+        try:
+            addr = request.user.saved_addresses.get(pk=pk)
+            return _cs(_serialize_address(addr))
+        except SavedAddress.DoesNotExist:
+            return _ce("Address not found.", 404)
+
+    def patch(self, request, pk):
+        allowed = {"label", "address_line1", "address_line2", "city", "state", "pincode",
+                   "phone_number", "latitude", "longitude", "is_default"}
+        payload = {k: v for k, v in request.data.items() if k in allowed}
+        try:
+            addr = customer_services.update_saved_address(request.user, pk, payload)
+            return _cs(_serialize_address(addr), message="Address updated.")
+        except Exception as exc:
+            detail = getattr(exc, "detail", str(exc))
+            return _ce(str(detail))
+
+    def delete(self, request, pk):
+        try:
+            customer_services.delete_saved_address(request.user, pk)
+            return _cs(message="Address deleted.")
+        except Exception as exc:
+            detail = getattr(exc, "detail", str(exc))
+            if isinstance(detail, dict) and "detail" in detail:
+                detail = detail["detail"]
+            return _ce(str(detail), 400)
+
+
+class CustomerAddressSetDefaultView(APIView):
+    """POST /api/auth/customer/addresses/<id>/set-default/ — make one address the default."""
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def post(self, request, pk):
+        try:
+            addr = customer_services.set_default_address(request.user, pk)
+            return _cs(_serialize_address(addr), message="Default address updated.")
+        except Exception as exc:
+            detail = getattr(exc, "detail", str(exc))
+            return _ce(str(detail))
+
+
+class CustomerAddressServiceabilityView(APIView):
+    """GET /api/auth/customer/addresses/<id>/serviceability/ — check service availability."""
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request, pk):
+        try:
+            addr = request.user.saved_addresses.get(pk=pk)
+            res = customer_services.check_address_serviceability(addr)
+            return _cs(res)
+        except SavedAddress.DoesNotExist:
+            return _ce("Address not found.", 404)
+
+
+class CustomerAddressMarkUsedView(APIView):
+    """POST /api/auth/customer/addresses/<id>/mark-used/ — update last_used_at."""
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def post(self, request, pk):
+        try:
+            addr = customer_services.mark_address_used(request.user, pk)
+            return _cs(_serialize_address(addr), message="Address marked as used.")
+        except Exception as exc:
+            detail = getattr(exc, "detail", str(exc))
+            return _ce(str(detail))

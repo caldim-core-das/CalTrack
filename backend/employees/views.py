@@ -13,10 +13,52 @@ from .serializers import EmployeeCreateSerializer, EmployeeSerializer
 
 class EmployeeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
-        company = getattr(self.request, 'company', None)
+        user = getattr(self.request, 'user', None)
+        if user and user.is_authenticated and getattr(user, 'company', None):
+            company = user.company
+        else:
+            company = getattr(self.request, 'company', None)
+
         if not company:
             return Employee.objects.none()
-        return Employee.objects.select_related("user").filter(company=company).order_by("employee_id")
+
+        # Clean up any invalid Employee entries that were auto-created for customer accounts
+        Employee.objects.filter(company=company, user__role="customer").delete()
+
+        # Ensure active staff/employee Users (roles: employee, manager, admin, kiosk) have an Employee profile
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        staff_roles = ["employee", "manager", "admin", "kiosk"]
+        active_users = User.objects.filter(company=company, is_active=True, role__in=staff_roles)
+
+        for u in active_users:
+            emp = Employee.objects.filter(company=company, user=u).first()
+            if emp:
+                # Reactivate employee record if the user is still active
+                if not emp.is_active:
+                    emp.is_active = True
+                    emp.save(update_fields=["is_active"])
+            else:
+                # Create a new employee record
+                count = Employee.objects.filter(company=company).count() + 1
+                emp_id = f"EMP-{count:03d}"
+                while Employee.objects.filter(company=company, employee_id=emp_id).exists():
+                    count += 1
+                    emp_id = f"EMP-{count:03d}"
+
+                Employee.objects.create(
+                    company=company,
+                    user=u,
+                    employee_id=emp_id,
+                    title=u.role.title() if hasattr(u, 'role') and u.role else "Team Member",
+                    country=getattr(company, 'primary_country', 'US') or "US",
+                    state=getattr(company, 'default_state', '') or "",
+                    is_active=True
+                )
+
+        return Employee.objects.select_related("user").filter(
+            company=company
+        ).exclude(user__role="customer").order_by("employee_id")
 
     def get_permissions(self):
         if self.action in {"list", "create", "update", "partial_update", "destroy"}:
@@ -40,6 +82,92 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if not employee:
             return Response({"detail": "Employee profile not found."}, status=404)
         return Response(EmployeeSerializer(employee).data)
+
+    @action(detail=False, methods=["post"], url_path="set-presence",
+            permission_classes=[permissions.IsAuthenticated])
+    def set_presence(self, request):
+        """
+        Mark the authenticated user's Employee record as online/offline.
+        Called by the frontend on app load (after JWT verification).
+        Body: { "is_online": true, "availability": "available" }
+        """
+        company = getattr(request, "company", None) or getattr(request.user, "company", None)
+        if not company:
+            return Response({"detail": "No company context."}, status=400)
+
+        employee = Employee.objects.filter(user=request.user, company=company).first()
+        if not employee:
+            return Response({"detail": "Employee profile not found."}, status=404)
+
+        is_online = bool(request.data.get("is_online", True))
+        availability = request.data.get("availability", "available") if is_online else "offline"
+        now = timezone.now()
+
+        update_fields = ["is_online", "last_activity_at", "current_availability"]
+        employee.is_online = is_online
+        employee.last_activity_at = now
+        employee.current_availability = availability
+
+        if is_online:
+            employee.last_login_at = now
+            update_fields.append("last_login_at")
+        else:
+            employee.last_logout_at = now
+            update_fields.append("last_logout_at")
+
+        employee.save(update_fields=update_fields)
+
+        # Create PresenceLog entry
+        try:
+            from .models import PresenceLog
+            if is_online:
+                PresenceLog.objects.create(
+                    employee=employee,
+                    login_at=now,
+                    company=company
+                )
+            else:
+                open_logs = PresenceLog.objects.filter(
+                    employee=employee, logout_at__isnull=True, company=company
+                )
+                for log in open_logs:
+                    log.logout_at = now
+                    if log.login_at:
+                        log.duration_seconds = int((now - log.login_at).total_seconds())
+                    log.save(update_fields=["logout_at", "duration_seconds"])
+        except Exception:
+            pass
+
+        # Broadcast to admin WebSocket group
+        try:
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            channel_layer = get_channel_layer()
+            if channel_layer:
+                async_to_sync(channel_layer.group_send)(
+                    f"live_admin_{company.id}",
+                    {
+                        "type": "employee_presence_change",
+                        "data": {
+                            "employee_id": str(employee.id),
+                            "user_id": request.user.id,
+                            "username": request.user.username,
+                            "full_name": request.user.get_full_name() or request.user.username,
+                            "is_online": is_online,
+                            "availability": availability,
+                            "login_at": now.isoformat() if is_online else None,
+                            "logout_at": now.isoformat() if not is_online else None,
+                        }
+                    }
+                )
+        except Exception:
+            pass
+
+        return Response({
+            "is_online": employee.is_online,
+            "availability": employee.current_availability,
+            "last_activity_at": now.isoformat(),
+        })
 
 
     @action(detail=True, methods=["get"], url_path="history")

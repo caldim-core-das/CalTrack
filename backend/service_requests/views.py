@@ -10,18 +10,22 @@ Business logic is NEVER inline — always delegated to state_machine.apply_trans
 or service-layer helpers. Views are thin: validate → call service → return response.
 """
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.parsers import FormParser, MultiPartParser, JSONParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.permissions import IsAdminRole, IsEmployeeRole, is_admin_role
+from accounts.permissions import IsAdminRole, IsEmployeeRole, IsCustomer, is_admin_role
 from employees.models import Employee
 
+from . import services as sr_services
 from .models import (
-    EmployeeJob, EmployeePerformance,
+    Complaint, EmployeeJob, EmployeePerformance,
     JobCompletionProof, ServiceFeedback, ServiceRequest,
+    RescheduleRequest, RescheduleAttachment, RescheduleStatus, RescheduleReason, TimeSlotChoices,
+    RefundRequest,
 )
 from .serializers import (
     AdminAssignSerializer, AdminChangePrioritySerializer,
@@ -30,7 +34,11 @@ from .serializers import (
     FeedbackTokenSummarySerializer, JobProofUploadSerializer,
     ServiceFeedbackAdminSerializer, ServiceFeedbackSubmitSerializer,
     ServiceRequestDetailSerializer, ServiceRequestListSerializer,
-    ServiceRequestPublicCreateSerializer,
+    ServiceRequestPublicCreateSerializer, RescheduleRequestSerializer,
+    AdminRescheduleListSerializer, EmployeeRescheduleNotificationSerializer,
+    RefundEvidenceSerializer, RefundInvestigationNoteSerializer,
+    EligibleBookingSerializer, CustomerRefundRequestSerializer,
+    AdminRefundRequestSerializer, EmployeeRefundInvestigationSerializer,
 )
 from .state_machine import apply_transition
 
@@ -51,6 +59,18 @@ def _error(message, status_code=400):
     )
 
 
+def _standard_response(success=True, data=None, error=None, meta=None, status_code=200):
+    return Response(
+        {
+            "success": success,
+            "data": data if data is not None else {},
+            "error": error,
+            "meta": meta if meta is not None else {},
+        },
+        status=status_code,
+    )
+
+
 def _get_company(request):
     """Return company from request if available (postgres/tenant), else None (sqlite/dev)."""
     return getattr(request, "company", None)
@@ -61,7 +81,7 @@ def _sr_qs(request):
     company = _get_company(request)
     qs = ServiceRequest.objects.select_related("assigned_employee", "assigned_employee__user")
     if company:
-        qs = qs.filter(company=company)
+        qs = qs.filter(Q(company=company) | Q(company__isnull=True))
     return qs
 
 
@@ -218,15 +238,23 @@ class CustomerMyBookingsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        if not hasattr(request.user, 'role') or request.user.role != 'customer':
-            return _error("Only customers can view their bookings.", 403)
+        user_email = (getattr(request.user, 'email', '') or '').strip()
         
-        company = _get_company(request)
-        qs = ServiceRequest.objects.filter(customer=request.user).select_related('assigned_employee', 'assigned_employee__user')
-        if company:
-            qs = qs.filter(company=company)
-        
-        qs = qs.order_by("-id")
+        # Auto-link unattached bookings created with this customer email
+        if user_email:
+            try:
+                ServiceRequest.objects.filter(
+                    email__iexact=user_email,
+                    customer__isnull=True
+                ).update(customer=request.user)
+            except Exception:
+                pass
+
+        query = Q(customer=request.user)
+        if user_email:
+            query |= Q(email__iexact=user_email)
+
+        qs = ServiceRequest.objects.filter(query).select_related('assigned_employee', 'assigned_employee__user').distinct().order_by("-id")
         serializer = ServiceRequestListSerializer(qs, many=True)
         return _success(data=serializer.data)
 
@@ -905,3 +933,1139 @@ class PublicFeedbackListView(APIView):
             })
             
         return _success(data=data)
+
+def _serialize_complaint(c, include_messages=False):
+    data = {
+        "id":               c.pk,
+        "complaint_number": c.complaint_number,
+        "booking_id":       c.booking_id,
+        "booking_request_id": c.booking.request_id if c.booking else None,
+        "customer_name":    c.booking.customer_name if c.booking else (c.raised_by.get_full_name() or c.raised_by.email),
+        "customer_phone":   getattr(c.raised_by, "phone", ""),
+        "category":         c.category,
+        "category_display": c.get_category_display(),
+        "priority":         c.priority,
+        "description":      c.description,
+        "status":           c.status,
+        "status_display":   c.get_status_display(),
+        "resolution_type":  c.resolution_type,
+        "resolution_notes": c.resolution_notes,
+        "risk_score":       c.risk_score,
+        "assigned_employee": (
+            {"id": c.assigned_employee.pk, "name": c.assigned_employee.user.get_full_name()}
+            if c.assigned_employee else None
+        ),
+        "assigned_admin": (
+            {"id": c.assigned_admin.pk, "name": c.assigned_admin.get_full_name()}
+            if c.assigned_admin else None
+        ),
+        "created_at":       c.created_at,
+        "resolved_at":      c.resolved_at,
+        "closed_at":        c.closed_at,
+        "attachment_count": c.attachments.count(),
+    }
+    if include_messages:
+        data["messages"] = [
+            {
+                "id":         r.pk,
+                "persona":    r.sender_persona,
+                "sender":     r.sender.get_full_name() or r.sender.email,
+                "message":    r.message,
+                "created_at": r.created_at,
+            }
+            for r in c.messages.all()
+        ]
+        data["history"] = [
+            {
+                "id": h.pk,
+                "from_status": h.from_status,
+                "to_status": h.to_status,
+                "changed_by": h.changed_by.get_full_name() if h.changed_by else "System",
+                "notes": h.notes,
+                "created_at": h.created_at
+            } for h in c.status_history.all()
+        ]
+        data["attachments"] = [
+            {
+                "id": a.pk,
+                "url": a.file.url if a.file else None,
+                "type": a.attachment_type,
+                "uploaded_by": a.uploaded_by.get_full_name() if a.uploaded_by else "Unknown",
+                "created_at": a.created_at
+            } for a in c.attachments.all()
+        ]
+    return data
+
+# ════════════════════════════════════════════════════════════════════
+# SLICE 4 — COMPLAINT VIEWS
+# ════════════════════════════════════════════════════════════════════
+
+class CustomerComplaintCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+    parser_classes = [FormParser, MultiPartParser, JSONParser]
+
+    def post(self, request):
+        category = request.data.get("category", "OTHER")
+        description = request.data.get("description", "")
+        booking_id = request.data.get("booking_id")
+
+        if not description:
+            return _error("'description' is required.")
+
+        booking = None
+        if booking_id:
+            try:
+                from django.db.models import Q
+                q = Q(request_id__iexact=str(booking_id))
+                if str(booking_id).isdigit():
+                    q |= Q(pk=int(booking_id))
+                    padded = f"SR-{int(booking_id):04d}"
+                    q |= Q(request_id__iexact=padded)
+                
+                if not ServiceRequest.objects.filter(q).exists():
+                    return _error("Booking not found in the system.", 404)
+                    
+                booking = ServiceRequest.objects.get(q, customer=request.user)
+            except ServiceRequest.DoesNotExist:
+                return _error("Booking found, but it does not belong to your account.", 403)
+            except ServiceRequest.MultipleObjectsReturned:
+                booking = ServiceRequest.objects.filter(q, customer=request.user).first()
+
+        attachment_files = request.FILES.getlist("attachments")
+
+        try:
+            c = sr_services.create_complaint(
+                customer=request.user,
+                booking=booking,
+                category=category,
+                description=description,
+                attachment_files=attachment_files or None,
+            )
+            return _success(_serialize_complaint(c), "Complaint submitted.", 201)
+        except Exception as exc:
+            return _error(str(exc))
+
+
+class CustomerComplaintListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request):
+        qs = sr_services.list_customer_complaints(request.user, request.GET)
+        return _success([_serialize_complaint(c) for c in qs])
+
+
+class CustomerComplaintDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request, pk):
+        try:
+            c = Complaint.objects.prefetch_related("messages", "status_history", "attachments").get(pk=pk)
+            if c.raised_by != request.user and not is_admin_role(request.user):
+                return _error("Permission denied.", 403)
+            return _success(_serialize_complaint(c, include_messages=True))
+        except Complaint.DoesNotExist:
+            return _error("Complaint not found.", 404)
+
+
+class CustomerComplaintMessageCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def post(self, request, pk):
+        try:
+            c = sr_services.get_complaint_detail(request.user, pk)
+        except PermissionDenied as e:
+            return _error(str(e), 403)
+        except Exception:
+            return _error("Complaint not found.", 404)
+
+        message = request.data.get("message", "")
+        if not message:
+            return _error("'message' is required.")
+
+        try:
+            resp = sr_services.add_customer_message(c, request.user, message)
+            return _success({"id": resp.pk, "message": resp.message, "created_at": resp.created_at}, "Message added.", 201)
+        except Exception as exc:
+            return _error(str(exc))
+
+
+# ── Admin Complaint ──────────────────────────────────────────────────────────────
+
+class AdminComplaintListView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def get(self, request):
+        qs = sr_services.list_admin_complaints(request.user, request.GET)
+        return _success([_serialize_complaint(c) for c in qs])
+
+
+def _get_complaint_admin(pk):
+    try:
+        return Complaint.objects.prefetch_related("messages", "status_history", "attachments").get(pk=pk)
+    except Complaint.DoesNotExist:
+        try:
+            from django_tenants.utils import schema_context
+            from companies.models import Company
+            for comp in Company.objects.all():
+                try:
+                    with schema_context(comp.schema_name):
+                        return Complaint.objects.prefetch_related("messages", "status_history", "attachments").get(pk=pk)
+                except Complaint.DoesNotExist:
+                    continue
+        except Exception:
+            pass
+        raise Complaint.DoesNotExist
+
+
+class AdminComplaintDetailView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def get(self, request, pk):
+        try:
+            c = _get_complaint_admin(pk)
+            score, reasons = sr_services.compute_risk_score(c)
+            data = _serialize_complaint(c, include_messages=True)
+            data["risk_analysis"] = {"score": score, "reasons": reasons}
+            return _success(data)
+        except Complaint.DoesNotExist:
+            return _error("Complaint not found.", 404)
+
+
+class AdminComplaintAssignView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, pk):
+        try:
+            c = _get_complaint_admin(pk)
+        except Complaint.DoesNotExist:
+            return _error("Complaint not found.", 404)
+
+        employee_id = request.data.get("employee_id")
+        priority = request.data.get("priority")
+        
+        emp = None
+        if employee_id:
+            try:
+                emp = Employee.objects.get(pk=employee_id)
+            except Employee.DoesNotExist:
+                return _error("Employee not found.", 404)
+
+        try:
+            sr_services.assign_complaint(c, request.user, request.user, assigned_employee=emp, priority=priority)
+            return _success(_serialize_complaint(c), "Complaint assigned.")
+        except Exception as exc:
+            return _error(str(exc))
+
+
+class AdminComplaintStatusUpdateView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, pk):
+        try:
+            c = _get_complaint_admin(pk)
+        except Complaint.DoesNotExist:
+            return _error("Complaint not found.", 404)
+
+        action = request.data.get("action")
+        notes = request.data.get("notes", "")
+        message = request.data.get("message", "")
+
+        try:
+            if action == "start_investigation":
+                sr_services.start_investigation(c, request.user)
+            elif action == "request_customer_info":
+                if not message: return _error("Message required")
+                sr_services.request_customer_info(c, request.user, message)
+            elif action == "request_technician_info":
+                if not message: return _error("Message required")
+                sr_services.request_technician_info(c, request.user, message)
+            elif action == "escalate":
+                sr_services.escalate_complaint(c, request.user, notes)
+            elif action == "close":
+                sr_services.close_complaint(c, request.user)
+            else:
+                return _error("Invalid action.")
+                
+            return _success(_serialize_complaint(c), f"Action {action} performed.")
+        except Exception as exc:
+            return _error(str(exc))
+
+
+class AdminComplaintResolveView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, pk):
+        try:
+            c = _get_complaint_admin(pk)
+        except Complaint.DoesNotExist:
+            return _error("Complaint not found.", 404)
+
+        resolution_type = request.data.get("resolution_type")
+        notes = request.data.get("resolution_notes", "")
+        refund_amount = request.data.get("refund_amount")
+
+        try:
+            sr_services.resolve_complaint(c, request.user, resolution_type, notes, refund_amount)
+            return _success(_serialize_complaint(c), "Complaint resolved.")
+        except Exception as exc:
+            return _error(str(exc))
+
+class AdminComplaintMessageCreateView(APIView):
+    permission_classes = [IsAdminRole]
+
+    def post(self, request, pk):
+        try:
+            c = _get_complaint_admin(pk)
+        except Complaint.DoesNotExist:
+            return _error("Complaint not found.", 404)
+
+        message = request.data.get("message", "")
+        if not message:
+            return _error("'message' is required.")
+
+        try:
+            resp = sr_services.add_message(c, request.user, "ADMIN", message)
+            return _success({"id": resp.pk, "message": resp.message, "created_at": resp.created_at}, "Message added.", 201)
+        except Exception as exc:
+            return _error(str(exc))
+
+
+# ── Employee Complaint ──────────────────────────────────────────────────────────────
+
+class EmployeeComplaintListView(APIView):
+    permission_classes = [IsEmployeeRole]
+
+    def get(self, request):
+        try:
+            emp = Employee.objects.get(user=request.user)
+        except Employee.DoesNotExist:
+            return _error("Employee profile not found.")
+        qs = sr_services.list_employee_complaints(emp)
+        return _success([_serialize_complaint(c) for c in qs])
+
+
+class EmployeeComplaintMessageCreateView(APIView):
+    permission_classes = [IsEmployeeRole]
+
+    def post(self, request, pk):
+        try:
+            emp = Employee.objects.get(user=request.user)
+            c = Complaint.objects.get(pk=pk, assigned_employee=emp)
+        except (Employee.DoesNotExist, Complaint.DoesNotExist):
+            return _error("Complaint not found or not assigned to you.", 404)
+
+        message = request.data.get("message", "")
+        if not message:
+            return _error("'message' is required.")
+
+        try:
+            resp = sr_services.submit_technician_explanation(c, emp, message)
+            return _success({"message": "Explanation submitted."}, "Response added.", 201)
+        except Exception as exc:
+            return _error(str(exc))
+class EmployeeComplaintResolveView(APIView):
+    permission_classes = [IsEmployeeRole]
+
+    def post(self, request, pk):
+        try:
+            emp = Employee.objects.get(user=request.user)
+            c = Complaint.objects.get(pk=pk, assigned_employee=emp)
+        except (Employee.DoesNotExist, Complaint.DoesNotExist):
+            return _error("Complaint not found or not assigned to you.", 404)
+
+        notes = request.data.get("resolution_notes", "")
+        return _success(_serialize_complaint(c), "Complaint resolved.")
+
+
+# ── Slice 2 & 3: Reschedule & Refund Views ──────────────────────────────────
+
+def _serialize_reschedule(r):
+    return RescheduleRequestSerializer(r).data
+
+def _serialize_refund(r):
+    return {
+        "id": r.pk,
+        "booking_id": r.booking_id,
+        "booking_request_id": r.booking.request_id if r.booking else None,
+        "booking_service": r.booking.service_category if r.booking else None,
+        "customer_name": r.requested_by.get_full_name() or r.requested_by.email,
+        "amount": str(r.amount),
+        "reason": r.reason,
+        "status": r.status,
+        "admin_notes": getattr(r, "admin_notes", ""),
+        "created_at": r.created_at,
+    }
+
+
+class CustomerRescheduleRequestCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def post(self, request):
+        booking_id = request.data.get("booking_id")
+        new_date = request.data.get("new_date") or request.data.get("requested_scheduled_at")
+        new_time_slot = request.data.get("new_time_slot", "09-10")
+        reason = request.data.get("reason", "schedule_conflict")
+        additional_notes = request.data.get("additional_notes", "")
+
+        if not booking_id or not new_date:
+            return _standard_response(
+                success=False,
+                error={"code": "VALIDATION_ERROR", "message": "booking_id and new_date are required."},
+                status_code=400
+            )
+
+        user_email = (getattr(request.user, 'email', '') or '').strip()
+        booking_query = Q(pk=booking_id) & (Q(customer=request.user) | Q(email__iexact=user_email))
+        try:
+            booking = ServiceRequest.objects.filter(booking_query).first()
+            if not booking:
+                raise ServiceRequest.DoesNotExist()
+        except ServiceRequest.DoesNotExist:
+            return _standard_response(
+                success=False,
+                error={"code": "NOT_FOUND", "message": "Booking not found or not owned by user."},
+                status_code=404
+            )
+
+        ALLOWED_RESCHEDULE_STATUSES = ["new_request", "reviewed", "confirmed", "assigned", "accepted"]
+        if booking.status not in ALLOWED_RESCHEDULE_STATUSES:
+            return _standard_response(
+                success=False,
+                error={"code": "NOT_ELIGIBLE", "message": f"Reschedule is unavailable because this booking is in '{booking.status_display or booking.status}' status."},
+                status_code=400
+            )
+
+        attachment_obj = None
+        if "file" in request.FILES or "attachment" in request.FILES:
+            upload_file = request.FILES.get("file") or request.FILES.get("attachment")
+            attachment_obj = RescheduleAttachment.objects.create(
+                file=upload_file,
+                original_name=upload_file.name,
+                uploaded_by=request.user,
+            )
+
+        try:
+            rr = sr_services.create_reschedule_request(
+                booking=booking,
+                requested_by=request.user,
+                new_date=new_date,
+                new_time_slot=new_time_slot,
+                reason=reason,
+                persona="CUSTOMER",
+                additional_notes=additional_notes,
+                attachment=attachment_obj,
+            )
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(
+                success=False,
+                error={"code": "INVALID_STATE", "message": str(detail)},
+                status_code=400
+            )
+
+        data = RescheduleRequestSerializer(rr).data
+        company = _get_company(request) or booking.company
+        avail_slots = sr_services.get_real_technician_availability(company, rr.new_date)
+        return _standard_response(
+            success=True,
+            data=data,
+            meta={"available_slots": avail_slots},
+            status_code=201
+        )
+
+
+class CustomerRescheduleRequestListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user_email = (getattr(request.user, 'email', '') or '').strip()
+        query = Q(requested_by=request.user) | Q(booking__customer=request.user)
+        if user_email:
+            query |= Q(booking__email__iexact=user_email)
+
+        qs = RescheduleRequest.objects.filter(query).select_related("booking", "requested_by", "attachment").order_by("-id").distinct()
+        data = RescheduleRequestSerializer(qs, many=True).data
+        return _standard_response(success=True, data=data)
+
+
+class AdminRescheduleRequestListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get(self, request):
+        qs = RescheduleRequest.objects.select_related("booking", "requested_by", "proposed_technician", "attachment").order_by("-created_at")
+
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        data = RescheduleRequestSerializer(qs, many=True).data
+        return _standard_response(success=True, data=data)
+
+
+class AdminRescheduleRequestReviewView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def patch(self, request, pk):
+        qs = RescheduleRequest.objects.select_related("booking")
+
+        try:
+            rr = qs.get(pk=pk)
+        except RescheduleRequest.DoesNotExist:
+            return _standard_response(
+                success=False,
+                error={"code": "NOT_FOUND", "message": "RescheduleRequest not found."},
+                status_code=404
+            )
+
+        action = request.data.get("action") or request.data.get("target_status")
+        note = request.data.get("note") or request.data.get("review_notes", "")
+        proposed_tech_id = request.data.get("proposed_technician_id") or request.data.get("assigned_employee_id")
+        new_date = request.data.get("new_date")
+        new_time_slot = request.data.get("new_time_slot")
+
+        proposed_tech = None
+        if proposed_tech_id:
+            try:
+                proposed_tech = Employee.objects.get(pk=proposed_tech_id)
+            except Employee.DoesNotExist:
+                return _standard_response(
+                    success=False,
+                    error={"code": "INVALID_EMPLOYEE", "message": "Proposed technician not found."},
+                    status_code=400
+                )
+
+        target_status = action
+        if not target_status:
+            if rr.status == RescheduleStatus.PENDING:
+                target_status = RescheduleStatus.ADMIN_REVIEW
+            elif rr.status == RescheduleStatus.ADMIN_REVIEW:
+                target_status = RescheduleStatus.TECHNICIAN_CONFIRMATION
+
+        try:
+            updated_rr = sr_services.apply_transition(
+                reschedule_request=rr,
+                new_status=target_status,
+                actor=request.user,
+                note=note,
+                proposed_technician=proposed_tech,
+                new_date=new_date,
+                new_time_slot=new_time_slot,
+            )
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(
+                success=False,
+                error={"code": "TRANSITION_ERROR", "message": str(detail)},
+                status_code=400
+            )
+
+        data = RescheduleRequestSerializer(updated_rr).data
+        avail_slots = sr_services.get_real_technician_availability(rr.booking.company, updated_rr.new_date)
+        return _standard_response(success=True, data=data, meta={"available_slots": avail_slots})
+
+
+# ── Extended Reschedule Workflow Views ────────────────────────────────────────
+
+class AdminRescheduleApproveView(APIView):
+    """Admin approves a reschedule request — triggers employee notification or reassignment."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        notes = request.data.get("notes", "")
+        try:
+            rr = sr_services.admin_approve_reschedule(request.user, pk, notes=notes)
+            data = AdminRescheduleListSerializer(rr).data
+            return _standard_response(success=True, data=data, meta={"outcome": rr.status})
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(success=False, error={"code": "APPROVE_FAILED", "message": str(detail)}, status_code=400)
+
+
+class AdminRescheduleRejectView(APIView):
+    """Admin rejects a reschedule request outright."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        reason = request.data.get("reason", "OTHER")
+        notes = request.data.get("notes", "")
+        try:
+            rr = sr_services.admin_reject_reschedule(request.user, pk, reason=reason, notes=notes)
+            data = AdminRescheduleListSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(success=False, error={"code": "REJECT_FAILED", "message": str(detail)}, status_code=400)
+
+
+class AdminRescheduleSuggestSlotView(APIView):
+    """Admin proposes multi-slot options or alternate date/time slot to the customer."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        slots = request.data.get("slots", [])
+        suggested_date = request.data.get("suggested_date")
+        suggested_time_slot = request.data.get("suggested_time_slot")
+        notes = request.data.get("notes", "") or request.data.get("message", "")
+
+        if not slots and suggested_date and suggested_time_slot:
+            slots = [{"date": suggested_date, "time_slot": suggested_time_slot}]
+
+        if not slots:
+            return _standard_response(
+                success=False,
+                error={"code": "MISSING_FIELDS", "message": "'slots' list or 'suggested_date'/'suggested_time_slot' are required."},
+                status_code=400
+            )
+        try:
+            rr = sr_services.admin_suggest_slots(request.user, pk, slots, message=notes)
+            data = AdminRescheduleListSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(success=False, error={"code": "SUGGEST_FAILED", "message": str(detail)}, status_code=400)
+
+
+class AdminRescheduleReassignView(APIView):
+    """Admin manually reassigns a new employee after REASSIGNMENT_NEEDED."""
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        employee_id = request.data.get("employee_id")
+        if not employee_id:
+            return _standard_response(
+                success=False,
+                error={"code": "MISSING_FIELD", "message": "'employee_id' is required."},
+                status_code=400
+            )
+        try:
+            rr = sr_services.admin_reassign_employee(request.user, pk, employee_id)
+            data = AdminRescheduleListSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(success=False, error={"code": "REASSIGN_FAILED", "message": str(detail)}, status_code=400)
+
+
+class CustomerRescheduleRespondToSuggestionView(APIView):
+    """Customer accepts or declines an admin-suggested slot."""
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def post(self, request, pk):
+        accept_raw = request.data.get("accept")
+        if accept_raw is None:
+            return _standard_response(
+                success=False,
+                error={"code": "MISSING_FIELD", "message": "'accept' (true/false) is required."},
+                status_code=400
+            )
+        if isinstance(accept_raw, str):
+            accept = accept_raw.lower() in ("true", "1", "yes")
+        else:
+            accept = bool(accept_raw)
+
+        try:
+            rr = sr_services.customer_respond_to_suggestion(request.user, pk, accept)
+            data = RescheduleRequestSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(success=False, error={"code": "RESPOND_FAILED", "message": str(detail)}, status_code=400)
+
+
+class EmployeeRescheduleNotificationListView(APIView):
+    """Employee sees all pending reschedule confirmations assigned to them."""
+    permission_classes = [permissions.IsAuthenticated, IsEmployeeRole]
+
+    def get(self, request):
+        qs = sr_services.list_employee_reschedule_notifications(request.user)
+        data = EmployeeRescheduleNotificationSerializer(qs, many=True).data
+        return _standard_response(success=True, data=data, meta={"count": len(data)})
+
+
+class EmployeeRescheduleAcceptView(APIView):
+    """Employee accepts a rescheduled booking — booking updated, customer notified."""
+    permission_classes = [permissions.IsAuthenticated, IsEmployeeRole]
+
+    def post(self, request, pk):
+        try:
+            rr = sr_services.employee_accept_reschedule(request.user, pk)
+            data = EmployeeRescheduleNotificationSerializer(rr).data
+            return _standard_response(success=True, data=data, meta={"message": "Schedule updated. Booking confirmed."})
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(success=False, error={"code": "ACCEPT_FAILED", "message": str(detail)}, status_code=400)
+
+
+class EmployeeRescheduleRejectView(APIView):
+    """Employee rejects the assignment — transitions to REASSIGNMENT_NEEDED, notifies admin."""
+    permission_classes = [permissions.IsAuthenticated, IsEmployeeRole]
+
+    def post(self, request, pk):
+        reason = request.data.get("reason", "OTHER")
+        note = request.data.get("note", "")
+        try:
+            rr = sr_services.employee_reject_reschedule(request.user, pk, reason=reason, note=note)
+            data = EmployeeRescheduleNotificationSerializer(rr).data
+            return _standard_response(success=True, data=data, meta={"message": "Admin notified. Finding another technician."})
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(success=False, error={"code": "REJECT_FAILED", "message": str(detail)}, status_code=400)
+
+
+class EmployeeRescheduleRequestRespondView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsEmployeeRole]
+
+    def patch(self, request, pk):
+        try:
+            emp = Employee.objects.get(user=request.user)
+        except Employee.DoesNotExist:
+            return _standard_response(
+                success=False,
+                error={"code": "UNAUTHORIZED", "message": "User is not registered as an employee."},
+                status_code=403
+            )
+
+        try:
+            rr = RescheduleRequest.objects.select_related("booking").get(
+                pk=pk,
+                proposed_technician=emp,
+                status=RescheduleStatus.TECHNICIAN_CONFIRMATION
+            )
+        except RescheduleRequest.DoesNotExist:
+            return _standard_response(
+                success=False,
+                error={"code": "NOT_FOUND", "message": "No pending confirmation request found for this technician."},
+                status_code=404
+            )
+
+        decision = str(request.data.get("decision", "")).upper()
+        note = request.data.get("note", "")
+
+        if decision not in ("APPROVED", "REJECTED", "CONFIRM", "DECLINE"):
+            return _standard_response(
+                success=False,
+                error={"code": "VALIDATION_ERROR", "message": "Decision must be 'APPROVED' (confirm) or 'REJECTED' (decline)."},
+                status_code=400
+            )
+
+        target_status = RescheduleStatus.APPROVED if decision in ("APPROVED", "CONFIRM") else RescheduleStatus.REJECTED
+
+        try:
+            updated_rr = sr_services.apply_transition(
+                reschedule_request=rr,
+                new_status=target_status,
+                actor=request.user,
+                note=note
+            )
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(
+                success=False,
+                error={"code": "TRANSITION_ERROR", "message": str(detail)},
+                status_code=400
+            )
+
+        data = RescheduleRequestSerializer(updated_rr).data
+        return _standard_response(success=True, data=data)
+
+
+class CustomerRescheduleRequestCancelView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def post(self, request, pk):
+        try:
+            rr = sr_services.cancel_reschedule_request(request.user, pk)
+            data = RescheduleRequestSerializer(rr).data
+            return _standard_response(success=True, data=data, meta={"message": "Reschedule request cancelled."})
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(
+                success=False,
+                error={"code": "CANCEL_FAILED", "message": str(detail)},
+                status_code=400
+            )
+
+
+class CustomerBookingAvailableSlotsView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request, booking_id):
+        try:
+            booking = ServiceRequest.objects.get(pk=booking_id, customer=request.user)
+        except ServiceRequest.DoesNotExist:
+            return _standard_response(
+                success=False,
+                error={"code": "NOT_FOUND", "message": "Booking not found."},
+                status_code=404
+            )
+
+        date_str = request.query_params.get("date")
+        if not date_str:
+            target_date = booking.preferred_date or timezone.now().date()
+        else:
+            import datetime
+            try:
+                target_date = datetime.datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return _standard_response(
+                    success=False,
+                    error={"code": "INVALID_DATE", "message": "Invalid date format. Use YYYY-MM-DD."},
+                    status_code=400
+                )
+
+        slots = sr_services.get_real_technician_availability(booking.company, target_date)
+        return _standard_response(success=True, data=slots, meta={"date": str(target_date)})
+
+
+class CustomerActiveBookingsListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user_email = (getattr(request.user, 'email', '') or '').strip()
+        query = Q(customer=request.user)
+        if user_email:
+            query |= Q(email__iexact=user_email)
+
+        # Allow reschedules for Pending Confirmation, Confirmed, and Employee Assigned active bookings
+        allowed_statuses = ["new_request", "waiting_for_payment", "confirmed", "reviewed", "assigned", "accepted", "on_the_way"]
+
+        qs = ServiceRequest.objects.filter(
+            query,
+            status__in=allowed_statuses
+        ).order_by("-id").distinct()
+
+        data = ServiceRequestListSerializer(qs, many=True).data
+        return _standard_response(success=True, data=data)
+
+
+# Backward-compatibility aliases
+class CustomerRescheduleView(CustomerRescheduleRequestListView):
+    def post(self, request):
+        return CustomerRescheduleRequestCreateView().post(request)
+
+class AdminRescheduleListView(AdminRescheduleRequestListView):
+    pass
+
+class AdminRescheduleActionView(AdminRescheduleRequestReviewView):
+    def post(self, request, pk, action=None):
+        request.data["action"] = action
+        return self.patch(request, pk)
+
+
+# ── Refund Views ──────────────────────────────────────────────────────────────
+
+class CustomerEligibleBookingsListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request):
+        bookings = sr_services.get_eligible_bookings(request.user)
+        data = EligibleBookingSerializer(bookings, many=True).data
+        return _standard_response(success=True, data=data)
+
+
+class CustomerBookingRefundSummaryView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request, booking_id):
+        try:
+            summary = sr_services.get_booking_refund_summary(request.user, booking_id)
+            return _standard_response(success=True, data=summary)
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(
+                success=False,
+                error={"code": "SUMMARY_FAILED", "message": str(detail)},
+                status_code=400
+            )
+
+
+class CustomerRefundRequestCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def post(self, request):
+        booking_id = request.data.get("booking_id")
+        refund_type = request.data.get("refund_type", "FULL")
+        requested_amount = request.data.get("requested_amount", 0)
+        reason = request.data.get("reason", "POOR_QUALITY")
+        additional_notes = request.data.get("additional_notes", "")
+        evidence_files = request.FILES.getlist("evidence") or request.FILES.getlist("files")
+
+        if not booking_id:
+            return _standard_response(
+                success=False,
+                error={"code": "MISSING_FIELD", "message": "'booking_id' is required."},
+                status_code=400
+            )
+
+        try:
+            rr = sr_services.create_refund_request(
+                customer=request.user,
+                booking_id=booking_id,
+                refund_type=refund_type,
+                requested_amount=requested_amount,
+                reason=reason,
+                additional_notes=additional_notes,
+                evidence_files=evidence_files
+            )
+            data = CustomerRefundRequestSerializer(rr).data
+            return _standard_response(success=True, data=data, status_code=201)
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(
+                success=False,
+                error={"code": "REFUND_FAILED", "message": str(detail)},
+                status_code=400
+            )
+
+
+class CustomerRefundRequestListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request):
+        qs = sr_services.list_refund_requests(request.user, "CUSTOMER")
+        data = CustomerRefundRequestSerializer(qs, many=True).data
+        return _standard_response(success=True, data=data)
+
+
+class CustomerRefundRequestDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+
+    def get(self, request, pk):
+        try:
+            rr = RefundRequest.objects.get(pk=pk, customer=request.user)
+            data = CustomerRefundRequestSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except RefundRequest.DoesNotExist:
+            return _standard_response(
+                success=False,
+                error={"code": "NOT_FOUND", "message": "Refund request not found."},
+                status_code=404
+            )
+
+
+class AdminRefundRequestListView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get(self, request):
+        status_filter = request.query_params.get("status")
+        filters = {}
+        if status_filter:
+            filters["status"] = status_filter
+
+        qs = sr_services.list_refund_requests(request.user, "ADMIN", filters=filters)
+        data = AdminRefundRequestSerializer(qs, many=True).data
+        return _standard_response(success=True, data=data)
+
+
+class AdminRefundRequestDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def get(self, request, pk):
+        try:
+            rr = RefundRequest.objects.get(pk=pk)
+            data = AdminRefundRequestSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except RefundRequest.DoesNotExist:
+            return _standard_response(
+                success=False,
+                error={"code": "NOT_FOUND", "message": "Refund request not found."},
+                status_code=404
+            )
+
+
+class AdminRefundApproveView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        is_full = request.data.get("is_full", True)
+        approved_amount = request.data.get("approved_amount")
+        internal_note = request.data.get("internal_note", "")
+
+        try:
+            rr = sr_services.admin_approve_refund(
+                admin_user=request.user,
+                refund_id=pk,
+                is_full=is_full,
+                approved_amount=approved_amount,
+                internal_note=internal_note
+            )
+            data = AdminRefundRequestSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(
+                success=False,
+                error={"code": "APPROVE_FAILED", "message": str(detail)},
+                status_code=400
+            )
+
+
+class AdminRefundRejectView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        internal_note = request.data.get("internal_note", "")
+
+        try:
+            rr = sr_services.admin_reject_refund(
+                admin_user=request.user,
+                refund_id=pk,
+                internal_note=internal_note
+            )
+            data = AdminRefundRequestSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(
+                success=False,
+                error={"code": "REJECT_FAILED", "message": str(detail)},
+                status_code=400
+            )
+
+
+class AdminRefundRequestInfoView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        target = request.data.get("target", "CUSTOMER")
+        note = request.data.get("note", "")
+        employee_id = request.data.get("employee_id")
+
+        try:
+            rr = sr_services.admin_request_more_info(
+                admin_user=request.user,
+                refund_id=pk,
+                target=target,
+                note=note,
+                employee_id=employee_id
+            )
+            data = AdminRefundRequestSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(
+                success=False,
+                error={"code": "REQUEST_INFO_FAILED", "message": str(detail)},
+                status_code=400
+            )
+
+
+class AdminRefundSendToFinanceView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        try:
+            rr = sr_services.admin_send_to_finance(request.user, pk)
+            data = AdminRefundRequestSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(
+                success=False,
+                error={"code": "FINANCE_FAILED", "message": str(detail)},
+                status_code=400
+            )
+
+
+class AdminRefundInternalNoteView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+
+    def post(self, request, pk):
+        note = request.data.get("note", "")
+        try:
+            rr = RefundRequest.objects.get(pk=pk)
+            timestamp = timezone.now().strftime("%Y-%m-%d %H:%M")
+            actor_name = request.user.get_full_name() or request.user.username
+            entry = f"[{timestamp}] {actor_name} (Note): {note}"
+            rr.internal_notes = f"{rr.internal_notes}\n{entry}".strip()
+            rr.save(update_fields=["internal_notes", "updated_at"])
+            data = AdminRefundRequestSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except Exception as e:
+            return _standard_response(
+                success=False,
+                error={"code": "NOTE_FAILED", "message": str(e)},
+                status_code=400
+            )
+
+
+class EmployeeAssignedRefundListView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        qs = sr_services.list_refund_requests(request.user, "EMPLOYEE")
+        data = EmployeeRefundInvestigationSerializer(qs, many=True).data
+        return _standard_response(success=True, data=data)
+
+
+class EmployeeRefundDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        try:
+            emp = Employee.objects.get(user=request.user)
+            rr = RefundRequest.objects.get(pk=pk, assigned_employee=emp)
+            data = EmployeeRefundInvestigationSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except Exception:
+            return _standard_response(
+                success=False,
+                error={"code": "NOT_FOUND", "message": "Assigned refund investigation not found."},
+                status_code=404
+            )
+
+
+class EmployeeRefundInvestigationSubmitView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        explanation = request.data.get("explanation", "")
+        work_completed_confirmed = request.data.get("work_completed_confirmed", False)
+        if isinstance(work_completed_confirmed, str):
+            work_completed_confirmed = work_completed_confirmed.lower() in ("true", "1", "yes")
+        photo_files = request.FILES.getlist("photos") or request.FILES.getlist("evidence")
+
+        if not explanation:
+            return _standard_response(
+                success=False,
+                error={"code": "MISSING_EXPLANATION", "message": "Investigation explanation is required."},
+                status_code=400
+            )
+
+        try:
+            rr = sr_services.employee_submit_investigation(
+                employee_user=request.user,
+                refund_id=pk,
+                explanation=explanation,
+                work_completed_confirmed=work_completed_confirmed,
+                photo_files=photo_files
+            )
+            data = EmployeeRefundInvestigationSerializer(rr).data
+            return _standard_response(success=True, data=data)
+        except Exception as e:
+            detail = getattr(e, "detail", str(e))
+            return _standard_response(
+                success=False,
+                error={"code": "SUBMIT_FAILED", "message": str(detail)},
+                status_code=400
+            )
+
+
+# Backward-compatibility aliases
+class CustomerRefundView(CustomerRefundRequestListView):
+    def post(self, request):
+        return CustomerRefundRequestCreateView().post(request)
+
+class AdminRefundListView(AdminRefundRequestListView):
+    pass
+
+class AdminRefundActionView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    def post(self, request, pk, action):
+        if action == "approve":
+            return AdminRefundApproveView().post(request, pk)
+        elif action == "reject":
+            return AdminRefundRejectView().post(request, pk)
+        return _standard_response(success=False, error={"code": "INVALID_ACTION", "message": "Invalid action."}, status_code=400)
+

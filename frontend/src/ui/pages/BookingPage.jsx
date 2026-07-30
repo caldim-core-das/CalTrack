@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react"
 import { useSearchParams } from "react-router-dom"
+import { useGoogleLogin } from "@react-oauth/google"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Search, MapPin, Phone, Mail, User, Shield, CheckCircle2, Star,
@@ -22,11 +23,11 @@ import { CalTrackLogo } from "../components/CalTrackLogo.jsx"
 import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, useMapEvents } from "react-leaflet";
 
-let BOOKING_CURRENCY_SYMBOL = "₹";
+let BOOKING_CURRENCY_SYMBOL = "â‚¹";
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    DATA
-   ───────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 const CATEGORIES = [
   { id: "cleaning", name: "Home Cleaning", image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&q=80&fit=crop", desc: "Deep clean & sanitization", rating: "4.8", jobs: "50K+" },
@@ -42,89 +43,128 @@ const CATEGORIES = [
 ]
 
 function openGoogleSignInPopup(onSuccess, onError) {
-  if (!window.google) {
-    if (typeof onError === 'function') onError("Google login service is not ready yet. Please try again in a few seconds.");
-    return;
-  }
+  const runSignIn = () => {
+    if (!window.google || !window.google.accounts || !window.google.accounts.oauth2) {
+      if (typeof onError === 'function') onError("Google login service is not available. Please refresh the page.");
+      return;
+    }
 
-  try {
-    const client = window.google.accounts.oauth2.initTokenClient({
-      client_id: "628867483502-e7snj6l150js2vpvkv70opo5h4aacgus.apps.googleusercontent.com",
-      scope: "email profile openid",
-      callback: (response) => {
-        if (response && response.access_token) {
-          if (typeof onSuccess === 'function') onSuccess(response.access_token);
-        } else {
-          if (typeof onError === 'function') onError("Google login cancelled or failed.");
+    try {
+      const client = window.google.accounts.oauth2.initTokenClient({
+        client_id: "628867483502-e7snj6l150js2vpvkv70opo5h4aacgus.apps.googleusercontent.com",
+        scope: "email profile openid",
+        callback: (response) => {
+          try {
+            if (response && response.access_token) {
+              if (typeof onSuccess === 'function') {
+                Promise.resolve(onSuccess(response.access_token)).catch(err => {
+                  if (typeof onError === 'function') onError(err?.message || "Google login failed.");
+                });
+              }
+            } else if (response && response.error) {
+              if (typeof onError === 'function') onError(response.error_description || "Google login cancelled or failed.");
+            } else {
+              if (typeof onError === 'function') onError("Google login cancelled.");
+            }
+          } catch (e) {
+            if (typeof onError === 'function') onError("Failed to process Google sign-in token.");
+          }
+        },
+        error_callback: (err) => {
+          if (typeof onError === 'function') onError(err?.message || "Google login error");
         }
-      },
-      error_callback: (err) => {
-        if (typeof onError === 'function') onError(err?.message || "Google login error");
+      });
+      if (client && typeof client.requestAccessToken === 'function') {
+        try {
+          client.requestAccessToken();
+        } catch (reqErr) {
+          if (typeof onError === 'function') onError("Browser blocked the Google login popup.");
+        }
       }
-    });
-    client.requestAccessToken();
-  } catch (err) {
-    if (typeof onError === 'function') onError(err?.message || "Failed to initialize Google login");
+    } catch (err) {
+      if (typeof onError === 'function') onError(err?.message || "Failed to initialize Google login");
+    }
+  };
+
+  if (!window.google?.accounts?.oauth2) {
+    let script = document.getElementById("google-gsi-client");
+    if (!script) {
+      script = document.createElement("script");
+      script.id = "google-gsi-client";
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+    script.onload = () => runSignIn();
+    script.onerror = () => {
+      if (typeof onError === 'function') onError("Failed to load Google Sign-In SDK.");
+    };
+    if (window.google?.accounts?.oauth2) {
+      runSignIn();
+    }
+  } else {
+    runSignIn();
   }
 }
 
 const PACKAGES = {
   cleaning: [
-    { id: "clean-std", name: "Standard", price: 999, priceStr: "₹999", duration: "2 hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&q=80&fit=crop", includes: ["Floor Cleaning", "Kitchen Surface Cleaning", "Bathroom Cleaning", "Dusting"], excludes: [] },
-    { id: "clean-prem", name: "Premium", price: 2499, priceStr: "₹2,499", duration: "4 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=300&q=80&fit=crop", includes: ["Complete Home Deep Cleaning", "Kitchen Deep Cleaning", "Bathroom Deep Cleaning", "Sofa Vacuuming", "Window Cleaning", "Balcony Cleaning"], excludes: [] },
-    { id: "clean-move", name: "Move-In / Move-Out Package", price: 3499, priceStr: "₹3,499", duration: "6 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=300&q=80&fit=crop", includes: ["Entire House Cleaning", "Cabinet Cleaning", "Fan & Light Cleaning", "Window & Glass Cleaning"], excludes: [] },
+    { id: "clean-std", name: "Standard", price: 999, priceStr: "â‚¹999", duration: "2 hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&q=80&fit=crop", includes: ["Floor Cleaning", "Kitchen Surface Cleaning", "Bathroom Cleaning", "Dusting"], excludes: [] },
+    { id: "clean-prem", name: "Premium", price: 2499, priceStr: "â‚¹2,499", duration: "4 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=300&q=80&fit=crop", includes: ["Complete Home Deep Cleaning", "Kitchen Deep Cleaning", "Bathroom Deep Cleaning", "Sofa Vacuuming", "Window Cleaning", "Balcony Cleaning"], excludes: [] },
+    { id: "clean-move", name: "Move-In / Move-Out Package", price: 3499, priceStr: "â‚¹3,499", duration: "6 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=300&q=80&fit=crop", includes: ["Entire House Cleaning", "Cabinet Cleaning", "Fan & Light Cleaning", "Window & Glass Cleaning"], excludes: [] },
   ],
   plumbing: [
-    { id: "plum-std", name: "Standard", price: 299, priceStr: "₹299", duration: "1 hr", popular: false, tag: "", includes: ["One Plumbing Issue", "Leak Check", "Basic Repair"], excludes: [] },
-    { id: "plum-prem", name: "Premium", price: 799, priceStr: "₹799", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=300&q=80&fit=crop", includes: ["Up to 3 Plumbing Repairs", "Pipe Inspection", "Drain Cleaning"], excludes: [] },
-    { id: "plum-comp", name: "Complete Home Plumbing", price: 1999, priceStr: "₹1,999", duration: "3 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1607472586893-edb57cb3b4e1?w=300&q=80&fit=crop", includes: ["Full House Plumbing Inspection", "Multiple Repairs", "Water Pressure Check"], excludes: [] },
+    { id: "plum-std", name: "Standard", price: 299, priceStr: "â‚¹299", duration: "1 hr", popular: false, tag: "", includes: ["One Plumbing Issue", "Leak Check", "Basic Repair"], excludes: [] },
+    { id: "plum-prem", name: "Premium", price: 799, priceStr: "â‚¹799", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=300&q=80&fit=crop", includes: ["Up to 3 Plumbing Repairs", "Pipe Inspection", "Drain Cleaning"], excludes: [] },
+    { id: "plum-comp", name: "Complete Home Plumbing", price: 1999, priceStr: "â‚¹1,999", duration: "3 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1607472586893-edb57cb3b4e1?w=300&q=80&fit=crop", includes: ["Full House Plumbing Inspection", "Multiple Repairs", "Water Pressure Check"], excludes: [] },
   ],
   electrical: [
-    { id: "elec-std", name: "Standard", price: 299, priceStr: "₹299", duration: "1 hr", popular: false, tag: "", includes: ["One Electrical Repair", "Safety Check"], excludes: [] },
-    { id: "elec-prem", name: "Premium", price: 899, priceStr: "₹899", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&q=80&fit=crop", includes: ["Multiple Electrical Repairs", "Wiring Inspection", "MCB Check"], excludes: [] },
-    { id: "elec-care", name: "Home Electrical Care", price: 1999, priceStr: "₹1,999", duration: "3 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1558611848-73f7eb4001a1?w=300&q=80&fit=crop", includes: ["Complete Home Inspection", "Fan & Light Service", "Socket Testing"], excludes: [] },
+    { id: "elec-std", name: "Standard", price: 299, priceStr: "â‚¹299", duration: "1 hr", popular: false, tag: "", includes: ["One Electrical Repair", "Safety Check"], excludes: [] },
+    { id: "elec-prem", name: "Premium", price: 899, priceStr: "â‚¹899", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&q=80&fit=crop", includes: ["Multiple Electrical Repairs", "Wiring Inspection", "MCB Check"], excludes: [] },
+    { id: "elec-care", name: "Home Electrical Care", price: 1999, priceStr: "â‚¹1,999", duration: "3 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1558611848-73f7eb4001a1?w=300&q=80&fit=crop", includes: ["Complete Home Inspection", "Fan & Light Service", "Socket Testing"], excludes: [] },
   ],
   hvac: [
-    { id: "hvac-std", name: "Standard Package", price: 599, priceStr: "₹599", duration: "1-2 Hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1621905252507-b35492d04029?w=300&q=80&fit=crop", includes: ["General AC Service", "Filter Cleaning", "Cooling Performance Check", "Basic Inspection"], excludes: [] },
-    { id: "hvac-prem", name: "Premium Package", price: 1299, priceStr: "₹1,299", duration: "2-3 Hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=300&q=80&fit=crop", includes: ["Deep Coil Cleaning", "Water Jet Cleaning", "Filter Cleaning", "Cooling Performance Check", "Gas Pressure Check", "Minor Adjustments", "30-Day Service Warranty"], excludes: [] },
-    { id: "hvac-amc", name: "Annual Maintenance Package (AMC)", price: 2999, priceStr: "₹2,999", duration: "Yearly", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1610486842247-7505ed272fc4?w=300&q=80&fit=crop", includes: ["4 AC Services per Year", "Priority Technician", "Discount on Spare Parts", "Free Basic Inspection", "Service Reminder"], excludes: [] },
+    { id: "hvac-std", name: "Standard Package", price: 599, priceStr: "â‚¹599", duration: "1-2 Hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1621905252507-b35492d04029?w=300&q=80&fit=crop", includes: ["General AC Service", "Filter Cleaning", "Cooling Performance Check", "Basic Inspection"], excludes: [] },
+    { id: "hvac-prem", name: "Premium Package", price: 1299, priceStr: "â‚¹1,299", duration: "2-3 Hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=300&q=80&fit=crop", includes: ["Deep Coil Cleaning", "Water Jet Cleaning", "Filter Cleaning", "Cooling Performance Check", "Gas Pressure Check", "Minor Adjustments", "30-Day Service Warranty"], excludes: [] },
+    { id: "hvac-amc", name: "Annual Maintenance Package (AMC)", price: 2999, priceStr: "â‚¹2,999", duration: "Yearly", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1610486842247-7505ed272fc4?w=300&q=80&fit=crop", includes: ["4 AC Services per Year", "Priority Technician", "Discount on Spare Parts", "Free Basic Inspection", "Service Reminder"], excludes: [] },
   ],
   appliance_repair: [
-    { id: "app-std", name: "Standard", price: 399, priceStr: "₹399", duration: "1 hr", popular: false, tag: "", includes: ["Appliance Diagnosis", "Basic Repair"], excludes: [] },
-    { id: "app-prem", name: "Premium", price: 999, priceStr: "₹999", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=300&q=80&fit=crop", includes: ["Complete Servicing", "Internal Cleaning", "Performance Testing"], excludes: [] },
-    { id: "app-amc", name: "Annual Care Plan", price: 2499, priceStr: "₹2,499", duration: "Yearly", popular: false, tag: "Best Value", includes: ["3 Service Visits", "Priority Support", "Discount on Parts"], excludes: [] },
+    { id: "app-std", name: "Standard", price: 399, priceStr: "â‚¹399", duration: "1 hr", popular: false, tag: "", includes: ["Appliance Diagnosis", "Basic Repair"], excludes: [] },
+    { id: "app-prem", name: "Premium", price: 999, priceStr: "â‚¹999", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=300&q=80&fit=crop", includes: ["Complete Servicing", "Internal Cleaning", "Performance Testing"], excludes: [] },
+    { id: "app-amc", name: "Annual Care Plan", price: 2499, priceStr: "â‚¹2,499", duration: "Yearly", popular: false, tag: "Best Value", includes: ["3 Service Visits", "Priority Support", "Discount on Parts"], excludes: [] },
   ],
   security: [
-    { id: "check", name: "System Check", price: 499, priceStr: "₹499", duration: "1 hr", popular: false, tag: "", includes: ["Camera test", "DVR check", "App verify"], excludes: ["New cables", "Repositioning"] },
-    { id: "install2", name: "2-Camera Setup", price: 2999, priceStr: "₹2,999", duration: "3 hrs", popular: true, tag: "Most Booked", includes: ["2 HD cameras", "DVR setup", "Mobile app config", "Cabling"], excludes: ["Monthly plan"] },
-    { id: "install4", name: "4-Camera Setup", price: 4999, priceStr: "₹4,999", duration: "5 hrs", popular: false, tag: "Best Value", includes: ["4 HD cameras", "DVR", "App", "Night vision", "1-yr warranty"], excludes: [] },
+    { id: "check", name: "System Check", price: 499, priceStr: "â‚¹499", duration: "1 hr", popular: false, tag: "", includes: ["Camera test", "DVR check", "App verify"], excludes: ["New cables", "Repositioning"] },
+    { id: "install2", name: "2-Camera Setup", price: 2999, priceStr: "â‚¹2,999", duration: "3 hrs", popular: true, tag: "Most Booked", includes: ["2 HD cameras", "DVR setup", "Mobile app config", "Cabling"], excludes: ["Monthly plan"] },
+    { id: "install4", name: "4-Camera Setup", price: 4999, priceStr: "â‚¹4,999", duration: "5 hrs", popular: false, tag: "Best Value", includes: ["4 HD cameras", "DVR", "App", "Night vision", "1-yr warranty"], excludes: [] },
   ],
   general: [
-    { id: "basic", name: "1 Hr Handyman", price: 299, priceStr: "₹299", duration: "1 hr", popular: false, tag: "", includes: ["Any general task", "Basic tools"], excludes: ["Materials", "Electrical/plumbing"] },
-    { id: "standard", name: "2 Hr Handyman", price: 499, priceStr: "₹499", duration: "2 hrs", popular: true, tag: "Most Booked", includes: ["Multiple small tasks", "Tools included", "Experienced pro"], excludes: ["Materials"] },
-    { id: "complete", name: "Full Day Pro", price: 999, priceStr: "₹999", duration: "8 hrs", popular: false, tag: "Best Value", includes: ["Unlimited tasks", "All tools", "Priority scheduling"], excludes: ["Materials above ₹500"] },
+    { id: "basic", name: "1 Hr Handyman", price: 299, priceStr: "â‚¹299", duration: "1 hr", popular: false, tag: "", includes: ["Any general task", "Basic tools"], excludes: ["Materials", "Electrical/plumbing"] },
+    { id: "standard", name: "2 Hr Handyman", price: 499, priceStr: "â‚¹499", duration: "2 hrs", popular: true, tag: "Most Booked", includes: ["Multiple small tasks", "Tools included", "Experienced pro"], excludes: ["Materials"] },
+    { id: "complete", name: "Full Day Pro", price: 999, priceStr: "â‚¹999", duration: "8 hrs", popular: false, tag: "Best Value", includes: ["Unlimited tasks", "All tools", "Priority scheduling"], excludes: ["Materials above â‚¹500"] },
   ],
   carpentry: [
-    { id: "carp-std", name: "Standard Repair", price: 499, priceStr: "₹499", duration: "2 hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=300&q=80&fit=crop", includes: ["Minor Woodwork", "Hinge Replacement", "Basic Fixes"], excludes: [] },
-    { id: "carp-prem", name: "Premium Setup", price: 999, priceStr: "₹999", duration: "4 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=300&q=80&fit=crop", includes: ["Furniture Assembly", "Custom Shelving", "Door Alignment"], excludes: [] },
-    { id: "carp-full", name: "Full Day Carpentry", price: 1999, priceStr: "₹1,999", duration: "8 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=300&q=80&fit=crop", includes: ["Extensive Repairs", "New Installations", "Material Shopping"], excludes: [] },
+    { id: "carp-std", name: "Standard Repair", price: 499, priceStr: "â‚¹499", duration: "2 hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=300&q=80&fit=crop", includes: ["Minor Woodwork", "Hinge Replacement", "Basic Fixes"], excludes: [] },
+    { id: "carp-prem", name: "Premium Setup", price: 999, priceStr: "â‚¹999", duration: "4 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=300&q=80&fit=crop", includes: ["Furniture Assembly", "Custom Shelving", "Door Alignment"], excludes: [] },
+    { id: "carp-full", name: "Full Day Carpentry", price: 1999, priceStr: "â‚¹1,999", duration: "8 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=300&q=80&fit=crop", includes: ["Extensive Repairs", "New Installations", "Material Shopping"], excludes: [] },
   ],
   pest_control: [
-    { id: "pest-std", name: "Basic Pest Control", price: 799, priceStr: "₹799", duration: "1 hr", popular: false, tag: "", image: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=300&q=80&fit=crop", includes: ["Cockroach & Ant Spray", "Targeted Areas"], excludes: [] },
-    { id: "pest-prem", name: "Comprehensive Treatment", price: 1499, priceStr: "₹1,499", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=300&q=80&fit=crop", includes: ["Full Home Spray", "Termite Check", "Bedbug Treatment"], excludes: [] },
-    { id: "pest-year", name: "Annual Pest Protection", price: 3499, priceStr: "₹3,499", duration: "Yearly", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1628102491629-778586284000?w=300&q=80&fit=crop", includes: ["3 Service Visits", "Priority Response", "Guarantee"], excludes: [] },
+    { id: "pest-std", name: "Basic Pest Control", price: 799, priceStr: "â‚¹799", duration: "1 hr", popular: false, tag: "", image: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=300&q=80&fit=crop", includes: ["Cockroach & Ant Spray", "Targeted Areas"], excludes: [] },
+    { id: "pest-prem", name: "Comprehensive Treatment", price: 1499, priceStr: "â‚¹1,499", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=300&q=80&fit=crop", includes: ["Full Home Spray", "Termite Check", "Bedbug Treatment"], excludes: [] },
+    { id: "pest-year", name: "Annual Pest Protection", price: 3499, priceStr: "â‚¹3,499", duration: "Yearly", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1628102491629-778586284000?w=300&q=80&fit=crop", includes: ["3 Service Visits", "Priority Response", "Guarantee"], excludes: [] },
   ],
   painting: [
-    { id: "paint-room", name: "Single Room Makeover", price: 2999, priceStr: "₹2,999", duration: "1 day", popular: false, tag: "", image: "https://images.unsplash.com/photo-1562259942-27364e0ee76b?w=300&q=80&fit=crop", includes: ["Basic Prep", "2 Coats Paint", "Cleanup"], excludes: [] },
-    { id: "paint-home", name: "Complete Home Painting", price: 9999, priceStr: "₹9,999", duration: "4 days", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1562259942-27364e0ee76b?w=300&q=80&fit=crop", includes: ["Wall Putty", "Primer", "Premium Paint", "Post-Cleanup"], excludes: [] },
-    { id: "paint-prem", name: "Texture & Decor Painting", price: 14999, priceStr: "₹14,999", duration: "5 days", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1584820927500-11b3337a7c5a?w=300&q=80&fit=crop", includes: ["Custom Textures", "Accent Walls", "Designer Finish"], excludes: [] },
+    { id: "paint-room", name: "Single Room Makeover", price: 2999, priceStr: "â‚¹2,999", duration: "1 day", popular: false, tag: "", image: "https://images.unsplash.com/photo-1562259942-27364e0ee76b?w=300&q=80&fit=crop", includes: ["Basic Prep", "2 Coats Paint", "Cleanup"], excludes: [] },
+    { id: "paint-home", name: "Complete Home Painting", price: 9999, priceStr: "â‚¹9,999", duration: "4 days", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1562259942-27364e0ee76b?w=300&q=80&fit=crop", includes: ["Wall Putty", "Primer", "Premium Paint", "Post-Cleanup"], excludes: [] },
+    { id: "paint-prem", name: "Texture & Decor Painting", price: 14999, priceStr: "â‚¹14,999", duration: "5 days", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1584820927500-11b3337a7c5a?w=300&q=80&fit=crop", includes: ["Custom Textures", "Accent Walls", "Designer Finish"], excludes: [] },
   ],
 }
 
 const TIME_SLOTS = [
-  { period: "Morning", icon: "🌅", slots: [{ t: "07:00", l: "7:00 AM" }, { t: "08:00", l: "8:00 AM" }, { t: "09:00", l: "9:00 AM" }, { t: "10:00", l: "10:00 AM" }, { t: "11:00", l: "11:00 AM" }] },
-  { period: "Afternoon", icon: "☀️", slots: [{ t: "12:00", l: "12:00 PM" }, { t: "13:00", l: "1:00 PM" }, { t: "14:00", l: "2:00 PM" }, { t: "15:00", l: "3:00 PM" }, { t: "16:00", l: "4:00 PM" }] },
-  { period: "Evening", icon: "🌆", slots: [{ t: "17:00", l: "5:00 PM" }, { t: "18:00", l: "6:00 PM" }, { t: "19:00", l: "7:00 PM" }] },
+  { period: "Morning", icon: "ðŸŒ…", slots: [{ t: "07:00", l: "7:00 AM" }, { t: "08:00", l: "8:00 AM" }, { t: "09:00", l: "9:00 AM" }, { t: "10:00", l: "10:00 AM" }, { t: "11:00", l: "11:00 AM" }] },
+  { period: "Afternoon", icon: "â˜€ï¸", slots: [{ t: "12:00", l: "12:00 PM" }, { t: "13:00", l: "1:00 PM" }, { t: "14:00", l: "2:00 PM" }, { t: "15:00", l: "3:00 PM" }, { t: "16:00", l: "4:00 PM" }] },
+  { period: "Evening", icon: "ðŸŒ†", slots: [{ t: "17:00", l: "5:00 PM" }, { t: "18:00", l: "6:00 PM" }, { t: "19:00", l: "7:00 PM" }] },
 ]
 
 const REVIEWS = [
@@ -153,9 +193,9 @@ function generateAvatarUrl(name) {
 
 const OTP_SESSION_KEY = "bk_cust_verified"
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    HELPERS
-   ───────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function getNextDays(n = 21) {
   const out = []
@@ -179,9 +219,9 @@ function getNextDays(n = 21) {
 
 const DAYS_LIST = getNextDays(21)
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    MINI COMPONENTS
-   ───────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function Tag({ children, color = "#7C3AED" }) {
   return (
@@ -238,7 +278,7 @@ function SummaryBar({ category, cart, date, time, step }) {
       </span>
       {cart && cart.length > 0 && <>
         <ChevronRight size={12} style={{ color: "#cbd5e1" }} />
-        <span style={{ color: "#7C3AED" }}>{totalItems} item{totalItems > 1 ? 's' : ''} · {BOOKING_CURRENCY_SYMBOL}{totalPrice}</span>
+        <span style={{ color: "#7C3AED" }}>{totalItems} item{totalItems > 1 ? 's' : ''} Â· {BOOKING_CURRENCY_SYMBOL}{totalPrice}</span>
       </>}
       {date && <>
         <ChevronRight size={12} style={{ color: "#cbd5e1" }} />
@@ -251,12 +291,12 @@ function SummaryBar({ category, cart, date, time, step }) {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   STEP 1 — HOME (Hero + Services)
-   ───────────────────────────────────────────────────────────────────────── */
-/* ─────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   STEP 1 â€” HOME (Hero + Services)
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    LOCATION PICKER MODAL
-   ───────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function LocationPickerModal({ onClose, onConfirm, initialLocation }) {
   const [search, setSearch] = useState(initialLocation || "")
   const [isFetching, setIsFetching] = useState(false)
@@ -464,7 +504,7 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
           <div className="uc-hero">
             <div className="uc-hero-inner">
               <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
-                <p className="uc-hero-tag">⭐ India's #1 Home Services Platform</p>
+                <p className="uc-hero-tag">â­ India's #1 Home Services Platform</p>
                 <h1 className="uc-hero-h1">
                   Professional
                   <br />
@@ -483,7 +523,7 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
                   <br />
                   at your doorstep
                 </h1>
-                <p className="uc-hero-sub">Trained & verified experts · Transparent pricing · Real-time tracking</p>
+                <p className="uc-hero-sub">Trained & verified experts Â· Transparent pricing Â· Real-time tracking</p>
               </motion.div>
 
               {/* Search Bar */}
@@ -491,7 +531,7 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
                 <Search size={18} className="uc-search-icon" />
                 <input
                   className="uc-search-input"
-                  placeholder="Search for services (e.g. AC repair, deep cleaning…)"
+                  placeholder="Search for services (e.g. AC repair, deep cleaningâ€¦)"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -505,7 +545,7 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
               {/* Trust pills */}
               <motion.div className="uc-trust-row" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
                 <span><ShieldCheck size={13} /> Verified Pros</span>
-                <span><Star size={13} style={{ fill: "#fbbf24", color: "#fbbf24" }} /> 4.8★ Rated</span>
+                <span><Star size={13} style={{ fill: "#fbbf24", color: "#fbbf24" }} /> 4.8â˜… Rated</span>
                 <span><Users size={13} /> 1M+ Happy Homes</span>
                 <span><Award size={13} /> 30-Day Guarantee</span>
               </motion.div>
@@ -530,7 +570,7 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
                     <p>{featured[rotIdx].desc}</p>
                     <div style={{ display: 'flex', gap: '12px', marginTop: '12px', fontSize: '0.95rem', color: '#f1f5f9', fontWeight: 600 }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Star size={14} style={{ fill: "#fbbf24", color: "#fbbf24" }} /> {featured[rotIdx].rating} Rated</span>
-                      <span>•</span>
+                      <span>â€¢</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle2 size={14} /> {featured[rotIdx].jobs} Bookings</span>
                     </div>
                   </div>
@@ -635,9 +675,9 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   STEP 2 — PACKAGE SELECTION
-   ───────────────────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   STEP 2 â€” PACKAGE SELECTION
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function StepPackage({ category, selectedPackage, onSelect, onNext, onBack, packagesData }) {
   const packages = ((packagesData && packagesData[category?.id]) || PACKAGES[category?.id] || []).map(p => ({ ...p, priceStr: BOOKING_CURRENCY_SYMBOL + p.price }))
@@ -656,7 +696,7 @@ function StepPackage({ category, selectedPackage, onSelect, onNext, onBack, pack
       </div>
 
       <h2 className="uc-step-h2">Choose your package</h2>
-      <p className="uc-step-sub">Transparent pricing · No hidden charges</p>
+      <p className="uc-step-sub">Transparent pricing Â· No hidden charges</p>
 
       <div className="uc-pkg-grid">
         {packages.map(pkg => {
@@ -671,7 +711,7 @@ function StepPackage({ category, selectedPackage, onSelect, onNext, onBack, pack
             >
               {pkg.tag && (
                 <div className="uc-pkg-tag" style={{ background: pkg.popular ? "#7C3AED" : "#059669" }}>
-                  {pkg.popular ? "⭐ " : "✅ "}{pkg.tag}
+                  {pkg.popular ? "â­ " : "âœ… "}{pkg.tag}
                 </div>
               )}
 
@@ -723,9 +763,9 @@ function StepPackage({ category, selectedPackage, onSelect, onNext, onBack, pack
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   STEP 3 — SCHEDULE
-   ───────────────────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   STEP 3 â€” SCHEDULE
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function StepSchedule({ category, selectedDate, selectedTime, onDateChange, onTimeChange, onNext, onBack }) {
   const dateScrollRef = useRef()
@@ -786,9 +826,9 @@ function StepSchedule({ category, selectedDate, selectedTime, onDateChange, onTi
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   STEP 4 — PHONE OTP IDENTITY
-   ───────────────────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   STEP 4 â€” PHONE OTP IDENTITY
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function StepLogin({ category, onVerified, onBack }) {
   const { user, refreshMe } = useAuth()
@@ -805,10 +845,10 @@ function StepLogin({ category, onVerified, onBack }) {
 
   // Restore session
   useEffect(() => {
-    if (user && user.role === 'customer') {
+    if (user) {
       onVerified({
         verified: true,
-        name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'Customer',
+        name: user.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (user.username || 'Customer'),
         phone: user.phone || '',
         email: user.email || ''
       })
@@ -827,38 +867,37 @@ function StepLogin({ category, onVerified, onBack }) {
     return () => clearTimeout(t)
   }, [cooldown])
 
-  const handleGoogleLogin = () => {
-    openGoogleSignInPopup(
-      async (accessToken) => {
-        setLoading(true);
-        setError("");
-        try {
-          const res = await apiRequest("/auth/customer/google/", {
-            method: "POST",
-            json: { access_token: accessToken }
-          });
-          if (res.success) {
-            await refreshMe();
-            const data = {
-              verified: true,
-              name: res.user?.name || "",
-              phone: res.user?.phone || "",
-              email: res.user?.email || ""
-            };
-            sessionStorage.setItem(OTP_SESSION_KEY, JSON.stringify(data));
-            onVerified(data);
-          } else {
-            setError(res.detail || "Google login failed");
-          }
-        } catch (err) {
-          setError(err?.body?.detail || "Google login failed");
-        } finally {
-          setLoading(false);
+  const googleLoginHandler = useGoogleLogin({
+    flow: "implicit",
+    onSuccess: async (tr) => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await apiCustomerGoogleLogin(tr.access_token);
+        if (res?.success) {
+          await refreshMe();
+          const data = {
+            verified: true,
+            name: res.user?.name || "",
+            phone: res.user?.phone || "",
+            email: res.user?.email || ""
+          };
+          sessionStorage.setItem(OTP_SESSION_KEY, JSON.stringify(data));
+          onVerified(data);
+        } else {
+          setError(res?.detail || "Google login failed");
         }
-      },
-      (err) => setError(err)
-    );
-  };
+      } catch (err) {
+        setError(err?.body?.detail || "Google login failed");
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: (err) => {
+      console.error("Google OAuth error:", err);
+      setError(err?.error_description || err?.error || "Google login failed");
+    }
+  });
 
   const nameOk = name.trim().length >= 2
   const phoneOk = phone.replace(/[\s\-\(\)\+]/g, "").length >= 7
@@ -959,7 +998,7 @@ function StepLogin({ category, onVerified, onBack }) {
           {error && <div className="uc-error"><AlertCircle size={13} /> {error}</div>}
 
           <button className="uc-btn-primary uc-btn-full" onClick={sendOtp} disabled={!nameOk || !phoneOk || loading}>
-            {loading ? <><RefreshCw size={15} className="spin-icon" /> Sending…</> : <><MessageSquare size={15} /> Send OTP</>}
+            {loading ? <><RefreshCw size={15} className="spin-icon" /> Sendingâ€¦</> : <><MessageSquare size={15} /> Send OTP</>}
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -970,7 +1009,7 @@ function StepLogin({ category, onVerified, onBack }) {
 
           <button
             type="button"
-            onClick={handleGoogleLogin}
+            onClick={() => googleLoginHandler()}
             disabled={loading}
             style={{
               width: '100%',
@@ -1017,7 +1056,7 @@ function StepLogin({ category, onVerified, onBack }) {
 
           {devCode && (
             <div className="uc-dev-banner">
-              <Zap size={13} /> Dev mode — code: <strong>{devCode}</strong> (auto-filled)
+              <Zap size={13} /> Dev mode â€” code: <strong>{devCode}</strong> (auto-filled)
             </div>
           )}
 
@@ -1035,7 +1074,7 @@ function StepLogin({ category, onVerified, onBack }) {
           {error && <div className="uc-error"><AlertCircle size={13} /> {error}</div>}
 
           <button className="uc-btn-primary uc-btn-full" onClick={verifyOtp} disabled={otp.join("").length < 4 || loading}>
-            {loading ? <><RefreshCw size={15} className="spin-icon" /> Verifying…</> : <><ShieldCheck size={15} /> Verify &amp; Continue</>}
+            {loading ? <><RefreshCw size={15} className="spin-icon" /> Verifyingâ€¦</> : <><ShieldCheck size={15} /> Verify &amp; Continue</>}
           </button>
 
           <div className="uc-resend">
@@ -1054,17 +1093,17 @@ function StepLogin({ category, onVerified, onBack }) {
             <CheckCircle2 size={48} style={{ color: "#10B981" }} />
           </motion.div>
           <div className="uc-success-title">Identity Verified!</div>
-          <div className="uc-success-sub">Welcome, {name} 👋</div>
-          <div className="uc-success-sub" style={{ color: "#94a3b8", fontSize: "0.78rem" }}>Loading your booking form…</div>
+          <div className="uc-success-sub">Welcome, {name} ðŸ‘‹</div>
+          <div className="uc-success-sub" style={{ color: "#94a3b8", fontSize: "0.78rem" }}>Loading your booking formâ€¦</div>
         </motion.div>
       )}
     </div>
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   STEP 5 — CUSTOMER DETAILS
-   ───────────────────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   STEP 5 â€” CUSTOMER DETAILS
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoChange, photoPreview, onNext, onBack, globalLocation, onOpenMap }) {
   const fileRef = useRef()
@@ -1081,7 +1120,7 @@ function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoCha
 
   useEffect(() => {
     if (!formData.issue_title && cart && cart.length > 0) {
-      const defaultTitle = cart.map(c => c.name).join(', ') + (category ? ` — ${category.name}` : '');
+      const defaultTitle = cart.map(c => c.name).join(', ') + (category ? ` â€” ${category.name}` : '');
       onChange({ target: { name: 'issue_title', value: defaultTitle } })
     }
   }, [cart, category, formData.issue_title])
@@ -1165,7 +1204,7 @@ function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoCha
             className="uc-textarea"
             name="description"
             rows={3}
-            placeholder="Any specific issues, brand of appliance, how long the problem has been occurring…"
+            placeholder="Any specific issues, brand of appliance, how long the problem has been occurringâ€¦"
             value={formData.description}
             onChange={onChange}
           />
@@ -1187,7 +1226,7 @@ function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoCha
               <>
                 <Camera size={24} style={{ color: "#94a3b8" }} />
                 <div className="uc-photo-text">Click to attach a photo of the issue</div>
-                <div className="uc-photo-hint">JPG, PNG — helps our expert prepare</div>
+                <div className="uc-photo-hint">JPG, PNG â€” helps our expert prepare</div>
               </>
             )}
             <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onPhotoChange} />
@@ -1204,9 +1243,9 @@ function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoCha
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   STEP 6 — CONFIRM
-   ───────────────────────────────────────────────────────────────────────── */
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   STEP 6 â€” CONFIRM
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, onBack, onSubmit, loading, error }) {
   const [agreed, setAgreed] = useState(false)
@@ -1233,7 +1272,7 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
         {/* Summary Card */}
         <div className="uc-summary-card">
           <div className="uc-summary-hero" style={{ background: `linear-gradient(135deg,#7C3AED,#a855f7)` }}>
-            <span style={{ fontSize: "2rem" }}>{category?.emoji || "🔧"}</span>
+            <span style={{ fontSize: "2rem" }}>{category?.emoji || "ðŸ”§"}</span>
             <div>
               <div style={{ fontWeight: 800, color: "white", fontSize: "1rem" }}>{category?.name || "Service"}</div>
               <div style={{ color: "rgba(255,255,255,0.8)", fontSize: "0.75rem" }}>
@@ -1308,7 +1347,7 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
               <span>{BOOKING_CURRENCY_SYMBOL}{totalPrice}</span>
             </div>
             <div style={{ textAlign: "center", fontSize: "0.68rem", color: "#94a3b8", marginTop: "0.25rem" }}>
-              Pay at doorstep · No advance required
+              Pay at doorstep Â· No advance required
             </div>
           </div>
         </div>
@@ -1352,11 +1391,11 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
             onClick={() => { if (agreed && !loading) setShowPayment(true) }}
             disabled={!agreed || loading}
           >
-            {loading ? <><RefreshCw size={16} className="spin-icon" /> Processing…</> : <><CreditCard size={16} /> Choose Payment & Confirm</>}
+            {loading ? <><RefreshCw size={16} className="spin-icon" /> Processingâ€¦</> : <><CreditCard size={16} /> Choose Payment & Confirm</>}
           </button>
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", marginTop: "0.75rem", fontSize: "0.7rem", color: "#94a3b8" }}>
-            <Shield size={12} /> Secured & encrypted · Pay on arrival
+            <Shield size={12} /> Secured & encrypted Â· Pay on arrival
           </div>
         </div>
       </div>
@@ -1375,9 +1414,9 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    PAYMENT MODAL
-   ───────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onConfirm, bookingId }) {
   const [selected, setSelected] = useState(allowedMethods.includes('online') && allowedMethods.length === 1 ? 'online' : 'cash')
@@ -1426,8 +1465,8 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
   }
 
   const options = [
-    { id: "cash", icon: "💵", label: "Cash on Service", sub: "Pay after service is completed", badge: "Most Popular", badgeColor: "#10B981", detail: ["No upfront payment", "Pay only on completion", "Any denomination accepted"] },
-    { id: "online", icon: "📱", label: "Pay via UPI", sub: "Google Pay, PhonePe, Paytm, BHIM", badge: "Instant", badgeColor: "#7C3AED", detail: ["100% secure & encrypted", "Instant confirmation", "Invoice emailed immediately"] },
+    { id: "cash", icon: "ðŸ’µ", label: "Cash on Service", sub: "Pay after service is completed", badge: "Most Popular", badgeColor: "#10B981", detail: ["No upfront payment", "Pay only on completion", "Any denomination accepted"] },
+    { id: "online", icon: "ðŸ“±", label: "Pay via UPI", sub: "Google Pay, PhonePe, Paytm, BHIM", badge: "Instant", badgeColor: "#7C3AED", detail: ["100% secure & encrypted", "Instant confirmation", "Invoice emailed immediately"] },
   ].filter(o => allowedMethods.includes(o.id))
 
   if (showOnlineSheet) {
@@ -1450,7 +1489,7 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
             {payPhase === 'processing' && (
               <div style={{ textAlign: 'center', padding: '2rem 0' }}>
                 <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} style={{ display: 'inline-block', marginBottom: '1.5rem' }}><RefreshCw size={48} color="#7C3AED" /></motion.div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Processing UPI Payment…</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Processing UPI Paymentâ€¦</div>
                 <div style={{ color: '#64748b', fontSize: '0.85rem' }}>Please do not close this window</div>
               </div>
             )}
@@ -1460,9 +1499,9 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
                   style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg,#10B981,#34D399)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
                   <Check size={36} color="white" />
                 </motion.div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Payment Successful! 🎉</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Payment Successful! ðŸŽ‰</div>
                 <div style={{ color: '#64748b', fontSize: '0.85rem' }}>Your booking is now confirmed</div>
-                <div style={{ marginTop: '1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.78rem', color: '#166534', fontWeight: 600 }}>✅ Amount {BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()} debited successfully</div>
+                <div style={{ marginTop: '1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.78rem', color: '#166534', fontWeight: 600 }}>âœ… Amount {BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()} debited successfully</div>
               </div>
             )}
             {payPhase === 'failed' && (
@@ -1495,7 +1534,7 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
             )}
             {payPhase === null && (
               <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                <Shield size={11} /> 256-bit SSL · UPI Encryption
+                <Shield size={11} /> 256-bit SSL Â· UPI Encryption
               </div>
             )}
           </div>
@@ -1546,12 +1585,12 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
         <div style={{ padding: '0 1.75rem' }}>
           <button onClick={handleConfirm} disabled={confirming}
             style={{ width: '100%', padding: '1rem', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', fontWeight: 800, fontSize: '1rem', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 20px rgba(124,58,237,0.3)' }}>
-            {confirming ? <><RefreshCw size={16} className="spin-icon" /> Processing…</> :
+            {confirming ? <><RefreshCw size={16} className="spin-icon" /> Processingâ€¦</> :
               selected === 'online' ? <><CreditCard size={16} /> Continue to Pay {BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()}</> :
                 <><CheckCheck size={16} /> Confirm Booking</>}
           </button>
           <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-            <Shield size={11} /> 256-bit SSL encrypted · Your info is safe
+            <Shield size={11} /> 256-bit SSL encrypted Â· Your info is safe
           </div>
         </div>
       </motion.div>
@@ -1559,9 +1598,9 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    POST-BOOKING ANIMATED FLOW
-   ───────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function PostBookingFlow({ bookingData, category, cart, formData, selDate, selTime, onDone }) {
   const [phase, setPhase] = useState(0)
@@ -1586,21 +1625,21 @@ function PostBookingFlow({ bookingData, category, cart, formData, selDate, selTi
   const phases = [
     {
       icon: <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}><RefreshCw size={52} color="#7C3AED" /></motion.div>,
-      title: "Creating your booking…",
+      title: "Creating your bookingâ€¦",
       sub: "Submitting your service request securely",
     },
     {
       icon: <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 0.8 }}><Users size={52} color="#F59E0B" /></motion.div>,
-      title: "Finding your expert…",
+      title: "Finding your expertâ€¦",
       sub: "Matching you with the best professional nearby",
     },
     {
       icon: <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 15 }}><CheckCircle2 size={52} color="#10B981" /></motion.div>,
-      title: "Professional Assigned! ✅",
+      title: "Professional Assigned! âœ…",
       sub: "Your expert is confirmed and on their way",
     },
     {
-      icon: <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 12 }}><span style={{ fontSize: '3.5rem' }}>🎉</span></motion.div>,
+      icon: <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 12 }}><span style={{ fontSize: '3.5rem' }}>ðŸŽ‰</span></motion.div>,
       title: "Booking Confirmed!",
       sub: "Your booking is all set. Tap below to track.",
     },
@@ -1645,7 +1684,7 @@ function PostBookingFlow({ bookingData, category, cart, formData, selDate, selTi
               <img src={MOCK_TECH.avatar} alt={MOCK_TECH.name} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #7C3AED30' }} />
               <div style={{ flex: 1, textAlign: 'left' }}>
                 <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>{MOCK_TECH.name}</div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>⭐ {MOCK_TECH.rating} · {MOCK_TECH.jobs} jobs</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>â­ {MOCK_TECH.rating} Â· {MOCK_TECH.jobs} jobs</div>
               </div>
               <div style={{ background: '#10B98115', color: '#10B981', fontWeight: 800, fontSize: '0.7rem', padding: '4px 10px', borderRadius: 99, border: '1px solid #10B98130' }}>ETA {MOCK_TECH.eta}</div>
             </motion.div>
@@ -1666,9 +1705,9 @@ function PostBookingFlow({ bookingData, category, cart, formData, selDate, selTi
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    LIVE TRACKING PAGE
-   ───────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function LiveTrackingPage({ successData, technician, category, cart, formData, selDate, selTime, onBookAgain }) {
   const rid = successData?.request_id || successData?.id || "BK" + Date.now().toString().slice(-6)
@@ -1678,11 +1717,11 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
   const displayTime = selTime ? TIME_SLOTS.flatMap(g => g.slots).find(s => s.t === selTime)?.l : ""
 
   const trackSteps = [
-    { label: "Booking Confirmed", icon: "✅", done: true, time: "Just now" },
-    { label: "Expert Assigned", icon: "👨‍🔧", done: false, time: "Pending" },
-    { label: "Expert On The Way", icon: "🛵", done: false, time: "Pending" },
-    { label: "Service In Progress", icon: "⚙️", done: false, time: "Scheduled" },
-    { label: "Service Completed", icon: "🌟", done: false, time: "Pending" },
+    { label: "Booking Confirmed", icon: "âœ…", done: true, time: "Just now" },
+    { label: "Expert Assigned", icon: "ðŸ‘¨â€ðŸ”§", done: false, time: "Pending" },
+    { label: "Expert On The Way", icon: "ðŸ›µ", done: false, time: "Pending" },
+    { label: "Service In Progress", icon: "âš™ï¸", done: false, time: "Scheduled" },
+    { label: "Service Completed", icon: "ðŸŒŸ", done: false, time: "Pending" },
   ]
 
   useEffect(() => {
@@ -1701,7 +1740,7 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
         >
           <CheckCircle2 size={44} color="white" />
         </motion.div>
-        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>Booking Confirmed! 🎉</h2>
+        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>Booking Confirmed! ðŸŽ‰</h2>
         <p style={{ margin: '0 0 0.5rem', color: '#64748b', fontSize: '0.9rem' }}>Your expert is on the way</p>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f5f3ff', border: '1px solid #7C3AED30', borderRadius: 99, padding: '6px 16px' }}>
           <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#7C3AED', textTransform: 'uppercase' }}>Booking Ref</span>
@@ -1719,7 +1758,7 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.05rem' }}>{tech.name}</div>
-            <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 2 }}>⭐ {tech.rating} · {tech.jobs} jobs completed</div>
+            <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 2 }}>â­ {tech.rating} Â· {tech.jobs} jobs completed</div>
             <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
               <span style={{ background: '#10B98112', color: '#10B981', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 99, border: '1px solid #10B98125' }}>Verified Pro</span>
               <span style={{ background: '#7C3AED12', color: '#7C3AED', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 99, border: '1px solid #7C3AED25' }}>Background Checked</span>
@@ -1745,7 +1784,7 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
         style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}
       >
-        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>📋 Booking Details</div>
+        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>ðŸ“‹ Booking Details</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', fontSize: '0.8rem' }}>
           {[
             { label: 'Service', value: category?.name },
@@ -1756,7 +1795,7 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
           ].map((r, i) => (
             <div key={i} style={{ ...(r.span ? { gridColumn: '1/-1' } : {}), background: '#f8fafc', borderRadius: 10, padding: '0.5rem 0.75rem' }}>
               <div style={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase' }}>{r.label}</div>
-              <div style={{ fontWeight: 700, color: r.highlight ? '#7C3AED' : '#0f172a', marginTop: 2 }}>{r.value || '—'}</div>
+              <div style={{ fontWeight: 700, color: r.highlight ? '#7C3AED' : '#0f172a', marginTop: 2 }}>{r.value || 'â€”'}</div>
             </div>
           ))}
         </div>
@@ -1765,7 +1804,7 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
         style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}
       >
-        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>🗺️ Live Tracking</div>
+        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>ðŸ—ºï¸ Live Tracking</div>
         {trackSteps.map((s, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.5rem 0', position: 'relative' }}>
             {i < trackSteps.length - 1 && <div style={{ position: 'absolute', left: 18, top: 36, width: 2, height: 24, background: s.done ? '#10B981' : '#e2e8f0' }} />}
@@ -1788,9 +1827,9 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    STEP INDICATOR BAR
-   ───────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 const STEP_LABELS = ["Service", "Package", "Schedule", "Identity", "Details", "Confirm"]
 
@@ -1817,16 +1856,16 @@ function StepBar({ step, total }) {
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    MAIN PAGE
-   ───────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    CUSTOMER ACCOUNT MODAL
-   ───────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
-  const { user, refreshMe } = useAuth()
+  const { user, refreshMe, loginWithGoogle, loginWithCustomerGoogle } = useAuth()
 
   const [loginMethod, setLoginMethod] = useState('email')
   const [loginEmail, setLoginEmail] = useState('')
@@ -1856,6 +1895,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
       if (loginMethod === 'email') await apiVerifyCustomerEmailOTP(loginEmail, otpValue)
       else await apiVerifyCustomerPhoneOTP(loginPhone, otpValue)
       await refreshMe()
+      if (onClose) onClose()
     } catch (e) {
       setLoginError(e.body?.detail || 'Invalid OTP')
     }
@@ -1867,30 +1907,31 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
     await refreshMe()
   }
 
-  const handleGoogleLogin = () => {
-    openGoogleSignInPopup(
-      async (accessToken) => {
-        setLoginLoading(true);
-        setLoginError("");
-        try {
-          const res = await apiRequest("/auth/customer/google/", {
-            method: "POST",
-            json: { access_token: accessToken }
-          });
-          if (res.success) {
-            await refreshMe();
-          } else {
-            setLoginError(res.detail || "Google login failed");
-          }
-        } catch (err) {
-          setLoginError(err?.body?.detail || "Google login failed");
-        } finally {
-          setLoginLoading(false);
+  const googleLoginHandler = useGoogleLogin({
+    flow: "implicit",
+    onSuccess: async (tr) => {
+      setLoginLoading(true);
+      setLoginError("");
+      try {
+        if (typeof loginWithCustomerGoogle === 'function') {
+          await loginWithCustomerGoogle(tr.access_token);
+        } else {
+          await apiCustomerGoogleLogin(tr.access_token);
         }
-      },
-      (err) => setLoginError(err)
-    );
-  };
+        await refreshMe();
+        if (onClose) onClose();
+      } catch (err) {
+        setLoginError(err?.message || err?.body?.detail || "Google login failed");
+      } finally {
+        setLoginLoading(false);
+      }
+    },
+    onError: (err) => {
+      console.error("Google OAuth error:", err);
+      setLoginLoading(false);
+      setLoginError(err?.error_description || err?.error || "Google sign-in was cancelled or failed.");
+    }
+  });
 
   const [selectedMockBooking, setSelectedMockBooking] = useState(null)
 
@@ -1954,6 +1995,301 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
     }
   }, [activeTab, user])
 
+  // â”€â”€ Reschedule State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Reschedule State ────────────────────────────────────────────────────────
+  const [reschedules, setReschedules] = useState([])
+  const [reschedulesLoading, setReschedulesLoading] = useState(false)
+  const [showRescheduleForm, setShowRescheduleForm] = useState(false)
+  const [rescheduleBookingId, setRescheduleBookingId] = useState('')
+  const [rescheduleDate, setRescheduleDate] = useState('')
+  const [rescheduleTimeSlot, setRescheduleTimeSlot] = useState('09-10')
+  const [rescheduleReason, setRescheduleReason] = useState('schedule_conflict')
+  const [rescheduleNotes, setRescheduleNotes] = useState('')
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false)
+  const [rescheduleError, setRescheduleError] = useState('')
+  const [rescheduleSuccess, setRescheduleSuccess] = useState('')
+  
+  const [activeBookings, setActiveBookings] = useState([])
+  const [availableSlots, setAvailableSlots] = useState([])
+  const [slotsLoading, setSlotsLoading] = useState(false)
+
+  // ── Refund State ──────────────────────────────────────────────────────────
+  const [refunds, setRefunds] = useState([])
+  const [refundsLoading, setRefundsLoading] = useState(false)
+  const [showRefundForm, setShowRefundForm] = useState(false)
+  const [refundBookingId, setRefundBookingId] = useState('')
+  const [refundAmount, setRefundAmount] = useState('')
+  const [refundReason, setRefundReason] = useState('POOR_QUALITY')
+  const [refundSubmitting, setRefundSubmitting] = useState(false)
+  const [refundError, setRefundError] = useState('')
+  const [refundSuccess, setRefundSuccess] = useState('')
+
+  const [eligibleRefundBookings, setEligibleRefundBookings] = useState([])
+  const [refundSummary, setRefundSummary] = useState(null)
+  const [refundSummaryLoading, setRefundSummaryLoading] = useState(false)
+  const [refundType, setRefundType] = useState('FULL')
+  const [refundRequestedAmount, setRefundRequestedAmount] = useState('')
+  const [refundNotes, setRefundNotes] = useState('')
+  const [refundFiles, setRefundFiles] = useState([])
+  const [expandedRefundId, setExpandedRefundId] = useState(null)
+
+  // ── Complaint State ─────────────────────────────────────────────────────────
+  const [complaints, setComplaints] = useState([])
+  const [complaintsLoading, setComplaintsLoading] = useState(false)
+  const [showComplaintForm, setShowComplaintForm] = useState(false)
+  const [complaintBookingId, setComplaintBookingId] = useState('')
+  const [complaintCategory, setComplaintCategory] = useState('OTHER')
+  const [complaintDesc, setComplaintDesc] = useState('')
+  const [complaintSubmitting, setComplaintSubmitting] = useState(false)
+  const [complaintError, setComplaintError] = useState('')
+  const [complaintSuccess, setComplaintSuccess] = useState('')
+  const [selectedComplaint, setSelectedComplaint] = useState(null)
+  const [complaintReply, setComplaintReply] = useState('')
+  const [complaintReplying, setComplaintReplying] = useState(false)
+
+  // ── Saved Addresses State ───────────────────────────────────────────────────
+  const [savedAddresses, setSavedAddresses] = useState([])
+  const [addressesLoading, setAddressesLoading] = useState(false)
+  const [showAddressForm, setShowAddressForm] = useState(false)
+  const [editingAddress, setEditingAddress] = useState(null)
+
+  const [addrLabel, setAddrLabel] = useState('home')
+  const [addrLine1, setAddrLine1] = useState('')
+  const [addrLine2, setAddrLine2] = useState('')
+  const [addrCity, setAddrCity] = useState('')
+  const [addrState, setAddrState] = useState('')
+  const [addrPincode, setAddrPincode] = useState('')
+  const [addrPhone, setAddrPhone] = useState('')
+  const [addrIsDefault, setAddrIsDefault] = useState(false)
+  const [addrSubmitting, setAddrSubmitting] = useState(false)
+  const [addrError, setAddrError] = useState('')
+  const [addrSuccess, setAddrSuccess] = useState('')
+
+  const [mapAddress, setMapAddress] = useState(null)
+
+  const humanizeLastUsed = (isoStr) => {
+    if (!isoStr) return 'Never used'
+    try {
+      const d = new Date(isoStr)
+      const diffMs = new Date() - d
+      const diffSecs = Math.floor(diffMs / 1000)
+      const diffMins = Math.floor(diffSecs / 60)
+      const diffHours = Math.floor(diffMins / 60)
+      const diffDays = Math.floor(diffHours / 24)
+
+      if (diffSecs < 60) return 'Just now'
+      if (diffMins < 60) return `${diffMins}m ago`
+      if (diffHours < 24) return `${diffHours}h ago`
+      if (diffDays === 1) return 'Yesterday'
+      if (diffDays < 30) return `${diffDays} days ago`
+      return d.toLocaleDateString()
+    } catch {
+      return 'Recently'
+    }
+  }
+
+  const fetchAddresses = () => {
+    setAddressesLoading(true)
+    apiRequest('/auth/customer/addresses/')
+      .then(r => setSavedAddresses(r.data || []))
+      .catch(() => setSavedAddresses([]))
+      .finally(() => setAddressesLoading(false))
+  }
+
+  useEffect(() => {
+    if (activeTab === 'Saved Addresses' && user) {
+      fetchAddresses()
+    }
+  }, [activeTab, user])
+
+  useEffect(() => {
+    if (activeTab === 'My Reschedules' && user) {
+      setReschedulesLoading(true)
+      apiRequest('/customer/reschedules/')
+        .then(r => setReschedules(r.data || []))
+        .catch(() => apiRequest('/booking/reschedule/').then(r => setReschedules(r.data || [])).catch(() => setReschedules([])))
+        .finally(() => setReschedulesLoading(false))
+
+      apiRequest('/customer/active-bookings/')
+        .then(r => {
+          const list = r.data || []
+          setActiveBookings(list)
+          if (list.length > 0 && !rescheduleBookingId) {
+            setRescheduleBookingId(list[0].id)
+          }
+        })
+        .catch(() => {
+          apiRequest('/booking/my-bookings/').then(r => {
+            const list = r.data || []
+            setActiveBookings(list)
+            if (list.length > 0 && !rescheduleBookingId) setRescheduleBookingId(list[0].id)
+          }).catch(console.error)
+        })
+    }
+  }, [activeTab, user])
+
+  useEffect(() => {
+    if (rescheduleBookingId && rescheduleDate) {
+      setSlotsLoading(true)
+      apiRequest(`/customer/bookings/${rescheduleBookingId}/slots/?date=${rescheduleDate}`)
+        .then(r => {
+          const slots = r.data || []
+          setAvailableSlots(slots)
+          const firstAvail = slots.find(s => s.is_available)
+          if (firstAvail) setRescheduleTimeSlot(firstAvail.time_slot)
+        })
+        .catch(() => setAvailableSlots([]))
+        .finally(() => setSlotsLoading(false))
+    }
+  }, [rescheduleBookingId, rescheduleDate])
+
+  const fetchCustomerRefundData = () => {
+    setRefundsLoading(true)
+    apiRequest('/customer/refunds/')
+      .then(r => setRefunds(r.data || []))
+      .catch(() => apiRequest('/booking/refunds/').then(r => setRefunds(r.data || [])).catch(() => setRefunds([])))
+      .finally(() => setRefundsLoading(false))
+
+    apiRequest('/customer/refunds/eligible-bookings/')
+      .then(r => {
+        const list = r.data || []
+        setEligibleRefundBookings(list)
+        if (list.length > 0 && !refundBookingId) {
+          setRefundBookingId(list[0].id)
+        }
+      })
+      .catch(() => setEligibleRefundBookings([]))
+  }
+
+  useEffect(() => {
+    if (activeTab === 'My Refunds' && user) {
+      fetchCustomerRefundData()
+    }
+  }, [activeTab, user])
+
+  useEffect(() => {
+    if (refundBookingId) {
+      setRefundSummaryLoading(true)
+      apiRequest(`/customer/refunds/bookings/${refundBookingId}/summary/`)
+        .then(r => {
+          setRefundSummary(r.data)
+          if (refundType === 'FULL' && r.data?.paid_amount) {
+            setRefundRequestedAmount(r.data.paid_amount)
+          }
+        })
+        .catch(() => setRefundSummary(null))
+        .finally(() => setRefundSummaryLoading(false))
+    }
+  }, [refundBookingId, refundType])
+
+  const handleSubmitReschedule = async () => {
+    setRescheduleError(''); setRescheduleSuccess(''); setRescheduleSubmitting(true)
+    try {
+      const payload = {
+        booking_id: rescheduleBookingId,
+        new_date: rescheduleDate,
+        new_time_slot: rescheduleTimeSlot,
+        reason: rescheduleReason,
+        additional_notes: rescheduleNotes,
+      }
+      let res;
+      try {
+        res = await apiRequest('/customer/reschedules/create/', { method: 'POST', json: payload })
+      } catch (e) {
+        res = await apiRequest('/booking/reschedule/', { method: 'POST', json: payload })
+      }
+      if (res.success || res.status === 'success') {
+        setRescheduleSuccess('Reschedule request submitted successfully!')
+        setShowRescheduleForm(false)
+        setRescheduleDate('')
+        setRescheduleNotes('')
+        try {
+          const updated = await apiRequest('/customer/reschedules/')
+          setReschedules(updated.data || [])
+        } catch(e) {
+          const updated = await apiRequest('/booking/reschedule/')
+          setReschedules(updated.data || [])
+        }
+      } else {
+        setRescheduleError(res.error?.message || res.message || 'Failed to submit reschedule request.')
+      }
+    } catch (e) {
+      setRescheduleError(e?.body?.message || e?.message || 'Failed to submit reschedule request.')
+    } finally {
+      setRescheduleSubmitting(false)
+    }
+  }
+
+  const handleSubmitRefund = async () => {
+    setRefundError(''); setRefundSuccess(''); setRefundSubmitting(true)
+    try {
+      const formData = new FormData()
+      formData.append('booking_id', refundBookingId)
+      formData.append('refund_type', refundType)
+      formData.append('requested_amount', refundType === 'FULL' ? (refundSummary?.paid_amount || refundRequestedAmount) : refundRequestedAmount)
+      formData.append('reason', refundReason || 'POOR_QUALITY')
+      formData.append('additional_notes', refundNotes)
+
+      if (refundFiles && refundFiles.length > 0) {
+        for (let i = 0; i < refundFiles.length; i++) {
+          formData.append('evidence', refundFiles[i])
+        }
+      }
+
+      const token = localStorage.getItem('token') || localStorage.getItem('access_token')
+      const response = await fetch('/api/customer/refunds/create/', {
+        method: 'POST',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: formData
+      })
+
+      const res = await response.json()
+      if (res.success || response.ok) {
+        setRefundSuccess('Refund request submitted successfully!')
+        setShowRefundForm(false)
+        setRefundNotes('')
+        setRefundFiles([])
+        fetchCustomerRefundData()
+      } else {
+        const errObj = res.error || {}
+        setRefundError(errObj.message || res.message || 'Failed to submit refund request.')
+      }
+    } catch (e) {
+      setRefundError(e?.message || 'Failed to submit refund request.')
+    } finally {
+      setRefundSubmitting(false)
+    }
+  }
+
+  const handleSubmitComplaint = async () => {
+    setComplaintError(''); setComplaintSuccess(''); setComplaintSubmitting(true)
+    try {
+      const res = await apiRequest('/booking/complaints/create/', { method: 'POST', json: { booking_id: complaintBookingId || undefined, category: complaintCategory, description: complaintDesc } })
+      if (res.success) {
+        setComplaintSuccess('Complaint submitted! We will respond within 24 hours.')
+        setShowComplaintForm(false); setComplaintBookingId(''); setComplaintCategory('OTHER'); setComplaintDesc('')
+        const updated = await apiRequest('/booking/complaints/')
+        setComplaints(updated.data || [])
+      } else { setComplaintError(res.message || 'Failed to submit') }
+    } catch (e) { setComplaintError(e?.body?.message || 'Failed to submit') }
+    finally { setComplaintSubmitting(false) }
+  }
+
+  const handleComplaintReply = async (complaintId) => {
+    if (!complaintReply.trim()) return
+    setComplaintReplying(true)
+    try {
+      await apiRequest(`/booking/complaints/${complaintId}/response/`, { method: 'POST', json: { message: complaintReply } })
+      setComplaintReply('')
+      const res = await apiRequest(`/booking/complaints/${complaintId}/`)
+      setSelectedComplaint(res.data)
+    } catch (e) { console.error(e) }
+    finally { setComplaintReplying(false) }
+  }
+
+
   const userFullName = user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : 'Customer'
   const userEmail = user?.email || ''
   const userPhone = user?.phone || ''
@@ -1995,7 +2331,10 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
     { id: "My Profile", icon: User },
     { id: "My Bookings", icon: Calendar },
     { id: "Saved Addresses", icon: MapPin },
-    { id: "Payment Methods", icon: CreditCard },
+    { id: "My Reschedules", icon: RefreshCw },
+    { id: "My Refunds", icon: CreditCard },
+    { id: "My Complaints", icon: MessageSquare },
+    { id: "Payment Methods", icon: Wallet },
     { id: "Notifications", icon: Bell },
     { id: "Help & Support", icon: LifeBuoy },
   ]
@@ -2049,100 +2388,547 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <h3 style={{ margin: '0 0 1.5rem', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>My Bookings</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {bookingsLoading ? <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Loading bookings...</div> : realBookings.length === 0 ? <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No bookings found.</div> : realBookings.map(b => (
-                <React.Fragment key={b.id}>
-                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 16, padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', position: 'relative', zIndex: 1 }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                        <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem' }}>{b.service_category_display || b.issue_title || 'Service Booking'}</span>
-                        <span style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: 99, fontWeight: 800, background: b.status === 'completed' ? '#10B98115' : '#7C3AED15', color: b.status === 'completed' ? '#10B981' : '#7C3AED', border: `1px solid ${b.status === 'completed' ? '#10B98130' : '#7C3AED30'}` }}>{b.status_display || b.status}</span>
-                      </div>
-                      <div style={{ fontSize: '0.85rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}><Calendar size={13} /> {b.preferred_date || 'N/A'} &nbsp;•&nbsp; <span style={{ fontFamily: 'monospace' }}>{b.request_id}</span></div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 900, color: '#0f172a', marginBottom: 12, fontSize: '1.1rem' }}>Paid</div>
-                      <button
-                        onClick={() => setSelectedMockBooking(selectedMockBooking?.id === b.id ? null : b)}
-                        style={{ fontSize: '0.85rem', padding: '8px 18px', borderRadius: 8, border: 'none', background: '#7C3AED', fontWeight: 700, cursor: 'pointer', color: 'white', boxShadow: '0 2px 4px rgba(124,58,237,0.25)', transition: 'background 0.2s' }}
-                        onMouseOver={e => e.currentTarget.style.background = '#6d28d9'}
-                        onMouseOut={e => e.currentTarget.style.background = '#7C3AED'}
-                      >
-                        {selectedMockBooking?.id === b.id ? 'Hide Details' : 'View Details'}
-                      </button>
-                    </div>
-                  </div>
+              {bookingsLoading ? <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Loading bookings...</div> : realBookings.length === 0 ? <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No bookings found.</div> : realBookings.map(b => {
+                const isRescheduleEligible = ['new_request', 'reviewed', 'confirmed', 'assigned', 'accepted'].includes(b.status)
+                const getRescheduleNotice = (st) => {
+                  if (['completed', 'closed', 'verified', 'feedback_pending', 'feedback_received'].includes(st)) {
+                    return "Reschedule is unavailable because this service has already been completed."
+                  }
+                  if (['in_progress', 'on_the_way'].includes(st)) {
+                    return "Reschedule is unavailable because service is currently in progress."
+                  }
+                  if (st === 'waiting_for_payment') {
+                    return "Reschedule is unavailable while payment is pending."
+                  }
+                  if (['cancelled', 'rejected'].includes(st)) {
+                    return "Reschedule is unavailable for cancelled/rejected bookings."
+                  }
+                  return null
+                }
+                const noticeMsg = getRescheduleNotice(b.status)
 
-                  {selectedMockBooking?.id === b.id && (
-                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '1.25rem', marginTop: '-16px', position: 'relative', zIndex: 0 }}>
-                      <div style={{ fontWeight: 800, color: '#334155', marginBottom: 12 }}>Booking Overview</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: '0.85rem' }}>
-                        <div>
-                          <div style={{ color: '#64748b', marginBottom: 4 }}>Assigned Expert</div>
-                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{b.assigned_employee ? b.assigned_employee.full_name : 'Not assigned yet'}</div>
+                return (
+                  <React.Fragment key={b.id}>
+                    <div style={{ border: '1px solid #e2e8f0', borderRadius: 16, padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', position: 'relative', zIndex: 1 }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                          <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem' }}>{(b.service_category_display || b.issue_title || 'Service Booking').replace(/â€“/g, ' - ').replace(/â€”/g, ' - ').replace(/&amp;/g, '&')}</span>
+                          <span style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: 99, fontWeight: 800, background: b.status === 'completed' ? '#10B98115' : '#7C3AED15', color: b.status === 'completed' ? '#10B981' : '#7C3AED', border: `1px solid ${b.status === 'completed' ? '#10B98130' : '#7C3AED30'}` }}>{b.status_display || b.status}</span>
                         </div>
-                        <div>
-                          <div style={{ color: '#64748b', marginBottom: 4 }}>Payment Status</div>
-                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{b.payment_status_display || (b.payment_status === 'paid' ? 'Paid' : 'Pending')}</div>
-                        </div>
-                        <div style={{ gridColumn: '1/-1', borderTop: '1px solid #e2e8f0', paddingTop: 12, marginTop: 4 }}>
-                          <div style={{ color: '#64748b', marginBottom: 4 }}>Service Address</div>
-                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{b.address || 'N/A'}</div>
-                        </div>
-
-                        {(b.payment_status === 'paid' || b.payment_status === 'collected') && (
-                          <div style={{ gridColumn: '1/-1', borderTop: '1px solid #e2e8f0', paddingTop: 12, marginTop: 4, display: 'flex', gap: 10 }}>
-                            <button onClick={() => window.open(`http://localhost:8000/api/booking/${b.id}/invoice/`, '_blank')} style={{ flex: 1, padding: '8px', background: 'white', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><FileText size={14} /> Download Invoice</button>
-                            <button onClick={() => alert("Invoice successfully sent to your registered email!")} style={{ flex: 1, padding: '8px', background: 'white', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Mail size={14} /> Email Invoice</button>
+                        <div style={{ fontSize: '0.85rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}><Calendar size={13} /> {b.preferred_date || 'N/A'} &nbsp;•&nbsp; <span style={{ fontFamily: 'monospace' }}>{b.request_id}</span></div>
+                        
+                        {/* Reschedule Action for Eligible Bookings (Pending Confirmation, Confirmed, Employee Assigned) */}
+                        {isRescheduleEligible && (
+                          <div style={{ marginTop: 6 }}>
+                            <button
+                              onClick={() => {
+                                setRescheduleBookingId(b.id)
+                                if (b.preferred_date) setRescheduleDate(b.preferred_date)
+                                setShowRescheduleForm(true)
+                                setActiveTab('My Reschedules')
+                              }}
+                              style={{ padding: '6px 14px', background: '#7C3AED', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(124,58,237,0.3)' }}
+                              onMouseOver={e => e.currentTarget.style.background = '#6d28d9'}
+                              onMouseOut={e => e.currentTarget.style.background = '#7C3AED'}
+                            >
+                              <RefreshCw size={13} /> Reschedule
+                            </button>
                           </div>
                         )}
                       </div>
-                    </motion.div>
-                  )}
-                </React.Fragment>
-              ))}
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: 900, color: ['paid', 'collected'].includes(b.payment_status) ? '#059669' : '#d97706', marginBottom: 12, fontSize: '1.05rem' }}>
+                          {b.payment_status_display || (b.payment_status === 'paid' ? 'Paid' : b.payment_status === 'collected' ? 'Collected' : 'Pending')}
+                        </div>
+                        <button
+                          onClick={() => setSelectedMockBooking(selectedMockBooking?.id === b.id ? null : b)}
+                          style={{ fontSize: '0.85rem', padding: '8px 18px', borderRadius: 8, border: 'none', background: '#7C3AED', fontWeight: 700, cursor: 'pointer', color: 'white', boxShadow: '0 2px 4px rgba(124,58,237,0.25)', transition: 'background 0.2s' }}
+                          onMouseOver={e => e.currentTarget.style.background = '#6d28d9'}
+                          onMouseOut={e => e.currentTarget.style.background = '#7C3AED'}
+                        >
+                          {selectedMockBooking?.id === b.id ? 'Hide Details' : 'View Details'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {selectedMockBooking?.id === b.id && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '1.5rem', marginTop: '-16px', position: 'relative', zIndex: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, borderBottom: '1px solid #e2e8f0', paddingBottom: 10 }}>
+                          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>📋 Full Booking Overview</div>
+                          <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', fontWeight: 800, color: '#7C3AED', background: '#7C3AED10', padding: '4px 10px', borderRadius: 8 }}>{b.request_id}</span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, fontSize: '0.85rem' }}>
+                          <div>
+                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: 4 }}>Assigned Technician</div>
+                            <div style={{ fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                              👤 {b.assigned_employee ? (b.assigned_employee.full_name || b.assigned_employee.user?.first_name || 'Assigned Technician') : 'Not assigned yet'}
+                            </div>
+                            {b.assigned_employee?.phone && (
+                              <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>📞 {b.assigned_employee.phone}</div>
+                            )}
+                          </div>
+
+                          <div>
+                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: 4 }}>Scheduled Date & Time</div>
+                            <div style={{ fontWeight: 700, color: '#0f172a' }}>
+                              📅 {b.preferred_date || 'Not scheduled'} {b.preferred_time ? `(${b.preferred_time})` : ''}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: 4 }}>Payment Details</div>
+                            <div style={{ fontWeight: 700, color: '#0f172a' }}>
+                              {b.payment_status_display || (b.payment_status === 'paid' ? 'Paid' : 'Pending')} · {b.payment_method_display || (b.payment_method === 'COD' ? 'Cash on Service' : 'Online Payment')}
+                            </div>
+                            {b.total_amount && (
+                              <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#059669', marginTop: 2 }}>Total: ₹{parseFloat(b.total_amount).toLocaleString('en-IN')}</div>
+                            )}
+                          </div>
+
+                          <div>
+                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: 4 }}>Customer Info</div>
+                            <div style={{ fontWeight: 700, color: '#0f172a' }}>{b.customer_name || user?.first_name || 'Customer'}</div>
+                            <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: 2 }}>✉️ {b.email || user?.email} {b.phone ? `· 📞 ${b.phone}` : ''}</div>
+                          </div>
+
+                          <div style={{ gridColumn: '1/-1', borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
+                            <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: 4 }}>Service Address</div>
+                            <div style={{ fontWeight: 600, color: '#0f172a', lineHeight: 1.5 }}>📍 {b.address || 'N/A'}</div>
+                          </div>
+
+                          {b.description && (
+                            <div style={{ gridColumn: '1/-1', borderTop: '1px solid #e2e8f0', paddingTop: 12 }}>
+                              <div style={{ color: '#64748b', fontSize: '0.72rem', fontWeight: 800, textTransform: 'uppercase', marginBottom: 4 }}>Service Notes & Items</div>
+                              <div style={{ fontWeight: 500, color: '#334155', background: 'white', padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0' }}>{b.description}</div>
+                            </div>
+                          )}
+
+                          <div style={{ gridColumn: '1/-1', borderTop: '1px solid #e2e8f0', paddingTop: 12, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            {(b.payment_status === 'paid' || b.payment_status === 'collected') && (
+                              <>
+                                <button onClick={() => window.open(`http://localhost:8000/api/booking/${b.id}/invoice/`, '_blank')} style={{ flex: 1, minWidth: 160, padding: '9px 14px', background: 'white', border: '1px solid #cbd5e1', borderRadius: 10, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><FileText size={14} /> Download Invoice</button>
+                                <button onClick={() => alert("Invoice successfully sent to your registered email!")} style={{ flex: 1, minWidth: 160, padding: '9px 14px', background: 'white', border: '1px solid #cbd5e1', borderRadius: 10, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}><Mail size={14} /> Email Invoice</button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </React.Fragment>
+                )
+              })}
             </div>
           </motion.div>
         )
       case "Saved Addresses":
+        const handleOpenForm = (addr = null) => {
+          setAddrError('')
+          setAddrSuccess('')
+          if (addr) {
+            setEditingAddress(addr)
+            setAddrLabel(addr.label || 'home')
+            setAddrLine1(addr.address_line1 || '')
+            setAddrLine2(addr.address_line2 || '')
+            setAddrCity(addr.city || '')
+            setAddrState(addr.state || '')
+            setAddrPincode(addr.pincode || '')
+            setAddrPhone(addr.phone_number || '')
+            setAddrIsDefault(!!addr.is_default)
+          } else {
+            setEditingAddress(null)
+            setAddrLabel('home')
+            setAddrLine1('')
+            setAddrLine2('')
+            setAddrCity('')
+            setAddrState('')
+            setAddrPincode('')
+            setAddrPhone(user?.phone || '')
+            setAddrIsDefault(savedAddresses.length === 0)
+          }
+          setShowAddressForm(true)
+        }
+
+        const handleSaveAddress = async () => {
+          setAddrError('')
+          setAddrSuccess('')
+          if (!addrLine1.trim() || !addrCity.trim() || !addrState.trim() || !addrPincode.trim()) {
+            setAddrError('Street Address, City, State, and Pincode are required.')
+            return
+          }
+
+          setAddrSubmitting(true)
+          const payload = {
+            label: addrLabel,
+            address_line1: addrLine1,
+            address_line2: addrLine2,
+            city: addrCity,
+            state: addrState,
+            pincode: addrPincode,
+            phone_number: addrPhone,
+            is_default: addrIsDefault,
+          }
+
+          try {
+            const url = editingAddress
+              ? `/auth/customer/addresses/${editingAddress.id}/`
+              : '/auth/customer/addresses/'
+            const method = editingAddress ? 'PATCH' : 'POST'
+            const res = await apiRequest(url, { method, json: payload })
+
+            if (res.success) {
+              setAddrSuccess(editingAddress ? 'Address updated successfully!' : 'New address saved!')
+              setShowAddressForm(false)
+              fetchAddresses()
+            } else {
+              setAddrError(res.message || 'Failed to save address.')
+            }
+          } catch (e) {
+            setAddrError(e?.body?.message || e?.message || 'Failed to save address.')
+          } finally {
+            setAddrSubmitting(false)
+          }
+        }
+
+        const handleSetDefault = async (addrId) => {
+          setAddrError('')
+          setAddrSuccess('')
+          try {
+            const res = await apiRequest(`/auth/customer/addresses/${addrId}/set-default/`, { method: 'POST', json: {} })
+            if (res.success) {
+              setAddrSuccess('Default address updated!')
+              fetchAddresses()
+            } else {
+              setAddrError(res.message || 'Failed to set default address.')
+            }
+          } catch (e) {
+            setAddrError(e?.body?.message || e?.message || 'Failed to set default address.')
+          }
+        }
+
+        const handleDelete = async (addrId) => {
+          setAddrError('')
+          setAddrSuccess('')
+          try {
+            const res = await apiRequest(`/auth/customer/addresses/${addrId}/`, { method: 'DELETE' })
+            if (res.success) {
+              setAddrSuccess('Address deleted successfully.')
+              fetchAddresses()
+            } else {
+              setAddrError(res.message || 'Failed to delete address.')
+            }
+          } catch (e) {
+            setAddrError(e?.body?.message || e?.message || 'Failed to delete address.')
+          }
+        }
+
+        const handleUseForBooking = async (addr) => {
+          try {
+            await apiRequest(`/auth/customer/addresses/${addr.id}/mark-used/`, { method: 'POST', json: {} })
+          } catch (e) {
+            console.error(e)
+          }
+          const fullAddr = `${addr.address_line1}${addr.address_line2 ? ', ' + addr.address_line2 : ''}, ${addr.city}, ${addr.state} ${addr.pincode}`
+          if (typeof setAddress === 'function') setAddress(fullAddr)
+          setAddrSuccess(`Selected "${addr.label_display || addr.label}" for booking!`)
+          setActiveTab('Book Service')
+        }
+
+        const labelIcons = {
+          home: '🏠',
+          work: '💼',
+          other: '📍',
+        }
+
         return (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-            <h3 style={{ margin: '0 0 1.5rem', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>Saved Addresses</h3>
-
-            {isAddingAddress ? (
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 16, padding: '1.5rem', background: 'white', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-                <div style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: 16, color: '#0f172a' }}>{editingAddressId ? 'Edit Address' : 'Add New Address'}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', fontWeight: 700, marginBottom: 8 }}>Address Title (e.g., Home, Work)</label>
-                    <input value={newAddressTitle} onChange={e => setNewAddressTitle(e.target.value)} type="text" placeholder="Work" style={{ width: '100%', padding: '0.85rem', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a' }} />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', fontWeight: 700, marginBottom: 8 }}>Full Address</label>
-                    <textarea value={newAddressText} onChange={e => setNewAddressText(e.target.value)} rows={3} placeholder="123 Main St..." style={{ width: '100%', padding: '0.85rem', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', resize: 'none' }} />
-                  </div>
-                  <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                    <button onClick={handleAddAddress} style={{ fontSize: '0.85rem', padding: '10px 20px', borderRadius: 8, border: 'none', background: '#7C3AED', color: 'white', fontWeight: 800, cursor: 'pointer' }}>{editingAddressId ? 'Save Changes' : 'Save Address'}</button>
-                    <button onClick={() => { setIsAddingAddress(false); setEditingAddressId(null); setNewAddressTitle(''); setNewAddressText(''); }} style={{ fontSize: '0.85rem', padding: '10px 20px', borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', color: '#475569', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
-                  </div>
-                </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>Saved Addresses</h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b' }}>Manage your home, office, and preferred service delivery locations.</p>
               </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                {mockAddresses.map(address => (
-                  <div key={address.id} style={{ border: '1px solid #e2e8f0', borderRadius: 16, padding: '1.5rem', position: 'relative', background: 'white', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-                    <div style={{ position: 'absolute', top: 20, right: 20, color: '#94a3b8', cursor: 'pointer' }}><MapPin size={20} /></div>
-                    <div style={{ fontWeight: 800, color: '#0f172a', marginBottom: 8, fontSize: '1.05rem' }}>{address.title}</div>
-                    <div style={{ fontSize: '0.85rem', color: '#64748b', lineHeight: 1.5, whiteSpace: 'pre-line' }}>{address.address}</div>
-                    <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-                      <button onClick={() => handleEditClick(address)} style={{ fontSize: '0.75rem', padding: '6px 12px', borderRadius: 6, border: '1px solid #e2e8f0', background: 'white', fontWeight: 700, cursor: 'pointer' }}>Edit</button>
-                      <button onClick={() => handleRemoveAddress(address.id)} style={{ fontSize: '0.75rem', padding: '6px 12px', borderRadius: 6, border: '1px solid #fee2e2', background: '#fef2f2', color: '#ef4444', fontWeight: 700, cursor: 'pointer' }}>Remove</button>
+              <button onClick={() => handleOpenForm(null)}
+                style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 12px rgba(124,58,237,0.25)' }}>
+                <MapPin size={15} /> Add New Address
+              </button>
+            </div>
+
+            {addrSuccess && (
+              <div style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '12px 16px', borderRadius: 12, fontSize: '0.85rem', fontWeight: 700, marginBottom: 20 }}>
+                ✓ {addrSuccess}
+              </div>
+            )}
+
+            {addrError && (
+              <div style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '12px 16px', borderRadius: 12, fontSize: '0.85rem', fontWeight: 700, marginBottom: 20 }}>
+                ⚠️ {addrError}
+              </div>
+            )}
+
+            {showAddressForm ? (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                style={{ border: '1.5px solid #7C3AED30', borderRadius: 20, padding: '1.75rem', background: '#faf5ff', marginBottom: 24, boxShadow: '0 10px 25px -5px rgba(124,58,237,0.08)' }}>
+                <div style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: 18, color: '#0f172a' }}>
+                  {editingAddress ? 'Edit Address' : 'Add New Address'}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Address Label Pills */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Address Type
+                    </label>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      {[
+                        { code: 'home', title: 'Home', icon: '🏠' },
+                        { code: 'work', title: 'Work', icon: '💼' },
+                        { code: 'other', title: 'Other', icon: '📍' },
+                      ].map(type => (
+                        <button key={type.code} type="button" onClick={() => setAddrLabel(type.code)}
+                          style={{
+                            padding: '10px 18px',
+                            borderRadius: 12,
+                            border: addrLabel === type.code ? '2px solid #7C3AED' : '1px solid #cbd5e1',
+                            background: addrLabel === type.code ? '#f3e8ff' : 'white',
+                            color: addrLabel === type.code ? '#7C3AED' : '#475569',
+                            fontWeight: 800,
+                            fontSize: '0.85rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6
+                          }}>
+                          <span>{type.icon}</span> {type.title}
+                        </button>
+                      ))}
                     </div>
                   </div>
-                ))}
-                <div onClick={() => setIsAddingAddress(true)} style={{ border: '2px dashed #cbd5e1', borderRadius: 16, padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, cursor: 'pointer', color: '#7C3AED', background: '#f8fafc', transition: 'all 0.2s', minHeight: 180 }} onMouseEnter={e => e.currentTarget.style.background = '#f1f5f9'} onMouseLeave={e => e.currentTarget.style.background = '#f8fafc'}>
-                  <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#7C3AED15', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><MapPin size={20} /></div>
-                  <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>Add New Address</div>
+
+                  {/* Street Lines */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Street Address (Line 1) *
+                    </label>
+                    <input value={addrLine1} onChange={e => setAddrLine1(e.target.value)} type="text" placeholder="e.g. 123 Main Street, Apt 4B"
+                      style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', background: 'white' }} />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Landmark / Suite (Line 2)
+                    </label>
+                    <input value={addrLine2} onChange={e => setAddrLine2(e.target.value)} type="text" placeholder="e.g. Near Central Park Tower"
+                      style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', background: 'white' }} />
+                  </div>
+
+                  {/* City, State, Pincode */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 6, textTransform: 'uppercase' }}>City *</label>
+                      <input value={addrCity} onChange={e => setAddrCity(e.target.value)} type="text" placeholder="New York"
+                        style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', background: 'white' }} />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 6, textTransform: 'uppercase' }}>State *</label>
+                      <input value={addrState} onChange={e => setAddrState(e.target.value)} type="text" placeholder="NY"
+                        style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', background: 'white' }} />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 6, textTransform: 'uppercase' }}>Pincode *</label>
+                      <input value={addrPincode} onChange={e => setAddrPincode(e.target.value)} type="text" placeholder="10001"
+                        style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', background: 'white' }} />
+                    </div>
+                  </div>
+
+                  {/* Phone Number */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Contact Phone Number
+                    </label>
+                    <input value={addrPhone} onChange={e => setAddrPhone(e.target.value)} type="text" placeholder="+1 (555) 123-4567"
+                      style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', background: 'white' }} />
+                  </div>
+
+                  {/* Set Default Toggle */}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none', marginTop: 4 }}>
+                    <input type="checkbox" checked={addrIsDefault} onChange={e => setAddrIsDefault(e.target.checked)} style={{ width: 18, height: 18, accentColor: '#7C3AED' }} />
+                    <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#0f172a' }}>Set as Default Address for Bookings</span>
+                  </label>
+
+                  {/* Submit & Cancel */}
+                  <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
+                    <button onClick={handleSaveAddress} disabled={addrSubmitting}
+                      style={{ padding: '12px 24px', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', opacity: addrSubmitting ? 0.7 : 1 }}>
+                      {addrSubmitting ? 'Saving...' : (editingAddress ? 'Save Changes' : 'Save Address')}
+                    </button>
+                    <button onClick={() => { setShowAddressForm(false); setEditingAddress(null); }}
+                      style={{ padding: '12px 20px', background: 'white', border: '1px solid #cbd5e1', borderRadius: 12, fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: '#475569' }}>
+                      Cancel
+                    </button>
+                  </div>
                 </div>
+              </motion.div>
+            ) : (
+              <div>
+                {addressesLoading ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>Loading saved addresses...</div>
+                ) : savedAddresses.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '4rem 1rem', background: 'white', borderRadius: 20, border: '1px solid #e2e8f0' }}>
+                    <MapPin size={40} style={{ marginBottom: 14, color: '#cbd5e1' }} />
+                    <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>No saved addresses found.</div>
+                    <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 4 }}>Add your home or office location to enable fast 1-click booking.</div>
+                    <button onClick={() => handleOpenForm(null)}
+                      style={{ marginTop: 16, padding: '10px 20px', background: '#7C3AED', color: 'white', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer' }}>
+                      + Add Your First Address
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 18 }}>
+                    {savedAddresses.map(addr => {
+                      const icon = labelIcons[addr.label] || '📍'
+                      return (
+                        <div key={addr.id}
+                          style={{
+                            border: addr.is_default ? '2px solid #7C3AED' : '1px solid #e2e8f0',
+                            borderRadius: 18,
+                            padding: '1.35rem',
+                            background: 'white',
+                            boxShadow: '0 4px 14px rgba(0,0,0,0.04)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justify: 'space-between',
+                            position: 'relative'
+                          }}>
+                          
+                          <div>
+                            {/* Card Header: Icon, Label, Default Badge */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: '1.2rem' }}>{icon}</span>
+                                <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a', textTransform: 'capitalize' }}>
+                                  {addr.label_display || addr.label}
+                                </span>
+                              </div>
+                              {addr.is_default && (
+                                <span style={{ fontSize: '0.72rem', padding: '4px 10px', borderRadius: 99, fontWeight: 800, background: '#7C3AED', color: 'white' }}>
+                                  Default
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Address Lines */}
+                            <div style={{ fontSize: '0.88rem', color: '#334155', fontWeight: 600, lineHeight: 1.5, marginBottom: 12 }}>
+                              <div>{addr.address_line1}</div>
+                              {addr.address_line2 && <div style={{ color: '#64748b', fontSize: '0.82rem' }}>{addr.address_line2}</div>}
+                              <div style={{ color: '#475569', fontSize: '0.83rem', marginTop: 2 }}>
+                                {addr.city}, {addr.state} - <strong>{addr.pincode}</strong>
+                              </div>
+                            </div>
+
+                            {/* Phone & Last Used Row */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.78rem', color: '#64748b', borderTop: '1px solid #f1f5f9', paddingTop: 10, marginBottom: 12 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span>📞</span> <strong style={{ color: '#334155' }}>{addr.phone_number || user?.phone || 'No phone attached'}</strong>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span>🕒</span> <span>Last used: <strong style={{ color: '#475569' }}>{humanizeLastUsed(addr.last_used_at)}</strong></span>
+                              </div>
+                            </div>
+
+                            {/* Serviceability Row */}
+                            <div style={{ marginBottom: 14 }}>
+                              {addr.serviceable ? (
+                                <span style={{ fontSize: '0.73rem', padding: '4px 10px', borderRadius: 99, fontWeight: 800, background: '#d1fae5', color: '#059669', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                  ✓ Service Available
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.73rem', padding: '4px 10px', borderRadius: 99, fontWeight: 800, background: '#fee2e2', color: '#dc2626', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                  ✕ {addr.serviceability_reason || 'Not Serviceable'}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action Row */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderTop: '1px solid #f1f5f9', paddingTop: 12 }}>
+                            <button onClick={() => handleUseForBooking(addr)}
+                              style={{ width: '100%', padding: '9px', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}>
+                              Use for Booking
+                            </button>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
+                              <button onClick={() => setMapAddress(addr)}
+                                style={{ padding: '7px 4px', background: 'white', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', color: '#475569', textAlign: 'center' }}>
+                                🗺️ Map
+                              </button>
+
+                              <button onClick={() => handleOpenForm(addr)}
+                                style={{ padding: '7px 4px', background: 'white', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', color: '#475569', textAlign: 'center' }}>
+                                ✏️ Edit
+                              </button>
+
+                              {!addr.is_default ? (
+                                <button onClick={() => handleSetDefault(addr.id)}
+                                  style={{ padding: '7px 4px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', color: '#7C3AED', textAlign: 'center' }}>
+                                  ⭐ Default
+                                </button>
+                              ) : (
+                                <span style={{ padding: '7px 4px', background: '#f1f5f9', borderRadius: 8, fontWeight: 700, fontSize: '0.72rem', color: '#94a3b8', textAlign: 'center' }}>
+                                  ⭐ Default
+                                </span>
+                              )}
+
+                              <button onClick={() => handleDelete(addr.id)}
+                                style={{ padding: '7px 4px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontWeight: 700, fontSize: '0.72rem', cursor: 'pointer', color: '#dc2626', textAlign: 'center' }}>
+                                🗑️ Delete
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* View Map Modal */}
+            {mapAddress && (
+              <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                  style={{ background: 'white', borderRadius: 20, width: '90%', maxWidth: 480, padding: '1.5rem', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <h4 style={{ margin: 0, fontWeight: 800, color: '#0f172a' }}>Location Map View</h4>
+                    <button onClick={() => setMapAddress(null)} style={{ background: 'none', border: 'none', fontSize: '1.2rem', cursor: 'pointer', color: '#64748b' }}>✕</button>
+                  </div>
+
+                  <div style={{ background: '#f1f5f9', borderRadius: 14, height: 180, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, border: '1px solid #cbd5e1', marginBottom: 14 }}>
+                    <MapPin size={36} color="#7C3AED" />
+                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>{mapAddress.label_display || mapAddress.label}</div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      Coordinates: {mapAddress.latitude || '37.7749'}, {mapAddress.longitude || '-122.4194'}
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '0.85rem', color: '#334155', fontWeight: 600, marginBottom: 16 }}>
+                    <div>{mapAddress.address_line1} {mapAddress.address_line2}</div>
+                    <div style={{ color: '#64748b' }}>{mapAddress.city}, {mapAddress.state} - {mapAddress.pincode}</div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <button onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapAddress.address_line1 + ', ' + mapAddress.city)}`, '_blank')}
+                      style={{ flex: 1, padding: '10px', background: '#7C3AED', color: 'white', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: '0.82rem', cursor: 'pointer' }}>
+                      Open in Google Maps
+                    </button>
+                    <button onClick={() => setMapAddress(null)}
+                      style={{ padding: '10px 18px', background: 'white', border: '1px solid #cbd5e1', borderRadius: 10, fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer', color: '#475569' }}>
+                      Close
+                    </button>
+                  </div>
+                </motion.div>
               </div>
             )}
           </motion.div>
@@ -2163,7 +2949,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                 gap: 16,
                 alignItems: 'center'
               }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#10B98115', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>💵</div>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#10B98115', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>ðŸ’µ</div>
                 <div>
                   <h4 style={{ margin: '0 0 4px', color: '#0f172a', fontSize: '1rem', fontWeight: 800 }}>Cash on Service (COD)</h4>
                   <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>
@@ -2238,12 +3024,769 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
             </div>
           </motion.div>
         )
+      case "My Reschedules":
+        const selectedBooking = activeBookings.find(b => String(b.id) === String(rescheduleBookingId)) || activeBookings[0]
+        const slotDefinitions = [
+          { code: '09-10', label: '09:00 AM - 10:00 AM' },
+          { code: '10-11', label: '10:00 AM - 11:00 AM' },
+          { code: '11-12', label: '11:00 AM - 12:00 PM' },
+          { code: '14-15', label: '02:00 PM - 03:00 PM' },
+          { code: '15-16', label: '03:00 PM - 04:00 PM' },
+        ]
+
+        return (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>My Reschedule Requests</h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b' }}>Request and track schedule modifications for your active service bookings.</p>
+              </div>
+              <button onClick={() => {
+                setShowRescheduleForm(!showRescheduleForm);
+                setRescheduleError('');
+                setRescheduleSuccess('');
+                if (activeBookings.length > 0 && !rescheduleBookingId) {
+                  setRescheduleBookingId(activeBookings[0].id)
+                }
+              }}
+                style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 12px rgba(124,58,237,0.25)' }}>
+                <RefreshCw size={15} /> {showRescheduleForm ? 'Close Form' : 'New Request'}
+              </button>
+            </div>
+
+            {rescheduleSuccess && (
+              <div style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '12px 16px', borderRadius: 12, fontSize: '0.85rem', fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+                ✓ {rescheduleSuccess}
+              </div>
+            )}
+
+            {showRescheduleForm && (
+              <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
+                style={{ border: '1.5px solid #7C3AED30', borderRadius: 20, padding: '1.75rem', background: '#faf5ff', marginBottom: 24, boxShadow: '0 10px 25px -5px rgba(124,58,237,0.08)' }}>
+                
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                  <h4 style={{ margin: 0, fontWeight: 800, fontSize: '1.1rem', color: '#0f172a' }}>New Reschedule Request</h4>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '4px 10px', borderRadius: 99, background: '#7C3AED15', color: '#7C3AED' }}>Guided Workflow</span>
+                </div>
+
+                {rescheduleError && (
+                  <div style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '12px 16px', borderRadius: 12, fontSize: '0.83rem', fontWeight: 600, marginBottom: 16 }}>
+                    ⚠️ {rescheduleError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                  
+                  {/* 1. Select Booking */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      1. Select Booking to Reschedule
+                    </label>
+                    {activeBookings.length === 0 ? (
+                      <div style={{ padding: '1rem', background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                        No active bookings eligible for rescheduling found.
+                      </div>
+                    ) : (
+                      <select value={rescheduleBookingId} onChange={e => setRescheduleBookingId(e.target.value)}
+                        style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', fontWeight: 700, background: 'white', outline: 'none' }}>
+                        {activeBookings.map(b => {
+                          const rawTitle = b.issue_title || b.service_category || 'Service Booking'
+                          const cleanTitle = rawTitle.replace(/â€“/g, ' - ').replace(/â€”/g, ' - ').replace(/&amp;/g, '&')
+                          return (
+                            <option key={b.id} value={b.id}>
+                              {cleanTitle} ({b.request_id || `SR-${b.id}`}) — Current: {b.preferred_date || b.created_at?.split('T')[0]}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* 2. Current Schedule Read-Only Display */}
+                  {selectedBooking && (
+                    <div style={{ background: 'white', borderRadius: 14, padding: '1rem 1.25rem', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 4 }}>Current Schedule</div>
+                        <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0f172a' }}>
+                          📅 {selectedBooking.preferred_date || 'Not set'} | ⏰ {selectedBooking.preferred_time || '09-10 (Morning)'}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', padding: '6px 12px', borderRadius: 99, background: '#f1f5f9', color: '#475569', fontWeight: 700 }}>
+                        Active Snapshot
+                      </span>
+                    </div>
+                  )}
+
+                  {/* 3. New Date & Time Slot */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        2. New Preferred Date
+                      </label>
+                      <input value={rescheduleDate} onChange={e => setRescheduleDate(e.target.value)} type="date" min={new Date().toISOString().split('T')[0]}
+                        style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', fontWeight: 700, background: 'white' }} />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Reason for Rescheduling
+                      </label>
+                      <select value={rescheduleReason} onChange={e => setRescheduleReason(e.target.value)}
+                        style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', fontWeight: 700, background: 'white' }}>
+                        <option value="schedule_conflict">Schedule Conflict</option>
+                        <option value="emergency">Personal Emergency</option>
+                        <option value="weather_delay">Weather Delay</option>
+                        <option value="technical_issue">Technical Issue</option>
+                        <option value="customer_request">Customer Preference</option>
+                        <option value="other">Other Reason</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* 4. Available Time Slots Grid */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      3. Select Available Time Slot {slotsLoading && <span style={{ color: '#7C3AED', fontWeight: 600 }}>(Checking technician availability...)</span>}
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+                      {slotDefinitions.map(slot => {
+                        const availInfo = availableSlots.find(s => s.time_slot === slot.code)
+                        const isAvailable = availInfo ? availInfo.is_available : true
+                        const isSelected = rescheduleTimeSlot === slot.code
+
+                        return (
+                          <button key={slot.code} type="button" disabled={!isAvailable} onClick={() => setRescheduleTimeSlot(slot.code)}
+                            style={{
+                              padding: '12px',
+                              borderRadius: 12,
+                              border: isSelected ? '2px solid #7C3AED' : '1px solid #e2e8f0',
+                              background: isSelected ? '#f3e8ff' : isAvailable ? 'white' : '#f8fafc',
+                              color: isSelected ? '#7C3AED' : isAvailable ? '#0f172a' : '#94a3b8',
+                              fontWeight: 700,
+                              fontSize: '0.82rem',
+                              cursor: isAvailable ? 'pointer' : 'not-allowed',
+                              textAlign: 'left',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 4,
+                              opacity: isAvailable ? 1 : 0.6,
+                              transition: 'all 0.15s ease'
+                            }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span>{slot.label}</span>
+                              {isSelected && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#7C3AED' }} />}
+                            </div>
+                            <span style={{ fontSize: '0.7rem', color: isAvailable ? (isSelected ? '#7C3AED' : '#10B981') : '#ef4444', fontWeight: 800 }}>
+                              {isAvailable ? '✓ Available' : '✕ Fully Booked'}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 5. Additional Notes */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Additional Notes (Optional)
+                    </label>
+                    <textarea value={rescheduleNotes} onChange={e => setRescheduleNotes(e.target.value)} rows={2}
+                      placeholder="Add any additional details for the admin or technician..."
+                      style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.88rem', color: '#0f172a', resize: 'none', background: 'white' }} />
+                  </div>
+
+                  {/* 6. Reschedule Policy Checklist */}
+                  <div style={{ background: '#f8fafc', borderRadius: 14, padding: '1rem 1.25rem', border: '1px solid #e2e8f0' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.8rem', color: '#475569', textTransform: 'uppercase', marginBottom: 8 }}>
+                      ⚡ CalTrack Reschedule Policy
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: '0.8rem', color: '#64748b' }}>
+                      <div>✓ Free reschedule when requested at least 12 hours prior to start time</div>
+                      <div>✓ Real-time technician availability checking & scoring algorithm</div>
+                      <div>✓ Automatic booking update once confirmed by technician/admin</div>
+                    </div>
+                  </div>
+
+                  {/* 7. Reactive Summary Block */}
+                  <div style={{ background: 'linear-gradient(135deg,#0f172a,#1e293b)', color: 'white', borderRadius: 16, padding: '1.25rem' }}>
+                    <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#94a3b8', fontWeight: 800, marginBottom: 10 }}>
+                      Schedule Summary Preview
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 12, alignItems: 'center', fontSize: '0.88rem' }}>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Old Schedule</div>
+                        <div style={{ fontWeight: 700, marginTop: 2 }}>{selectedBooking?.preferred_date || 'N/A'} ({selectedBooking?.preferred_time || '09-10'})</div>
+                      </div>
+                      <div style={{ fontSize: '1.2rem', color: '#a855f7', fontWeight: 900 }}>➔</div>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', color: '#a855f7', fontWeight: 800 }}>New Schedule</div>
+                        <div style={{ fontWeight: 800, color: '#4ade80', marginTop: 2 }}>{rescheduleDate || 'Select Date'} ({rescheduleTimeSlot})</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 8. Submit & Cancel Action Buttons */}
+                  <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+                    <button onClick={handleSubmitReschedule} disabled={rescheduleSubmitting || !rescheduleBookingId || !rescheduleDate || !rescheduleTimeSlot}
+                      style={{ padding: '12px 24px', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', opacity: (rescheduleSubmitting || !rescheduleBookingId || !rescheduleDate || !rescheduleTimeSlot) ? 0.6 : 1, boxShadow: '0 4px 14px rgba(124,58,237,0.3)' }}>
+                      {rescheduleSubmitting ? 'Submitting...' : 'Submit Reschedule Request'}
+                    </button>
+                    <button onClick={() => setShowRescheduleForm(false)}
+                      style={{ padding: '12px 20px', background: 'white', border: '1px solid #cbd5e1', borderRadius: 12, fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: '#475569' }}>
+                      Cancel
+                    </button>
+                  </div>
+
+                </div>
+              </motion.div>
+            )}
+
+            {/* List of Requests */}
+            {reschedulesLoading ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>Loading reschedule requests...</div>
+            ) : reschedules.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '4rem 1rem', background: 'white', borderRadius: 20, border: '1px solid #e2e8f0' }}>
+                <RefreshCw size={40} style={{ marginBottom: 14, color: '#cbd5e1' }} />
+                <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>No reschedule requests yet.</div>
+                <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: 4 }}>Click "New Request" above to request a schedule change for your active bookings.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {reschedules.map(r => {
+                  const statusConfig = {
+                    PENDING:                    { bg: '#FEF3C7', color: '#D97706', label: 'Pending Admin Review' },
+                    ADMIN_REVIEW:               { bg: '#E0E7FF', color: '#4F46E5', label: 'Under Admin Review' },
+                    SLOT_SUGGESTED:             { bg: '#F5F3FF', color: '#7C3AED', label: 'Admin Suggested New Slot' },
+                    AWAITING_EMPLOYEE_RESPONSE: { bg: '#EFF6FF', color: '#2563EB', label: 'Awaiting Technician Confirmation' },
+                    REASSIGNMENT_NEEDED:        { bg: '#FFF7ED', color: '#C2410C', label: 'Finding Another Technician' },
+                    RESCHEDULED:                { bg: '#D1FAE5', color: '#059669', label: '✓ Rescheduled Successfully' },
+                    REJECTED:                   { bg: '#FEE2E2', color: '#DC2626', label: 'Rejected' },
+                    CANCELLED:                  { bg: '#F1F5F9', color: '#64748B', label: 'Cancelled' },
+                    APPROVED:                   { bg: '#D1FAE5', color: '#059669', label: 'Approved' },
+                    CUSTOMER_NOTIFIED:          { bg: '#D1FAE5', color: '#059669', label: 'Confirmed & Updated' },
+                    TECHNICIAN_CONFIRMATION:    { bg: '#F3E8FF', color: '#7C3AED', label: 'Awaiting Tech Confirmation' },
+                  }
+                  const sc = statusConfig[r.status] || { bg: '#F1F5F9', color: '#64748B', label: r.status_display || r.status }
+                  const currentDisplay = r.current_date ? `${r.current_date} (${r.current_time || '09-10'})` : 'N/A'
+                  const newDisplay = `${r.new_date} (${r.new_time_slot || '09-10'})`
+                  const suggestedDisplay = r.suggested_date ? `${r.suggested_date} (${r.suggested_time_slot || '—'})` : null
+                  const isTerminal = ['RESCHEDULED', 'REJECTED', 'CANCELLED'].includes(r.status)
+
+                  return (
+                    <div key={r.id} style={{ border: '1px solid #e2e8f0', borderRadius: 16, padding: '1.35rem', background: 'white', boxShadow: '0 4px 12px rgba(0,0,0,0.03)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                        <div>
+                          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem', marginBottom: 2 }}>
+                            {r.issue_title || r.booking_service || 'Service Booking'}
+                          </div>
+                          <div style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace', fontWeight: 600 }}>
+                            {r.reschedule_id || `REQ-${r.id}`} · {r.request_id || r.booking_request_id || '—'}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '0.72rem', padding: '6px 12px', borderRadius: 99, fontWeight: 800, background: sc.bg, color: sc.color }}>
+                          {sc.label}
+                        </span>
+                      </div>
+
+                      {/* Schedule Visualizer */}
+                      <div style={{ background: '#0f172a', borderRadius: 12, padding: '12px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: '0.82rem' }}>
+                        <div>
+                          <div style={{ fontSize: '0.65rem', color: '#f59e0b', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>Current</div>
+                          <div style={{ color: 'white', fontWeight: 700 }}>{currentDisplay}</div>
+                        </div>
+                        <span style={{ color: '#a855f7', fontWeight: 900, fontSize: '1.1rem' }}>→</span>
+                        <div>
+                          <div style={{ fontSize: '0.65rem', color: '#34d399', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>Requested</div>
+                          <div style={{ color: '#6ee7b7', fontWeight: 700 }}>{newDisplay}</div>
+                        </div>
+                        {suggestedDisplay && (
+                          <>
+                            <span style={{ color: '#c084fc', fontWeight: 900 }}>✦</span>
+                            <div>
+                              <div style={{ fontSize: '0.65rem', color: '#c084fc', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>Admin Suggests</div>
+                              <div style={{ color: '#e9d5ff', fontWeight: 700 }}>{suggestedDisplay}</div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Details */}
+                      <div style={{ fontSize: '0.8rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
+                        <div><span style={{ fontWeight: 700 }}>Reason:</span> {r.reason}</div>
+                        {r.additional_notes && <div><span style={{ fontWeight: 700 }}>Notes:</span> {r.additional_notes}</div>}
+                        {r.review_notes && <div style={{ color: '#4f46e5' }}><span style={{ fontWeight: 700 }}>Admin Note:</span> {r.review_notes}</div>}
+                        {r.rejection_reason && <div style={{ color: '#dc2626' }}><span style={{ fontWeight: 700 }}>Rejection:</span> {r.rejection_reason_display || r.rejection_reason} {r.rejection_notes && `— ${r.rejection_notes}`}</div>}
+                        {r.proposed_technician_name && <div style={{ color: '#2563eb' }}><span style={{ fontWeight: 700 }}>Technician:</span> {r.proposed_technician_name}</div>}
+                      </div>
+
+                      {/* Status-specific info banners */}
+                      {r.status === 'AWAITING_EMPLOYEE_RESPONSE' && (
+                        <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '10px 14px', fontSize: '0.8rem', color: '#1d4ed8', fontWeight: 600, marginBottom: 10 }}>
+                          🔄 Your request was approved. Waiting for <strong>{r.proposed_technician_name || 'the technician'}</strong> to confirm availability.
+                        </div>
+                      )}
+                      {r.status === 'REASSIGNMENT_NEEDED' && (
+                        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '10px 14px', fontSize: '0.8rem', color: '#c2410c', fontWeight: 600, marginBottom: 10 }}>
+                          ⚙️ The assigned technician was unavailable. Admin is finding a replacement — no action needed from you.
+                        </div>
+                      )}
+                      {r.status === 'RESCHEDULED' && (
+                        <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '10px 14px', fontSize: '0.8rem', color: '#15803d', fontWeight: 700, marginBottom: 10 }}>
+                          ✅ Your booking has been rescheduled to <strong>{newDisplay}</strong>. See you then!
+                        </div>
+                      )}
+
+                      {/* SLOT_SUGGESTED — Accept / Decline buttons */}
+                      {r.status === 'SLOT_SUGGESTED' && suggestedDisplay && (
+                        <div style={{ background: '#faf5ff', border: '1.5px solid #d8b4fe', borderRadius: 12, padding: '14px 16px', marginBottom: 10 }}>
+                          <div style={{ fontWeight: 800, color: '#6d28d9', fontSize: '0.88rem', marginBottom: 8 }}>
+                            🗓 Admin suggested a new time slot: <strong>{suggestedDisplay}</strong>
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#7c3aed', marginBottom: 12 }}>
+                            Accept or decline this suggestion. Accepting will re-enter review with the suggested slot.
+                          </div>
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const res = await apiRequest(`/customer/reschedules/${r.id}/respond-suggestion/`, {
+                                    method: 'POST', json: { accept: true }
+                                  })
+                                  if (res?.success) {
+                                    const updated = await apiRequest('/customer/reschedules/')
+                                    setReschedules(updated.data || [])
+                                  }
+                                } catch (e) { console.error(e) }
+                              }}
+                              style={{ padding: '9px 20px', background: 'linear-gradient(135deg,#059669,#10b981)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer' }}
+                            >
+                              ✓ Accept Suggested Slot
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!window.confirm("Decline this suggested slot? Your request will be marked as rejected.")) return
+                                try {
+                                  const res = await apiRequest(`/customer/reschedules/${r.id}/respond-suggestion/`, {
+                                    method: 'POST', json: { accept: false }
+                                  })
+                                  if (res?.success) {
+                                    const updated = await apiRequest('/customer/reschedules/')
+                                    setReschedules(updated.data || [])
+                                  }
+                                } catch (e) { console.error(e) }
+                              }}
+                              style={{ padding: '9px 20px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 10, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer' }}
+                            >
+                              ✕ Decline Suggestion
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Cancel button — only for PENDING */}
+                      {r.status === 'PENDING' && (
+                        <button onClick={async () => {
+                          try {
+                            await apiRequest(`/customer/reschedules/${r.id}/cancel/`, { method: 'POST', json: {} })
+                            const updated = await apiRequest('/customer/reschedules/')
+                            setReschedules(updated.data || [])
+                          } catch (e) {
+                            try {
+                              await apiRequest(`/booking/reschedule/${r.id}/cancel/`, { method: 'POST', json: {} })
+                              const updated = await apiRequest('/booking/reschedule/')
+                              setReschedules(updated.data || [])
+                            } catch (err) { console.error(err) }
+                          }
+                        }}
+                          style={{ marginTop: 6, padding: '8px 16px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', borderRadius: 10, fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer' }}>
+                          Cancel Request
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </motion.div>
+        )
+
+      case "My Refunds":
+        const selectedRefundBooking = eligibleRefundBookings.find(b => String(b.id) === String(refundBookingId)) || eligibleRefundBookings[0]
+        const refundReasonChoices = [
+          { code: 'POOR_QUALITY', label: 'Poor Quality Work' },
+          { code: 'SERVICE_NOT_COMPLETED', label: 'Service Not Completed' },
+          { code: 'CANCELLED_BY_PROVIDER', label: 'Cancelled By Provider' },
+          { code: 'OVERCHARGED', label: 'Overcharged' },
+          { code: 'OTHER', label: 'Other Issue' },
+        ]
+
+        return (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>My Refund Requests</h3>
+                <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b' }}>Request refunds for completed paid bookings and track resolution timeline.</p>
+              </div>
+              <button onClick={() => { setShowRefundForm(!showRefundForm); setRefundError(''); setRefundSuccess(''); }}
+                style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 12px rgba(124,58,237,0.25)' }}>
+                <CreditCard size={15} /> {showRefundForm ? 'Close Form' : 'Request Refund'}
+              </button>
+            </div>
+
+            {refundSuccess && (
+              <div style={{ background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', padding: '12px 16px', borderRadius: 12, fontSize: '0.85rem', fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+                ✓ {refundSuccess}
+              </div>
+            )}
+
+            {showRefundForm && (
+              <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
+                style={{ border: '1.5px solid #7C3AED30', borderRadius: 20, padding: '1.75rem', background: '#faf5ff', marginBottom: 24, boxShadow: '0 10px 25px -5px rgba(124,58,237,0.08)' }}>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <h4 style={{ margin: 0, fontWeight: 800, fontSize: '1.1rem', color: '#0f172a' }}>New Refund Request</h4>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '4px 10px', borderRadius: 99, background: '#7C3AED15', color: '#7C3AED' }}>Guided Refund Flow</span>
+                </div>
+
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 12, padding: '12px 16px', fontSize: '0.83rem', color: '#92400e', fontWeight: 700, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: '1.2rem' }}>⚠️</span>
+                  <div>Refunds are only available for paid completed bookings. The requested amount cannot exceed what was paid.</div>
+                </div>
+
+                {refundError && (
+                  <div style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fecaca', padding: '12px 16px', borderRadius: 12, fontSize: '0.83rem', fontWeight: 600, marginBottom: 16 }}>
+                    ⚠️ {refundError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                  
+                  {/* 1. Select Booking */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      1. Select Paid Booking
+                    </label>
+                    {eligibleRefundBookings.length === 0 ? (
+                      <div style={{ padding: '1rem', background: 'white', borderRadius: 12, border: '1px solid #e2e8f0', color: '#94a3b8', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                        No eligible paid bookings available for refund.
+                      </div>
+                    ) : (
+                      <select value={refundBookingId} onChange={e => setRefundBookingId(e.target.value)}
+                        style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', fontWeight: 700, background: 'white' }}>
+                        {eligibleRefundBookings.map(b => (
+                          <option key={b.id} value={b.id}>
+                            {b.issue_title || b.request_id} — {b.request_id} ({BOOKING_CURRENCY_SYMBOL}{b.estimated_cost || '500'})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* 2. Booking Refund Summary Card */}
+                  {refundSummary && (
+                    <div style={{ background: 'white', borderRadius: 16, padding: '1.25rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.02)' }}>
+                      <div style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 800, marginBottom: 10 }}>
+                        Booking Financial Summary
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, fontSize: '0.85rem' }}>
+                        <div>
+                          <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Paid Amount</div>
+                          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem', marginTop: 2 }}>{BOOKING_CURRENCY_SYMBOL}{refundSummary.paid_amount}</div>
+                        </div>
+                        <div>
+                          <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Max Refundable</div>
+                          <div style={{ fontWeight: 800, color: '#7C3AED', fontSize: '1.05rem', marginTop: 2 }}>{BOOKING_CURRENCY_SYMBOL}{refundSummary.max_refundable_amount}</div>
+                        </div>
+                        <div>
+                          <div style={{ color: '#64748b', fontSize: '0.75rem' }}>Status</div>
+                          <div style={{ fontWeight: 800, color: refundSummary.eligible ? '#10B981' : '#EF4444', fontSize: '0.85rem', marginTop: 4 }}>
+                            {refundSummary.eligible ? '✓ Eligible' : '✕ Ineligible'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. Refund Type Choice Pills */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      2. Refund Type
+                    </label>
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      {[
+                        { code: 'FULL', label: 'Full Refund', desc: '100% of total paid amount' },
+                        { code: 'PARTIAL', label: 'Partial Refund', desc: 'Custom specific amount' },
+                      ].map(t => {
+                        const isSel = refundType === t.code
+                        return (
+                          <button key={t.code} onClick={() => {
+                            setRefundType(t.code)
+                            if (t.code === 'FULL' && refundSummary?.paid_amount) {
+                              setRefundRequestedAmount(refundSummary.paid_amount)
+                            }
+                          }}
+                            style={{
+                              flex: 1, padding: '0.85rem 1rem', borderRadius: 14,
+                              border: isSel ? '2px solid #7C3AED' : '1.5px solid #e2e8f0',
+                              background: isSel ? 'linear-gradient(135deg,#7C3AED15,#a855f715)' : 'white',
+                              cursor: 'pointer', textAlign: 'left',
+                            }}>
+                            <div style={{ fontWeight: 800, color: isSel ? '#7C3AED' : '#0f172a', fontSize: '0.88rem' }}>{t.label}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>{t.desc}</div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 4. Amount Input (only for partial) */}
+                  {refundType === 'PARTIAL' && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        3. Refund Amount (₹)
+                      </label>
+                      <input
+                        type="number" min="1" max={refundSummary?.max_refundable_amount}
+                        value={refundRequestedAmount} onChange={e => setRefundRequestedAmount(e.target.value)}
+                        placeholder={`Max: ₹${refundSummary?.max_refundable_amount || '—'}`}
+                        style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', fontWeight: 700 }}
+                      />
+                    </div>
+                  )}
+
+                  {/* 5. Reason */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      {refundType === 'PARTIAL' ? '4.' : '3.'} Reason for Refund
+                    </label>
+                    <select value={refundReason} onChange={e => setRefundReason(e.target.value)}
+                      style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', fontWeight: 700, background: 'white' }}>
+                      <option value="">Select a reason...</option>
+                      {refundReasonChoices.map(rc => (
+                        <option key={rc.code} value={rc.code}>{rc.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* 6. Additional Notes */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Additional Notes <span style={{ fontWeight: 400, textTransform: 'none', color: '#94a3b8' }}>(optional)</span>
+                    </label>
+                    <textarea value={refundNotes} onChange={e => setRefundNotes(e.target.value)}
+                      rows={3} placeholder="Describe the issue in detail..."
+                      style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.88rem', color: '#0f172a', resize: 'none' }} />
+                  </div>
+
+                  {/* 7. Submit */}
+                  <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
+                    <button onClick={handleSubmitRefund}
+                      disabled={refundSubmitting || !refundBookingId || !refundReason || (refundType === 'PARTIAL' && !refundRequestedAmount)}
+                      style={{ padding: '12px 24px', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer', opacity: (refundSubmitting || !refundBookingId || !refundReason) ? 0.6 : 1, boxShadow: '0 4px 14px rgba(124,58,237,0.25)' }}>
+                      {refundSubmitting ? 'Submitting...' : 'Submit Refund Request'}
+                    </button>
+                    <button onClick={() => setShowRefundForm(false)}
+                      style={{ padding: '12px 20px', background: 'white', border: '1px solid #cbd5e1', borderRadius: 12, fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', color: '#475569' }}>
+                      Cancel
+                    </button>
+                  </div>
+
+                </div>
+              </motion.div>
+            )}
+
+            {refundsLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Loading refund requests...</div>
+            ) : refunds.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
+                <CreditCard size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
+                <div style={{ fontWeight: 700 }}>No refund requests yet.</div>
+                <div style={{ fontSize: '0.85rem', marginTop: 4 }}>Request a refund for any completed paid booking.</div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {refunds.map(r => {
+                  const sc = { REQUESTED: '#F59E0B', UNDER_REVIEW: '#3B82F6', APPROVED: '#8B5CF6', REJECTED: '#EF4444', PROCESSED: '#10B981', FAILED: '#EF4444' }[r.status] || '#64748b'
+                  return (
+                    <div key={r.id} style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: '1.25rem', background: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                        <div>
+                          <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem', marginBottom: 4 }}>{r.booking_service || 'Service Booking'}</div>
+                          <div style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace' }}>{r.booking_request_id}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontWeight: 900, fontSize: '1.1rem', color: '#7C3AED', marginBottom: 4 }}>₹{r.amount}</div>
+                          <span style={{ fontSize: '0.7rem', padding: '3px 9px', borderRadius: 99, fontWeight: 800, background: sc + '18', color: sc, border: `1px solid ${sc}30` }}>{r.status}</span>
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: 4 }}><span style={{ fontWeight: 700 }}>Reason:</span> {r.reason}</div>
+                      {r.admin_notes && <div style={{ fontSize: '0.8rem', color: '#475569', marginBottom: 4 }}><span style={{ fontWeight: 700 }}>Admin Notes:</span> {r.admin_notes}</div>}
+                      {r.gateway_reference && <div style={{ fontSize: '0.78rem', color: '#64748b' }}><span style={{ fontWeight: 700 }}>Reference:</span> {r.gateway_reference}</div>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </motion.div>
+        )
+
+      case "My Complaints":
+        return (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            {selectedComplaint ? (
+              // Complaint thread view
+              <div>
+                <button onClick={() => setSelectedComplaint(null)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: '#7C3AED', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', marginBottom: 16 }}>
+                  <ChevronLeft size={18} /> Back to Complaints
+                </button>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: '1.5rem', background: 'white', marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', marginBottom: 4 }}>{selectedComplaint.category_display}</div>
+                      {selectedComplaint.booking_request_id && <div style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace' }}>{selectedComplaint.booking_request_id}</div>}
+                    </div>
+                    {(() => {
+                      const sc = { OPEN: '#F59E0B', IN_PROGRESS: '#3B82F6', RESOLVED: '#10B981', ESCALATED: '#EF4444', CLOSED: '#94a3b8' }[selectedComplaint.status] || '#64748b'
+                      return <span style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: 99, fontWeight: 800, background: sc + '18', color: sc, border: `1px solid ${sc}30` }}>{selectedComplaint.status_display}</span>
+                    })()}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.6 }}>{selectedComplaint.description}</div>
+                </div>
+                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem', marginBottom: 12 }}>Conversation Thread</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20, maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
+                  {(selectedComplaint.messages || []).length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '1.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>No responses yet. Our team will respond within 24 hours.</div>
+                  )}
+                  {(selectedComplaint.messages || []).map(resp => {
+                    const isCustomer = resp.persona === 'CUSTOMER'
+                    return (
+                      <div key={resp.id} style={{ display: 'flex', justifyContent: isCustomer ? 'flex-end' : 'flex-start' }}>
+                        <div style={{ maxWidth: '75%', padding: '10px 14px', borderRadius: isCustomer ? '14px 14px 2px 14px' : '14px 14px 14px 2px', background: isCustomer ? 'linear-gradient(135deg,#7C3AED,#a855f7)' : '#f1f5f9', color: isCustomer ? 'white' : '#0f172a', fontSize: '0.85rem', lineHeight: 1.5 }}>
+                          <div style={{ fontWeight: 700, fontSize: '0.7rem', opacity: 0.75, marginBottom: 4 }}>{isCustomer ? 'You' : resp.persona === 'ADMIN' ? 'ðŸ›¡ï¸ Support Team' : 'ðŸ‘· Employee'}</div>
+                          {resp.message}
+                          <div style={{ fontSize: '0.65rem', opacity: 0.6, marginTop: 4 }}>{new Date(resp.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {selectedComplaint.status !== 'CLOSED' && selectedComplaint.status !== 'RESOLVED' && (
+                  <div style={{ display: 'flex', gap: 10 }}>
+                    <input value={complaintReply} onChange={e => setComplaintReply(e.target.value)} placeholder="Type your reply..." onKeyDown={e => e.key === 'Enter' && handleComplaintReply(selectedComplaint.id)}
+                      style={{ flex: 1, padding: '0.8rem 1rem', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: '0.9rem', color: '#0f172a' }} />
+                    <button onClick={() => handleComplaintReply(selectedComplaint.id)} disabled={complaintReplying || !complaintReply.trim()}
+                      style={{ padding: '0.8rem 1.2rem', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 800, cursor: 'pointer', opacity: complaintReplying ? 0.7 : 1 }}>
+                      Send
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Complaints list view
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>My Complaints</h3>
+                  <button onClick={() => { setShowComplaintForm(true); setComplaintError(''); setComplaintSuccess(''); }}
+                    style={{ padding: '8px 18px', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <MessageSquare size={14} /> New Complaint
+                  </button>
+                </div>
+
+                {complaintSuccess && <div style={{ background: '#f0fdf4', color: '#15803d', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', fontWeight: 700, marginBottom: 16 }}>âœ… {complaintSuccess}</div>}
+
+                {showComplaintForm && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                    style={{ border: '1.5px solid #7C3AED30', borderRadius: 16, padding: '1.5rem', background: '#faf5ff', marginBottom: 20 }}>
+                    <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a', marginBottom: 16 }}>File a New Complaint</div>
+                    {complaintError && <div style={{ background: '#fef2f2', color: '#ef4444', padding: '8px 12px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 600, marginBottom: 12 }}>{complaintError}</div>}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', fontWeight: 700, marginBottom: 6 }}>Category</label>
+                        <select value={complaintCategory} onChange={e => setComplaintCategory(e.target.value)}
+                          style={{ width: '100%', padding: '0.8rem', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', background: 'white' }}>
+                          <option value="SERVICE_QUALITY">Service Quality</option>
+                          <option value="EMPLOYEE_BEHAVIOR">Employee Behavior</option>
+                          <option value="BILLING">Billing</option>
+                          <option value="SCHEDULING">Scheduling</option>
+                          <option value="OTHER">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', fontWeight: 700, marginBottom: 6 }}>Booking ID (optional)</label>
+                        <input value={complaintBookingId} onChange={e => setComplaintBookingId(e.target.value)} placeholder="Leave blank for general complaint" type="text"
+                          style={{ width: '100%', padding: '0.8rem', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: '#475569', fontWeight: 700, marginBottom: 6 }}>Describe Your Issue</label>
+                        <textarea value={complaintDesc} onChange={e => setComplaintDesc(e.target.value)} rows={4} placeholder="Please describe your issue in detail..."
+                          style={{ width: '100%', padding: '0.8rem', borderRadius: 10, border: '1px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', resize: 'none' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                        <button onClick={handleSubmitComplaint} disabled={complaintSubmitting || !complaintDesc}
+                          style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', opacity: complaintSubmitting ? 0.7 : 1 }}>
+                          {complaintSubmitting ? 'Submitting...' : 'Submit Complaint'}
+                        </button>
+                        <button onClick={() => setShowComplaintForm(false)}
+                          style={{ padding: '10px 20px', background: 'white', border: '1px solid #e2e8f0', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', color: '#475569' }}>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {complaintsLoading ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Loading complaints...</div>
+                ) : complaints.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
+                    <MessageSquare size={36} style={{ marginBottom: 12, opacity: 0.4 }} />
+                    <div style={{ fontWeight: 700 }}>No complaints filed yet.</div>
+                    <div style={{ fontSize: '0.85rem', marginTop: 4 }}>If you have an issue with a service, let us know!</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {complaints.map(c => {
+                      const sc = { OPEN: '#F59E0B', IN_PROGRESS: '#3B82F6', RESOLVED: '#10B981', ESCALATED: '#EF4444', CLOSED: '#94a3b8' }[c.status] || '#64748b'
+                      return (
+                        <div key={c.id} onClick={async () => {
+                          const res = await apiRequest(`/booking/complaints/${c.id}/`)
+                          setSelectedComplaint(res.data)
+                        }}
+                          style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: '1.25rem', background: 'white', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', cursor: 'pointer', transition: 'border-color 0.2s' }}
+                          onMouseEnter={e => e.currentTarget.style.borderColor = '#7C3AED50'}
+                          onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                            <div>
+                              <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem', marginBottom: 2 }}>{c.category_display}</div>
+                              {c.booking_request_id && <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>{c.booking_request_id}</div>}
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <span style={{ fontSize: '0.7rem', padding: '3px 9px', borderRadius: 99, fontWeight: 800, background: sc + '18', color: sc, border: `1px solid ${sc}30`, display: 'block', marginBottom: 4 }}>{c.status_display}</span>
+                              {c.attachment_count > 0 && <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>ðŸ“Ž {c.attachment_count} file{c.attachment_count > 1 ? 's' : ''}</span>}
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.description}</div>
+                          <div style={{ marginTop: 10, fontSize: '0.72rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span>{new Date(c.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                            <span style={{ color: '#7C3AED', fontWeight: 700 }}>View Thread â†’</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </motion.div>
+        )
+
       default:
         return null
     }
   }
 
-  if (!user || user.role !== 'customer') {
+  if (!user) {
     return (
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(4px)', zIndex: 10050, display: 'flex', justifyContent: 'center', alignItems: 'center' }} onClick={onClose}>
         <motion.div
@@ -2287,7 +3830,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
 
               <button
                 type="button"
-                onClick={handleGoogleLogin}
+                onClick={() => googleLoginHandler()}
                 disabled={loginLoading}
                 style={{
                   width: '100%',
@@ -2570,13 +4113,13 @@ export function BookingPage() {
     data.append("phone", formData.phone)
     data.append("email", formData.email || "")
     data.append("service_category", category?.id || "general")
-    data.append("issue_title", formData.issue_title || `${cart.map(c => c.name).join(', ')} — ${category?.name}`)
+    data.append("issue_title", formData.issue_title || `${cart.map(c => c.name).join(', ')} â€” ${category?.name}`)
     data.append("description", formData.description || "")
     data.append("address", formData.landmark ? formData.address + " | " + formData.landmark : formData.address)
     data.append("preferred_date", selDate)
     data.append("preferred_time", selTime)
     data.append("total_amount", cart.reduce((a, c) => a + (c.price * c.quantity), 0))
-    // Serialize cart_data as JSON string — backend will parse it robustly
+    // Serialize cart_data as JSON string â€” backend will parse it robustly
     data.append("cart_data", JSON.stringify(cart.map(c => ({
       id: c.id, name: c.name, price: c.price, quantity: c.quantity,
       categoryName: c.categoryName || category?.name || ""
@@ -2603,7 +4146,7 @@ export function BookingPage() {
       } else setError(res?.message || "Something went wrong. Please try again.")
     } catch (err) {
       if (err?.body?.errors) {
-        const msgs = Object.entries(err.body.errors).map(([f, m]) => `${f}: ${Array.isArray(m) ? m.join(", ") : m}`).join(" · ")
+        const msgs = Object.entries(err.body.errors).map(([f, m]) => `${f}: ${Array.isArray(m) ? m.join(", ") : m}`).join(" Â· ")
         setError(msgs || err.body.message)
       } else setError(err?.body?.message || err?.body?.detail || "Connection error. Try again.")
     } finally { setLoading(false) }
@@ -2851,9 +4394,9 @@ export function BookingPage() {
 
       {/* Footer */}
       <footer className="uc-footer">
-        <Shield size={12} /> SSL Encrypted &nbsp;·&nbsp;
-        <Star size={12} style={{ fill: "#F59E0B", color: "#F59E0B" }} /> 4.8★ Rated &nbsp;·&nbsp;
-        <CheckCircle2 size={12} /> 1M+ Bookings &nbsp;·&nbsp;
+        <Shield size={12} /> SSL Encrypted &nbsp;Â·&nbsp;
+        <Star size={12} style={{ fill: "#F59E0B", color: "#F59E0B" }} /> 4.8â˜… Rated &nbsp;Â·&nbsp;
+        <CheckCircle2 size={12} /> 1M+ Bookings &nbsp;Â·&nbsp;
         <Award size={12} /> 30-Day Guarantee
       </footer>
 
@@ -2927,7 +4470,7 @@ function PackageModal({ category, cart, setCart, onClose, onCheckout, packagesDa
           <span style={{ fontWeight: 700 }}>4.8</span> <span style={{ color: "#94a3b8", textDecoration: "underline" }}>(113K reviews)</span>
         </div>
         <div className="uc-pkg-uc-price">
-          Starts at {p.priceStr} <span className="uc-pkg-uc-dot">•</span> {p.duration}
+          Starts at {p.priceStr} <span className="uc-pkg-uc-dot">â€¢</span> {p.duration}
         </div>
         <ul className="uc-pkg-uc-includes">
           {p.includes.map(inc => <li key={inc}>{inc}</li>)}
@@ -2993,7 +4536,7 @@ function PackageModal({ category, cart, setCart, onClose, onCheckout, packagesDa
                   />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b', lineHeight: 1.2, marginBottom: '0.2rem' }}>{s.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>{s.priceStr || (BOOKING_CURRENCY_SYMBOL + '499')} • {s.duration || '1 hr'}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>{s.priceStr || (BOOKING_CURRENCY_SYMBOL + '499')} â€¢ {s.duration || '1 hr'}</div>
 
                     {getCartCount(s.id) > 0 ? (
                       <div className="uc-swiggy-qty" style={{ width: 80, height: 28, fontSize: '0.8rem' }}>
@@ -3052,9 +4595,9 @@ function PackageModal({ category, cart, setCart, onClose, onCheckout, packagesDa
   )
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    STYLES
-   ───────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function BkStyles() {
   return (
@@ -3064,7 +4607,7 @@ function BkStyles() {
       @keyframes bk-spin { to { transform:rotate(360deg); } }
       .spin-icon { animation: bk-spin 0.8s linear infinite; display:inline-block; }
 
-      /* ── Root ── */
+      /* â”€â”€ Root â”€â”€ */
       .uc-root {
         min-height: 100vh;
         background: #ffffff;
@@ -3075,7 +4618,7 @@ function BkStyles() {
         overflow-x: hidden;
       }
 
-      /* ── Nav ── */
+      /* â”€â”€ Nav â”€â”€ */
       .uc-nav {
         position: sticky; top:0; z-index:100;
         background: rgba(255,255,255,0.97);
@@ -3144,7 +4687,7 @@ function BkStyles() {
         opacity: 0.9;
       }
 
-      /* ── Nav Search Bar ── */
+      /* â”€â”€ Nav Search Bar â”€â”€ */
       .uc-nav-search {
         display: flex; align-items: center; gap: 0.5rem;
         background: #f8fafc; border: 1.5px solid #e2e8f0;
@@ -3181,7 +4724,7 @@ function BkStyles() {
         padding: 0.5rem 1.5rem; position: sticky; top: 60px; z-index: 99;
       }
 
-      /* ── Progress ── */
+      /* â”€â”€ Progress â”€â”€ */
       .uc-progress-wrap {
         background: white;
         border-bottom: 1px solid #f1f5f9;
@@ -3238,7 +4781,7 @@ function BkStyles() {
       }
       .uc-sb-line-done { background: #10B981; }
 
-      /* ── Main ── */
+      /* â”€â”€ Main â”€â”€ */
       .uc-main {
         flex: 1;
         overflow-y: auto;
@@ -3309,7 +4852,7 @@ function BkStyles() {
         border: 1px solid #f1f5f9;
       }
 
-      /* ── HERO ── */
+      /* â”€â”€ HERO â”€â”€ */
       .uc-hero {
         background: transparent;
         position: relative;
@@ -3351,7 +4894,7 @@ function BkStyles() {
         margin-bottom: 2rem;
       }
 
-      /* ── Search ── */
+      /* â”€â”€ Search â”€â”€ */
       .uc-search-bar {
         position: relative;
         max-width: 560px;
@@ -3392,7 +4935,7 @@ function BkStyles() {
         display:flex; align-items:center; gap:0.3rem;
       }
 
-      /* ── Category Grid ── */
+      /* â”€â”€ Category Grid â”€â”€ */
       .uc-section {
         width: 100%;
         padding: 2.5rem 1.5rem;
@@ -3474,7 +5017,7 @@ function BkStyles() {
       .uc-cat-arrow { color:#cbd5e1; flex-shrink:0; }
       .uc-cat-card:hover .uc-cat-arrow { color:#7C3AED; }
 
-      /* ── How It Works ── */
+      /* â”€â”€ How It Works â”€â”€ */
       .uc-how {
         background: linear-gradient(135deg, #faf5ff, #f0fdf4);
         padding: 3rem 1.5rem;
@@ -3515,7 +5058,7 @@ function BkStyles() {
       .uc-how-title { font-size:1.1rem; font-weight:800; color:#1e293b; margin-bottom:0.5rem; }
       .uc-how-desc  { font-size:0.85rem; color:#64748b; line-height:1.6; }
 
-      /* ── Reviews ── */
+      /* â”€â”€ Reviews â”€â”€ */
       .uc-reviews-section {
         padding: 3rem 1.5rem;
         max-width:1200px;
@@ -3546,7 +5089,7 @@ function BkStyles() {
       .uc-review-ago { font-size: 0.75rem; color: #94a3b8; margin-top: 0.1rem; }
       .uc-review-text { font-size:0.85rem; color:#475569; line-height:1.6; font-style: italic; }
 
-      /* ── Step Pages ── */
+      /* â”€â”€ Step Pages â”€â”€ */
       .uc-step-page {
         display:flex;
         flex-direction:column;
@@ -3575,7 +5118,7 @@ function BkStyles() {
       }
       .uc-step-sub { font-size:0.82rem; color:#64748b; margin:0 0 1.5rem; font-weight:500; }
 
-      /* ── Package Cards ── */
+      /* â”€â”€ Package Cards â”€â”€ */
       .uc-pkg-grid {
         display:grid;
         grid-template-columns: repeat(auto-fill, minmax(220px,1fr));
@@ -3626,7 +5169,7 @@ function BkStyles() {
       .uc-pkg-radio--sel { border-color:#7C3AED; background:#7C3AED; }
       .uc-pkg-radio-dot { width:8px; height:8px; border-radius:50%; background:white; }
 
-      /* ── Schedule ── */
+      /* â”€â”€ Schedule â”€â”€ */
       .uc-date-section, .uc-time-section { margin-bottom:1.5rem; }
       .uc-subsection-label {
         display:flex; align-items:center; gap:0.4rem;
@@ -3679,7 +5222,7 @@ function BkStyles() {
       .uc-time-slot:hover { border-color:#7C3AED; color:#7C3AED; }
       .uc-time-slot--sel { background:#7C3AED; border-color:#7C3AED; color:white; font-weight:700; }
 
-      /* ── Login ── */
+      /* â”€â”€ Login â”€â”€ */
       .uc-login-page { padding-top:0.5rem; }
       .uc-login-center { text-align:center; margin-bottom:1.5rem; }
       .uc-login-shield {
@@ -3734,7 +5277,7 @@ function BkStyles() {
       .uc-success-title { font-family:'Outfit',sans-serif; font-size:1.6rem; font-weight:900; color:#1e293b; }
       .uc-success-sub   { font-size:0.88rem; color:#64748b; font-weight:600; }
 
-      /* ── Form ── */
+      /* â”€â”€ Form â”€â”€ */
       .uc-form { display:flex; flex-direction:column; gap:1rem; margin-bottom:1.5rem; }
       .uc-field-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
       @media(max-width:560px) { .uc-field-row { grid-template-columns:1fr; } }
@@ -3797,7 +5340,7 @@ function BkStyles() {
         justify-content:center;
       }
 
-      /* ── Confirm ── */
+      /* â”€â”€ Confirm â”€â”€ */
       .uc-confirm-layout {
         display:grid;
         grid-template-columns:1fr 1fr;
@@ -3844,7 +5387,7 @@ function BkStyles() {
         margin:0.5rem 0;
       }
 
-      /* ── Success Page ── */
+      /* â”€â”€ Success Page â”€â”€ */
       .uc-success-page {
         max-width:520px;
         margin:3rem auto;
@@ -3885,7 +5428,7 @@ function BkStyles() {
       .uc-tl-icon { font-size:1rem; width:24px; text-align:center; }
       .uc-tl-label { flex:1; }
 
-      /* ── Buttons ── */
+      /* â”€â”€ Buttons â”€â”€ */
       .uc-btn-primary {
         display:inline-flex; align-items:center; justify-content:center; gap:0.45rem;
         background:linear-gradient(135deg,#7C3AED,#6d28d9);
@@ -3926,7 +5469,7 @@ function BkStyles() {
 
       .uc-step-footer { padding-top:0.5rem; }
 
-      /* ── Footer ── */
+      /* â”€â”€ Footer â”€â”€ */
       .uc-footer {
         background:white; border-top:1px solid #e2e8f0;
         padding:0.75rem 1.5rem;
@@ -3934,7 +5477,7 @@ function BkStyles() {
         gap:0.4rem; flex-wrap:wrap;
         font-size:0.72rem; font-weight:600; color:#94a3b8;
       }
-      /* ── Package Modal ── */
+      /* â”€â”€ Package Modal â”€â”€ */
       .uc-modal-overlay {
         position: fixed; top: 0; left: 0; right: 0; bottom: 0;
         background: rgba(15, 23, 42, 0.4);

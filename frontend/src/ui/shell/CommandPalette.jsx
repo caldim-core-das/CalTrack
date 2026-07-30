@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, Home, Clock, CheckSquare, CalendarDays, Banknote, CalendarRange, Users, BarChart3, Settings, LogOut, Command, ChevronRight } from "lucide-react"
+import { Search, Home, Clock, CheckSquare, CalendarDays, Banknote, CalendarRange, Users, BarChart3, Settings, LogOut, Command, ChevronRight, Package } from "lucide-react"
 import { routes } from "../routes.js"
 import { motion, AnimatePresence } from "framer-motion"
 
 const ACTIONS = [
   { id: "dashboard", label: "Go to Dashboard", shortcut: ["G", "D"], icon: <Home size={18} />, to: routes.dashboard, color: "text-emerald-500" },
+  { id: "inventory", label: "Inventory Management", shortcut: ["G", "I"], icon: <Package size={18} />, to: routes.inventory, color: "text-purple-500" },
   { id: "time", label: "Track Time", shortcut: ["G", "T"], icon: <Clock size={18} />, to: routes.time, color: "text-amber-500" },
   { id: "tasks", label: "Manage Jobs", shortcut: ["G", "K"], icon: <CheckSquare size={18} />, to: routes.tasks, color: "text-teal-500" },
   { id: "leaves", label: "Request Leave", shortcut: ["G", "L"], icon: <CalendarDays size={18} />, to: routes.leaves, color: "text-rose-500" },

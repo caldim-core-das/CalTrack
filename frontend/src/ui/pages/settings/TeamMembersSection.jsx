@@ -329,49 +329,62 @@ export default function TeamMembersSection({ showToast, SectionHeader }) {
         )}
       </Card>
 
-      {isAdmin && invites.length > 0 && (
-        <Card title={
-          <div className="flex items-center gap-3">
-            <Mail size={18} className="text-amber-500" />
-            <span>Pending Invitations</span>
-            <Pill tone="warn">{invites.length}</Pill>
-          </div>
-        }>
-          <div className="divide-y divide-stroke dark:divide-slate-800/60 -mx-6 -mb-6">
-            {invites.map(invite => (
-              <div key={invite.id} className="flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900/30">
-                    <Mail size={18} />
+      {(() => {
+        const activeInvites = invites.filter(invite => {
+          const invEmail = (typeof invite.email === 'object' ? invite.email?.email : invite.email)?.toLowerCase()
+          const alreadyJoined = members.some(m => {
+            const memEmail = (typeof m.email === 'object' ? m.email?.email : m.email)?.toLowerCase()
+            return memEmail && memEmail === invEmail
+          })
+          return !alreadyJoined && invite.status !== "accepted"
+        })
+
+        if (!isAdmin || activeInvites.length === 0) return null
+
+        return (
+          <Card title={
+            <div className="flex items-center gap-3">
+              <Mail size={18} className="text-amber-500" />
+              <span>Pending Invitations</span>
+              <Pill tone="warn">{activeInvites.length}</Pill>
+            </div>
+          }>
+            <div className="divide-y divide-stroke dark:divide-slate-800/60 -mx-6 -mb-6">
+              {activeInvites.map(invite => (
+                <div key={invite.id} className="flex items-center justify-between p-6 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 border border-amber-100 dark:border-amber-900/30">
+                      <Mail size={18} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-black text-slate-900 dark:text-white truncate">
+                        {typeof invite.email === 'object' ? invite.email?.email : invite.email}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-500 font-bold uppercase tracking-widest mt-1">
+                        Invited by {invite.invited_by_name} · Expires {new Date(invite.expires_at).toLocaleDateString()}
+                      </div>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-black text-slate-900 dark:text-white truncate">
-                      {typeof invite.email === 'object' ? invite.email?.email : invite.email}
-                    </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-500 font-bold uppercase tracking-widest mt-1">
-                      Invited by {invite.invited_by_name} · Expires {new Date(invite.expires_at).toLocaleDateString()}
-                    </div>
+                  <div className="flex items-center gap-4">
+                    <Pill tone={invite.is_expired ? "bad" : "warn"}>
+                      {invite.is_expired ? "Expired" : "Pending"}
+                    </Pill>
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleRevokeInvite(invite.id)}
+                      disabled={revoking === invite.id}
+                      className="h-9 px-4 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
+                    >
+                      {revoking === invite.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} className="mr-2" />}
+                      Cancel
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <Pill tone={invite.is_expired ? "bad" : "warn"}>
-                    {invite.is_expired ? "Expired" : "Pending"}
-                  </Pill>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleRevokeInvite(invite.id)}
-                    disabled={revoking === invite.id}
-                    className="h-9 px-4 text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                  >
-                    {revoking === invite.id ? <Loader2 size={14} className="animate-spin" /> : <X size={14} className="mr-2" />}
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
+              ))}
+            </div>
+          </Card>
+        )
+      })()}
     </div>
   )
 }

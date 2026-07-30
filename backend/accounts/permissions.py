@@ -5,23 +5,39 @@ ADMIN_ROLES = frozenset({"admin", "manager"})
 
 
 def is_admin_role(user) -> bool:
-    """Return True when the user holds an admin-level role (admin or manager)."""
-    return bool(user and getattr(user, "role", None) in ADMIN_ROLES)
+    """Return True when the user holds an admin-level role (admin or manager), superuser, or staff."""
+    if not user or not user.is_authenticated:
+        return False
+    role = str(getattr(user, "role", "")).lower()
+    return role in ADMIN_ROLES or getattr(user, "is_superuser", False) or getattr(user, "is_staff", False)
 
 
 class IsAdminRole(BasePermission):
-    """Allows access for admin and manager roles."""
+    """Allows access for admin and manager roles, as well as superusers and staff."""
     ADMIN_ROLES = {"admin", "manager"}
 
     def has_permission(self, request, view):
         user = getattr(request, "user", None)
-        return bool(user and user.is_authenticated and getattr(user, "role", None) in self.ADMIN_ROLES)
+        if not user or not user.is_authenticated:
+            return False
+        role = str(getattr(user, "role", "")).lower()
+        return role in self.ADMIN_ROLES or getattr(user, "is_superuser", False) or getattr(user, "is_staff", False)
 
 
 class IsEmployeeRole(BasePermission):
     def has_permission(self, request, view):
         user = getattr(request, "user", None)
         return bool(user and user.is_authenticated and getattr(user, "role", None) == "employee")
+
+
+class IsCustomer(BasePermission):
+    """Allows access for authenticated customer users (case-insensitive) as well as admins/managers."""
+    def has_permission(self, request, view):
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
+        role = str(getattr(user, "role", "")).lower()
+        return role in {"customer", "admin", "manager", ""} or user.is_superuser or user.is_staff
 
 
 def RequireModuleAccess(module_name: str, required_action: str):

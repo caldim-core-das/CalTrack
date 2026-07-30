@@ -3423,9 +3423,26 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
 
   // Sort employees by availability + GPS distance priority (Urban Company / Swiggy flow)
   const empList = useMemo(() => {
-    let list = availableEmployees && availableEmployees.length > 0
-      ? [...availableEmployees]
-      : [...employees];
+    let rawList = (availableEmployees && availableEmployees.length > 0)
+      ? availableEmployees
+      : employees;
+
+    let filtered = (rawList || []).filter(emp => {
+      const r = emp.user?.role || emp.role || ""
+      const title = String(emp.title || "").toLowerCase()
+      return r !== "admin" && r !== "customer" && title !== "admin"
+    });
+
+    // Fallback if availableEmployees only contained admin accounts
+    if (filtered.length === 0 && availableEmployees && availableEmployees.length > 0 && employees && employees.length > 0) {
+      filtered = (employees || []).filter(emp => {
+        const r = emp.user?.role || emp.role || ""
+        const title = String(emp.title || "").toLowerCase()
+        return r !== "admin" && r !== "customer" && title !== "admin"
+      });
+    }
+
+    let list = [...filtered];
 
     const category = form.category;
     let allowedRoles = null;
@@ -3437,13 +3454,6 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
       else if (category === "cleaning") allowedRoles = ["cleaning"];
       else if (category === "maintenance") allowedRoles = ["handyman"];
       else if (category === "repair") allowedRoles = ["appliance_technician", "handyman", "painter"];
-    }
-
-    if (allowedRoles) {
-      list = list.filter(emp => {
-        const empRoles = emp.service_roles || [];
-        return empRoles.some(r => allowedRoles.includes(r));
-      });
     }
 
     const nearbyMap = {};
@@ -3459,10 +3469,15 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
       const avail = emp.current_availability || "offline";
       const isOnline = avail !== "offline";
       const isNearby = nearbyDetail && nearbyDetail.distance_km <= 10;
+      const empRoles = emp.service_roles || [];
+      const matchesRole = allowedRoles ? empRoles.some(r => allowedRoles.includes(r)) : true;
 
       let priority = 3; // OFFLINE
       if (isOnline) {
         priority = isNearby ? 1 : 2;
+      }
+      if (!matchesRole) {
+        priority += 10; // place non-matching roles lower but keep selectable
       }
 
       return {
@@ -3470,6 +3485,7 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
         nearbyDetail,
         isOnline,
         isNearby,
+        matchesRole,
         priorityOrder: priority,
         distance_km: nearbyDetail ? nearbyDetail.distance_km : null,
       };
@@ -3727,28 +3743,16 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
                 const userId = emp.user?.id || emp.id
                 const name = `${emp.first_name || emp.user?.first_name || emp.user?.username || "?"} ${emp.last_name || emp.user?.last_name || ""}`.trim()
 
-                const hourlyRate = emp.hourly_rate !== undefined ? parseFloat(emp.hourly_rate) : 0
-                const isRateMissing = (emp.role !== "admin" && emp.user?.role !== "admin" && (!emp.title || !emp.title.toLowerCase().includes("admin"))) && hourlyRate <= 0
+                const dot = emp.isOnline ? "🟢" : "🔴"
+                const statusStr = emp.isOnline ? (cfg.label || "Available") : "Offline"
+                const recTag = (emp.matchesRole && form.category) ? " (⭐ Recommended)" : ""
+                const titleStr = emp.title && emp.title !== "Employee" ? ` · ${emp.title}` : ""
+                const distStr = emp.isOnline && emp.nearbyDetail ? ` · ${emp.nearbyDetail.distance_km}km` : ""
 
-                let displayLabel = `[${cfg.label.toUpperCase()}] ${name}`;
-                if (emp.isOnline) {
-                  if (emp.nearbyDetail) {
-                    const distStr = `${emp.nearbyDetail.distance_km}km`;
-                    const etaMin = Math.max(1, Math.round(emp.nearbyDetail.distance_km / 30 * 60));
-                    displayLabel = `🟢 [ONLINE · ${distStr} · ETA: ${etaMin}m] ${name} (${cfg.label})`;
-                  } else {
-                    displayLabel = `🟢 [ONLINE] ${name} (${cfg.label})`;
-                  }
-                } else {
-                  displayLabel = `🔴 [OFFLINE] ${name}`;
-                }
-
-                if (isRateMissing) {
-                  displayLabel += " [RATE NOT SET - CANNOT ASSIGN]"
-                }
+                const displayLabel = `${dot} ${name}${titleStr} · ${statusStr}${distStr}${recTag}`
 
                 return (
-                  <option key={emp.id} value={userId} disabled={isRateMissing}>
+                  <option key={emp.id} value={userId}>
                     {displayLabel}
                   </option>
                 )

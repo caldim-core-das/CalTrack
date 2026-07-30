@@ -458,6 +458,18 @@ class AdminMapConsumer(AsyncWebsocketConsumer):
             "acknowledged_by": event.get("acknowledged_by"),
         }))
 
+    async def employee_presence_change(self, event):
+        await self.send(json.dumps({
+            "type": "presence_change",
+            "data": event.get("data"),
+        }))
+
+    async def employee_status_change(self, event):
+        await self.send(json.dumps({
+            "type": "presence_change",
+            "data": event.get("data"),
+        }))
+
     async def task_assigned(self, event):
         await self.send(json.dumps({
             "type": "task_assigned",
