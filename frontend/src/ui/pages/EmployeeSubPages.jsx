@@ -1498,3 +1498,453 @@ export function TrainingRecordsPage() {
     </div>
   )
 }
+
+
+export function EmployeeRefundInvestigationsPage() {
+  const [investigations, setInvestigations] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selectedInv, setSelectedInv] = useState(null)
+  
+  const [explanation, setExplanation] = useState("")
+  const [workConfirmed, setWorkConfirmed] = useState(true)
+  const [photos, setPhotos] = useState([])
+  const [submitting, setSubmitting] = useState(false)
+  const [errorMsg, setErrorMsg] = useState("")
+  const [successMsg, setSuccessMsg] = useState("")
+
+  const loadAssigned = async () => {
+    setLoading(true)
+    try {
+      const res = await apiRequest("/employee/refunds/assigned/")
+      if (res?.success) {
+        setInvestigations(res.data || [])
+        if (res.data && res.data.length > 0 && !selectedInv) {
+          setSelectedInv(res.data[0])
+        }
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadAssigned()
+  }, [])
+
+  const handleSubmit = async () => {
+    if (!selectedInv || !explanation.trim()) return
+    setSubmitting(true)
+    setErrorMsg("")
+    setSuccessMsg("")
+
+    try {
+      const formData = new FormData()
+      formData.append("explanation", explanation)
+      formData.append("work_completed_confirmed", workConfirmed ? "true" : "false")
+      if (photos && photos.length > 0) {
+        for (let i = 0; i < photos.length; i++) {
+          formData.append("photos", photos[i])
+        }
+      }
+
+      const token = localStorage.getItem("token") || localStorage.getItem("access_token")
+      const response = await fetch(`/api/employee/refunds/${selectedInv.id}/submit-investigation/`, {
+        method: "POST",
+        headers: {
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: formData
+      })
+
+      const res = await response.json()
+      if (res.success || response.ok) {
+        setSuccessMsg("Investigation report submitted successfully. Sent back to Admin queue.")
+        setExplanation("")
+        setPhotos([])
+        loadAssigned()
+      } else {
+        setErrorMsg(res?.error?.message || res?.message || "Failed to submit investigation report.")
+      }
+    } catch (e) {
+      setErrorMsg(e?.message || "Network error submitting report.")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="p-10 text-center text-slate-500 font-semibold">Loading assigned refund investigations...</div>
+  }
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-var(--header-height,64px))] w-full bg-slate-50 overflow-y-auto p-8 space-y-6">
+      <div>
+        <h1 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+          <FileText className="text-purple-600" size={24} />
+          Assigned Refund Investigations
+        </h1>
+        <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">
+          Review customer refund claims, submit job verification notes, and upload service photos.
+        </p>
+      </div>
+
+      {successMsg && (
+        <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 p-4 rounded-xl text-sm font-bold flex items-center gap-2">
+          <CheckCircle2 size={18} className="text-emerald-600" /> {successMsg}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+        {/* Left List */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col gap-3 shadow-sm">
+          <h3 className="font-extrabold text-sm text-slate-800 uppercase tracking-wider mb-2">Assigned Requests</h3>
+
+          {investigations.length === 0 && (
+            <div className="p-8 text-center text-slate-400 italic font-semibold">
+              No refund investigations currently assigned to you.
+            </div>
+          )}
+
+          {investigations.map(inv => {
+            const isSel = selectedInv?.id === inv.id
+            return (
+              <div
+                key={inv.id}
+                onClick={() => { setSelectedInv(inv); setErrorMsg(""); setSuccessMsg(""); }}
+                className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                  isSel
+                    ? "border-purple-600 bg-purple-50/40 shadow-sm"
+                    : "border-slate-200 bg-white hover:border-slate-300"
+                }`}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <span className="text-xs font-mono font-bold text-slate-500">{inv.refund_id || `RF-${inv.id}`}</span>
+                    <h4 className="font-bold text-sm text-slate-900 mt-0.5">{inv.issue_title || 'Service Job'}</h4>
+                  </div>
+                  <span className="text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase bg-amber-100 text-amber-700">
+                    {inv.status}
+                  </span>
+                </div>
+
+                <div className="text-xs text-slate-600 space-y-1 mt-2">
+                  <div>Customer: <strong className="text-slate-800">{inv.customer_name}</strong></div>
+                  <div>Reason: <span className="font-semibold text-purple-600">{inv.reason}</span></div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Right Detail & Response Form */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col gap-5 shadow-sm">
+          {selectedInv ? (
+            <>
+              <div className="border-b border-slate-100 pb-4">
+                <span className="text-xs font-mono font-bold text-purple-600">{selectedInv.refund_id}</span>
+                <h3 className="text-lg font-black text-slate-900 mt-1">Job Investigation Review</h3>
+                <div className="text-xs text-slate-500 mt-0.5">Booking ID: {selectedInv.booking_request_id || selectedInv.booking} • Customer: {selectedInv.customer_name}</div>
+              </div>
+
+              {/* Customer Complaint/Reason Details */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-slate-700 space-y-2">
+                <div><strong className="text-slate-900">Customer Claim Reason:</strong> {selectedInv.reason}</div>
+                {selectedInv.additional_notes && <div><strong className="text-slate-900">Customer Notes:</strong> {selectedInv.additional_notes}</div>}
+              </div>
+
+              {errorMsg && (
+                <div className="bg-rose-50 text-rose-700 border border-rose-200 p-3 rounded-xl text-xs font-semibold">
+                  ⚠️ {errorMsg}
+                </div>
+              )}
+
+              {/* Investigation Form */}
+              <div className="space-y-4">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={workConfirmed}
+                    onChange={e => setWorkConfirmed(e.target.checked)}
+                    className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+                  />
+                  I confirm that service work was completed according to checklist standards
+                </label>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">
+                    Technician Explanation & Findings
+                  </label>
+                  <textarea
+                    value={explanation}
+                    onChange={e => setExplanation(e.target.value)}
+                    rows={4}
+                    placeholder="Describe what work was completed, condition of equipment, or reason for customer issue..."
+                    className="w-full border border-slate-300 rounded-xl p-3 text-xs focus:ring-1 focus:ring-purple-500 outline-none bg-slate-50 focus:bg-white transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">
+                    Upload Additional Site / Work Photos
+                  </label>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={e => setPhotos(Array.from(e.target.files || []))}
+                    className="w-full text-xs text-slate-500 border border-dashed border-slate-300 p-3 rounded-xl cursor-pointer bg-slate-50"
+                  />
+                  {photos.length > 0 && (
+                    <div className="text-xs text-purple-600 font-bold mt-1">
+                      ✓ {photos.length} photo(s) attached
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || !explanation.trim()}
+                  className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold text-xs hover:bg-purple-700 disabled:opacity-50 transition-colors shadow-md shadow-purple-600/20"
+                >
+                  {submitting ? 'Submitting Report...' : 'Submit Investigation Report'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-full text-slate-400 font-semibold italic">
+              Select an assigned investigation request to view details.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Employee Reschedule Notifications Page ────────────────────────────────
+
+const EMP_REJECTION_REASONS = [
+  { value: "ALREADY_ASSIGNED", label: "Already Assigned Elsewhere" },
+  { value: "PERSONAL_CONFLICT", label: "Personal Conflict" },
+  { value: "OTHER", label: "Other" },
+]
+
+export function EmployeeRescheduleNotificationsPage() {
+  const [notifications, setNotifications] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [actionLoading, setActionLoading] = useState({})
+  const [rejectModal, setRejectModal] = useState(null) // { id, reason, note }
+  const [toast, setToast] = useState(null)
+
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const res = await apiRequest("/employee/reschedules/notifications/")
+      if (res?.success) setNotifications(res.data || [])
+      else showToast(res?.error?.message || "Failed to load notifications", "error")
+    } catch (e) {
+      showToast("Network error", "error")
+    } finally { setLoading(false) }
+  }
+
+  useEffect(() => { load() }, [])
+
+  const setLoading_ = (id, val) => setActionLoading(p => ({ ...p, [id]: val }))
+
+  const handleAccept = async (id) => {
+    if (!window.confirm("Accept this rescheduled booking? The booking will be updated and the customer will be notified.")) return
+    setLoading_(id, true)
+    try {
+      const res = await apiRequest(`/employee/reschedules/${id}/accept/`, { method: "POST", json: {} })
+      if (res?.success) {
+        showToast("Booking confirmed! Customer has been notified.", "success")
+        load()
+      } else {
+        showToast(res?.error?.message || "Failed to accept", "error")
+      }
+    } catch (e) { showToast("Network error", "error") }
+    finally { setLoading_(id, false) }
+  }
+
+  const handleRejectSubmit = async () => {
+    const { id, reason, note } = rejectModal
+    setLoading_(id, true)
+    try {
+      const res = await apiRequest(`/employee/reschedules/${id}/reject/`, {
+        method: "POST", json: { reason, note }
+      })
+      if (res?.success) {
+        showToast("Admin notified. They will find another technician.", "success")
+        setRejectModal(null)
+        load()
+      } else {
+        showToast(res?.error?.message || "Failed to reject", "error")
+      }
+    } catch (e) { showToast("Network error", "error") }
+    finally { setLoading_(id, false) }
+  }
+
+  return (
+    <div style={{ padding: "1.5rem", minHeight: "100vh", background: "#f8fafc" }}>
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", top: 20, right: 20, zIndex: 9999,
+          padding: "12px 20px", borderRadius: 12, fontWeight: 700, fontSize: "0.85rem",
+          background: toast.type === "error" ? "#fef2f2" : "#f0fdf4",
+          color: toast.type === "error" ? "#dc2626" : "#15803d",
+          border: `1px solid ${toast.type === "error" ? "#fecaca" : "#bbf7d0"}`,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.12)"
+        }}>
+          {toast.type === "error" ? "⚠️" : "✓"} {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: "1.4rem", fontWeight: 800, color: "#0f172a" }}>
+            🔔 Reschedule Notifications
+          </h2>
+          <p style={{ margin: "4px 0 0", fontSize: "0.85rem", color: "#64748b" }}>
+            Bookings rescheduled to your schedule — confirm your availability
+          </p>
+        </div>
+        <button
+          onClick={load}
+          style={{ padding: "8px 16px", background: "white", border: "1px solid #e2e8f0", borderRadius: 10, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", color: "#334155" }}
+        >
+          ↺ Refresh
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "4rem", color: "#94a3b8" }}>
+          <div style={{ width: 32, height: 32, border: "4px solid #6366f1", borderTopColor: "transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+          Loading notifications...
+        </div>
+      ) : notifications.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "5rem 1rem", background: "white", borderRadius: 20, border: "1px solid #e2e8f0" }}>
+          <div style={{ fontSize: "3rem", marginBottom: 12 }}>✅</div>
+          <div style={{ fontWeight: 800, fontSize: "1.05rem", color: "#0f172a" }}>No pending confirmations</div>
+          <div style={{ fontSize: "0.85rem", color: "#64748b", marginTop: 4 }}>You're all caught up. Reschedule requests assigned to you will appear here.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 700 }}>
+          {notifications.map(n => {
+            const isLoading_ = actionLoading[n.id]
+            return (
+              <div key={n.id} style={{ background: "white", borderRadius: 20, border: "1.5px solid #e0e7ff", boxShadow: "0 4px 16px rgba(99,102,241,0.07)", overflow: "hidden" }}>
+                {/* Header strip */}
+                <div style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", padding: "14px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontWeight: 800, color: "white", fontSize: "0.95rem" }}>{n.service || "Service Booking"}</div>
+                    <div style={{ fontSize: "0.75rem", color: "#c7d2fe", marginTop: 2 }}>{n.reschedule_id || `#${n.id}`} · {n.booking_id_str || "—"}</div>
+                  </div>
+                  <span style={{ background: "rgba(255,255,255,0.15)", color: "white", padding: "4px 12px", borderRadius: 99, fontSize: "0.72rem", fontWeight: 700 }}>
+                    ACTION REQUIRED
+                  </span>
+                </div>
+
+                {/* Schedule shift */}
+                <div style={{ background: "#0f172a", padding: "14px 20px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                  <div>
+                    <div style={{ fontSize: "0.65rem", color: "#f59e0b", fontWeight: 800, textTransform: "uppercase", marginBottom: 2 }}>Previous</div>
+                    <div style={{ color: "white", fontWeight: 700, fontSize: "0.9rem" }}>{n.old_date || "—"}</div>
+                    <div style={{ color: "#94a3b8", fontSize: "0.78rem" }}>{n.old_slot || "—"}</div>
+                  </div>
+                  <div style={{ color: "#a855f7", fontWeight: 900, fontSize: "1.4rem" }}>→</div>
+                  <div>
+                    <div style={{ fontSize: "0.65rem", color: "#34d399", fontWeight: 800, textTransform: "uppercase", marginBottom: 2 }}>New Schedule</div>
+                    <div style={{ color: "#6ee7b7", fontWeight: 800, fontSize: "0.9rem" }}>{n.new_date || "—"}</div>
+                    <div style={{ color: "#4ade80", fontSize: "0.78rem" }}>{n.new_slot || "—"}</div>
+                  </div>
+                </div>
+
+                {/* Details */}
+                <div style={{ padding: "14px 20px 0" }}>
+                  <div style={{ fontSize: "0.82rem", color: "#475569", display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
+                    <div><span style={{ fontWeight: 700, color: "#334155" }}>Address:</span> {n.address || "—"}</div>
+                    <div><span style={{ fontWeight: 700, color: "#334155" }}>Customer Reason:</span> {n.customer_reason || n.reason || "—"}</div>
+                    {n.additional_notes && <div><span style={{ fontWeight: 700, color: "#334155" }}>Notes:</span> <em>{n.additional_notes}</em></div>}
+                    <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>Requested: {n.created_at ? new Date(n.created_at).toLocaleDateString() : "—"}</div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div style={{ display: "flex", gap: 10, padding: "14px 0", borderTop: "1px solid #f1f5f9" }}>
+                    <button
+                      onClick={() => handleAccept(n.id)}
+                      disabled={isLoading_}
+                      style={{
+                        flex: 1, padding: "11px 0", background: isLoading_ ? "#d1fae5" : "linear-gradient(135deg, #059669, #10b981)",
+                        color: "white", border: "none", borderRadius: 12, fontWeight: 800, fontSize: "0.88rem",
+                        cursor: isLoading_ ? "not-allowed" : "pointer", transition: "all 0.2s", opacity: isLoading_ ? 0.7 : 1
+                      }}
+                    >
+                      {isLoading_ ? "Confirming…" : "✓ Accept — I'm Available"}
+                    </button>
+                    <button
+                      onClick={() => setRejectModal({ id: n.id, reason: "OTHER", note: "" })}
+                      disabled={isLoading_}
+                      style={{
+                        flex: 1, padding: "11px 0", background: "#fef2f2", border: "1.5px solid #fecaca",
+                        color: "#dc2626", borderRadius: 12, fontWeight: 800, fontSize: "0.88rem",
+                        cursor: isLoading_ ? "not-allowed" : "pointer", opacity: isLoading_ ? 0.7 : 1
+                      }}
+                    >
+                      ✕ Can't Make It
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {rejectModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "white", borderRadius: 20, padding: "1.75rem", width: "100%", maxWidth: 420, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ margin: "0 0 16px", fontWeight: 800, fontSize: "1.1rem", color: "#0f172a" }}>Can't Make This Reschedule?</h3>
+            <div style={{ marginBottom: 14 }}>
+              <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#475569", marginBottom: 6 }}>Reason</label>
+              <select
+                value={rejectModal.reason}
+                onChange={e => setRejectModal(p => ({ ...p, reason: e.target.value }))}
+                style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "10px 12px", fontSize: "0.88rem", outline: "none" }}
+              >
+                {EMP_REJECTION_REASONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 700, color: "#475569", marginBottom: 6 }}>Additional Note (optional)</label>
+              <textarea
+                rows={3}
+                value={rejectModal.note}
+                onChange={e => setRejectModal(p => ({ ...p, note: e.target.value }))}
+                placeholder="Let admin know more details..."
+                style={{ width: "100%", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: "10px 12px", fontSize: "0.88rem", resize: "none", outline: "none", boxSizing: "border-box" }}
+              />
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleRejectSubmit} style={{ flex: 1, padding: "11px 0", background: "#dc2626", color: "white", border: "none", borderRadius: 12, fontWeight: 800, cursor: "pointer" }}>
+                Confirm — Notify Admin
+              </button>
+              <button onClick={() => setRejectModal(null)} style={{ flex: 1, padding: "11px 0", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: 12, fontWeight: 700, cursor: "pointer" }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

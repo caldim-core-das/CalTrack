@@ -3376,12 +3376,19 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
     }
     set("priority", priorityMap[selected.priority] || "medium")
 
-    // Map client details
+    // Map client & reschedule details
     set("client_name", selected.customer_name)
     set("client_contact_number", selected.phone)
     set("client_email", selected.email || "")
     set("job_address", selected.address)
-    set("due_date", selected.preferred_date)
+
+    const effectiveDate = selected.latest_reschedule?.new_date || selected.rescheduled_date || selected.preferred_date
+    const effectiveTime = selected.latest_reschedule?.new_time_slot || selected.rescheduled_time || selected.preferred_time
+    const effectiveTechId = selected.latest_reschedule?.proposed_technician_id || selected.assigned_employee?.user?.id || selected.assigned_employee?.id
+
+    if (effectiveDate) set("due_date", effectiveDate)
+    if (effectiveTime) set("preferred_time", effectiveTime)
+    if (effectiveTechId) set("assigned_to", String(effectiveTechId))
 
     // Trigger address input for geocoding
     setAddressInput(selected.address)
@@ -3423,9 +3430,26 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
 
   // Sort employees by availability + GPS distance priority (Urban Company / Swiggy flow)
   const empList = useMemo(() => {
-    let list = availableEmployees && availableEmployees.length > 0
-      ? [...availableEmployees]
-      : [...employees];
+    let rawList = (availableEmployees && availableEmployees.length > 0)
+      ? availableEmployees
+      : employees;
+
+    let filtered = (rawList || []).filter(emp => {
+      const r = emp.user?.role || emp.role || ""
+      const title = String(emp.title || "").toLowerCase()
+      return r !== "admin" && r !== "customer" && title !== "admin"
+    });
+
+    // Fallback if availableEmployees only contained admin accounts
+    if (filtered.length === 0 && availableEmployees && availableEmployees.length > 0 && employees && employees.length > 0) {
+      filtered = (employees || []).filter(emp => {
+        const r = emp.user?.role || emp.role || ""
+        const title = String(emp.title || "").toLowerCase()
+        return r !== "admin" && r !== "customer" && title !== "admin"
+      });
+    }
+
+    let list = [...filtered];
 
     const category = form.category;
     let allowedRoles = null;
@@ -3439,13 +3463,6 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
       else if (category === "repair") allowedRoles = ["appliance_technician", "handyman", "painter"];
     }
 
-    if (allowedRoles) {
-      list = list.filter(emp => {
-        const empRoles = emp.service_roles || [];
-        return empRoles.some(r => allowedRoles.includes(r));
-      });
-    }
-
     const nearbyMap = {};
     if (workflowData?.nearby_employees) {
       workflowData.nearby_employees.forEach(rec => {
@@ -3456,13 +3473,18 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
     return list.map(emp => {
       const userId = emp.user?.id || emp.id;
       const nearbyDetail = nearbyMap[String(userId)];
-      const avail = emp.current_availability || "offline";
-      const isOnline = avail !== "offline";
+      const isOnline = emp.is_online !== undefined && emp.is_online !== null ? Boolean(emp.is_online) : (emp.current_availability && emp.current_availability !== "offline");
+      const avail = isOnline ? (emp.current_availability || "available") : "offline";
       const isNearby = nearbyDetail && nearbyDetail.distance_km <= 10;
+      const empRoles = emp.service_roles || [];
+      const matchesRole = allowedRoles ? empRoles.some(r => allowedRoles.includes(r)) : true;
 
       let priority = 3; // OFFLINE
       if (isOnline) {
         priority = isNearby ? 1 : 2;
+      }
+      if (!matchesRole) {
+        priority += 10; // place non-matching roles lower but keep selectable
       }
 
       return {
@@ -3470,6 +3492,7 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
         nearbyDetail,
         isOnline,
         isNearby,
+        matchesRole,
         priorityOrder: priority,
         distance_km: nearbyDetail ? nearbyDetail.distance_km : null,
       };
@@ -3594,17 +3617,31 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
 
   async function submit(e) {
     e.preventDefault()
-    if (!form.assigned_to) return setErr("Please select an employee.")
-    if (!form.title.trim()) return setErr("Title is required.")
+    if (!form.assigned_to) {
+      setErr("Please select an employee to assign this work order.")
+      e.target?.scrollIntoView?.({ behavior: "smooth", block: "start" })
+      return
+    }
+    const finalTitle = (form.title || "").trim() || (form.description ? form.description.trim().slice(0, 50) : "General Work Order")
     const latVal = form.location_lat ? parseFloat(form.location_lat) : null
     const lonVal = form.location_lon ? parseFloat(form.location_lon) : null
-    if (form.location_lat && isNaN(latVal)) return setErr("Latitude must be a valid number (e.g. 12.9716).")
-    if (form.location_lon && isNaN(lonVal)) return setErr("Longitude must be a valid number (e.g. 77.5946).")
+    if (form.location_lat && isNaN(latVal)) {
+      setErr("Latitude must be a valid number (e.g. 12.9716).")
+      e.target?.scrollIntoView?.({ behavior: "smooth", block: "start" })
+      return
+    }
+    if (form.location_lon && isNaN(lonVal)) {
+      setErr("Longitude must be a valid number (e.g. 77.5946).")
+      e.target?.scrollIntoView?.({ behavior: "smooth", block: "start" })
+      return
+    }
     setBusy(true); setErr("")
     try {
       const payload = {
         ...form,
+        title: finalTitle,
         estimated_hours: parseFloat(form.estimated_hours) || 1,
+        due_date: form.due_date || new Date().toISOString().slice(0, 10),
         ...(latVal !== null ? { location_lat: latVal } : {}),
         ...(lonVal !== null ? { location_lon: lonVal } : {}),
       }
@@ -3612,8 +3649,15 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
       if (!lonVal) delete payload.location_lon
       if (!payload.geofence_radius) delete payload.geofence_radius
       if (!payload.job_site) delete payload.job_site
-      if (!payload.sla_deadline) delete payload.sla_deadline
-      else payload.sla_deadline = new Date(payload.sla_deadline).toISOString()
+      if (!payload.service_request) delete payload.service_request
+
+      if (!payload.sla_deadline) {
+        delete payload.sla_deadline
+      } else {
+        const d = new Date(payload.sla_deadline)
+        if (isNaN(d.getTime())) delete payload.sla_deadline
+        else payload.sla_deadline = d.toISOString()
+      }
 
       const created = await apiRequest("/tasks/admin/", {
         method: "POST",
@@ -3633,7 +3677,19 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
       await onAssigned?.()
       onClose?.()
     } catch (ex) {
-      setErr(ex?.body?.detail || "Failed to assign task.")
+      let errorMsg = "Failed to assign task."
+      if (ex?.body) {
+        if (typeof ex.body === "string") errorMsg = ex.body
+        else if (typeof ex.body.detail === "string") errorMsg = ex.body.detail
+        else if (typeof ex.body === "object") {
+          const firstKey = Object.keys(ex.body)[0]
+          const firstVal = ex.body[firstKey]
+          const valStr = Array.isArray(firstVal) ? firstVal[0] : String(firstVal)
+          errorMsg = `${firstKey}: ${valStr}`
+        }
+      }
+      setErr(errorMsg)
+      e.target?.scrollIntoView?.({ behavior: "smooth", block: "start" })
     } finally {
       setBusy(false)
     }
@@ -3727,28 +3783,16 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
                 const userId = emp.user?.id || emp.id
                 const name = `${emp.first_name || emp.user?.first_name || emp.user?.username || "?"} ${emp.last_name || emp.user?.last_name || ""}`.trim()
 
-                const hourlyRate = emp.hourly_rate !== undefined ? parseFloat(emp.hourly_rate) : 0
-                const isRateMissing = (emp.role !== "admin" && emp.user?.role !== "admin" && (!emp.title || !emp.title.toLowerCase().includes("admin"))) && hourlyRate <= 0
+                const dot = emp.isOnline ? "🟢" : "🔴"
+                const statusStr = emp.isOnline ? (cfg.label || "Available") : "Offline"
+                const recTag = (emp.matchesRole && form.category) ? " (⭐ Recommended)" : ""
+                const titleStr = emp.title && emp.title !== "Employee" ? ` · ${emp.title}` : ""
+                const distStr = emp.isOnline && emp.nearbyDetail ? ` · ${emp.nearbyDetail.distance_km}km` : ""
 
-                let displayLabel = `[${cfg.label.toUpperCase()}] ${name}`;
-                if (emp.isOnline) {
-                  if (emp.nearbyDetail) {
-                    const distStr = `${emp.nearbyDetail.distance_km}km`;
-                    const etaMin = Math.max(1, Math.round(emp.nearbyDetail.distance_km / 30 * 60));
-                    displayLabel = `🟢 [ONLINE · ${distStr} · ETA: ${etaMin}m] ${name} (${cfg.label})`;
-                  } else {
-                    displayLabel = `🟢 [ONLINE] ${name} (${cfg.label})`;
-                  }
-                } else {
-                  displayLabel = `🔴 [OFFLINE] ${name}`;
-                }
-
-                if (isRateMissing) {
-                  displayLabel += " [RATE NOT SET - CANNOT ASSIGN]"
-                }
+                const displayLabel = `${dot} ${name}${titleStr} · ${statusStr}${distStr}${recTag}`
 
                 return (
-                  <option key={emp.id} value={userId} disabled={isRateMissing}>
+                  <option key={emp.id} value={userId}>
                     {displayLabel}
                   </option>
                 )

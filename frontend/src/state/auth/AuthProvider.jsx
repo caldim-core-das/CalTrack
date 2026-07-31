@@ -14,6 +14,7 @@ import {
   apiFetchMe,
   apiRegister,
   apiGoogleLogin,
+  apiCustomerGoogleLogin,
   apiLogout,
   extractAuthError,
 } from "../../api/authService.js"
@@ -91,7 +92,7 @@ export function AuthProvider({ children }) {
     [refreshMe]
   )
 
-  // ── Google OAuth ──────────────────────────────────────────────────────────
+  // ── Google OAuth (Employee / Staff) ───────────────────────────────────────
   const loginWithGoogle = useCallback(
     async (googleAccessToken) => {
       await apiGoogleLogin(googleAccessToken)   // server sets cookies
@@ -100,8 +101,25 @@ export function AuthProvider({ children }) {
     [refreshMe]
   )
 
+  // ── Customer Google OAuth ─────────────────────────────────────────────────
+  const loginWithCustomerGoogle = useCallback(
+    async (googleAccessToken) => {
+      await apiCustomerGoogleLogin(googleAccessToken)   // server sets cookies
+      return await refreshMe()
+    },
+    [refreshMe]
+  )
+
   // ── Logout ────────────────────────────────────────────────────────────────
   const logout = useCallback(async () => {
+    // Mark offline before clearing cookies
+    try {
+      const { apiRequest } = await import("../../api/client.js")
+      await apiRequest("/employees/set-presence/", {
+        method: "POST",
+        json: { is_online: false },
+      })
+    } catch (_) {}
     await apiLogout()                                   // server clears cookies
     localStorage.removeItem("quicktims.orgName")
     localStorage.removeItem("caltrack_activation_dossier")
@@ -117,7 +135,18 @@ export function AuthProvider({ children }) {
     }, 6000)
 
     refreshMe()
-      .then((u) => console.log("DEBUG: refreshMe resolved with:", u))
+      .then((u) => {
+        console.log("DEBUG: refreshMe resolved with:", u)
+        // ── Set employee presence ONLINE as soon as we know who is logged in ──
+        if (u) {
+          import("../../api/client.js").then(({ apiRequest }) => {
+            apiRequest("/employees/set-presence/", {
+              method: "POST",
+              json: { is_online: true, availability: "available" },
+            }).catch(() => {}) // silent — non-critical
+          })
+        }
+      })
       .catch((e) => console.error("DEBUG: refreshMe rejected with:", e))
       .catch(() => {})
       .finally(() => {
@@ -127,6 +156,19 @@ export function AuthProvider({ children }) {
 
     return () => clearTimeout(fallbackTimer)
   }, [refreshMe])
+
+  // ── Mark offline when the tab/browser closes ─────────────────────────────
+  useEffect(() => {
+    const handleUnload = () => {
+      if (!user) return
+      // Use sendBeacon for guaranteed delivery on page close
+      const url = "/api/employees/set-presence/"
+      const blob = new Blob([JSON.stringify({ is_online: false })], { type: "application/json" })
+      try { navigator.sendBeacon(url, blob) } catch (_) {}
+    }
+    window.addEventListener("beforeunload", handleUnload)
+    return () => window.removeEventListener("beforeunload", handleUnload)
+  }, [user])
 
   // ── Session expiry event (fired by API client on unrecoverable 401) ───────
   useEffect(() => {
@@ -142,8 +184,8 @@ export function AuthProvider({ children }) {
 
   // ── Context value ─────────────────────────────────────────────────────────
   const value = useMemo(
-    () => ({ isReady, user, login, register, loginWithGoogle, logout, refreshMe }),
-    [isReady, user, login, register, loginWithGoogle, logout, refreshMe]
+    () => ({ isReady, user, login, register, loginWithGoogle, loginWithCustomerGoogle, logout, refreshMe }),
+    [isReady, user, login, register, loginWithGoogle, loginWithCustomerGoogle, logout, refreshMe]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

@@ -155,3 +155,42 @@ class RegistrationDossier(models.Model):
 
     def __str__(self):
         return f"Dossier: {self.full_name} ({self.email}) - {self.status}"
+
+
+class SavedAddress(models.Model):
+    """
+    Customer saved addresses — supports multiple addresses with a single default.
+    Default enforcement is done in customer_services.py, not at the DB constraint level.
+    """
+
+    class Label(models.TextChoices):
+        HOME  = "home",  "Home"
+        WORK  = "work",  "Work"
+        OTHER = "other", "Other"
+
+    user          = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.CASCADE,
+        related_name="saved_addresses",
+        limit_choices_to={"role": "customer"},
+    )
+    label         = models.CharField(max_length=20, choices=Label.choices, default=Label.HOME)
+    address_line1 = models.CharField(max_length=255)
+    address_line2 = models.CharField(max_length=255, blank=True, default="")
+    city          = models.CharField(max_length=100)
+    state         = models.CharField(max_length=100)
+    pincode       = models.CharField(max_length=20)
+    phone_number  = models.CharField(max_length=30, blank=True, default="")
+    latitude      = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude     = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    is_default    = models.BooleanField(default=False)
+    last_used_at  = models.DateTimeField(null=True, blank=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    updated_at    = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_default", "-last_used_at", "-created_at"]
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} — {self.get_label_display()} ({self.city})"
+

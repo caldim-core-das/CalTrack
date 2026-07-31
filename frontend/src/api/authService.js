@@ -10,7 +10,7 @@
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? (
   import.meta.env.PROD
     ? `${window.location.origin}/Caltrack/api`
-    : `${window.location.protocol}//${window.location.hostname}:8000/api`
+    : `/api`
 )
 
 
@@ -72,6 +72,8 @@ export async function apiVerifyCustomerPhoneOTP(phone, otp) {
     body: JSON.stringify({ phone, otp })
   })
 }
+
+
 
 export async function apiFetchCustomerBookings() {
   return fetchJSON("/booking/my-bookings/")
@@ -159,6 +161,17 @@ export async function apiGoogleLogin(googleAccessToken, inviteToken = null) {
     body: JSON.stringify(payload),
   })
 }
+
+/**
+ * Customer Google OAuth — logs in or creates customer account, sets cookies.
+ */
+export async function apiCustomerGoogleLogin(googleAccessToken) {
+  return fetchJSON("/auth/customer/google/", {
+    method: "POST",
+    body: JSON.stringify({ access_token: googleAccessToken }),
+  })
+}
+
 
 /**
  * Request password reset email.

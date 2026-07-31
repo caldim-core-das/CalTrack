@@ -6,11 +6,43 @@ import { apiFetchRegistrationDossier } from "../../api/authService.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { useRole } from "../../state/auth/useRole.js"
 import { Button, Card, Input, Pill } from "../components/kit.jsx"
-import { Loader2, ShieldCheck, ShieldOff, AlertTriangle, ChevronDown, ChevronUp, Users, Edit3, Trash2, X, History, CalendarDays, CheckCircle2, Clock3, AlertCircle, Star, Briefcase, TrendingUp } from "lucide-react"
+import { Loader2, ShieldCheck, ShieldOff, AlertTriangle, ChevronDown, ChevronUp, Users, Edit3, Trash2, X, History, CalendarDays, CheckCircle2, Clock3, AlertCircle, Star, Briefcase, TrendingUp, Eye } from "lucide-react"
 import { fireSparkleFromEl } from "../sparkle.js"
 import { TECHNICIAN_ROLES } from "../../utils/roles.js"
 
-// ── Exempt status badge ─────────────────────────────────────────────────────
+// ── Presence dot & badge ────────────────────────────────────────────────────
+const PRESENCE_CONFIG = {
+  available:  { label: "Available",  dot: "bg-emerald-500", ring: "ring-emerald-400/40", text: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20", border: "border-emerald-200 dark:border-emerald-800/50" },
+  working:    { label: "Working",    dot: "bg-amber-400",   ring: "ring-amber-400/40",   text: "text-amber-600 dark:text-amber-400",   bg: "bg-amber-50 dark:bg-amber-900/20",   border: "border-amber-200 dark:border-amber-800/50" },
+  busy:       { label: "Working",    dot: "bg-amber-400",   ring: "ring-amber-400/40",   text: "text-amber-600 dark:text-amber-400",   bg: "bg-amber-50 dark:bg-amber-900/20",   border: "border-amber-200 dark:border-amber-800/50" },
+  on_break:   { label: "On Break",   dot: "bg-orange-400",  ring: "ring-orange-400/40",  text: "text-orange-600 dark:text-orange-400", bg: "bg-orange-50 dark:bg-orange-900/20", border: "border-orange-200 dark:border-orange-800/50" },
+  on_leave:   { label: "On Leave",   dot: "bg-blue-400",    ring: "ring-blue-400/40",    text: "text-blue-600 dark:text-blue-400",    bg: "bg-blue-50 dark:bg-blue-900/20",    border: "border-blue-200 dark:border-blue-800/50" },
+  offline:    { label: "Offline",    dot: "bg-slate-300 dark:bg-slate-600",  ring: "ring-slate-300/40 dark:ring-slate-600/40",  text: "text-slate-400 dark:text-slate-500",  bg: "bg-slate-50 dark:bg-slate-800/40",  border: "border-slate-200 dark:border-slate-700/50" },
+}
+
+function PresenceDot({ status, size = 8, animate = true }) {
+  const cfg = PRESENCE_CONFIG[status] || PRESENCE_CONFIG.offline
+  return (
+    <span className="relative inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+      {animate && (status === "available" || status === "busy" || status === "working") && (
+        <span className={`absolute inset-0 rounded-full ${cfg.dot} opacity-60 animate-ping`} />
+      )}
+      <span className={`relative rounded-full ${cfg.dot}`} style={{ width: size, height: size }} />
+    </span>
+  )
+}
+
+function OnlineBadge({ status }) {
+  const cfg = PRESENCE_CONFIG[status] || PRESENCE_CONFIG.offline
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider border ${cfg.bg} ${cfg.text} ${cfg.border}`}>
+      <PresenceDot status={status} size={6} animate={true} />
+      {cfg.label}
+    </span>
+  )
+}
+
+
 function ExemptBadge({ status }) {
   if (status === "exempt") return (
     <span className="inline-flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wider">
@@ -139,7 +171,7 @@ function EditEmployeeModal({ employee, availableRoles, onClose, onSave, saving, 
                 <ChevronDown size={16} className={`text-slate-400 transition-transform ${showRoles ? "rotate-180" : ""}`} />
               </button>
             </div>
-            
+
             {showRoles && (
               <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 p-2 max-h-64 overflow-y-auto">
                 <div className="flex flex-col gap-1">
@@ -150,11 +182,10 @@ function EditEmployeeModal({ employee, availableRoles, onClose, onSave, saving, 
                         key={r.id}
                         type="button"
                         onClick={() => setServiceRoles(prev => active ? prev.filter(x => x !== r.id) : [...prev, r.id])}
-                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                          active
+                        className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${active
                             ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
                             : "hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
-                        }`}
+                          }`}
                       >
                         {r.label}
                         {active && <CheckCircle2 size={16} className="text-indigo-600 dark:text-indigo-400" />}
@@ -821,6 +852,218 @@ function EmployeeHistoryDrawer({ employee, onClose }) {
   )
 }
 
+function EmployeeDetailsModal({ employee, availableRoles, onClose, onEdit, onHistory }) {
+  const user = employee.user || {}
+  const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ") || user.username || "Employee"
+  const rolesList = (employee.service_roles || []).map(id => availableRoles.find(r => r.id === id)?.label || id)
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="w-full max-w-3xl bg-white dark:bg-slate-950 rounded-3xl border border-stroke dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="px-8 py-6 border-b border-stroke dark:border-slate-800 bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-700 flex items-center justify-between text-white shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-2xl font-black text-white shadow-inner">
+              {fullName.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-widest text-indigo-200">{employee.employee_id || "EMP"}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${employee.is_active !== false ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30" : "bg-rose-500/20 text-rose-300 border border-rose-400/30"}`}>
+                  {employee.is_active !== false ? "Active" : "Inactive"}
+                </span>
+              </div>
+              <h2 className="text-2xl font-black tracking-tight mt-0.5">{fullName}</h2>
+              <div className="text-indigo-200 text-xs font-semibold">{employee.title || "No Title Specified"}</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="p-2 rounded-2xl hover:bg-white/10 text-white/80 hover:text-white transition-colors"
+            onClick={onClose}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-8 overflow-y-auto space-y-6 flex-1">
+          {/* Information Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Account & Profile */}
+            <div className="rounded-2xl border border-stroke dark:border-slate-800 p-6 bg-surface dark:bg-slate-900/40 space-y-4">
+              <div className="text-[11px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                <Users size={14} /> Personal &amp; Account Details
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between border-b border-stroke/50 dark:border-slate-800/60 pb-2">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Username:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{user.username || "—"}</span>
+                </div>
+                <div className="flex justify-between border-b border-stroke/50 dark:border-slate-800/60 pb-2">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Email:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{user.email || employee.email || "—"}</span>
+                </div>
+                <div className="flex justify-between border-b border-stroke/50 dark:border-slate-800/60 pb-2">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Employee ID:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{employee.employee_id || "—"}</span>
+                </div>
+                <div className="flex justify-between border-b border-stroke/50 dark:border-slate-800/60 pb-2">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Department:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{employee.department || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Date of Birth:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{employee.date_of_birth || "—"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Compensation & Regional Settings */}
+            <div className="rounded-2xl border border-stroke dark:border-slate-800 p-6 bg-surface dark:bg-slate-900/40 space-y-4">
+              <div className="text-[11px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                <Briefcase size={14} /> Compensation &amp; Region
+              </div>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between border-b border-stroke/50 dark:border-slate-800/60 pb-2">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Country / Region:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">
+                    {employee.country === "UK" ? "🇬🇧 United Kingdom" : employee.country === "IN" ? "🇮🇳 India" : "🇺🇸 United States"}
+                  </span>
+                </div>
+                {employee.state && (
+                  <div className="flex justify-between border-b border-stroke/50 dark:border-slate-800/60 pb-2">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">State / UT:</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{employee.state}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-b border-stroke/50 dark:border-slate-800/60 pb-2">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Hourly Rate:</span>
+                  <span className="font-black text-emerald-600 dark:text-emerald-400">
+                    {employee.country === "UK" ? "£" : "$"}{Number(employee.hourly_rate || 0).toFixed(2)} / hr
+                  </span>
+                </div>
+                {employee.weekly_salary && (
+                  <div className="flex justify-between border-b border-stroke/50 dark:border-slate-800/60 pb-2">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Weekly Salary:</span>
+                    <span className="font-bold text-slate-900 dark:text-white">${employee.weekly_salary} / wk</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Payroll Group / Currency:</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{employee.payroll_group || "Standard"} ({employee.currency || "USD"})</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Compliance Classification Card */}
+          <div className="rounded-2xl border border-stroke dark:border-slate-800 p-6 bg-surface dark:bg-slate-900/40 space-y-4">
+            <div className="text-[11px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+              <ShieldCheck size={14} /> Statutory Compliance &amp; Tax Classification
+            </div>
+            
+            {employee.country === "UK" ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-3 bg-bg dark:bg-slate-950/60 rounded-xl border border-stroke/60 dark:border-slate-800">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Tax Code</div>
+                  <div className="text-base font-black text-slate-900 dark:text-white mt-1">{employee.uk_tax_code || "1257L"}</div>
+                </div>
+                <div className="p-3 bg-bg dark:bg-slate-950/60 rounded-xl border border-stroke/60 dark:border-slate-800">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">NI Category</div>
+                  <div className="text-base font-black text-slate-900 dark:text-white mt-1">{employee.uk_ni_category || "A"}</div>
+                </div>
+                <div className="p-3 bg-bg dark:bg-slate-950/60 rounded-xl border border-stroke/60 dark:border-slate-800">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Rolled-up Holiday Pay</div>
+                  <div className="text-base font-black text-emerald-600 dark:text-emerald-400 mt-1">{employee.rolled_up_holiday_pay ? "Enabled (12.07%)" : "Disabled"}</div>
+                </div>
+              </div>
+            ) : employee.country === "IN" ? (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-3 bg-bg dark:bg-slate-950/60 rounded-xl border border-stroke/60 dark:border-slate-800">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">EPF Rate</div>
+                  <div className="text-base font-black text-slate-900 dark:text-white mt-1">12% Basic</div>
+                </div>
+                <div className="p-3 bg-bg dark:bg-slate-950/60 rounded-xl border border-stroke/60 dark:border-slate-800">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">ESIC Coverage</div>
+                  <div className="text-base font-black text-slate-900 dark:text-white mt-1">0.75% EE / 3.25% ER</div>
+                </div>
+                <div className="p-3 bg-bg dark:bg-slate-950/60 rounded-xl border border-stroke/60 dark:border-slate-800">
+                  <div className="text-[10px] font-bold text-amber-500 uppercase">TDS Tax Rate</div>
+                  <div className="text-base font-black text-amber-600 dark:text-amber-400 mt-1">10% Statutory</div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-3 bg-bg dark:bg-slate-950/60 rounded-xl border border-stroke/60 dark:border-slate-800">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">FLSA Status</div>
+                  <div className="mt-1"><ExemptBadge status={employee.exempt_status} /></div>
+                </div>
+                <div className="p-3 bg-bg dark:bg-slate-950/60 rounded-xl border border-stroke/60 dark:border-slate-800">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase">Overtime Eligibility</div>
+                  <div className="text-sm font-bold text-slate-800 dark:text-slate-200 mt-1">
+                    {employee.exempt_status === "exempt" ? "Exempt (Salaried Professional)" : "Non-Exempt (Eligible for OT Pay)"}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Service Roles */}
+          <div className="rounded-2xl border border-stroke dark:border-slate-800 p-6 bg-surface dark:bg-slate-900/40 space-y-3">
+            <div className="text-[11px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400">
+              Assigned Service Roles
+            </div>
+            {rolesList.length === 0 ? (
+              <div className="text-xs text-slate-400 italic">No specific service roles assigned</div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {rolesList.map((r, i) => (
+                  <span key={i} className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/50 rounded-lg px-3 py-1 text-xs font-bold">
+                    {r}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <div className="px-8 py-5 border-t border-stroke dark:border-slate-800 bg-surface dark:bg-slate-900/60 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() => { onClose(); onHistory(employee); }}
+              className="text-xs font-bold flex items-center gap-1.5"
+            >
+              <History size={14} /> Work History
+            </Button>
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() => { onClose(); onEdit(employee); }}
+              className="text-xs font-bold flex items-center gap-1.5"
+            >
+              <Edit3 size={14} /> Edit Profile
+            </Button>
+          </div>
+          <Button type="button" onClick={onClose} className="min-w-[100px]">
+            Close
+          </Button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 export function EmployeesPage() {
   const { user } = useAuth()
   const { isAdmin } = useRole()
@@ -844,10 +1087,10 @@ export function EmployeesPage() {
   const [currency, setCurrency] = useState(user?.companyCurrency || user?.company_currency || "USD")
   const [payrollGroup, setPayrollGroup] = useState("")
   const [taxCategory, setTaxCategory] = useState("")
-  
+
   // Compliance fields
   const orgCountry = user?.companyCountry || user?.company_country || user?.companyRegion || user?.primaryCountry || "US"
-  const orgRegion  = (orgCountry === "IN" || orgCountry === "India") ? "IN" : (orgCountry === "UK" || orgCountry === "United Kingdom") ? "UK" : "US"
+  const orgRegion = (orgCountry === "IN" || orgCountry === "India") ? "IN" : (orgCountry === "UK" || orgCountry === "United Kingdom") ? "UK" : "US"
   const [country, setCountry] = useState(orgCountry)
   const [state, setState] = useState(orgCountry === "IN" ? "MH" : (orgCountry === "US" ? "NY" : ""))
   const [dateOfBirth, setDateOfBirth] = useState("")
@@ -885,8 +1128,9 @@ export function EmployeesPage() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [historyEmployee, setHistoryEmployee] = useState(null)
+  const [viewingEmployee, setViewingEmployee] = useState(null)
 
-  const activeCount = useMemo(() => items.filter((e) => e.is_active && (!roleFilter || (e.service_roles && e.service_roles.includes(roleFilter)))).length, [items, roleFilter])
+  const activeCount = useMemo(() => items.filter((e) => e.is_active && e.user?.role !== "customer" && (!roleFilter || (e.service_roles && e.service_roles.includes(roleFilter)))).length, [items, roleFilter])
 
   async function load() {
     setLoading(true)
@@ -924,7 +1168,7 @@ export function EmployeesPage() {
         hourly_rate: data.hourly_rate === "" || data.hourly_rate === null || typeof data.hourly_rate === "undefined" ? 0 : Number(data.hourly_rate),
         country: data.country || null,
         state: ["US", "IN"].includes(data.country) ? (data.state || null) : null,
-        exempt_status: data.country === "US" ? (data.exempt_status || "non_exempt") : null,
+        exempt_status: data.exempt_status || "non_exempt",
         weekly_salary: data.country === "US" ? (data.weekly_salary === "" || data.weekly_salary === null || typeof data.weekly_salary === "undefined" ? null : Number(data.weekly_salary)) : null,
         uk_tax_code: data.country === "UK" ? (data.uk_tax_code || null) : null,
         uk_ni_category: data.country === "UK" ? (data.uk_ni_category || null) : null,
@@ -995,7 +1239,20 @@ export function EmployeesPage() {
       setEditingEmployee(null)
       await load()
     } catch (err) {
-      setError(err?.body?.detail || "Failed to update employee.")
+      let msg = "Failed to update employee."
+      if (err?.body) {
+        if (typeof err.body === "string") {
+          msg = err.body
+        } else if (err.body.detail) {
+          msg = typeof err.body.detail === "string" ? err.body.detail : JSON.stringify(err.body.detail)
+        } else if (typeof err.body === "object") {
+          const fieldErrs = Object.entries(err.body)
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : JSON.stringify(v)}`)
+            .join(" | ")
+          if (fieldErrs) msg = fieldErrs
+        }
+      }
+      setError(msg)
     } finally {
       setSavingEdit(false)
     }
@@ -1130,11 +1387,10 @@ export function EmployeesPage() {
             <button
               type="button"
               onClick={() => setRoleFilter("")}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
-                roleFilter === ""
+              className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${roleFilter === ""
                   ? "bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800/50 dark:text-indigo-300"
                   : "bg-white border-stroke text-slate-600 dark:bg-slate-950 dark:border-slate-700 dark:text-slate-400"
-              }`}
+                }`}
             >
               All Roles
             </button>
@@ -1145,11 +1401,10 @@ export function EmployeesPage() {
                   key={r.id}
                   type="button"
                   onClick={() => setRoleFilter(active ? "" : r.id)}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
-                    active
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${active
                       ? "bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800/50 dark:text-indigo-300"
                       : "bg-white border-stroke text-slate-600 dark:bg-slate-950 dark:border-slate-700 dark:text-slate-400"
-                  }`}
+                    }`}
                 >
                   {r.label}
                 </button>
@@ -1267,11 +1522,10 @@ export function EmployeesPage() {
                             key={r.id}
                             type="button"
                             onClick={() => setServiceRoles(prev => active ? prev.filter(x => x !== r.id) : [...prev, r.id])}
-                            className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
-                              active
+                            className={`px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${active
                                 ? "bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800/50 dark:text-indigo-300"
                                 : "bg-white border-stroke text-slate-600 dark:bg-slate-950 dark:border-slate-700 dark:text-slate-400"
-                            }`}
+                              }`}
                           >
                             {r.label}
                           </button>
@@ -1451,6 +1705,7 @@ export function EmployeesPage() {
                   <tr className="bg-bg dark:bg-slate-800/50 border-b-2 border-stroke dark:border-slate-800">
                     <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">ID</th>
                     <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">User</th>
+                    <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">Online</th>
                     <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest">Title</th>
                     {orgRegion !== "IN" && (
                       <th className="px-6 py-4 text-[11px] font-black text-slate-500 dark:text-slate-500 uppercase tracking-widest text-right">Rate</th>
@@ -1464,12 +1719,18 @@ export function EmployeesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stroke dark:divide-slate-800">
-                  {items.filter(e => !roleFilter || (e.service_roles && e.service_roles.includes(roleFilter))).map((e) => (
+                  {items.filter(e => e.user?.role !== "customer" && (!roleFilter || (e.service_roles && e.service_roles.includes(roleFilter)))).map((e) => (
                     <tr key={e.id} className="hover:bg-bg dark:hover:bg-slate-800/30 transition-colors">
-                      <td className="px-6 py-5 font-bold text-slate-900 dark:text-white">{e.employee_id}</td>
-                      <td className="px-6 py-5 text-slate-600 dark:text-slate-400">
-                        <div className="font-bold">{e.user?.username}</div>
-                        {(e.user?.email || e.email) && <div className="text-[11px] opacity-60 font-medium">{e.user?.email || e.email}</div>}
+                      <td className="px-6 py-5 font-bold text-slate-900 dark:text-white cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" onClick={() => setViewingEmployee(e)}>{e.employee_id}</td>
+                      <td className="px-6 py-5 text-slate-600 dark:text-slate-400 cursor-pointer" onClick={() => setViewingEmployee(e)}>
+                        <div className="flex items-center gap-2">
+                          <PresenceDot status={e.current_availability || "offline"} size={8} />
+                          <div className="font-bold text-slate-900 dark:text-white hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">{e.user?.username}</div>
+                        </div>
+                        {(e.user?.email || e.email) && <div className="text-[11px] opacity-60 font-medium pl-4">{e.user?.email || e.email}</div>}
+                      </td>
+                      <td className="px-6 py-5">
+                        <OnlineBadge status={e.current_availability || "offline"} />
                       </td>
                       <td className="px-6 py-5 text-slate-700 dark:text-slate-300">{e.title || "—"}</td>
                       {orgRegion !== "IN" && (
@@ -1519,6 +1780,15 @@ export function EmployeesPage() {
                         <div className="inline-flex items-center gap-2">
                           <button
                             type="button"
+                            className="p-2 rounded-xl border border-stroke dark:border-slate-800 hover:bg-sky-50 dark:hover:bg-sky-900/20 text-sky-600 dark:text-sky-400 transition-colors disabled:opacity-40"
+                            title="View Details"
+                            onClick={() => setViewingEmployee(e)}
+                            disabled={deletingId === e.id}
+                          >
+                            <Eye size={16} />
+                          </button>
+                          <button
+                            type="button"
                             className="p-2 rounded-xl border border-stroke dark:border-slate-800 hover:bg-violet-50 dark:hover:bg-violet-900/20 text-violet-600 dark:text-violet-400 transition-colors disabled:opacity-40"
                             title="History"
                             onClick={() => setHistoryEmployee(e)}
@@ -1557,6 +1827,15 @@ export function EmployeesPage() {
         </Card>
       </div>
 
+      {viewingEmployee && (
+        <EmployeeDetailsModal
+          employee={viewingEmployee}
+          availableRoles={availableRoles}
+          onClose={() => setViewingEmployee(null)}
+          onEdit={(emp) => openEdit(emp)}
+          onHistory={(emp) => setHistoryEmployee(emp)}
+        />
+      )}
       {showEditModal && editingEmployee && (
         <EditEmployeeModal
           employee={editingEmployee}
