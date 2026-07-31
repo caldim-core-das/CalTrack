@@ -3376,12 +3376,19 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
     }
     set("priority", priorityMap[selected.priority] || "medium")
 
-    // Map client details
+    // Map client & reschedule details
     set("client_name", selected.customer_name)
     set("client_contact_number", selected.phone)
     set("client_email", selected.email || "")
     set("job_address", selected.address)
-    set("due_date", selected.preferred_date)
+
+    const effectiveDate = selected.latest_reschedule?.new_date || selected.rescheduled_date || selected.preferred_date
+    const effectiveTime = selected.latest_reschedule?.new_time_slot || selected.rescheduled_time || selected.preferred_time
+    const effectiveTechId = selected.latest_reschedule?.proposed_technician_id || selected.assigned_employee?.user?.id || selected.assigned_employee?.id
+
+    if (effectiveDate) set("due_date", effectiveDate)
+    if (effectiveTime) set("preferred_time", effectiveTime)
+    if (effectiveTechId) set("assigned_to", String(effectiveTechId))
 
     // Trigger address input for geocoding
     setAddressInput(selected.address)
@@ -3466,8 +3473,8 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
     return list.map(emp => {
       const userId = emp.user?.id || emp.id;
       const nearbyDetail = nearbyMap[String(userId)];
-      const avail = emp.current_availability || "offline";
-      const isOnline = avail !== "offline";
+      const isOnline = emp.is_online !== undefined && emp.is_online !== null ? Boolean(emp.is_online) : (emp.current_availability && emp.current_availability !== "offline");
+      const avail = isOnline ? (emp.current_availability || "available") : "offline";
       const isNearby = nearbyDetail && nearbyDetail.distance_km <= 10;
       const empRoles = emp.service_roles || [];
       const matchesRole = allowedRoles ? empRoles.some(r => allowedRoles.includes(r)) : true;
@@ -3610,17 +3617,31 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
 
   async function submit(e) {
     e.preventDefault()
-    if (!form.assigned_to) return setErr("Please select an employee.")
-    if (!form.title.trim()) return setErr("Title is required.")
+    if (!form.assigned_to) {
+      setErr("Please select an employee to assign this work order.")
+      e.target?.scrollIntoView?.({ behavior: "smooth", block: "start" })
+      return
+    }
+    const finalTitle = (form.title || "").trim() || (form.description ? form.description.trim().slice(0, 50) : "General Work Order")
     const latVal = form.location_lat ? parseFloat(form.location_lat) : null
     const lonVal = form.location_lon ? parseFloat(form.location_lon) : null
-    if (form.location_lat && isNaN(latVal)) return setErr("Latitude must be a valid number (e.g. 12.9716).")
-    if (form.location_lon && isNaN(lonVal)) return setErr("Longitude must be a valid number (e.g. 77.5946).")
+    if (form.location_lat && isNaN(latVal)) {
+      setErr("Latitude must be a valid number (e.g. 12.9716).")
+      e.target?.scrollIntoView?.({ behavior: "smooth", block: "start" })
+      return
+    }
+    if (form.location_lon && isNaN(lonVal)) {
+      setErr("Longitude must be a valid number (e.g. 77.5946).")
+      e.target?.scrollIntoView?.({ behavior: "smooth", block: "start" })
+      return
+    }
     setBusy(true); setErr("")
     try {
       const payload = {
         ...form,
+        title: finalTitle,
         estimated_hours: parseFloat(form.estimated_hours) || 1,
+        due_date: form.due_date || new Date().toISOString().slice(0, 10),
         ...(latVal !== null ? { location_lat: latVal } : {}),
         ...(lonVal !== null ? { location_lon: lonVal } : {}),
       }
@@ -3628,8 +3649,15 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
       if (!lonVal) delete payload.location_lon
       if (!payload.geofence_radius) delete payload.geofence_radius
       if (!payload.job_site) delete payload.job_site
-      if (!payload.sla_deadline) delete payload.sla_deadline
-      else payload.sla_deadline = new Date(payload.sla_deadline).toISOString()
+      if (!payload.service_request) delete payload.service_request
+
+      if (!payload.sla_deadline) {
+        delete payload.sla_deadline
+      } else {
+        const d = new Date(payload.sla_deadline)
+        if (isNaN(d.getTime())) delete payload.sla_deadline
+        else payload.sla_deadline = d.toISOString()
+      }
 
       const created = await apiRequest("/tasks/admin/", {
         method: "POST",
@@ -3649,7 +3677,19 @@ function AssignTaskPanel({ employees, jobSites, availableEmployees, onAssigned, 
       await onAssigned?.()
       onClose?.()
     } catch (ex) {
-      setErr(ex?.body?.detail || "Failed to assign task.")
+      let errorMsg = "Failed to assign task."
+      if (ex?.body) {
+        if (typeof ex.body === "string") errorMsg = ex.body
+        else if (typeof ex.body.detail === "string") errorMsg = ex.body.detail
+        else if (typeof ex.body === "object") {
+          const firstKey = Object.keys(ex.body)[0]
+          const firstVal = ex.body[firstKey]
+          const valStr = Array.isArray(firstVal) ? firstVal[0] : String(firstVal)
+          errorMsg = `${firstKey}: ${valStr}`
+        }
+      }
+      setErr(errorMsg)
+      e.target?.scrollIntoView?.({ behavior: "smooth", block: "start" })
     } finally {
       setBusy(false)
     }

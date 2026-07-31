@@ -244,7 +244,7 @@ class AdminTaskListCreateView(GenericAPIView):
         return Response(TaskSerializer(qs, many=True).data)
 
     def post(self, request):
-        ser = TaskSerializer(data=request.data)
+        ser = TaskSerializer(data=request.data, context={"request": request})
         ser.is_valid(raise_exception=True)
         # New tasks always start as pending_acceptance for the assignee
         task = ser.save(

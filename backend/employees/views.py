@@ -91,13 +91,24 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         Called by the frontend on app load (after JWT verification).
         Body: { "is_online": true, "availability": "available" }
         """
+        if getattr(request.user, "role", None) == "customer":
+            return Response({
+                "is_online": False,
+                "availability": "offline",
+                "message": "Customer accounts do not have employee presence."
+            }, status=200)
+
         company = getattr(request, "company", None) or getattr(request.user, "company", None)
         if not company:
             return Response({"detail": "No company context."}, status=400)
 
         employee = Employee.objects.filter(user=request.user, company=company).first()
         if not employee:
-            return Response({"detail": "Employee profile not found."}, status=404)
+            return Response({
+                "is_online": False,
+                "availability": "offline",
+                "message": "Employee profile not found."
+            }, status=200)
 
         is_online = bool(request.data.get("is_online", True))
         availability = request.data.get("availability", "available") if is_online else "offline"

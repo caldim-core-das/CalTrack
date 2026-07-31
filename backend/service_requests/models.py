@@ -317,21 +317,27 @@ class CatalogService(models.Model):
 # ─── Slice 2: Reschedule ──────────────────────────────────────────────────────
 
 class RescheduleStatus(models.TextChoices):
-    # ── Legacy & Alias statuses (preserved for backward compatibility) ────────
+    # ── Complete Manual Workflow Statuses ──────────────────────────────────────
     PENDING                     = "PENDING",                     "Pending Admin Review"
     PENDING_ADMIN_REVIEW        = "PENDING_ADMIN_REVIEW",        "Pending Admin Review"
-    ADMIN_REVIEW                = "ADMIN_REVIEW",                "Admin Review"
-    AWAITING_EMPLOYEE_RESPONSE  = "AWAITING_EMPLOYEE_RESPONSE",  "Awaiting Employee Response"
+    ADMIN_REVIEW                = "ADMIN_REVIEW",                "Under Admin Review"
+    ADMIN_APPROVED              = "ADMIN_APPROVED",              "Admin Approved"
+    EMPLOYEE_ASSIGNMENT_IN_PROGRESS = "EMPLOYEE_ASSIGNMENT_IN_PROGRESS", "Employee Assignment in Progress"
+    EMPLOYEE_ASSIGNED           = "EMPLOYEE_ASSIGNED",           "Employee Assigned"
+    AWAITING_EMPLOYEE_RESPONSE  = "AWAITING_EMPLOYEE_RESPONSE",  "Awaiting Employee Confirmation"
     AWAITING_EMPLOYEE_CONFIRMATION = "AWAITING_EMPLOYEE_CONFIRMATION", "Awaiting Employee Confirmation"
     TECHNICIAN_CONFIRMATION     = "TECHNICIAN_CONFIRMATION",     "Technician Confirmation"
     EMPLOYEE_CONFIRMED          = "EMPLOYEE_CONFIRMED",          "Employee Confirmed"
+    EMPLOYEE_ACCEPTED           = "EMPLOYEE_ACCEPTED",           "Employee Accepted"
+    EMPLOYEE_REJECTED           = "EMPLOYEE_REJECTED",           "Employee Rejected"
+    REASSIGNMENT_NEEDED         = "REASSIGNMENT_NEEDED",         "Reassignment Needed"
+    BOOKING_UPDATED             = "BOOKING_UPDATED",             "Booking Being Updated"
     APPROVED                    = "APPROVED",                    "Approved"
     CUSTOMER_NOTIFIED           = "CUSTOMER_NOTIFIED",           "Customer Notified"
     SLOT_SUGGESTED              = "SLOT_SUGGESTED",              "Slot Suggested by Admin"
     CUSTOMER_ACCEPTED_SUGGESTION = "CUSTOMER_ACCEPTED_SUGGESTION", "Customer Accepted Suggestion"
     CANCELLED_SUGGESTION        = "CANCELLED_SUGGESTION",        "Cancelled Suggestion"
-    REASSIGNMENT_NEEDED         = "REASSIGNMENT_NEEDED",         "Reassignment Needed"
-    RESCHEDULED                 = "RESCHEDULED",                 "Rescheduled"
+    RESCHEDULED                 = "RESCHEDULED",                 "Rescheduled Successfully"
     REJECTED                    = "REJECTED",                    "Rejected"
     CANCELLED                   = "CANCELLED",                   "Cancelled"
 
@@ -451,7 +457,7 @@ class RescheduleRequest(models.Model):
         related_name="reschedule_requests",
     )
 
-    status                = models.CharField(max_length=30, choices=RescheduleStatus.choices, default=RescheduleStatus.PENDING)
+    status                = models.CharField(max_length=60, choices=RescheduleStatus.choices, default=RescheduleStatus.PENDING)
 
     # Admin review & technician proposal (legacy + extended)
     proposed_technician   = models.ForeignKey(

@@ -15,7 +15,7 @@ import {
 import {
   apiRequestCustomerEmailOTP, apiVerifyCustomerEmailOTP,
   apiRequestCustomerPhoneOTP, apiVerifyCustomerPhoneOTP,
-  apiFetchCustomerBookings, apiLogout
+  apiFetchCustomerBookings, apiLogout, apiCustomerGoogleLogin, extractAuthError
 } from "../../api/authService.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { apiRequest } from "../../api/client.js"
@@ -888,7 +888,7 @@ function StepLogin({ category, onVerified, onBack }) {
           setError(res?.detail || "Google login failed");
         }
       } catch (err) {
-        setError(err?.body?.detail || "Google login failed");
+        setError(extractAuthError(err, "Google login failed"));
       } finally {
         setLoading(false);
       }
@@ -1921,7 +1921,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
         await refreshMe();
         if (onClose) onClose();
       } catch (err) {
-        setLoginError(err?.message || err?.body?.detail || "Google login failed");
+        setLoginError(extractAuthError(err, "Google login failed"));
       } finally {
         setLoginLoading(false);
       }
@@ -2425,7 +2425,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                                 setRescheduleBookingId(b.id)
                                 if (b.preferred_date) setRescheduleDate(b.preferred_date)
                                 setShowRescheduleForm(true)
-                                setActiveTab('My Reschedules')
+                                if (typeof onChangeTab === 'function') onChangeTab('My Reschedules')
                               }}
                               style={{ padding: '6px 14px', background: '#7C3AED', color: 'white', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(124,58,237,0.3)' }}
                               onMouseOver={e => e.currentTarget.style.background = '#6d28d9'}
@@ -3318,6 +3318,64 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                         {r.rejection_reason && <div style={{ color: '#dc2626' }}><span style={{ fontWeight: 700 }}>Rejection:</span> {r.rejection_reason_display || r.rejection_reason} {r.rejection_notes && `— ${r.rejection_notes}`}</div>}
                         {r.proposed_technician_name && <div style={{ color: '#2563eb' }}><span style={{ fontWeight: 700 }}>Technician:</span> {r.proposed_technician_name}</div>}
                       </div>
+
+                      {/* 8-Step Dynamic Customer UI Progress Tracker */}
+                      {!['REJECTED', 'CANCELLED'].includes(r.status) && (
+                        <div style={{ marginTop: 14, marginBottom: 16, padding: '14px 16px', background: '#f8fafc', borderRadius: 14, border: '1px solid #e2e8f0' }}>
+                          <div style={{ fontSize: '0.72rem', fontWeight: 900, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span>Progress Tracker</span>
+                            <span style={{ color: '#6366f1' }}>Step {r.step_index || (r.status === 'RESCHEDULED' ? 8 : r.status === 'AWAITING_EMPLOYEE_RESPONSE' ? 6 : 2)} of 8</span>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                            {[
+                              { num: 1, label: 'Submitted' },
+                              { num: 2, label: 'Under Review' },
+                              { num: 3, label: 'Admin Approved' },
+                              { num: 4, label: 'Assignment' },
+                              { num: 5, label: 'Tech Assigned' },
+                              { num: 6, label: 'Waiting Tech' },
+                              { num: 7, label: 'Updating' },
+                              { num: 8, label: 'Rescheduled' },
+                            ].map(st => {
+                              const stepIdx = r.step_index || (
+                                r.status === 'RESCHEDULED' ? 8 :
+                                r.status === 'EMPLOYEE_ACCEPTED' ? 7 :
+                                (r.status === 'AWAITING_EMPLOYEE_RESPONSE' || r.status === 'AWAITING_EMPLOYEE_CONFIRMATION') ? 6 :
+                                (r.status === 'EMPLOYEE_ASSIGNED') ? 5 :
+                                (r.status === 'ADMIN_APPROVED' || r.status === 'REASSIGNMENT_NEEDED') ? 4 :
+                                (r.status === 'ADMIN_REVIEW') ? 2 : 1
+                              )
+                              const isCompleted = stepIdx > st.num || r.status === 'RESCHEDULED'
+                              const isCurrent = stepIdx === st.num && r.status !== 'RESCHEDULED'
+
+                              return (
+                                <div key={st.num} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textCenter: 'center' }}>
+                                  <div style={{
+                                    width: 24, height: 24, borderRadius: '50%',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 10, fontWeight: 900,
+                                    background: isCompleted ? '#10b981' : isCurrent ? '#6366f1' : '#e2e8f0',
+                                    color: (isCompleted || isCurrent) ? 'white' : '#94a3b8',
+                                    boxShadow: isCurrent ? '0 0 0 3px rgba(99,102,241,0.2)' : 'none',
+                                    transition: 'all 0.2s ease',
+                                    marginBottom: 4,
+                                  }}>
+                                    {isCompleted ? '✓' : st.num}
+                                  </div>
+                                  <div style={{
+                                    fontSize: '0.62rem', fontWeight: isCurrent ? 900 : 700,
+                                    color: isCompleted ? '#059669' : isCurrent ? '#4f46e5' : '#94a3b8',
+                                    textAlign: 'center', lineHeight: 1.1
+                                  }}>
+                                    {st.label}
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Status-specific info banners */}
                       {r.status === 'AWAITING_EMPLOYEE_RESPONSE' && (

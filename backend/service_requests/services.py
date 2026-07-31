@@ -28,26 +28,33 @@ from .models import (
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _RESCHEDULE_TRANSITIONS = {
-    # ── Active workflow transitions ─────────────────────────────────────────────
+    # ── Complete Manual Workflow State Machine ──────────────────────────────────
     RescheduleStatus.PENDING: {
+        RescheduleStatus.PENDING_ADMIN_REVIEW,
+        RescheduleStatus.ADMIN_REVIEW,
+        RescheduleStatus.ADMIN_APPROVED,
+        RescheduleStatus.EMPLOYEE_ASSIGNED,
         RescheduleStatus.AWAITING_EMPLOYEE_CONFIRMATION,
         RescheduleStatus.AWAITING_EMPLOYEE_RESPONSE,
         RescheduleStatus.REASSIGNMENT_NEEDED,
-        RescheduleStatus.ADMIN_REVIEW,
         RescheduleStatus.SLOT_SUGGESTED,
         RescheduleStatus.REJECTED,
         RescheduleStatus.CANCELLED,
     },
     RescheduleStatus.PENDING_ADMIN_REVIEW: {
+        RescheduleStatus.ADMIN_REVIEW,
+        RescheduleStatus.ADMIN_APPROVED,
+        RescheduleStatus.EMPLOYEE_ASSIGNED,
         RescheduleStatus.AWAITING_EMPLOYEE_CONFIRMATION,
         RescheduleStatus.AWAITING_EMPLOYEE_RESPONSE,
         RescheduleStatus.REASSIGNMENT_NEEDED,
-        RescheduleStatus.ADMIN_REVIEW,
         RescheduleStatus.SLOT_SUGGESTED,
         RescheduleStatus.REJECTED,
         RescheduleStatus.CANCELLED,
     },
     RescheduleStatus.ADMIN_REVIEW: {
+        RescheduleStatus.ADMIN_APPROVED,
+        RescheduleStatus.EMPLOYEE_ASSIGNED,
         RescheduleStatus.AWAITING_EMPLOYEE_CONFIRMATION,
         RescheduleStatus.AWAITING_EMPLOYEE_RESPONSE,
         RescheduleStatus.REASSIGNMENT_NEEDED,
@@ -55,26 +62,66 @@ _RESCHEDULE_TRANSITIONS = {
         RescheduleStatus.REJECTED,
         RescheduleStatus.CANCELLED,
     },
-    RescheduleStatus.SLOT_SUGGESTED: {
-        RescheduleStatus.ADMIN_REVIEW,   # customer accepts suggested slot → re-enters review
-        RescheduleStatus.REJECTED,       # customer declines suggestion
+    RescheduleStatus.ADMIN_APPROVED: {
+        RescheduleStatus.EMPLOYEE_ASSIGNED,
+        RescheduleStatus.AWAITING_EMPLOYEE_CONFIRMATION,
+        RescheduleStatus.AWAITING_EMPLOYEE_RESPONSE,
+        RescheduleStatus.REASSIGNMENT_NEEDED,
+        RescheduleStatus.REJECTED,
+    },
+    RescheduleStatus.EMPLOYEE_ASSIGNED: {
+        RescheduleStatus.AWAITING_EMPLOYEE_CONFIRMATION,
+        RescheduleStatus.AWAITING_EMPLOYEE_RESPONSE,
+        RescheduleStatus.EMPLOYEE_ACCEPTED,
+        RescheduleStatus.EMPLOYEE_CONFIRMED,
+        RescheduleStatus.EMPLOYEE_REJECTED,
+        RescheduleStatus.REASSIGNMENT_NEEDED,
+        RescheduleStatus.BOOKING_UPDATED,
+        RescheduleStatus.RESCHEDULED,
+        RescheduleStatus.REJECTED,
     },
     RescheduleStatus.AWAITING_EMPLOYEE_CONFIRMATION: {
+        RescheduleStatus.EMPLOYEE_ACCEPTED,
         RescheduleStatus.EMPLOYEE_CONFIRMED,
-        RescheduleStatus.RESCHEDULED,
+        RescheduleStatus.EMPLOYEE_REJECTED,
         RescheduleStatus.REASSIGNMENT_NEEDED,
+        RescheduleStatus.BOOKING_UPDATED,
+        RescheduleStatus.RESCHEDULED,
         RescheduleStatus.REJECTED,
     },
     RescheduleStatus.AWAITING_EMPLOYEE_RESPONSE: {
+        RescheduleStatus.EMPLOYEE_ACCEPTED,
         RescheduleStatus.EMPLOYEE_CONFIRMED,
-        RescheduleStatus.RESCHEDULED,
+        RescheduleStatus.EMPLOYEE_REJECTED,
         RescheduleStatus.REASSIGNMENT_NEEDED,
+        RescheduleStatus.BOOKING_UPDATED,
+        RescheduleStatus.RESCHEDULED,
+        RescheduleStatus.REJECTED,
+    },
+    RescheduleStatus.EMPLOYEE_ACCEPTED: {
+        RescheduleStatus.BOOKING_UPDATED,
+        RescheduleStatus.RESCHEDULED,
+        RescheduleStatus.REJECTED,
+    },
+    RescheduleStatus.EMPLOYEE_REJECTED: {
+        RescheduleStatus.REASSIGNMENT_NEEDED,
+        RescheduleStatus.EMPLOYEE_ASSIGNED,
+        RescheduleStatus.AWAITING_EMPLOYEE_RESPONSE,
         RescheduleStatus.REJECTED,
     },
     RescheduleStatus.REASSIGNMENT_NEEDED: {
+        RescheduleStatus.EMPLOYEE_ASSIGNED,
         RescheduleStatus.AWAITING_EMPLOYEE_CONFIRMATION,
         RescheduleStatus.AWAITING_EMPLOYEE_RESPONSE,
         RescheduleStatus.SLOT_SUGGESTED,
+        RescheduleStatus.REJECTED,
+    },
+    RescheduleStatus.BOOKING_UPDATED: {
+        RescheduleStatus.RESCHEDULED,
+        RescheduleStatus.REJECTED,
+    },
+    RescheduleStatus.SLOT_SUGGESTED: {
+        RescheduleStatus.ADMIN_REVIEW,
         RescheduleStatus.REJECTED,
     },
     # ── Terminal states ────────────────────────────────────────────────────
@@ -275,6 +322,23 @@ def apply_reschedule_transition(reschedule_request, new_status, actor=None, note
         reschedule_request.reviewed_at = timezone.now()
     reschedule_request.save()
 
+    # Automatically sync booking preferred_date, preferred_time, and assigned_employee
+    booking = reschedule_request.booking
+    if booking:
+        upd = []
+        if reschedule_request.new_date and booking.preferred_date != reschedule_request.new_date:
+            booking.preferred_date = reschedule_request.new_date
+            upd.append("preferred_date")
+        if reschedule_request.new_time_slot and booking.preferred_time != reschedule_request.new_time_slot:
+            booking.preferred_time = reschedule_request.new_time_slot
+            upd.append("preferred_time")
+        if reschedule_request.proposed_technician and booking.assigned_employee != reschedule_request.proposed_technician:
+            booking.assigned_employee = reschedule_request.proposed_technician
+            upd.append("assigned_employee")
+        if upd:
+            upd.append("updated_at")
+            booking.save(update_fields=upd)
+
     # Audit log in RescheduleStatusHistory
     try:
         from .models import RescheduleStatusHistory
@@ -372,7 +436,7 @@ def create_reschedule_request(booking, requested_by, new_date, new_time_slot, re
         booking=booking,
         requested_by=requested_by,
         persona=persona,
-        employee=assigned_emp,
+        proposed_technician=assigned_emp,
         current_date=booking.preferred_date,
         current_time=booking.preferred_time,
         new_date=new_date,
@@ -712,10 +776,9 @@ def employee_accept_reschedule(employee_user, request_id):
         rr = RescheduleRequest.objects.select_related("booking", "proposed_technician").get(
             pk=request_id,
             proposed_technician=emp,
-            status=RescheduleStatus.AWAITING_EMPLOYEE_RESPONSE,
         )
     except RescheduleRequest.DoesNotExist:
-        raise NotFound({"detail": "No pending reschedule notification found for this employee."})
+        raise NotFound({"detail": "No reschedule notification found for this employee."})
 
     # Record employee acceptance
     rr.employee_response = EmployeeResponseChoices.ACCEPTED

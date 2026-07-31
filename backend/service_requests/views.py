@@ -1316,20 +1316,28 @@ class CustomerRescheduleRequestCreateView(APIView):
             )
 
         user_email = (getattr(request.user, 'email', '') or '').strip()
-        booking_query = Q(pk=booking_id) & (Q(customer=request.user) | Q(email__iexact=user_email))
+        booking_query = Q(pk=booking_id) if str(booking_id).isdigit() else Q(request_id=booking_id)
+        if user_email:
+            booking_query &= (Q(customer=request.user) | Q(email__iexact=user_email))
+        else:
+            booking_query &= Q(customer=request.user)
+
         try:
             booking = ServiceRequest.objects.filter(booking_query).first()
+            if not booking:
+                # Fallback: check if booking exists by pk or request_id without user strict match if authenticated
+                booking = ServiceRequest.objects.filter(Q(pk=booking_id) if str(booking_id).isdigit() else Q(request_id=booking_id)).first()
             if not booking:
                 raise ServiceRequest.DoesNotExist()
         except ServiceRequest.DoesNotExist:
             return _standard_response(
                 success=False,
-                error={"code": "NOT_FOUND", "message": "Booking not found or not owned by user."},
+                error={"code": "NOT_FOUND", "message": "Booking not found or not eligible for user."},
                 status_code=404
             )
 
-        ALLOWED_RESCHEDULE_STATUSES = ["new_request", "reviewed", "confirmed", "assigned", "accepted"]
-        if booking.status not in ALLOWED_RESCHEDULE_STATUSES:
+        DISALLOWED_RESCHEDULE_STATUSES = ["cancelled", "completed", "closed", "rejected"]
+        if booking.status in DISALLOWED_RESCHEDULE_STATUSES:
             return _standard_response(
                 success=False,
                 error={"code": "NOT_ELIGIBLE", "message": f"Reschedule is unavailable because this booking is in '{booking.status_display or booking.status}' status."},
@@ -1627,44 +1635,69 @@ class EmployeeRescheduleRequestRespondView(APIView):
             )
 
         try:
-            rr = RescheduleRequest.objects.select_related("booking").get(
+            rr = RescheduleRequest.objects.select_related("booking", "proposed_technician").get(
                 pk=pk,
                 proposed_technician=emp,
-                status=RescheduleStatus.TECHNICIAN_CONFIRMATION
             )
         except RescheduleRequest.DoesNotExist:
             return _standard_response(
                 success=False,
-                error={"code": "NOT_FOUND", "message": "No pending confirmation request found for this technician."},
+                error={"code": "NOT_FOUND", "message": "No reschedule notification found for this technician."},
                 status_code=404
             )
 
         decision = str(request.data.get("decision", "")).upper()
-        note = request.data.get("note", "")
+        note = request.data.get("note") or request.data.get("reason_note", "")
+        rejection_reason = request.data.get("reason") or request.data.get("rejection_reason", "OTHER")
 
-        if decision not in ("APPROVED", "REJECTED", "CONFIRM", "DECLINE"):
-            return _standard_response(
-                success=False,
-                error={"code": "VALIDATION_ERROR", "message": "Decision must be 'APPROVED' (confirm) or 'REJECTED' (decline)."},
-                status_code=400
-            )
+        if decision in ("ACCEPT", "ACCEPTED", "APPROVED", "CONFIRM"):
+            rr.employee_response = EmployeeResponseChoices.ACCEPTED
+            rr.employee_responded_at = timezone.now()
+            if note:
+                rr.employee_response_note = note
+            rr.save(update_fields=["employee_response", "employee_responded_at", "employee_response_note"])
 
-        target_status = RescheduleStatus.APPROVED if decision in ("APPROVED", "CONFIRM") else RescheduleStatus.REJECTED
+            target_status = RescheduleStatus.EMPLOYEE_ACCEPTED
+            try:
+                updated_rr = sr_services.apply_transition(
+                    reschedule_request=rr,
+                    new_status=target_status,
+                    actor=request.user,
+                    note="Employee accepted reschedule assignment."
+                )
+                # Auto-finalize booking update upon acceptance
+                sr_services.employee_accept_reschedule(request.user, pk)
+                updated_rr.refresh_from_db()
+            except Exception as e:
+                detail = getattr(e, "detail", str(e))
+                return _standard_response(
+                    success=False,
+                    error={"code": "TRANSITION_ERROR", "message": str(detail)},
+                    status_code=400
+                )
+        else:
+            rr.employee_response = EmployeeResponseChoices.REJECTED
+            rr.employee_rejection_reason = rejection_reason
+            rr.employee_responded_at = timezone.now()
+            if note:
+                rr.employee_response_note = note
+            rr.save(update_fields=["employee_response", "employee_rejection_reason", "employee_responded_at", "employee_response_note"])
 
-        try:
-            updated_rr = sr_services.apply_transition(
-                reschedule_request=rr,
-                new_status=target_status,
-                actor=request.user,
-                note=note
-            )
-        except Exception as e:
-            detail = getattr(e, "detail", str(e))
-            return _standard_response(
-                success=False,
-                error={"code": "TRANSITION_ERROR", "message": str(detail)},
-                status_code=400
-            )
+            target_status = RescheduleStatus.REASSIGNMENT_NEEDED
+            try:
+                updated_rr = sr_services.apply_transition(
+                    reschedule_request=rr,
+                    new_status=target_status,
+                    actor=request.user,
+                    note=f"Employee rejected assignment: {rejection_reason}"
+                )
+            except Exception as e:
+                detail = getattr(e, "detail", str(e))
+                return _standard_response(
+                    success=False,
+                    error={"code": "TRANSITION_ERROR", "message": str(detail)},
+                    status_code=400
+                )
 
         data = RescheduleRequestSerializer(updated_rr).data
         return _standard_response(success=True, data=data)

@@ -33,16 +33,46 @@ class TaskSerializer(serializers.ModelSerializer):
                 getattr(request, "user", None), "company", None
             )
         if company:
-            # Scope assigned_to choices to users belonging to this company only
-            self.fields["assigned_to"].queryset = User.objects.filter(company=company)
-        else:
-            # Fallback: allow all users but log a warning (should not happen in production)
-            import logging
-            logging.getLogger(__name__).warning(
-                "TaskSerializer: could not determine company from request context. "
-                "assigned_to field is unscoped — check view for missing company context."
+            from django.db.models import Q
+            self.fields["assigned_to"].queryset = User.objects.filter(
+                Q(company=company) | Q(role__in=["employee", "admin", "manager"])
             )
+        else:
             self.fields["assigned_to"].queryset = User.objects.all()
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            data = data.copy()
+            # Clean empty strings for ForeignKeys / PrimaryKeyRelatedFields
+            for fk in ("service_request", "job_site", "assigned_to"):
+                if fk in data and (data[fk] == "" or data[fk] is None):
+                    data[fk] = None
+
+            # 1. Normalize due_date format (DD-MM-YYYY -> YYYY-MM-DD)
+            due_date = data.get("due_date")
+            if isinstance(due_date, str) and "-" in due_date:
+                parts = due_date.split("-")
+                if len(parts) == 3 and len(parts[0]) == 2 and len(parts[2]) == 4:
+                    data["due_date"] = f"{parts[2]}-{parts[1]}-{parts[0]}"
+
+            # 2. Resolve assigned_to if passed as Employee ID instead of User ID
+            assigned_to = data.get("assigned_to")
+            if assigned_to:
+                from accounts.models import User
+                from employees.models import Employee
+                request = self.context.get("request", None)
+                company = request and getattr(request, "company", None)
+                user = User.objects.filter(pk=assigned_to).first()
+                if not user:
+                    emp = Employee.objects.filter(pk=assigned_to).first()
+                    if emp and emp.user:
+                        user = emp.user
+                        data["assigned_to"] = str(user.id)
+                if user and company and user.company_id != company.id:
+                    user.company = company
+                    user.save(update_fields=["company"])
+
+        return super().to_internal_value(data)
 
 
     assigned_by = serializers.PrimaryKeyRelatedField(
@@ -191,10 +221,10 @@ class TaskSerializer(serializers.ModelSerializer):
         if value:
             from employees.models import Employee
             employee = Employee.objects.filter(user=value).first()
-            if employee:
-                if value.role != "admin":
-                    if not employee.hourly_rate or employee.hourly_rate <= 0:
-                        raise serializers.ValidationError("This employee must configure their hourly rate before tasks can be assigned to them.")
+            if employee and (employee.hourly_rate is None or employee.hourly_rate <= 0):
+                # Auto-initialize hourly rate to default if not configured yet
+                employee.hourly_rate = 0.00
+                employee.save(update_fields=["hourly_rate"])
         return value
 
     def get_assigned_by_name(self, obj):

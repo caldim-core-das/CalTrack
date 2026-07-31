@@ -161,6 +161,31 @@ class ServiceRequestListSerializer(serializers.ModelSerializer):
     payment_method_display = serializers.CharField(source="get_payment_method_display", read_only=True)
     payment_status_display = serializers.CharField(source="get_payment_status_display", read_only=True)
     assigned_employee      = EmployeeMinimalSerializer(read_only=True)
+    latest_reschedule      = serializers.SerializerMethodField()
+
+    def get_latest_reschedule(self, obj):
+        rr = getattr(obj, "reschedule_requests", None)
+        if not rr:
+            return None
+        last_rr = rr.order_by("-id").first()
+        if not last_rr:
+            return None
+        tech_name = ""
+        tech_id = None
+        if last_rr.proposed_technician:
+            tech_id = last_rr.proposed_technician.user_id or last_rr.proposed_technician.id
+            if last_rr.proposed_technician.user:
+                tech_name = last_rr.proposed_technician.user.get_full_name() or last_rr.proposed_technician.user.username
+            else:
+                tech_name = f"Employee #{last_rr.proposed_technician.id}"
+        return {
+            "id": last_rr.id,
+            "status": last_rr.status,
+            "new_date": str(last_rr.new_date) if last_rr.new_date else None,
+            "new_time_slot": last_rr.new_time_slot or "",
+            "proposed_technician_id": str(tech_id) if tech_id else None,
+            "proposed_technician_name": tech_name,
+        }
 
     class Meta:
         model = ServiceRequest
@@ -172,7 +197,7 @@ class ServiceRequestListSerializer(serializers.ModelSerializer):
             "payment_method", "payment_method_display",
             "payment_status", "payment_status_display",
             "total_amount", "transaction_id", "invoice_id",
-            "assigned_employee", "created_at", "updated_at",
+            "assigned_employee", "latest_reschedule", "created_at", "updated_at",
         )
 
 
@@ -196,12 +221,37 @@ class ServiceRequestDetailSerializer(serializers.ModelSerializer):
     payment_method_display = serializers.CharField(source="get_payment_method_display", read_only=True)
     payment_status_display = serializers.CharField(source="get_payment_status_display", read_only=True)
     assigned_employee      = EmployeeMinimalSerializer(read_only=True)
+    latest_reschedule      = serializers.SerializerMethodField()
     payment_collected_by   = serializers.SerializerMethodField()
     photo_url              = serializers.SerializerMethodField()
     allowed_transitions    = serializers.SerializerMethodField()
     has_feedback           = serializers.SerializerMethodField()
     feedback_token         = serializers.SerializerMethodField()
     feedback               = ServiceFeedbackNestedSerializer(read_only=True, allow_null=True)
+
+    def get_latest_reschedule(self, obj):
+        rr = getattr(obj, "reschedule_requests", None)
+        if not rr:
+            return None
+        last_rr = rr.order_by("-id").first()
+        if not last_rr:
+            return None
+        tech_name = ""
+        tech_id = None
+        if last_rr.proposed_technician:
+            tech_id = last_rr.proposed_technician.user_id or last_rr.proposed_technician.id
+            if last_rr.proposed_technician.user:
+                tech_name = last_rr.proposed_technician.user.get_full_name() or last_rr.proposed_technician.user.username
+            else:
+                tech_name = f"Employee #{last_rr.proposed_technician.id}"
+        return {
+            "id": last_rr.id,
+            "status": last_rr.status,
+            "new_date": str(last_rr.new_date) if last_rr.new_date else None,
+            "new_time_slot": last_rr.new_time_slot or "",
+            "proposed_technician_id": str(tech_id) if tech_id else None,
+            "proposed_technician_name": tech_name,
+        }
 
     class Meta:
         model = ServiceRequest
@@ -215,7 +265,7 @@ class ServiceRequestDetailSerializer(serializers.ModelSerializer):
             "transaction_id", "payment_gateway",
             "payment_collected_by", "payment_collected_at", "invoice_id",
             "photo_url", "status", "status_display", "priority", "priority_display",
-            "assigned_employee", "allowed_transitions",
+            "assigned_employee", "latest_reschedule", "allowed_transitions",
             "has_feedback", "feedback_token", "feedback",
             "created_at", "updated_at",
         )
@@ -460,8 +510,11 @@ class RescheduleRequestSerializer(serializers.ModelSerializer):
             "admin_reviewed_by", "admin_reviewed_by_name",
             "employee_response", "employee_response_note", "employee_rejection_reason",
             "employee_responded_at", "history",
-            "available_slots", "review_notes", "reviewed_at", "created_at", "updated_at",
+            "available_slots", "step_index", "step_label", "review_notes", "reviewed_at", "created_at", "updated_at",
         )
+
+    step_index = serializers.SerializerMethodField()
+    step_label = serializers.SerializerMethodField()
 
     def get_requested_by_name(self, obj):
         if obj.requested_by:
@@ -482,6 +535,41 @@ class RescheduleRequestSerializer(serializers.ModelSerializer):
         from .services import get_real_technician_availability
         company = getattr(obj.booking, "company", None)
         return get_real_technician_availability(company, obj.new_date)
+
+    def get_step_index(self, obj):
+        status_map = {
+            "PENDING": 1,
+            "PENDING_ADMIN_REVIEW": 1,
+            "ADMIN_REVIEW": 2,
+            "ADMIN_APPROVED": 3,
+            "EMPLOYEE_ASSIGNMENT_IN_PROGRESS": 4,
+            "EMPLOYEE_ASSIGNED": 5,
+            "AWAITING_EMPLOYEE_RESPONSE": 6,
+            "AWAITING_EMPLOYEE_CONFIRMATION": 6,
+            "EMPLOYEE_CONFIRMED": 6,
+            "EMPLOYEE_ACCEPTED": 7,
+            "BOOKING_UPDATED": 7,
+            "RESCHEDULED": 8,
+            "REJECTED": 9,
+            "CANCELLED": 0,
+        }
+        return status_map.get(obj.status, 1)
+
+    def get_step_label(self, obj):
+        labels = {
+            1: "Request Submitted",
+            2: "Under Admin Review",
+            3: "Admin Approved",
+            4: "Employee Assignment",
+            5: "Employee Assigned",
+            6: "Waiting for Employee Confirmation",
+            7: "Booking Being Updated",
+            8: "Rescheduled Successfully",
+            9: "Request Rejected",
+            0: "Request Cancelled",
+        }
+        idx = self.get_step_index(obj)
+        return labels.get(idx, "Request Submitted")
 
 
 class AdminRescheduleListSerializer(serializers.ModelSerializer):

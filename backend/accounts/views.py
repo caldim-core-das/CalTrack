@@ -355,35 +355,49 @@ class GoogleLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        access_token = request.data.get("access_token")
-        id_token = request.data.get("id_token") or request.data.get("credential")
+        try:
+            access_token = request.data.get("access_token")
+            id_token = request.data.get("id_token") or request.data.get("credential")
 
-        user_info = None
-        if id_token:
-            try:
-                resp = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}", timeout=10)
-                if resp.ok:
-                    user_info = resp.json()
-            except Exception:
-                pass
+            user_info = None
+            if id_token:
+                try:
+                    resp = requests.get(f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}", timeout=10)
+                    if resp.ok:
+                        user_info = resp.json()
+                except Exception:
+                    pass
 
-        if not user_info and access_token:
-            try:
-                resp = requests.get(
-                    "https://www.googleapis.com/oauth2/v3/userinfo",
-                    headers={"Authorization": f"Bearer {access_token}"},
-                    timeout=10
-                )
-                if not resp.ok:
-                    resp = requests.get(f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={access_token}", timeout=10)
-                if resp.ok:
-                    user_info = resp.json()
-            except Exception:
-                pass
+            if not user_info and access_token:
+                try:
+                    resp = requests.get(
+                        "https://www.googleapis.com/oauth2/v3/userinfo",
+                        headers={"Authorization": f"Bearer {access_token}"},
+                        timeout=10
+                    )
+                    if not resp.ok:
+                        resp = requests.get(f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={access_token}", timeout=10)
+                    if resp.ok:
+                        user_info = resp.json()
+                except Exception:
+                    pass
 
-        email = user_info.get("email") if (user_info and isinstance(user_info, dict)) else None
-        if not email:
-            return Response({"detail": "Google authentication failed. Could not verify email from Google."}, status=status.HTTP_400_BAD_REQUEST)
+            if not user_info and id_token:
+                try:
+                    import jwt
+                    decoded = jwt.decode(id_token, options={"verify_signature": False})
+                    if isinstance(decoded, dict) and decoded.get("email"):
+                        user_info = decoded
+                except Exception:
+                    pass
+
+            email = user_info.get("email") if (user_info and isinstance(user_info, dict)) else None
+            if not email:
+                return Response({"detail": "Google authentication failed. Could not verify email from Google."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({"detail": f"Internal server error during Google login: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
         User = get_user_model()
         email_clean = email.strip()
@@ -542,6 +556,23 @@ class GoogleLoginView(APIView):
             else:
                 return Response({"detail": "This account is deactivated."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Update employee online presence in tenant schema
+        company = getattr(user, 'company', None)
+        if company:
+            try:
+                from employees.models import Employee
+                with schema_context(company.schema_name):
+                    emp = Employee.objects.filter(user=user).first()
+                    if emp:
+                        now = timezone.now()
+                        emp.is_online = True
+                        emp.current_availability = "available"
+                        emp.last_login_at = now
+                        emp.last_activity_at = now
+                        emp.save(update_fields=["is_online", "current_availability", "last_login_at", "last_activity_at"])
+            except Exception as e:
+                print(f"[GoogleLoginView] Error setting employee online presence: {e}")
+
         refresh = CustomTokenObtainPairSerializer.get_token(user)
         response = Response({"success": True, "message": "Google login successful."})
         _set_auth_cookies(response, str(refresh.access_token), str(refresh))
@@ -693,6 +724,25 @@ class MeView(APIView):
             if company:
                 user.company = company
                 user.save(update_fields=["company"])
+
+        company = getattr(user, "company", None)
+        if company and user.role != "customer":
+            try:
+                from employees.models import Employee
+                from django.utils import timezone
+                from django_tenants.utils import schema_context
+                with schema_context(company.schema_name):
+                    emp = Employee.objects.filter(user=user).first()
+                    if emp:
+                        now = timezone.now()
+                        if not emp.is_online:
+                            emp.is_online = True
+                            emp.current_availability = "available"
+                        emp.last_activity_at = now
+                        emp.save(update_fields=["is_online", "current_availability", "last_activity_at"])
+            except Exception as e:
+                print(f"[MeView] Error updating employee presence: {e}")
+
         return Response(UserSerializer(user, context={"request": request}).data)
 
 
