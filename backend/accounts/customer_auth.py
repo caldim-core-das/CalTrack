@@ -27,162 +27,213 @@ class CustomerEmailOTPRequestView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
-        email = request.data.get("email")
-        if not email:
-            return Response({"detail": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        email = email.lower().strip()
-        user = User.objects.filter(email__iexact=email).first()
-        if not user:
-            # Create a new customer profile
-            username = f"customer_{random.randint(100000, 999999)}_{random.randint(100000, 999999)}"
-            user = User.objects.create_user(
-                username=username,
-                email=email,
-                role=User.Role.CUSTOMER
-            )
-        
-        otp = _generate_otp()
-        user.email_otp = otp
-        user.otp_created_at = timezone.now()
-        user.save(update_fields=["email_otp", "otp_created_at"])
-        
-        # Send email
-        subject = "Your Caltrack Login Code"
-        message = f"Your Caltrack login code is: {otp}\n\nThis code will expire in 5 minutes."
         try:
-            send_mail(
-                subject,
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                [email],
-                fail_silently=False,
-            )
+            email = request.data.get("email")
+            if not email or not isinstance(email, str):
+                return Response({"detail": "Valid email is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            email = email.lower().strip()
+            if not email:
+                return Response({"detail": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            user = User.objects.filter(email__iexact=email).first()
+            if not user:
+                # Create a new customer profile with unique username
+                base_username = f"customer_{random.randint(100000, 999999)}"
+                username = base_username
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}_{random.randint(100, 999)}"
+
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    role=User.Role.CUSTOMER
+                )
+            
+            otp = _generate_otp()
+            user.email_otp = otp
+            user.otp_created_at = timezone.now()
+            user.save(update_fields=["email_otp", "otp_created_at"])
+            
+            # Send email safely without crashing
+            subject = "Your Caltrack Login Code"
+            message = f"Your Caltrack login code is: {otp}\n\nThis code will expire in 5 minutes."
+            from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@caltrack.com"
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    from_email,
+                    [email],
+                    fail_silently=True,
+                )
+            except Exception as e:
+                print(f"Failed to send email OTP to {email}: {e}")
+
+            # Also print to console for development
+            print(f"--- MOCK EMAIL ---")
+            print(f"To: {email}")
+            print(f"Subject: Your Caltrack Login Code")
+            print(f"Body: Your OTP is {otp}")
+            print(f"------------------")
+
+            return Response({"detail": "OTP sent to email.", "otp": otp})
         except Exception as e:
-            print(f"Failed to send email OTP to {email}: {e}")
-
-        # Also print to console for development
-        print(f"--- MOCK EMAIL ---")
-        print(f"To: {email}")
-        print(f"Subject: Your Caltrack Login Code")
-        print(f"Body: Your OTP is {otp}")
-        print(f"------------------")
-
-        return Response({"detail": "OTP sent to email.", "otp": otp})
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"detail": f"Internal server error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class CustomerEmailOTPVerifyView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
-        email = request.data.get("email")
-        otp = request.data.get("otp")
-        if not email or not otp:
-            return Response({"detail": "Email and OTP are required."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        email = email.lower().strip()
-        user = User.objects.filter(email__iexact=email).first()
-        if not user:
-            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
-        
-        if user.email_otp != otp:
-            return Response({"detail": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        if (timezone.now() - user.otp_created_at).total_seconds() > 300:
-            return Response({"detail": "OTP expired."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Clear OTP and return tokens
-        user.email_otp = None
-        user.otp_created_at = None
-        user.save(update_fields=["email_otp", "otp_created_at"])
-        
-        tokens = _get_tokens_for_user(user)
-        response = Response({"success": True, "detail": "Login successful"})
-        return _set_auth_cookies(response, tokens["access"], tokens["refresh"])
+        try:
+            email = request.data.get("email")
+            otp = request.data.get("otp")
+            if not email or not otp:
+                return Response({"detail": "Email and OTP are required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            email = str(email).lower().strip()
+            otp = str(otp).strip()
+            user = User.objects.filter(email__iexact=email).first()
+            if not user:
+                return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+            if not user.email_otp or not user.otp_created_at:
+                return Response({"detail": "No active OTP request found. Please request a new OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if user.email_otp != otp:
+                return Response({"detail": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if (timezone.now() - user.otp_created_at).total_seconds() > 300:
+                return Response({"detail": "OTP expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Clear OTP and return tokens
+            user.email_otp = None
+            user.otp_created_at = None
+            user.save(update_fields=["email_otp", "otp_created_at"])
+            
+            tokens = _get_tokens_for_user(user)
+            response = Response({"success": True, "detail": "Login successful"})
+            return _set_auth_cookies(response, tokens["access"], tokens["refresh"])
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"detail": f"Internal server error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class CustomerPhoneOTPRequestView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
-        phone = request.data.get("phone")
-        if not phone:
-            return Response({"detail": "Phone is required."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        phone = phone.strip()
-        user = User.objects.filter(phone=phone, role=User.Role.CUSTOMER).first()
-        if not user:
-            # Create a new customer profile
-            username = f"customer_{random.randint(100000, 999999)}_{random.randint(100000, 999999)}"
-            user = User.objects.create_user(
-                username=username,
-                phone=phone,
-                role=User.Role.CUSTOMER
-            )
-        
-        otp = _generate_otp()
-        user.phone_otp = otp
-        user.otp_created_at = timezone.now()
-        user.save(update_fields=["phone_otp", "otp_created_at"])
-        
-        # Try to send SMS via Twilio
-        sent_real_sms = False
-        delivery_error = ""
         try:
-            from twilio.rest import Client as TwilioClient
-            account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-            auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-            from_number = os.getenv("TWILIO_FROM_NUMBER")
-            if account_sid and auth_token and from_number and not account_sid.startswith("your_"):
-                client = TwilioClient(account_sid, auth_token)
-                client.messages.create(
-                    body=f"Your Caltrack login code is {otp}. Expires in 5 minutes.",
-                    from_=from_number,
-                    to=phone
+            phone = request.data.get("phone")
+            if not phone:
+                return Response({"detail": "Phone is required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            phone = str(phone).strip()
+            user = User.objects.filter(phone=phone, role=User.Role.CUSTOMER).first()
+            if not user:
+                base_username = f"customer_{random.randint(100000, 999999)}"
+                username = base_username
+                while User.objects.filter(username=username).exists():
+                    username = f"{base_username}_{random.randint(100, 999)}"
+
+                user = User.objects.create_user(
+                    username=username,
+                    phone=phone,
+                    role=User.Role.CUSTOMER
                 )
-                sent_real_sms = True
-        except ImportError:
-            delivery_error = "Twilio client library not installed"
+            
+            otp = _generate_otp()
+            user.phone_otp = otp
+            user.otp_created_at = timezone.now()
+            user.save(update_fields=["phone_otp", "otp_created_at"])
+            
+            # Try to send SMS via Twilio
+            sent_real_sms = False
+            delivery_error = ""
+            try:
+                from twilio.rest import Client as TwilioClient
+                account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+                auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+                from_number = os.getenv("TWILIO_FROM_NUMBER")
+                if account_sid and auth_token and from_number and not account_sid.startswith("your_"):
+                    client = TwilioClient(account_sid, auth_token)
+                    client.messages.create(
+                        body=f"Your Caltrack login code is {otp}. Expires in 5 minutes.",
+                        from_=from_number,
+                        to=phone
+                    )
+                    sent_real_sms = True
+            except ImportError:
+                delivery_error = "Twilio client library not installed"
+            except Exception as e:
+                delivery_error = str(e)
+                print(f"Twilio SMS send error: {e}")
+
+            # Print OTP to server console
+            print("\n" + "=" * 50)
+            print(f"  [SMS GATEWAY] OTP for {phone} is: {otp}")
+            if delivery_error:
+                print(f"  [SMS GATEWAY] Twilio delivery skipped/failed: {delivery_error}")
+            print("" + "=" * 50 + "\n")
+
+            return Response({"detail": "OTP sent to phone.", "otp": otp})
         except Exception as e:
-            delivery_error = str(e)
-            print(f"Twilio SMS send error: {e}")
-
-        # Print OTP to server console
-        print("\n" + "=" * 50)
-        print(f"  [SMS GATEWAY] OTP for {phone} is: {otp}")
-        if delivery_error:
-            print(f"  [SMS GATEWAY] Twilio delivery skipped/failed: {delivery_error}")
-        print("" + "=" * 50 + "\n")
-
-        return Response({"detail": "OTP sent to phone."})
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"detail": f"Internal server error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class CustomerPhoneOTPVerifyView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
-        phone = request.data.get("phone")
-        otp = request.data.get("otp")
-        if not phone or not otp:
-            return Response({"detail": "Phone and OTP are required."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        phone = phone.strip()
-        user = User.objects.filter(phone=phone, role=User.Role.CUSTOMER).first()
-        if not user:
-            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
-        
-        if user.phone_otp != otp:
-            return Response({"detail": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        if (timezone.now() - user.otp_created_at).total_seconds() > 300:
-            return Response({"detail": "OTP expired."}, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Clear OTP and return tokens
-        user.phone_otp = None
-        user.otp_created_at = None
-        user.save(update_fields=["phone_otp", "otp_created_at"])
-        
-        tokens = _get_tokens_for_user(user)
-        response = Response({"success": True, "detail": "Login successful"})
-        return _set_auth_cookies(response, tokens["access"], tokens["refresh"])
+        try:
+            phone = request.data.get("phone")
+            otp = request.data.get("otp")
+            if not phone or not otp:
+                return Response({"detail": "Phone and OTP are required."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            phone = str(phone).strip()
+            otp = str(otp).strip()
+            user = User.objects.filter(phone=phone, role=User.Role.CUSTOMER).first()
+            if not user:
+                return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+            
+            if not user.phone_otp or not user.otp_created_at:
+                return Response({"detail": "No active OTP request found. Please request a new OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if user.phone_otp != otp:
+                return Response({"detail": "Invalid OTP."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if (timezone.now() - user.otp_created_at).total_seconds() > 300:
+                return Response({"detail": "OTP expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Clear OTP and return tokens
+            user.phone_otp = None
+            user.otp_created_at = None
+            user.save(update_fields=["phone_otp", "otp_created_at"])
+            
+            tokens = _get_tokens_for_user(user)
+            response = Response({"success": True, "detail": "Login successful"})
+            return _set_auth_cookies(response, tokens["access"], tokens["refresh"])
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"detail": f"Internal server error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class CustomerGoogleLoginView(APIView):
