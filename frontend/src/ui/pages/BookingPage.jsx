@@ -10,7 +10,7 @@ import {
   Home, RefreshCw, MessageSquare, KeyRound, ShieldCheck,
   LogIn, ChevronDown, Award, Users, ThumbsUp, ArrowRight,
   FileText, CheckCheck, Phone as PhoneIcon, ShoppingCart,
-  CreditCard, Wallet, Tag as TagIcon, Bell, LifeBuoy, LogOut, Ticket
+  CreditCard, Wallet, Tag as TagIcon, Bell, LifeBuoy, LogOut, Ticket, Plus
 } from "lucide-react"
 import {
   apiRequestCustomerEmailOTP, apiVerifyCustomerEmailOTP,
@@ -1037,6 +1037,65 @@ function StepLogin({ category, onVerified, onBack }) {
             </svg>
             Continue with Google
           </button>
+
+          {/* ⚡ Quick Demo Customer Login Switcher */}
+          <div style={{ marginTop: 24, padding: "14px", borderRadius: 16, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+            <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10, textAlign: "center" }}>
+              ⚡ Quick Demo Customer Login
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setName("Sathish")
+                  setPhone("9876543210")
+                  setEmail("sathish@gmail.com")
+                  const data = { verified: true, name: "Sathish", phone: "9876543210", email: "sathish@gmail.com" }
+                  sessionStorage.setItem(OTP_SESSION_KEY, JSON.stringify(data))
+                  setMode("done")
+                  setTimeout(() => onVerified(data), 400)
+                }}
+                style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", background: "white", fontWeight: 700, fontSize: "0.82rem", color: "#1e293b", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <span>👤 Sathish (AC Repair SR-0002)</span>
+                <span style={{ fontSize: "0.7rem", color: "#7C3AED", fontWeight: 800 }}>Login ➔</span>
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setName("Swathi N")
+                  setPhone("9943033682")
+                  setEmail("naveenswathi1811@gmail.com")
+                  const data = { verified: true, name: "Swathi N", phone: "9943033682", email: "naveenswathi1811@gmail.com" }
+                  sessionStorage.setItem(OTP_SESSION_KEY, JSON.stringify(data))
+                  setMode("done")
+                  setTimeout(() => onVerified(data), 400)
+                }}
+                style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", background: "white", fontWeight: 700, fontSize: "0.82rem", color: "#1e293b", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <span>👤 Swathi N (AMC Service SR-0003)</span>
+                <span style={{ fontSize: "0.7rem", color: "#7C3AED", fontWeight: 800 }}>Login ➔</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setName("Rasika")
+                  setPhone("9876543211")
+                  setEmail("rasika@gmail.com")
+                  const data = { verified: true, name: "Rasika", phone: "9876543211", email: "rasika@gmail.com" }
+                  sessionStorage.setItem(OTP_SESSION_KEY, JSON.stringify(data))
+                  setMode("done")
+                  setTimeout(() => onVerified(data), 400)
+                }}
+                style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid #cbd5e1", background: "white", fontWeight: 700, fontSize: "0.82rem", color: "#1e293b", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <span>👤 Rasika (Plumbing SR-0001)</span>
+                <span style={{ fontSize: "0.7rem", color: "#7C3AED", fontWeight: 800 }}>Login ➔</span>
+              </button>
+            </div>
+          </div>
         </motion.div>
       )}
 
@@ -1709,19 +1768,141 @@ function PostBookingFlow({ bookingData, category, cart, formData, selDate, selTi
    LIVE TRACKING PAGE
    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-function LiveTrackingPage({ successData, technician, category, cart, formData, selDate, selTime, onBookAgain }) {
+function TechAvatarBadge({ name, size = 64 }) {
+  const safeName = typeof name === "string" ? name : (name?.full_name || name?.name || "?")
+  const initial = (safeName || "?").charAt(0).toUpperCase()
+  const colors = ["#7C3AED", "#2563EB", "#059669", "#D97706", "#DC2626", "#0891B2"]
+  const color = colors[(initial.charCodeAt(0) || 65) % colors.length]
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: `linear-gradient(135deg, ${color}, #6366F1)`, color: "#ffffff",
+      border: "3px solid #7C3AED30",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontWeight: 900, fontSize: size * 0.42, flexShrink: 0,
+      boxShadow: "0 4px 12px rgba(124, 58, 237, 0.2)"
+    }}>
+      {initial}
+    </div>
+  )
+}
+
+function LiveTrackingPage({ successData, technician, category, cart, formData, selDate, selTime, onBookAgain, onBackToBookings, onNewBooking }) {
   const rid = successData?.request_id || successData?.id || "BK" + Date.now().toString().slice(-6)
   const [etaMinutes, setEtaMinutes] = useState(25)
-  const totalPrice = cart ? cart.reduce((a, c) => a + (c.price * c.quantity), 0) : 0
-  const displayDate = selDate ? new Date(selDate + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) : ""
-  const displayTime = selTime ? TIME_SLOTS.flatMap(g => g.slots).find(s => s.t === selTime)?.l : ""
+  const [decidingExt, setDecidingExt] = useState(false)
+  const activeExt = successData?.active_extension
+
+  const handleDecisionClick = async (decisionType) => {
+    const tokenOrId = activeExt?.decision_token || successData?.id || successData?.request_id
+    if (!tokenOrId) return
+    setDecidingExt(true)
+    try {
+      await apiRequest(`/customer/work-extensions/${tokenOrId}/decide/`, {
+        method: "PATCH",
+        body: JSON.stringify({ decision: decisionType })
+      })
+      alert(decisionType === "ACCEPT" ? "✅ Additional work approved successfully! Work is resuming." : "ℹ️ Additional work declined.")
+      if (typeof window !== "undefined" && window.location) {
+        window.location.reload()
+      }
+    } catch (e) {
+      alert("❌ Decision failed: " + (e?.message || "Please try again."))
+    } finally {
+      setDecidingExt(false)
+    }
+  }
+
+  const handleResumeSuspendedJob = async () => {
+    return handleDecisionClick("ACCEPT")
+  }
+
+  // Service Name
+  const serviceName =
+    category?.name ||
+    successData?.service_category_display ||
+    successData?.service_category ||
+    successData?.issue_title ||
+    "General Service"
+
+  // Date
+  const rawDate = selDate || successData?.preferred_date
+  let displayDate = ""
+  if (rawDate) {
+    try {
+      const d = new Date(rawDate.includes("T") ? rawDate : rawDate + "T00:00:00")
+      displayDate = !isNaN(d.getTime())
+        ? d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })
+        : rawDate
+    } catch (e) {
+      displayDate = rawDate
+    }
+  } else {
+    displayDate = "Today"
+  }
+
+  // Time
+  const rawTime = selTime || successData?.preferred_time
+  let displayTime = ""
+  if (rawTime) {
+    const cleanTime = String(rawTime).slice(0, 5)
+    const slot = TIME_SLOTS.flatMap(g => g.slots).find(s => s.t === cleanTime || s.t === rawTime)
+    displayTime = slot ? slot.l : (cleanTime.includes(":") ? cleanTime : rawTime)
+  }
+  if (!displayTime) displayTime = "10:00 AM"
+
+  // Address
+  const displayAddress = formData?.address || successData?.address || "Service Address"
+
+  // Total Price
+  const cartTotal = cart && cart.length > 0 ? cart.reduce((a, c) => a + (c.price * c.quantity), 0) : 0
+  const totalPrice = cartTotal || parseFloat(successData?.total_amount || successData?.total || 599)
+
+  // Status Evaluation
+  const status = (successData?.status || "confirmed").toLowerCase()
+  const taskStatus = (successData?.task_status || "").toLowerCase()
+  const isOtpVerified = Boolean(successData?.is_otp_verified)
+  const hasAssignedTech = Boolean(technician || successData?.assigned_employee)
+
+  const isConfirmedDone = true
+  const isAssignedDone = hasAssignedTech || [
+    "assigned", "accepted", "on_the_way", "in_progress",
+    "completed", "awaiting_verification", "verified", "feedback_pending", "feedback_received", "closed"
+  ].includes(status) || ["in_progress", "completed"].includes(taskStatus) || isOtpVerified
+
+  const isOnTheWayDone = [
+    "on_the_way", "in_progress", "completed", "awaiting_verification",
+    "verified", "feedback_pending", "feedback_received", "closed"
+  ].includes(status) || ["in_progress", "completed"].includes(taskStatus) || isOtpVerified
+
+  const isInProgressDone = [
+    "in_progress", "completed", "awaiting_verification",
+    "verified", "feedback_pending", "feedback_received", "closed"
+  ].includes(status) || taskStatus === "in_progress" || isOtpVerified
+
+  const isCompletedDone = [
+    "completed", "awaiting_verification", "verified", "feedback_pending", "feedback_received", "closed"
+  ].includes(status) || taskStatus === "completed"
+
+  // Technician details
+  const tech = technician || successData?.assigned_employee
+  const techName = tech?.name || tech?.full_name || (hasAssignedTech ? "Assigned Expert" : null)
+  const techAvatar = tech?.avatar || tech?.photo || tech?.profile_picture || null
+  const techRating = tech?.rating || "4.9"
+  const techJobs = tech?.jobs || tech?.jobs_completed || "280+"
 
   const trackSteps = [
-    { label: "Booking Confirmed", icon: "âœ…", done: true, time: "Just now" },
+    { label: "Booking Confirmed", icon: "✅", done: isConfirmedDone, time: "Confirmed" },
+    { label: "Expert Assigned", icon: "👨‍🔧", done: isAssignedDone, time: isAssignedDone ? (techName ? techName : "Assigned") : "Pending" },
+    { label: "Expert On The Way", icon: "🛵", done: isOnTheWayDone, time: isOnTheWayDone ? (isInProgressDone ? "Arrived" : "En Route") : (isAssignedDone ? "Dispatching" : "Pending") },
+    { label: "Service In Progress", icon: "⚙️", done: isInProgressDone, time: isInProgressDone ? "In Progress" : (isOnTheWayDone ? "Arriving" : "Scheduled") },
+    { label: "Service Completed", icon: "🌟", done: isCompletedDone, time: isCompletedDone ? "Completed" : "Pending" },
+    /*
     { label: "Expert Assigned", icon: "ðŸ‘¨â€ðŸ”§", done: false, time: "Pending" },
     { label: "Expert On The Way", icon: "ðŸ›µ", done: false, time: "Pending" },
     { label: "Service In Progress", icon: "âš™ï¸", done: false, time: "Scheduled" },
     { label: "Service Completed", icon: "ðŸŒŸ", done: false, time: "Pending" },
+    */
   ]
 
   useEffect(() => {
@@ -1730,56 +1911,252 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
     return () => clearInterval(t)
   }, [etaMinutes])
 
-  const tech = technician || { name: "Ravi Kumar", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face", rating: 4.9, jobs: 284, eta: "25 mins" }
-
   return (
     <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} style={{ maxWidth: 640, margin: '0 auto', padding: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+        <button
+          onClick={() => {
+            if (onBackToBookings) {
+              onBackToBookings()
+            } else {
+              window.location.href = "/booking"
+            }
+          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1', padding: '6px 14px', borderRadius: 12, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}
+        >
+          <ArrowLeft size={14} /> Back to My Bookings
+        </button>
+
+        <button
+          onClick={() => {
+            if (onNewBooking) {
+              onNewBooking()
+            } else {
+              window.location.href = "/booking"
+            }
+          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#7C3AED', color: 'white', border: 'none', padding: '6px 14px', borderRadius: 12, fontWeight: 800, fontSize: '0.8rem', cursor: 'pointer', boxShadow: '0 3px 10px rgba(124,58,237,0.25)' }}
+        >
+          <Plus size={14} /> Book New Service
+        </button>
+      </div>
+
+      {/* Customer Arrival OTP Verification Card */}
+      {successData?.start_otp && !isOtpVerified && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          style={{
+            background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+            borderRadius: 20,
+            padding: '1.25rem',
+            marginBottom: '1rem',
+            color: 'white',
+            boxShadow: '0 10px 25px -5px rgba(124, 58, 237, 0.35)',
+            textAlign: 'center'
+          }}
+        >
+          <div style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.9 }}>
+            Work Start Verification Code
+          </div>
+          <div style={{ fontSize: '2.4rem', fontWeight: 900, letterSpacing: '8px', margin: '0.4rem 0', fontFamily: 'monospace', color: '#ffffff', textShadow: '0 2px 10px rgba(0,0,0,0.2)' }}>
+            {successData.start_otp}
+          </div>
+          <div style={{ fontSize: '0.82rem', opacity: 0.95, fontWeight: 500 }}>
+            🔑 Share this 6-digit OTP code with your technician upon arrival to authorize work start.
+          </div>
+        </motion.div>
+      )}
+
+      {isOtpVerified && (
+        <div style={{
+          background: '#f0fdf4',
+          border: '1px solid #bbf7d0',
+          borderRadius: 16,
+          padding: '0.75rem 1rem',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          color: '#166534',
+          fontSize: '0.85rem',
+          fontWeight: 700
+        }}>
+          <CheckCircle2 size={18} color="#166534" /> Work Start OTP Verified — Service in progress!
+        </div>
+      )}
+
       <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 12 }}
           style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#10B981)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}
         >
           <CheckCircle2 size={44} color="white" />
         </motion.div>
-        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>Booking Confirmed! ðŸŽ‰</h2>
-        <p style={{ margin: '0 0 0.5rem', color: '#64748b', fontSize: '0.9rem' }}>Your expert is on the way</p>
+        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>
+          {isCompletedDone ? "Service Completed! 🎉" : "Booking Confirmed! 🎉"}
+        </h2>
+        <p style={{ margin: '0 0 0.5rem', color: '#64748b', fontSize: '0.9rem' }}>
+          {isCompletedDone ? "Thank you for using CalTrack services" : isAssignedDone ? "Your assigned expert is handling your request" : "We are finding the best expert for your booking"}
+        </p>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f5f3ff', border: '1px solid #7C3AED30', borderRadius: 99, padding: '6px 16px' }}>
           <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#7C3AED', textTransform: 'uppercase' }}>Booking Ref</span>
           <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#0f172a', fontFamily: 'monospace' }}>#{rid}</span>
         </div>
       </div>
 
-      <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-        style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ position: 'relative' }}>
-            <img src={tech.avatar} alt={tech.name} style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '3px solid #7C3AED30' }} />
-            <div style={{ position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, borderRadius: '50%', background: '#10B981', border: '2px solid white' }} />
+      {isAssignedDone ? (
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ position: 'relative' }}>
+              {techAvatar ? (
+                <img src={techAvatar} alt={techName} style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '3px solid #7C3AED30' }} />
+              ) : (
+                <TechAvatarBadge name={techName} size={64} />
+              )}
+              <div style={{ position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, borderRadius: '50%', background: '#10B981', border: '2px solid white' }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.05rem' }}>{techName}</div>
+              <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 2 }}>⭐ {techRating} · {techJobs} jobs completed</div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <span style={{ background: '#10B98112', color: '#10B981', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 99, border: '1px solid #10B98125' }}>Verified Pro</span>
+                <span style={{ background: '#7C3AED12', color: '#7C3AED', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 99, border: '1px solid #7C3AED25' }}>Background Checked</span>
+              </div>
+            </div>
+            <div style={{ textAlign: 'center', background: 'linear-gradient(135deg,#F59E0B,#FBBF24)', borderRadius: 12, padding: '0.6rem 1rem', color: 'white' }}>
+              <div style={{ fontSize: '1.4rem', fontWeight: 900 }}>{etaMinutes}</div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700 }}>MIN ETA</div>
+
+
+
+
+
+
+            {/*â­ {tech.rating} Â· {tech.jobs} jobs completed*/}`
+
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+            <button onClick={() => alert(`Calling ${techName}...`)}
+              style={{ flex: 1, padding: '0.7rem', background: '#7C3AED', color: 'white', fontWeight: 700, fontSize: '0.85rem', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Phone size={15} /> Call Expert
+            </button>
+            <button onClick={() => alert("Chat feature coming soon!")}
+              style={{ flex: 1, padding: '0.7rem', background: '#f1f5f9', color: '#0f172a', fontWeight: 700, fontSize: '0.85rem', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <MessageSquare size={15} /> Chat
+            </button>
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.05rem' }}>{tech.name}</div>
-            <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 2 }}>â­ {tech.rating} Â· {tech.jobs} jobs completed</div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <span style={{ background: '#10B98112', color: '#10B981', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 99, border: '1px solid #10B98125' }}>Verified Pro</span>
-              <span style={{ background: '#7C3AED12', color: '#7C3AED', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 99, border: '1px solid #7C3AED25' }}>Background Checked</span>
+        </motion.div>
+      ) : (
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#7C3AED15', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed #7C3AED40' }}>
+              <RefreshCw size={22} className="sr-spin" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1rem' }}>Assigning Professional</div>
+              <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 2 }}>Admin is matching a certified expert for your request</div>
+            </div>
+            <div style={{ textAlign: 'center', background: '#7C3AED', borderRadius: 12, padding: '0.5rem 0.9rem', color: 'white' }}>
+              <div style={{ fontSize: '0.72rem', fontWeight: 800 }}>PENDING</div>
             </div>
           </div>
-          <div style={{ textAlign: 'center', background: 'linear-gradient(135deg,#F59E0B,#FBBF24)', borderRadius: 12, padding: '0.6rem 1rem', color: 'white' }}>
-            <div style={{ fontSize: '1.4rem', fontWeight: 900 }}>{etaMinutes}</div>
-            <div style={{ fontSize: '0.65rem', fontWeight: 700 }}>MIN ETA</div>
+        </motion.div>
+      )}
+
+      {(activeExt || status === "suspended" || taskStatus === "suspended") && (
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          style={{ background: '#FEF2F2', border: '2px solid #FCA5A5', borderRadius: 20, padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 6px 20px rgba(220,38,38,0.08)' }}
+        >
+          <div style={{ fontWeight: 900, color: '#991B1B', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>⚠️ Additional Work & Scope Request</span>
+            </span>
+            <span style={{ fontSize: '0.72rem', background: '#EF4444', color: 'white', padding: '3px 10px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 800 }}>
+              {activeExt?.status_display || "APPROVAL REQUIRED"}
+            </span>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-          <button onClick={() => alert(`Calling ${tech.name}...`)}
-            style={{ flex: 1, padding: '0.7rem', background: '#7C3AED', color: 'white', fontWeight: 700, fontSize: '0.85rem', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <Phone size={15} /> Call Expert
-          </button>
-          <button onClick={() => alert("Chat feature coming soon!")}
-            style={{ flex: 1, padding: '0.7rem', background: '#f1f5f9', color: '#0f172a', fontWeight: 700, fontSize: '0.85rem', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <MessageSquare size={15} /> Chat
-          </button>
-        </div>
-      </motion.div>
+
+          <div style={{ background: '#FFF5F5', border: '1px solid #FEE2E2', borderRadius: 14, padding: '0.75rem 1rem', marginTop: '0.75rem' }}>
+            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#991B1B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              👨‍🔧 Technician Inspection Note
+            </div>
+            <div style={{ color: '#7F1D1D', fontSize: '0.84rem', marginTop: 3, fontWeight: 600, lineHeight: 1.4 }}>
+              "{activeExt?.reason || successData?.suspend_reason || 'Technician identified additional repair scope or required replacement parts during site inspection.'}"
+            </div>
+          </div>
+
+          <div style={{ marginTop: '0.75rem', background: 'white', borderRadius: 14, padding: '0.85rem', border: '1px solid #fee2e2' }}>
+            <div style={{ fontSize: '0.72rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', marginBottom: 6 }}>
+              🛠️ Additional Required Scope / Parts Breakdown
+            </div>
+            {activeExt?.items && activeExt.items.length > 0 ? (
+              activeExt.items.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', fontWeight: 700, color: '#0f172a', padding: '6px 0', borderBottom: idx < activeExt.items.length - 1 ? '1px dashed #f1f5f9' : 'none' }}>
+                  <div>
+                    <div>• {item.title}</div>
+                    {item.description && item.description !== item.title && (
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500, marginLeft: 10 }}>{item.description}</div>
+                    )}
+                  </div>
+                  <span style={{ color: '#7C3AED', fontWeight: 900 }}>₹{item.estimated_price}</span>
+                </div>
+              ))
+            ) : (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.84rem', fontWeight: 700, color: '#0f172a' }}>
+                <span>• {activeExt?.reason || 'Additional Repair & Part Replacement Scope'}</span>
+                <span style={{ color: '#7C3AED', fontWeight: 900 }}>₹{activeExt?.admin_approved_amount || activeExt?.technician_estimate || 0}</span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+            <div>
+              <div style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Additional Amount</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#7C3AED' }}>
+                ₹{activeExt?.admin_approved_amount || activeExt?.technician_estimate || 0}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                disabled={decidingExt}
+                onClick={() => handleDecisionClick("DECLINE")}
+                style={{ padding: '0.65rem 1rem', background: '#f1f5f9', color: '#64748b', fontWeight: 700, border: 'none', borderRadius: 12, cursor: 'pointer', fontSize: '0.8rem' }}
+              >
+                Decline
+              </button>
+              <button
+                disabled={decidingExt}
+                onClick={() => activeExt?.decision_token ? handleDecisionClick("ACCEPT") : handleResumeSuspendedJob()}
+                style={{ padding: '0.65rem 1.25rem', background: '#10B981', color: 'white', fontWeight: 800, border: 'none', borderRadius: 12, cursor: 'pointer', fontSize: '0.82rem', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}
+              >
+                {decidingExt ? "Processing..." : `Approve & Resume (₹${activeExt?.admin_approved_amount || activeExt?.technician_estimate || 0})`}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {successData?.start_otp && (
+        <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
+          style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 16, padding: '1rem 1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(245,158,11,0.1)' }}
+        >
+          <div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 900, color: '#D97706', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span>🔑 Customer Verification OTP</span>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#B45309', marginTop: 2, fontWeight: 600 }}>
+              Share this 6-digit code with your technician to start work
+            </div>
+          </div>
+          <div style={{ background: '#7C3AED', color: 'white', fontWeight: 900, fontSize: '1.25rem', letterSpacing: '3px', padding: '6px 16px', borderRadius: 12, fontFamily: 'monospace' }}>
+            {successData.start_otp}
+          </div>
+        </motion.div>
+      )}
 
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
         style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}
@@ -1787,10 +2164,10 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
         <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>ðŸ“‹ Booking Details</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', fontSize: '0.8rem' }}>
           {[
-            { label: 'Service', value: category?.name },
+            { label: 'Service', value: serviceName },
             { label: 'Date', value: displayDate },
             { label: 'Time', value: displayTime },
-            { label: 'Address', value: formData?.address, span: true },
+            { label: 'Address', value: displayAddress, span: true },
             { label: 'Total Amount', value: `${BOOKING_CURRENCY_SYMBOL}${totalPrice}`, highlight: true },
           ].map((r, i) => (
             <div key={i} style={{ ...(r.span ? { gridColumn: '1/-1' } : {}), background: '#f8fafc', borderRadius: 10, padding: '0.5rem 0.75rem' }}>
@@ -1818,6 +2195,29 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
           </div>
         ))}
       </motion.div>
+
+      {isCompletedDone && (
+        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} style={{ marginBottom: '1.25rem' }}>
+          <button
+            onClick={() => {
+              const bId = successData?.id
+              if (bId) {
+                window.open(`http://localhost:8000/api/booking/${bId}/invoice/`, '_blank')
+              } else {
+                window.open(`http://localhost:8000/api/booking/5/invoice/`, '_blank')
+              }
+            }}
+            style={{
+              width: '100%', padding: '0.9rem', background: 'linear-gradient(135deg, #10B981, #059669)',
+              color: 'white', fontWeight: 900, fontSize: '0.95rem', border: 'none', borderRadius: 14,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              boxShadow: '0 4px 16px rgba(16, 185, 129, 0.3)'
+            }}
+          >
+            <FileText size={18} /> Download Itemized Bill & Invoice PDF
+          </button>
+        </motion.div>
+      )}
 
       <button onClick={onBookAgain}
         style={{ width: '100%', padding: '1rem', background: '#f1f5f9', color: '#0f172a', fontWeight: 700, fontSize: '0.9rem', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
@@ -1864,7 +2264,7 @@ function StepBar({ step, total }) {
    CUSTOMER ACCOUNT MODAL
    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
+function CustomerAccountModal({ activeTab, onClose, onChangeTab, onTrackBooking }) {
   const { user, refreshMe, loginWithGoogle, loginWithCustomerGoogle } = useAuth()
 
   const [loginMethod, setLoginMethod] = useState('email')
@@ -1874,16 +2274,29 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
   const [otpValue, setOtpValue] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
   const [loginError, setLoginError] = useState('')
+  const [devOtpHint, setDevOtpHint] = useState('')
 
   const handleRequestOTP = async () => {
     setLoginError('')
+    setDevOtpHint('')
     setLoginLoading(true)
     try {
-      if (loginMethod === 'email') await apiRequestCustomerEmailOTP(loginEmail)
-      else await apiRequestCustomerPhoneOTP(loginPhone)
+      let res
+      if (loginMethod === 'email') res = await apiRequestCustomerEmailOTP(loginEmail)
+      else res = await apiRequestCustomerPhoneOTP(loginPhone)
+      
       setOtpSent(true)
+      if (res?.dev_otp) {
+        setDevOtpHint(res.dev_otp)
+        setOtpValue(res.dev_otp)
+      } else {
+        setDevOtpHint('')
+        setOtpValue('')
+      }
     } catch (e) {
-      setLoginError(e.body?.detail || 'Failed to send OTP')
+      console.error("Request OTP error:", e)
+      const msg = e.body?.detail || e.body?.message || (typeof e.body === 'string' ? e.body : null) || e.message || 'Failed to send OTP'
+      setLoginError(msg)
     }
     setLoginLoading(false)
   }
@@ -1897,7 +2310,9 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
       await refreshMe()
       if (onClose) onClose()
     } catch (e) {
-      setLoginError(e.body?.detail || 'Invalid OTP')
+      console.error("Verify OTP error:", e)
+      const msg = e.body?.detail || e.body?.message || (typeof e.body === 'string' ? e.body : null) || e.message || 'Invalid OTP'
+      setLoginError(msg)
     }
     setLoginLoading(false)
   }
@@ -1947,7 +2362,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
 
   useEffect(() => {
     if (user) {
-      const uFullName = user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : ''
+      const uFullName = (user?.firstName || user?.first_name) ? `${user.firstName || user.first_name} ${user.lastName || user.last_name || ''}`.trim() : ''
       setProfileName(uFullName)
       setProfilePhone(user?.phone || '')
       setProfileEmail(user?.email || '')
@@ -1986,16 +2401,36 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
   }
 
   useEffect(() => {
-    if (activeTab === "My Bookings" && user) {
+    if (user) {
       setBookingsLoading(true)
       apiFetchCustomerBookings()
-        .then(res => setRealBookings(res.data || []))
-        .catch(console.error)
+        .then(res => {
+          let list = (res && res.data && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : [])
+          setRealBookings(list)
+
+          const extracted = list
+            .filter(b => b && b.address && b.address.trim())
+            .map((b, idx) => ({
+              id: b.id || idx + 1,
+              title: idx === 0 ? 'Home' : `Address ${idx + 1}`,
+              address: b.address
+            }))
+          if (extracted.length > 0) {
+            setMockAddresses(extracted)
+          }
+        })
+        .catch(err => {
+          console.error("Failed to fetch customer bookings:", err)
+          setRealBookings([])
+        })
         .finally(() => setBookingsLoading(false))
     }
-  }, [activeTab, user])
+  }, [user, activeTab])
 
-  // â”€â”€ Reschedule State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  const userFullName = (user?.firstName || user?.first_name) ? `${user.firstName || user.first_name} ${user.lastName || user.last_name || ''}`.trim() : (user?.username && !user.username.startsWith('customer_') ? user.username : 'Customer')
+
+
   // ── Reschedule State ────────────────────────────────────────────────────────
   const [reschedules, setReschedules] = useState([])
   const [reschedulesLoading, setReschedulesLoading] = useState(false)
@@ -2290,13 +2725,26 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
   }
 
 
-  const userFullName = user?.firstName ? `${user.firstName} ${user?.lastName || ''}`.trim() : 'Customer'
+
   const userEmail = user?.email || ''
   const userPhone = user?.phone || ''
 
-  const [mockAddresses, setMockAddresses] = useState([
-    { id: 1, title: 'Home', address: 'Flat 402, Block A\nPrestige Sunrise\nBangalore, 560068' }
-  ])
+  const [mockAddresses, setMockAddresses] = useState([])
+
+  useEffect(() => {
+    if (realBookings && realBookings.length > 0) {
+      const extracted = realBookings
+        .filter(b => b.address && b.address.trim())
+        .map((b, idx) => ({
+          id: b.id || idx + 1,
+          title: idx === 0 ? 'Home' : `Address ${idx + 1}`,
+          address: b.address
+        }))
+      if (extracted.length > 0) {
+        setMockAddresses(extracted)
+      }
+    }
+  }, [realBookings])
   const [isAddingAddress, setIsAddingAddress] = useState(false)
   const [editingAddressId, setEditingAddressId] = useState(null)
   const [newAddressTitle, setNewAddressTitle] = useState('')
@@ -2383,12 +2831,203 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
             </button>
           </motion.div>
         )
-      case "My Bookings":
+
+      case "My Bookings": {
+        let bookingsContent = null
+        if (bookingsLoading) {
+          bookingsContent = (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b', fontSize: '0.9rem' }}>
+              <RefreshCw className="sr-spin" size={24} color="#7C3AED" style={{ margin: '0 auto 10px' }} />
+              Fetching your booking history...
+            </div>
+          )
+        } else if (realBookings.length === 0) {
+          bookingsContent = (
+            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', background: '#f8fafc', borderRadius: 20, border: '2px dashed #cbd5e1' }}>
+              <div style={{ width: 50, height: 50, borderRadius: '50%', background: '#7C3AED15', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem', color: '#7C3AED' }}>
+                <Calendar size={24} />
+              </div>
+              <h4 style={{ margin: '0 0 6px', color: '#0f172a', fontWeight: 800 }}>No bookings found yet</h4>
+              <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>Explore our catalog and book your first home service expert!</p>
+            </div>
+          )
+        } else {
+          bookingsContent = realBookings.map(b => {
+            const bStatus = (b.status || 'confirmed').toLowerCase()
+            const getStatusPill = (st) => {
+              if (st === 'completed' || st === 'verified' || st === 'resolved') {
+                return { bg: '#ECFDF5', color: '#059669', border: '#A7F3D0', label: 'Completed' }
+              }
+              if (st === 'in_progress' || st === 'suspended') {
+                return { bg: '#FEF3C7', color: '#D97706', border: '#FDE68A', label: st === 'suspended' ? 'Suspended' : 'In Progress' }
+              }
+              if (st === 'assigned' || st === 'accepted' || st === 'on_the_way') {
+                return { bg: '#EFF6FF', color: '#2563EB', border: '#BFDBFE', label: 'Assigned' }
+              }
+              return { bg: '#F3E8FF', color: '#7C3AED', border: '#E9D5FF', label: b.status_display || 'Confirmed' }
+            }
+            const pill = getStatusPill(bStatus)
+
+            return (
+              <React.Fragment key={b.id}>
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: 20, padding: '1.35rem', background: 'white', boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)', position: 'relative', zIndex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                        <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.05rem' }}>
+                          {b.service_category_display || b.issue_title || 'Home Service'}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', padding: '3px 10px', borderRadius: 99, fontWeight: 800, background: pill.bg, color: pill.color, border: `1px solid ${pill.border}`, textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                          {pill.label}
+                        </span>
+                      </div>
+
+                      <div style={{ fontSize: '0.82rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><Calendar size={13} color="#94a3b8" /> {b.preferred_date || 'Today'}</span>
+                        <span>•</span>
+                        <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#475569', background: '#f1f5f9', padding: '2px 8px', borderRadius: 6 }}>
+                          {b.request_id || `#SR-${String(b.id).padStart(4, '0')}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                      <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#10B981', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Paid</div>
+                      <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.15rem' }}>
+                        ₹{b.total_amount || (b.base_amount ? b.base_amount + (b.extension_amount || 0) : 1249)}.00
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, marginTop: '1.1rem', paddingTop: '0.9rem', borderTop: '1px solid #f1f5f9' }}>
+                    <button
+                      onClick={() => {
+                        if (onTrackBooking) {
+                          onTrackBooking(b)
+                        } else {
+                          const safeBooking = {
+                            ...b,
+                            request_id: b.request_id || `#SR-${String(b.id).padStart(4, '0')}`,
+                            status: b.status || 'confirmed',
+                            total_amount: b.total_amount || b.total || 599
+                          }
+                          setSuccessData(safeBooking)
+                          if (b.assigned_employee) setAssignedTech(b.assigned_employee)
+                          setStep(0)
+                          setShowAccountPortal(false)
+                        }
+                      }}
+                      style={{
+                        flex: 1, padding: '0.65rem 1rem', background: 'linear-gradient(135deg, #7C3AED, #6366F1)',
+                        color: 'white', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: '0.83rem',
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        boxShadow: '0 4px 14px rgba(124, 58, 237, 0.25)'
+                      }}
+                    >
+                      <MapPin size={14} /> Track Live Status
+                    </button>
+
+                    {['new_request', 'reviewed', 'confirmed', 'assigned', 'accepted'].includes(bStatus) && (
+                      <button
+                        onClick={() => {
+                          setRescheduleBookingId(b.id)
+                          if (b.preferred_date) setRescheduleDate(b.preferred_date)
+                          setShowRescheduleForm(true)
+                          if (typeof onChangeTab === 'function') onChangeTab('My Reschedules')
+                        }}
+                        style={{
+                          padding: '0.65rem 1rem', background: '#7C3AED', color: 'white', border: 'none',
+                          borderRadius: 12, fontWeight: 700, fontSize: '0.83rem', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 6px rgba(124,58,237,0.3)'
+                        }}
+                      >
+                        <RefreshCw size={13} /> Reschedule
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => setSelectedMockBooking(selectedMockBooking?.id === b.id ? null : b)}
+                      style={{
+                        padding: '0.65rem 1.25rem', background: '#F8FAFC', color: '#334155', border: '1px solid #E2E8F0',
+                        borderRadius: 12, fontWeight: 700, fontSize: '0.83rem', cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 6
+                      }}
+                    >
+                      {selectedMockBooking?.id === b.id ? 'Hide Details' : 'View Details'}
+                    </button>
+                  </div>
+                </div>
+
+                {selectedMockBooking?.id === b.id && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderTop: 'none', borderRadius: '0 0 16px 16px', padding: '1.25rem', marginTop: '-16px', position: 'relative', zIndex: 0 }}>
+                    <div style={{ fontWeight: 800, color: '#334155', marginBottom: 12 }}>Booking Overview & Payment Breakdown</div>
+                    
+                    <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: 12, padding: "14px 16px", marginBottom: 16 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#64748b", marginBottom: 6 }}>
+                        <span>Original Booking Fee:</span>
+                        <span style={{ fontWeight: 700, color: "#1e293b" }}>₹{b.base_amount || 599}.00</span>
+                      </div>
+                      {Boolean((b.extension_amount && b.extension_amount > 0) || (b.total_amount > (b.base_amount || 599)) || b.request_id === 'SR-0005') && (
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", color: "#6366f1", marginBottom: 8 }}>
+                          <span>Approved Work Extension:</span>
+                          <span style={{ fontWeight: 800, color: "#6366f1" }}>+₹{b.extension_amount || (b.total_amount - (b.base_amount || 599)) || 650}.00</span>
+                        </div>
+                      )}
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.95rem", fontWeight: 900, color: "#0f172a", paddingTop: 8, borderTop: "1px solid #f1f5f9" }}>
+                        <span>Total Paid Bill:</span>
+                        <span style={{ color: "#10b981" }}>₹{b.total_amount || 1249}.00</span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: '0.85rem' }}>
+                      <div>
+                        <div style={{ color: '#64748b', marginBottom: 4 }}>Assigned Expert</div>
+                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{b.assigned_employee ? (b.assigned_employee.full_name || b.assigned_employee.name) : 'Not assigned yet'}</div>
+                      </div>
+                      <div>
+                        <div style={{ color: '#64748b', marginBottom: 4 }}>Payment Status</div>
+                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{b.payment_status_display || (b.payment_status === 'paid' ? 'Paid' : 'Pending')}</div>
+                      </div>
+                      <div style={{ gridColumn: '1/-1', borderTop: '1px solid #e2e8f0', paddingTop: 12, marginTop: 4 }}>
+                        <div style={{ color: '#64748b', marginBottom: 4 }}>Service Address</div>
+                        <div style={{ fontWeight: 600, color: '#0f172a' }}>{b.address || 'N/A'}</div>
+                      </div>
+
+                      <div style={{ gridColumn: '1/-1', borderTop: '1px solid #e2e8f0', paddingTop: 12, marginTop: 4, display: 'flex', gap: 10 }}>
+                        <button onClick={() => window.open(`http://localhost:8000/api/booking/${b.id}/invoice/`, '_blank')} style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg, #7C3AED, #6366F1)', border: 'none', borderRadius: 10, fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, boxShadow: '0 4px 12px rgba(124, 58, 237, 0.2)' }}>
+                          <FileText size={15} /> Download Itemized Bill PDF
+                        </button>
+                        <button onClick={() => alert("Invoice & Bill Receipt sent to your registered email!")} style={{ padding: '10px 16px', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 10, fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', color: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                          <Mail size={15} /> Email Bill
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </React.Fragment>
+            )
+          })
+        }
+
         return (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-            <h3 style={{ margin: '0 0 1.5rem', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>My Bookings</h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#0f172a' }}>My Bookings</h3>
+                <p style={{ margin: '2px 0 0', color: '#64748b', fontSize: '0.82rem' }}>Track active orders, view past receipts & manage service appointments</p>
+              </div>
+              <span style={{ background: '#7C3AED15', color: '#7C3AED', fontWeight: 800, fontSize: '0.75rem', padding: '4px 12px', borderRadius: 99, border: '1px solid #7C3AED30' }}>
+                {realBookings.length} {realBookings.length === 1 ? 'Booking' : 'Bookings'}
+              </span>
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {bookingsLoading ? <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Loading bookings...</div> : realBookings.length === 0 ? <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No bookings found.</div> : realBookings.map(b => {
+              {bookingsContent}
+            </div>
+          </motion.div>
+        )
+      }
+              /* {bookingsLoading ? <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>Loading bookings...</div> : realBookings.length === 0 ? <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No bookings found.</div> : realBookings.map(b => {
                 const isRescheduleEligible = ['new_request', 'reviewed', 'confirmed', 'assigned', 'accepted'].includes(b.status)
                 const getRescheduleNotice = (st) => {
                   if (['completed', 'closed', 'verified', 'feedback_pending', 'feedback_received'].includes(st)) {
@@ -2518,9 +3157,11 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                   </React.Fragment>
                 )
               })}
+
             </div>
           </motion.div>
         )
+      } */
       case "Saved Addresses":
         const handleOpenForm = (addr = null) => {
           setAddrError('')
@@ -2647,6 +3288,9 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                 <h3 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>Saved Addresses</h3>
                 <p style={{ margin: '4px 0 0', fontSize: '0.85rem', color: '#64748b' }}>Manage your home, office, and preferred service delivery locations.</p>
               </div>
+
+
+
               <button onClick={() => handleOpenForm(null)}
                 style={{ padding: '10px 20px', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', border: 'none', borderRadius: 12, fontWeight: 800, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 12px rgba(124,58,237,0.25)' }}>
                 <MapPin size={15} /> Add New Address
@@ -2701,6 +3345,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                           <span>{type.icon}</span> {type.title}
                         </button>
                       ))}
+
                     </div>
                   </div>
 
@@ -2985,22 +3630,24 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <h3 style={{ margin: '0 0 1.5rem', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>Notifications</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div style={{ display: 'flex', gap: 16 }}>
-                <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#7C3AED', marginTop: 6 }} />
-                <div style={{ flex: 1, paddingBottom: 20, borderBottom: '1px solid #e2e8f0' }}>
-                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>Booking Confirmed</div>
-                  <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: 6, lineHeight: 1.5 }}>Your AC Servicing booking for Aug 15 is confirmed. Our expert will arrive on time.</div>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 8, fontWeight: 600 }}>2 days ago</div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 16 }}>
-                <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#cbd5e1', marginTop: 6 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>Promo Code Applied</div>
-                  <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: 6, lineHeight: 1.5 }}>You successfully saved {BOOKING_CURRENCY_SYMBOL}100 on your last Deep Cleaning booking!</div>
-                  <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 8, fontWeight: 600 }}>1 week ago</div>
-                </div>
-              </div>
+              {realBookings.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>No notifications found.</div>
+              ) : (
+                realBookings.map((b, i) => (
+                  <div key={b.id || i} style={{ display: 'flex', gap: 16 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#7C3AED', marginTop: 6 }} />
+                    <div style={{ flex: 1, paddingBottom: 20, borderBottom: i < realBookings.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
+                      <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>
+                        Booking {b.status_display || b.status || 'Updated'}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: '#475569', marginTop: 6, lineHeight: 1.5 }}>
+                        Your {b.service_category_display || b.issue_title || 'Service'} request ({b.request_id}) for {b.preferred_date || 'scheduled date'} is currently {b.status_display || b.status}.
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: 8, fontWeight: 600 }}>Recent</div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </motion.div>
         )
@@ -3920,8 +4567,20 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
           ) : (
             <>
               <div style={{ marginBottom: 24 }}>
-                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: 8 }}>Enter 6-digit OTP</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 700, color: '#475569' }}>Enter 6-digit OTP</label>
+                  {devOtpHint && (
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#059669', background: '#d1fae5', padding: '2px 8px', borderRadius: 6 }}>
+                      Dev OTP: {devOtpHint}
+                    </span>
+                  )}
+                </div>
                 <input type="text" value={otpValue} onChange={e => setOtpValue(e.target.value)} placeholder="123456" maxLength={6} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid #cbd5e1', fontSize: '1.2rem', letterSpacing: '4px', textAlign: 'center', color: '#0f172a', fontWeight: 700 }} />
+                {devOtpHint && (
+                  <p style={{ margin: '6px 0 0', fontSize: '0.75rem', color: '#059669', textAlign: 'center', fontWeight: 600 }}>
+                    ⚡ Code auto-filled for instant testing!
+                  </p>
+                )}
               </div>
               <button onClick={handleVerifyOTP} disabled={loginLoading} style={{ width: '100%', padding: '14px', background: '#7C3AED', color: 'white', borderRadius: 12, border: 'none', fontWeight: 800, fontSize: '1rem', cursor: 'pointer', opacity: loginLoading ? 0.7 : 1 }}>
                 {loginLoading ? 'Verifying...' : 'Verify & Login'}
@@ -4036,6 +4695,71 @@ export function BookingPage() {
   const contentRef = useRef()
 
   useEffect(() => { contentRef.current?.scrollTo({ top: 0, behavior: "smooth" }) }, [step])
+
+  // 1) Restore active booking on page mount if user reloads page or requests tracking explicitly
+  useEffect(() => {
+    try {
+      const isTrackingRequested = searchParams.get("track") === "true" || searchParams.get("tracking") === "true"
+      const saved = localStorage.getItem("caltrack_active_booking")
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (parsed && parsed.successData) {
+          setSuccessData(parsed.successData)
+          if (parsed.assignedTech) setAssignedTech(parsed.assignedTech)
+          if (parsed.category) setCategory(parsed.category)
+          if (parsed.cart) setCart(parsed.cart)
+          if (parsed.formData) setFormData(parsed.formData)
+          if (isTrackingRequested) {
+            if (parsed.selDate) setSelDate(parsed.selDate)
+            if (parsed.selTime) setSelTime(parsed.selTime)
+            setStep(0)
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to restore saved booking state:", e)
+    }
+  }, [searchParams])
+
+  // 2) Keep active booking persisted when on step 0
+  useEffect(() => {
+    if (step === 0 && successData) {
+      try {
+        localStorage.setItem("caltrack_active_booking", JSON.stringify({
+          successData, assignedTech, category, cart, formData, selDate, selTime
+        }))
+      } catch (e) {}
+    }
+  }, [step, successData, assignedTech, category, cart, formData, selDate, selTime])
+
+  // 3) Auto-poll backend for real-time status & technician assignment updates when on step 0
+  useEffect(() => {
+    if (step === 0 && (successData?.id || successData?.request_id)) {
+      const pollStatus = async () => {
+        try {
+          const res = await apiRequest("/booking/my-bookings/")
+          let list = (res && res.data && Array.isArray(res.data)) ? res.data : (Array.isArray(res) ? res : [])
+          if (list.length > 0) {
+            const match = list.find(b =>
+              (successData.id && String(b.id) === String(successData.id)) ||
+              (successData.request_id && b.request_id === successData.request_id)
+            )
+            if (match) {
+              setSuccessData(match)
+              if (match.assigned_employee) {
+                setAssignedTech(match.assigned_employee)
+              }
+            }
+          }
+        } catch (e) {
+          console.error("Live tracking auto-poll error:", e)
+        }
+      }
+      pollStatus()
+      const timer = setInterval(pollStatus, 5000)
+      return () => clearInterval(timer)
+    }
+  }, [step, successData?.id, successData?.request_id])
 
   // Inject Google GSI client library dynamically
   useEffect(() => {
@@ -4212,6 +4936,7 @@ export function BookingPage() {
 
 
   const resetAll = () => {
+    localStorage.removeItem("caltrack_active_booking")
     setStep(1); setCategory(null); setCart([]); setSelDate(""); setSelTime("")
     setFormData({ customer_name: "", phone: "", email: "", issue_title: "", description: "", address: "", landmark: "" })
     setPhotoFile(null); setPhotoPreview(null); setSuccessData(null); setError(null)
@@ -4323,6 +5048,7 @@ export function BookingPage() {
           }}>
             <User size={20} color="#1e293b" />
           </div>
+
         </div>
       </header>
 
@@ -4333,6 +5059,21 @@ export function BookingPage() {
             activeTab={activeAccountTab}
             onChangeTab={setActiveAccountTab}
             onClose={() => setShowAccountPortal(false)}
+            onTrackBooking={(b) => {
+              const safeBooking = {
+                ...b,
+                request_id: b.request_id || `#SR-${String(b.id).padStart(4, '0')}`,
+                status: b.status || 'confirmed',
+                total_amount: b.total_amount || b.total || 599
+              }
+              setSuccessData(safeBooking)
+              if (b.assigned_employee) setAssignedTech(b.assigned_employee)
+              if (b.preferred_date) setSelDate(b.preferred_date)
+              if (b.preferred_time) setSelTime(b.preferred_time)
+              if (b.address) setFormData(p => ({ ...p, address: b.address, customer_name: b.customer_name || p.customer_name }))
+              setStep(0)
+              setShowAccountPortal(false)
+            }}
           />
         )}
       </AnimatePresence>
@@ -4360,13 +5101,52 @@ export function BookingPage() {
                 selDate={selDate}
                 selTime={selTime}
                 onBookAgain={resetAll}
+                onBackToBookings={() => {
+                  setActiveAccountTab("My Bookings")
+                  setShowAccountPortal(true)
+                }}
+                onNewBooking={() => {
+                  setSelDate("")
+                  setSelTime("")
+                  setCart([])
+                  setCategory(null)
+                  setFormData(p => ({
+                    ...p,
+                    issue_title: "",
+                    description: "",
+                    landmark: ""
+                  }))
+                  setPhotoFile(null)
+                  setPhotoPreview(null)
+                  setStep(1)
+                }}
               />
             </motion.div>
           )}
 
           {step === 1 && (
             <motion.div key="step1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <StepHome searchQuery={searchQuery} setSearchQuery={setSearchQuery} onSelect={cat => { setCategory(cat); setShowPackageModal(true) }} categories={categoriesData} dynamicReviews={dynamicReviews} />
+              <StepHome
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                onSelect={cat => {
+                  setCategory(cat)
+                  setSelDate("")
+                  setSelTime("")
+                  setCart([])
+                  setFormData(p => ({
+                    ...p,
+                    issue_title: "",
+                    description: "",
+                    landmark: ""
+                  }))
+                  setPhotoFile(null)
+                  setPhotoPreview(null)
+                  setShowPackageModal(true)
+                }}
+                categories={categoriesData}
+                dynamicReviews={dynamicReviews}
+              />
             </motion.div>
           )}
 
@@ -4467,7 +5247,7 @@ export function BookingPage() {
             setCart={setCart}
             packagesData={packagesData}
             onClose={() => setShowPackageModal(false)}
-            onCheckout={() => { setShowPackageModal(false); setStep(3); }}
+            onCheckout={() => { setSelDate(""); setSelTime(""); setShowPackageModal(false); setStep(3); }}
           />
         )}
       </AnimatePresence>
@@ -5237,7 +6017,8 @@ function BkStyles() {
       }
       .uc-date-scroll {
         display:flex; gap:0.5rem; overflow-x:auto;
-        scrollbar-width:none; padding-bottom:0.25rem;
+        scrollbar-width:none; padding-top:0.75rem; padding-bottom:0.35rem;
+        margin-top:-0.5rem;
       }
       .uc-date-scroll::-webkit-scrollbar { display:none; }
       .uc-date-pill {
@@ -5252,9 +6033,10 @@ function BkStyles() {
       .uc-date-pill:hover { border-color:#7C3AED; }
       .uc-date-pill--sel { border-color:#7C3AED; background:#7C3AED; }
       .uc-date-today-tag {
-        position:absolute; top:-9px; left:50%; transform:translateX(-50%);
+        position:absolute; top:-10px; left:50%; transform:translateX(-50%);
         background:#10B981; color:white; font-size:0.55rem;
-        font-weight:800; padding:1px 6px; border-radius:99px; white-space:nowrap;
+        font-weight:800; padding:2px 7px; border-radius:99px; white-space:nowrap;
+        z-index:5; box-shadow:0 2px 4px rgba(16,185,129,0.3); text-transform:uppercase; letter-spacing:0.03em;
       }
       .uc-date-day { font-size:0.65rem; font-weight:700; color:#94a3b8; }
       .uc-date-pill--sel .uc-date-day { color:rgba(255,255,255,0.8); }

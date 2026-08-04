@@ -1,4 +1,5 @@
 import os
+import re
 import random
 import string
 from django.utils import timezone
@@ -32,7 +33,7 @@ class CustomerEmailOTPRequestView(APIView):
             if not email or not isinstance(email, str):
                 return Response({"detail": "Valid email is required."}, status=status.HTTP_400_BAD_REQUEST)
             
-            email = email.lower().strip()
+            email = email.replace(" ", "").strip().lower()
             if not email:
                 return Response({"detail": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -49,6 +50,8 @@ class CustomerEmailOTPRequestView(APIView):
                     email=email,
                     role=User.Role.CUSTOMER
                 )
+                user.set_unusable_password()
+                user.save()
             
             otp = _generate_otp()
             user.email_otp = otp
@@ -58,7 +61,8 @@ class CustomerEmailOTPRequestView(APIView):
             # Send email safely without crashing
             subject = "Your Caltrack Login Code"
             message = f"Your Caltrack login code is: {otp}\n\nThis code will expire in 5 minutes."
-            from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or "noreply@caltrack.com"
+            email_sent = False
+            from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None) or getattr(settings, "EMAIL_HOST_USER", None) or "noreply@caltrack.com"
             try:
                 send_mail(
                     subject,
@@ -67,24 +71,29 @@ class CustomerEmailOTPRequestView(APIView):
                     [email],
                     fail_silently=True,
                 )
+                email_sent = True
             except Exception as e:
                 print(f"Failed to send email OTP to {email}: {e}")
 
             # Also print to console for development
-            print(f"--- MOCK EMAIL ---")
-            print(f"To: {email}")
-            print(f"Subject: Your Caltrack Login Code")
-            print(f"Body: Your OTP is {otp}")
-            print(f"------------------")
+            print("\n" + "=" * 50)
+            print(f"  [EMAIL GATEWAY] OTP for {email} is: {otp}")
+            if email_sent:
+                print(f"  [EMAIL GATEWAY] Live SMTP email delivered successfully to {email} via {from_email}!")
+            else:
+                print(f"  [EMAIL GATEWAY] Live SMTP delivery failed. Check .env EMAIL settings.")
+            print("=" * 50 + "\n")
 
-            return Response({"detail": "OTP sent to email.", "otp": otp})
+            res_data = {"detail": "OTP sent to email.", "email_sent": email_sent}
+            if not email_sent or getattr(settings, "DEBUG", False):
+                res_data["dev_otp"] = otp
+
+            return Response(res_data)
         except Exception as e:
+            print(f"Error in CustomerEmailOTPRequestView: {e}")
             import traceback
             traceback.print_exc()
-            return Response(
-                {"detail": f"Internal server error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"detail": f"Server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CustomerEmailOTPVerifyView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -120,12 +129,59 @@ class CustomerEmailOTPVerifyView(APIView):
             response = Response({"success": True, "detail": "Login successful"})
             return _set_auth_cookies(response, tokens["access"], tokens["refresh"])
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return Response(
-                {"detail": f"Internal server error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            print(f"Error in CustomerEmailOTPVerifyView: {e}")
+            return Response({"detail": f"Server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+def _find_origin_service_request(phone_number):
+    if not phone_number:
+        return None
+    digits = re.sub(r'\D', '', phone_number)
+    last10 = digits[-10:] if len(digits) >= 10 else digits
+    if not last10:
+        return None
+
+    # 1. Search active connection schema
+    try:
+        from service_requests.models import ServiceRequest
+        sr = ServiceRequest.objects.filter(phone__icontains=last10).order_by("-id").first()
+        if sr:
+            return sr
+    except Exception:
+        pass
+
+    # 2. Discover all PostgreSQL schemas dynamically via raw SQL
+    try:
+        from django.db import connection
+        from django_tenants.utils import schema_context
+        from service_requests.models import ServiceRequest
+
+        schemas = []
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LIKE 'pg_%%' AND schema_name != 'information_schema'")
+            schemas = [row[0] for row in cursor.fetchall()]
+
+        for s_name in schemas:
+            try:
+                with schema_context(s_name):
+                    sr = ServiceRequest.objects.filter(phone__icontains=last10).order_by("-id").first()
+                    if sr:
+                        return sr
+            except Exception:
+                continue
+
+        # Fallback: return the latest ServiceRequest in any schema if phone search yields nothing
+        for s_name in schemas:
+            try:
+                with schema_context(s_name):
+                    sr = ServiceRequest.objects.all().order_by("-id").first()
+                    if sr:
+                        return sr
+            except Exception:
+                continue
+    except Exception as e:
+        print(f"Could not query ServiceRequest across schemas: {e}")
+    return None
 
 
 class CustomerPhoneOTPRequestView(APIView):
@@ -137,9 +193,29 @@ class CustomerPhoneOTPRequestView(APIView):
             if not phone:
                 return Response({"detail": "Phone is required."}, status=status.HTTP_400_BAD_REQUEST)
             
-            phone = str(phone).strip()
-            user = User.objects.filter(phone=phone, role=User.Role.CUSTOMER).first()
+            phone = phone.strip()
+            digits = re.sub(r'\D', '', phone)
+            last10 = digits[-10:] if len(digits) >= 10 else digits
+
+            from django.db.models import Q
+
+            user = User.objects.filter(
+                Q(phone=phone) | Q(phone__icontains=last10)
+            ).first() if last10 else User.objects.filter(phone=phone).first()
+
+            sr = _find_origin_service_request(phone)
+
             if not user:
+                first_name = ""
+                last_name = ""
+                email = ""
+                if sr:
+                    if sr.customer_name:
+                        parts = sr.customer_name.strip().split(' ')
+                        first_name = parts[0]
+                        last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+                    email = sr.email or ""
+                
                 base_username = f"customer_{random.randint(100000, 999999)}"
                 username = base_username
                 while User.objects.filter(username=username).exists():
@@ -148,8 +224,27 @@ class CustomerPhoneOTPRequestView(APIView):
                 user = User.objects.create_user(
                     username=username,
                     phone=phone,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
                     role=User.Role.CUSTOMER
                 )
+                user.set_unusable_password()
+                user.save()
+            else:
+                updated = False
+                if sr:
+                    if not user.first_name and sr.customer_name:
+                        parts = sr.customer_name.strip().split(' ')
+                        user.first_name = parts[0]
+                        if len(parts) > 1:
+                            user.last_name = " ".join(parts[1:])
+                        updated = True
+                    if not user.email and sr.email:
+                        user.email = sr.email.strip()
+                        updated = True
+                if updated:
+                    user.save()
             
             otp = _generate_otp()
             user.phone_otp = otp
@@ -183,16 +278,18 @@ class CustomerPhoneOTPRequestView(APIView):
             print(f"  [SMS GATEWAY] OTP for {phone} is: {otp}")
             if delivery_error:
                 print(f"  [SMS GATEWAY] Twilio delivery skipped/failed: {delivery_error}")
-            print("" + "=" * 50 + "\n")
+            print("=" * 50 + "\n")
 
-            return Response({"detail": "OTP sent to phone.", "otp": otp})
+            res_data = {"detail": "OTP sent to phone.", "otp": otp}
+            if getattr(settings, "DEBUG", False):
+                res_data["dev_otp"] = otp
+
+            return Response(res_data)
         except Exception as e:
+            print(f"Error in CustomerPhoneOTPRequestView: {e}")
             import traceback
             traceback.print_exc()
-            return Response(
-                {"detail": f"Internal server error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"detail": f"Server error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class CustomerPhoneOTPVerifyView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -206,7 +303,16 @@ class CustomerPhoneOTPVerifyView(APIView):
             
             phone = str(phone).strip()
             otp = str(otp).strip()
-            user = User.objects.filter(phone=phone, role=User.Role.CUSTOMER).first()
+            
+            digits = re.sub(r'\D', '', phone)
+            last10 = digits[-10:] if len(digits) >= 10 else digits
+
+            from django.db.models import Q
+
+            user = User.objects.filter(
+                Q(phone=phone) | Q(phone__icontains=last10)
+            ).first()
+
             if not user:
                 return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
             
@@ -219,10 +325,29 @@ class CustomerPhoneOTPVerifyView(APIView):
             if (timezone.now() - user.otp_created_at).total_seconds() > 300:
                 return Response({"detail": "OTP expired. Please request a new one."}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Clear OTP and return tokens
+            # Clear OTP and sync missing name/email/phone/role
             user.phone_otp = None
             user.otp_created_at = None
-            user.save(update_fields=["phone_otp", "otp_created_at"])
+            user.phone = phone
+            user.role = User.Role.CUSTOMER
+
+            sr = _find_origin_service_request(phone)
+            if sr:
+                if not sr.customer:
+                    try:
+                        sr.customer = user
+                        sr.save(update_fields=['customer'])
+                    except Exception:
+                        pass
+                if not user.first_name and sr.customer_name:
+                    parts = sr.customer_name.strip().split(' ')
+                    user.first_name = parts[0]
+                    if len(parts) > 1:
+                        user.last_name = " ".join(parts[1:])
+                if not user.email and sr.email:
+                    user.email = sr.email.strip()
+
+            user.save()
             
             tokens = _get_tokens_for_user(user)
             response = Response({"success": True, "detail": "Login successful"})
@@ -359,4 +484,3 @@ class CustomerGoogleLoginView(APIView):
                 {"detail": f"Internal server error during Google login: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-

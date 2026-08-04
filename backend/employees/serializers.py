@@ -22,7 +22,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(source='user.last_name', required=False, allow_blank=True)
     email = serializers.EmailField(source='user.email', required=False, allow_blank=True)
     role = serializers.CharField(source='user.role', required=False)
-    exempt_status = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    exempt_status = serializers.CharField(required=False, allow_null=True, allow_blank=True, default="non_exempt")
     job_site_name = serializers.SlugRelatedField(
         source='assigned_job_site',
         read_only=True,
@@ -154,15 +154,17 @@ class EmployeeSerializer(serializers.ModelSerializer):
                 return value
 
             if old_rate != new_rate:
+                from accounts.permissions import is_admin_role
                 is_superuser = request.user.is_superuser
+                is_company_admin = is_admin_role(request.user)
                 is_inviting_admin = (
                     self.instance.invited_by is None or
                     self.instance.invited_by == request.user or
                     (self.instance.invited_by and self.instance.invited_by.email == request.user.email)
                 )
-                if not (is_superuser or is_inviting_admin):
+                if not (is_superuser or is_company_admin or is_inviting_admin):
                     raise serializers.ValidationError(
-                        "Only the admin who invited/approved this employee can assign or modify their hourly rate."
+                        "Only company admins or the admin who invited this employee can assign or modify their hourly rate."
                     )
         return value
 

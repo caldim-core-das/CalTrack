@@ -255,6 +255,23 @@ export function AppShell() {
   const [cmdOpen, setCmdOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true)
   const [profileOpen, setProfileOpen] = useState(false)
+  const profileMenuRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+        setProfileOpen(false)
+      }
+    }
+    if (profileOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+      document.addEventListener("touchstart", handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+      document.removeEventListener("touchstart", handleClickOutside)
+    }
+  }, [profileOpen])
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const [localTime, setLocalTime] = useState(new Date())
   const [orgName, setOrgName] = useState(() => localStorage.getItem("quicktims.orgName") || "")
@@ -455,12 +472,14 @@ export function AppShell() {
   }, [dispatch])
 
   const isLiveTrackingPage = location.pathname === routes.live_locations
-  useWebSocket(isAdmin && !isLiveTrackingPage ? "/ws/live/admin/" : null, {
+  const isStaffOrAdmin = user && (user.role === 'admin' || user.role === 'owner' || user.role === 'manager' || user.role === 'employee' || user.role === 'tech' || user.is_staff)
+
+  useWebSocket(isAdmin && isStaffOrAdmin && !isLiveTrackingPage ? "/ws/live/admin/" : null, {
     onMessage: handleGlobalWsMessage,
   })
 
-  // Global presence socket connection
-  useWebSocket("/ws/live/presence/", {
+  // Global presence socket connection — staff/employees only
+  useWebSocket(isStaffOrAdmin ? "/ws/live/presence/" : null, {
     onMessage: (msg) => {
       if (msg.type === "presence_status_change") {
         window.dispatchEvent(new CustomEvent("quicktims:presenceStatusChange", { detail: msg.data }))
@@ -542,7 +561,7 @@ export function AppShell() {
 
           <div className="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
 
-          <div className="relative profileMenuWrap">
+          <div className="relative profileMenuWrap" ref={profileMenuRef}>
             <button
               className="flex items-center gap-3 p-1 rounded-2xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-300 group"
               type="button"

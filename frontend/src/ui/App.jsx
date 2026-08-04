@@ -163,6 +163,9 @@ const EmployeeJobsPage = lazy(() =>
 const EmployeeFeedbackPage = lazy(() =>
   import("./pages/EmployeeFeedbackPage.jsx").then(m => ({ default: m.EmployeeFeedbackPage }))
 )
+const CustomerDecisionPage = lazy(() =>
+  import("./pages/CustomerDecisionPage.jsx").then(m => ({ default: m.CustomerDecisionPage }))
+)
 
 // ─── Route Guards ────────────────────────────────────────────
 
@@ -331,6 +334,8 @@ export function App() {
 
           <Route path={routes.booking} element={<BookingPage />} />
           <Route path={routes.feedback} element={<FeedbackPage />} />
+          <Route path={routes.customer_work_extension} element={<CustomerDecisionPage />} />
+          <Route path="/customer/decision/:token" element={<CustomerDecisionPage />} />
 
           {/* ── Authenticated shell ── */}
           <Route

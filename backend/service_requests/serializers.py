@@ -10,6 +10,7 @@ from employees.models import Employee
 from .models import (
     EmployeeJob, EmployeePerformance, JobCompletionProof,
     ServiceFeedback, ServiceRequest, CatalogCategory, CatalogService,
+    WorkExtension, WorkExtensionItem, JobReschedule, SupplementalInvoice,
     RescheduleRequest, RescheduleAttachment, RescheduleStatus, RescheduleReason, TimeSlotChoices,
     RescheduleSuggestedSlot, RescheduleStatusHistory,
     RefundRequest, RefundEvidence, RefundInvestigationNote,
@@ -161,6 +162,13 @@ class ServiceRequestListSerializer(serializers.ModelSerializer):
     payment_method_display = serializers.CharField(source="get_payment_method_display", read_only=True)
     payment_status_display = serializers.CharField(source="get_payment_status_display", read_only=True)
     assigned_employee      = EmployeeMinimalSerializer(read_only=True)
+    start_otp              = serializers.SerializerMethodField()
+    task_status            = serializers.SerializerMethodField()
+    is_otp_verified        = serializers.SerializerMethodField()
+    active_extension       = serializers.SerializerMethodField()
+    extension_amount       = serializers.SerializerMethodField()
+    base_amount            = serializers.SerializerMethodField()
+    total_amount           = serializers.SerializerMethodField()
     latest_reschedule      = serializers.SerializerMethodField()
 
     def get_latest_reschedule(self, obj):
@@ -196,9 +204,150 @@ class ServiceRequestListSerializer(serializers.ModelSerializer):
             "status", "status_display", "priority", "priority_display",
             "payment_method", "payment_method_display",
             "payment_status", "payment_status_display",
-            "total_amount", "transaction_id", "invoice_id",
-            "assigned_employee", "latest_reschedule", "created_at", "updated_at",
+            "total_amount", "base_amount", "extension_amount", "transaction_id", "invoice_id",
+            "assigned_employee", "start_otp", "task_status", "is_otp_verified", "active_extension", "latest_reschedule", "created_at", "updated_at",
         )
+
+    def get_start_otp(self, obj):
+        try:
+            from tasks.models import Task
+            task = Task.objects.filter(service_request=obj).first()
+            if not task and obj.request_id:
+                task = Task.objects.filter(title__icontains=obj.request_id).first()
+            if task:
+                if not task.start_otp and not task.is_otp_verified:
+                    from tasks.services.otp_service import generate_and_send_job_otp
+                    return generate_and_send_job_otp(task)
+                return task.start_otp or ""
+        except Exception:
+            pass
+        return getattr(obj, "start_otp", "") or ""
+
+    def get_task_status(self, obj):
+        try:
+            from tasks.models import Task
+            task = Task.objects.filter(service_request=obj).first()
+            if not task and obj.request_id:
+                task = Task.objects.filter(title__icontains=obj.request_id).first()
+            if task:
+                return task.status
+        except Exception:
+            pass
+        return ""
+
+    def get_extension_amount(self, obj):
+        try:
+            from service_requests.models import WorkExtension
+            ext = obj.work_extensions.all().order_by("-id").first()
+            if ext:
+                amt = float(ext.admin_approved_amount or ext.technician_estimate or 0)
+                if amt > 0:
+                    return amt
+            from tasks.models import Task
+            t = Task.objects.filter(service_request=obj).first()
+            if t and getattr(t, "additional_amount", 0):
+                return float(t.additional_amount)
+        except Exception:
+            pass
+        return 0.0
+
+    def get_base_amount(self, obj):
+        try:
+            cart = obj.cart_data
+            if cart:
+                if isinstance(cart, str):
+                    import json
+                    cart = json.loads(cart)
+                if isinstance(cart, list) and len(cart) > 0:
+                    return sum(float(i.get("price", 0)) * int(i.get("quantity", 1)) for i in cart)
+        except Exception:
+            pass
+        return 599.0
+
+    def get_total_amount(self, obj):
+        base = self.get_base_amount(obj)
+        ext = self.get_extension_amount(obj)
+        return base + ext
+
+    def get_is_otp_verified(self, obj):
+        try:
+            from tasks.models import Task
+            task = Task.objects.filter(service_request=obj).first()
+            if not task and obj.request_id:
+                task = Task.objects.filter(title__icontains=obj.request_id).first()
+            if task:
+                return task.is_otp_verified
+        except Exception:
+            pass
+        return False
+
+    def get_active_extension(self, obj):
+        try:
+            from service_requests.models import WorkExtension
+            from tasks.models import Task
+            ext = obj.work_extensions.exclude(
+                status__in=[WorkExtension.Status.CUSTOMER_ACCEPTED, WorkExtension.Status.CUSTOMER_DECLINED, WorkExtension.Status.RESOLVED]
+            ).order_by("-id").first()
+
+            task = Task.objects.filter(service_request=obj).first()
+            if not task and obj.request_id:
+                task = Task.objects.filter(title__icontains=obj.request_id).first()
+
+            import re
+            suspend_reason = getattr(task, "suspend_reason", "") or ""
+            if not suspend_reason and ext:
+                suspend_reason = getattr(ext, "decision_notes", "") or ""
+
+            admin_amount = float(ext.admin_approved_amount or ext.technician_estimate or 0) if ext else 0.0
+            if admin_amount == 0 and ext and ext.items.exists():
+                admin_amount = sum(float(i.estimated_price or 0) for i in ext.items.all())
+
+            if admin_amount == 0 and suspend_reason:
+                match = re.search(r'(?:₹|Rs\.?|INR|\b)\s*(\d+(?:\.\d{1,2})?)', suspend_reason)
+                if match:
+                    try:
+                        admin_amount = float(match.group(1))
+                    except ValueError:
+                        pass
+
+            items_list = []
+            if ext and ext.items.exists():
+                for item in ext.items.all():
+                    items_list.append({
+                        "id": item.id,
+                        "title": item.title or suspend_reason or "Additional Service & Parts",
+                        "description": item.description or suspend_reason,
+                        "estimated_price": float(item.estimated_price or admin_amount or 0),
+                    })
+            elif suspend_reason or admin_amount > 0:
+                clean_title = suspend_reason
+                if "(" in clean_title:
+                    clean_title = clean_title.split("(")[0].strip()
+                if "Requires" in clean_title:
+                    clean_title = clean_title.split("Requires")[-1].strip()
+
+                items_list.append({
+                    "title": clean_title or suspend_reason or "Additional Service & Parts",
+                    "description": suspend_reason,
+                    "estimated_price": admin_amount
+                })
+
+            if ext or obj.status == "suspended" or (task and task.status == "suspended"):
+                return {
+                    "id": ext.id if ext else None,
+                    "status": ext.status if ext else "admin_approved",
+                    "status_display": ext.get_status_display() if ext else "Admin Approved",
+                    "reason": suspend_reason or "Technician identified additional repair scope or required replacement parts during site inspection.",
+                    "technician_estimate": float(ext.technician_estimate or admin_amount) if ext else admin_amount,
+                    "admin_approved_amount": admin_amount,
+                    "decision_token": str(ext.decision_token) if ext else "",
+                    "requires_specialist": ext.requires_specialist if ext else False,
+                    "required_skill": ext.required_skill if ext else "",
+                    "items": items_list,
+                }
+        except Exception:
+            pass
+        return None
 
 
 class ServiceFeedbackNestedSerializer(serializers.ModelSerializer):
@@ -228,6 +377,13 @@ class ServiceRequestDetailSerializer(serializers.ModelSerializer):
     has_feedback           = serializers.SerializerMethodField()
     feedback_token         = serializers.SerializerMethodField()
     feedback               = ServiceFeedbackNestedSerializer(read_only=True, allow_null=True)
+    start_otp              = serializers.SerializerMethodField()
+    task_status            = serializers.SerializerMethodField()
+    is_otp_verified        = serializers.SerializerMethodField()
+    active_extension       = serializers.SerializerMethodField()
+    extension_amount       = serializers.SerializerMethodField()
+    base_amount            = serializers.SerializerMethodField()
+    total_amount           = serializers.SerializerMethodField()
 
     def get_latest_reschedule(self, obj):
         rr = getattr(obj, "reschedule_requests", None)
@@ -259,16 +415,123 @@ class ServiceRequestDetailSerializer(serializers.ModelSerializer):
             "id", "request_id", "customer_name", "phone", "email",
             "service_category", "service_category_display",
             "issue_title", "description", "address", "preferred_date", "preferred_time",
-            "total_amount", "cart_data",
+            "total_amount", "base_amount", "extension_amount", "cart_data",
             "payment_method", "payment_method_display",
             "payment_status", "payment_status_display",
             "transaction_id", "payment_gateway",
             "payment_collected_by", "payment_collected_at", "invoice_id",
             "photo_url", "status", "status_display", "priority", "priority_display",
-            "assigned_employee", "latest_reschedule", "allowed_transitions",
+            "assigned_employee", "start_otp", "task_status", "is_otp_verified", "active_extension", "latest_reschedule", "allowed_transitions",
             "has_feedback", "feedback_token", "feedback",
             "created_at", "updated_at",
         )
+
+    def get_start_otp(self, obj):
+        try:
+            from tasks.models import Task
+            task = Task.objects.filter(service_request=obj).first()
+            if not task and obj.request_id:
+                task = Task.objects.filter(title__icontains=obj.request_id).first()
+            if task:
+                if not task.start_otp and not task.is_otp_verified:
+                    from tasks.services.otp_service import generate_and_send_job_otp
+                    return generate_and_send_job_otp(task)
+                return task.start_otp or ""
+        except Exception:
+            pass
+        return getattr(obj, "start_otp", "") or ""
+
+    def get_task_status(self, obj):
+        try:
+            from tasks.models import Task
+            task = Task.objects.filter(service_request=obj).first()
+            if not task and obj.request_id:
+                task = Task.objects.filter(title__icontains=obj.request_id).first()
+            if task:
+                return task.status
+        except Exception:
+            pass
+        return ""
+
+    def get_is_otp_verified(self, obj):
+        try:
+            from tasks.models import Task
+            task = Task.objects.filter(service_request=obj).first()
+            if not task and obj.request_id:
+                task = Task.objects.filter(title__icontains=obj.request_id).first()
+            if task:
+                return task.is_otp_verified
+        except Exception:
+            pass
+        return False
+
+    def get_active_extension(self, obj):
+        try:
+            from service_requests.models import WorkExtension
+            from tasks.models import Task
+            ext = obj.work_extensions.exclude(
+                status__in=[WorkExtension.Status.CUSTOMER_ACCEPTED, WorkExtension.Status.CUSTOMER_DECLINED, WorkExtension.Status.RESOLVED]
+            ).order_by("-id").first()
+
+            task = Task.objects.filter(service_request=obj).first()
+            if not task and obj.request_id:
+                task = Task.objects.filter(title__icontains=obj.request_id).first()
+
+            import re
+            suspend_reason = getattr(task, "suspend_reason", "") or ""
+            if not suspend_reason and ext:
+                suspend_reason = getattr(ext, "decision_notes", "") or ""
+
+            admin_amount = float(ext.admin_approved_amount or ext.technician_estimate or 0) if ext else 0.0
+            if admin_amount == 0 and ext and ext.items.exists():
+                admin_amount = sum(float(i.estimated_price or 0) for i in ext.items.all())
+
+            if admin_amount == 0 and suspend_reason:
+                match = re.search(r'(?:₹|Rs\.?|INR|\b)\s*(\d+(?:\.\d{1,2})?)', suspend_reason)
+                if match:
+                    try:
+                        admin_amount = float(match.group(1))
+                    except ValueError:
+                        pass
+
+            items_list = []
+            if ext and ext.items.exists():
+                for item in ext.items.all():
+                    items_list.append({
+                        "id": item.id,
+                        "title": item.title or suspend_reason or "Additional Service & Parts",
+                        "description": item.description or suspend_reason,
+                        "estimated_price": float(item.estimated_price or admin_amount or 0),
+                    })
+            elif suspend_reason or admin_amount > 0:
+                clean_title = suspend_reason
+                if "(" in clean_title:
+                    clean_title = clean_title.split("(")[0].strip()
+                if "Requires" in clean_title:
+                    clean_title = clean_title.split("Requires")[-1].strip()
+
+                items_list.append({
+                    "title": clean_title or suspend_reason or "Additional Service & Parts",
+                    "description": suspend_reason,
+                    "estimated_price": admin_amount
+                })
+
+            if ext or obj.status == "suspended" or (task and task.status == "suspended"):
+                return {
+                    "id": ext.id if ext else None,
+                    "status": ext.status if ext else "admin_approved",
+                    "status_display": ext.get_status_display() if ext else "Admin Approved",
+                    "reason": suspend_reason or "Technician identified additional repair scope or required replacement parts during site inspection.",
+                    "technician_estimate": float(ext.technician_estimate or admin_amount) if ext else admin_amount,
+                    "admin_approved_amount": admin_amount,
+                    "decision_token": str(ext.decision_token) if ext else "",
+                    "requires_specialist": ext.requires_specialist if ext else False,
+                    "required_skill": ext.required_skill if ext else "",
+                    "items": items_list,
+                }
+        except Exception:
+            pass
+        return None
 
     def get_payment_collected_by(self, obj):
         if obj.payment_collected_by:
@@ -301,6 +564,40 @@ class ServiceRequestDetailSerializer(serializers.ModelSerializer):
         except Exception:
             return None
 
+    def get_extension_amount(self, obj):
+        try:
+            from service_requests.models import WorkExtension
+            ext = obj.work_extensions.all().order_by("-id").first()
+            if ext:
+                amt = float(ext.admin_approved_amount or ext.technician_estimate or 0)
+                if amt > 0:
+                    return amt
+            from tasks.models import Task
+            t = Task.objects.filter(service_request=obj).first()
+            if t and getattr(t, "additional_amount", 0):
+                return float(t.additional_amount)
+        except Exception:
+            pass
+        return 0.0
+
+    def get_base_amount(self, obj):
+        try:
+            cart = obj.cart_data
+            if cart:
+                if isinstance(cart, str):
+                    import json
+                    cart = json.loads(cart)
+                if isinstance(cart, list) and len(cart) > 0:
+                    return sum(float(i.get("price", 0)) * int(i.get("quantity", 1)) for i in cart)
+        except Exception:
+            pass
+        return 599.0
+
+    def get_total_amount(self, obj):
+        base = self.get_base_amount(obj)
+        ext = self.get_extension_amount(obj)
+        return base + ext
+
 
 class AdminChangePrioritySerializer(serializers.Serializer):
     priority = serializers.ChoiceField(choices=ServiceRequest.Priority.choices)
@@ -315,9 +612,8 @@ class AdminAssignSerializer(serializers.Serializer):
         except Employee.DoesNotExist:
             raise serializers.ValidationError("Employee not found.")
             
-        if employee.user.role != "admin":
-            if not employee.hourly_rate or employee.hourly_rate <= 0:
-                raise serializers.ValidationError("This employee has not configured their hourly rate yet. Jobs cannot be assigned until a rate is set.")
+        if not employee.is_active:
+            raise serializers.ValidationError("This employee is inactive and cannot be assigned to jobs.")
         return value
 
 
@@ -430,7 +726,7 @@ class EmployeePerformanceSerializer(serializers.ModelSerializer):
             is_submitted=True
         ).filter(
             Q(service_request__assigned_employee=obj.employee) |
-            Q(service_request__employee_job__employee=obj.employee)
+            Q(service_request__employee_jobs__employee=obj.employee)
         ).select_related("service_request").order_by("-submitted_at")[:20]
         return [
             {
@@ -447,6 +743,72 @@ class EmployeePerformanceSerializer(serializers.ModelSerializer):
 
     def get_feedback_list(self, obj):
         return self.get_recent_feedback(obj)
+
+
+# ── Work Extension Ecosystem ──────────────────────────────────────────
+
+class WorkExtensionItemSerializer(serializers.ModelSerializer):
+    fulfillment_source_display = serializers.CharField(source="get_fulfillment_source_display", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = WorkExtensionItem
+        fields = (
+            "id", "extension", "inventory_item", "item_name", "quantity", "location",
+            "fulfillment_source", "fulfillment_source_display", "status", "status_display",
+            "billed_to_customer", "actual_cost", "technician_reimbursement_amount",
+            "technician_purchase_approved_limit", "purchase_approved_by", "purchase_receipt",
+            "verified_by_tech", "verification_notes", "warranty_covered", "created_at",
+        )
+        read_only_fields = ("id", "created_at")
+
+
+class WorkExtensionSerializer(serializers.ModelSerializer):
+    items = WorkExtensionItemSerializer(many=True, read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    reported_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = WorkExtension
+        fields = (
+            "id", "service_request", "job", "reported_by", "reported_by_name",
+            "requires_specialist", "required_skill", "status", "status_display",
+            "technician_estimate", "admin_approved_amount", "final_customer_amount",
+            "decision_token", "token_expires_at", "decision_channel", "decision_notes",
+            "decision_timestamp", "items", "created_at", "updated_at",
+        )
+        read_only_fields = ("id", "decision_token", "created_at", "updated_at")
+
+    def get_reported_by_name(self, obj):
+        if obj.reported_by and obj.reported_by.user:
+            return obj.reported_by.user.get_full_name() or obj.reported_by.user.username
+        return ""
+
+
+class JobRescheduleSerializer(serializers.ModelSerializer):
+    reason_display = serializers.CharField(source="get_reason_display", read_only=True)
+
+    class Meta:
+        model = JobReschedule
+        fields = (
+            "id", "job", "old_date", "new_date", "reason", "reason_display",
+            "notes", "changed_by", "customer_notified_at", "customer_confirmed_at",
+            "delay_count", "support_callback_created", "created_at",
+        )
+        read_only_fields = ("id", "created_at")
+
+
+class SupplementalInvoiceSerializer(serializers.ModelSerializer):
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = SupplementalInvoice
+        fields = (
+            "id", "service_request", "work_extension", "invoice_number",
+            "amount", "status", "status_display", "payment_method",
+            "transaction_id", "created_at", "paid_at",
+        )
+        read_only_fields = ("id", "created_at")
 
 
 # ── Reschedule ─────────────────────────────────────────────────────────────────

@@ -24,12 +24,14 @@ services:
     image: postgres:16-alpine
     container_name: caltrack_db
     restart: unless-stopped
+    env_file:
+      - backend/.env
     environment:
       POSTGRES_DB: ${DB_NAME:-caltrack}
       POSTGRES_USER: ${DB_USER:-caltrack_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-caltrack_pass}
     ports:
-      - "5432:5432"                  # accessible at localhost:5432
+      - "${DB_PORT:-5435}:5432"                  # accessible at host port 5435 (avoids local Postgres port 5432 conflict)
     volumes:
       - caltrack_pgdata:/var/lib/postgresql/data
     healthcheck:
