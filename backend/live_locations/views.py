@@ -241,14 +241,18 @@ def build_live_snapshot(company, user=None):
 
 class LiveLocationUpdateView(APIView):
     """Employee reports their live location (REST polling fallback)."""
-    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("live_location", "view")]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         try:
-            company = getattr(request, "company", None)
-            employee = Employee.objects.filter(user=request.user, company=company).first()
+            user = request.user
+            company = getattr(request, "company", None) or getattr(user, "company", None)
+            employee = getattr(user, "employee_profile", None) or Employee.objects.filter(user=user).first()
             if not employee:
-                return Response({"detail": "Employee profile not found."}, status=status.HTTP_404_NOT_FOUND)
+                return Response(
+                    {"status": "ignored", "detail": "Employee profile not found for live tracking."},
+                    status=status.HTTP_200_OK,
+                )
 
             time_log = (
                 TimeLog.objects.filter(employee=employee, clock_out__isnull=True)
@@ -258,15 +262,14 @@ class LiveLocationUpdateView(APIView):
             if not time_log:
                 from tasks.models import Task
                 has_accepted_task = Task.objects.filter(
-                    assigned_to=request.user,
-                    company=company,
+                    assigned_to=user,
                     acceptance_status=Task.AcceptanceStatus.ACCEPTED,
                     status__in=(Task.Status.PENDING, Task.Status.IN_PROGRESS),
                 ).exists()
                 if not has_accepted_task:
                     return Response(
-                        {"detail": "You must be clocked in or have an accepted task to report live location."},
-                        status=status.HTTP_400_BAD_REQUEST,
+                        {"status": "ignored", "detail": "Not clocked in and no active accepted task."},
+                        status=status.HTTP_200_OK,
                     )
 
             lat = request.data.get("lat")

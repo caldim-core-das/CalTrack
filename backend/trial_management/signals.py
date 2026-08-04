@@ -5,6 +5,9 @@ from companies.models import Company
 
 @receiver(post_save, sender=Company)
 def auto_activate_trial(sender, instance, created, **kwargs):
+    if kwargs.get('raw'):
+        return
+
     if created:
         if getattr(instance, '_skip_trial_activation', False):
             from trial_management.models import TrialPlan

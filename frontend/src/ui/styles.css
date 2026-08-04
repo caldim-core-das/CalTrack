@@ -66,7 +66,7 @@
 }
 
 
-/* â”€â”€â”€ Design Tokens â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Design Tokens ────────────────────────────────────────── */
 :root {
   /* Backgrounds */
   --bg: #F6F8FA;
@@ -167,7 +167,7 @@
   --shadow-md: 0 16px 48px rgba(0, 0, 0, 0.5);
 }
 
-/* â”€â”€â”€ Reset â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Reset ────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -308,7 +308,7 @@ h6 {
   }
 }
 
-/* â”€â”€â”€ App Shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── App Shell ──────────────────────────────────────────────── */
 .app {
   min-height: 100vh;
   display: grid;
@@ -321,7 +321,7 @@ h6 {
   --sidebar-w: 72px;
 }
 
-/* â”€â”€â”€ Topbar â€” Premium SaaS Glassmorphism â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Topbar — Premium SaaS Glassmorphism ───────────────────── */
 .topbar {
   grid-column: 1 / -1;
   display: grid;
@@ -446,7 +446,7 @@ h6 {
   justify-content: flex-end;
 }
 
-/* â”€â”€â”€ Brand / Logo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Brand / Logo ─────────────────────────────────────────── */
 .brand {
   display: flex;
   align-items: center;
@@ -581,7 +581,7 @@ h6 {
   font-family: var(--font);
 }
 
-/* â”€â”€â”€ Search Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Search Bar ───────────────────────────────────────────── */
 .topbar-search-btn {
   display: flex;
   align-items: center;
@@ -639,7 +639,7 @@ h6 {
   letter-spacing: 0.5px;
 }
 
-/* â”€â”€â”€ Clock Widget â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Clock Widget ─────────────────────────────────────────── */
 .topbarWidget {
   display: flex;
   align-items: center;
@@ -695,7 +695,7 @@ h6 {
   border-color: rgba(26, 86, 219, 0.35);
 }
 
-/* â”€â”€â”€ Actions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Actions ──────────────────────────────────────────────── */
 .topbarActions {
   display: flex;
   align-items: center;
@@ -709,7 +709,7 @@ h6 {
   margin: 0 6px;
 }
 
-/* â”€â”€â”€ User Profile Pill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── User Profile Pill ────────────────────────────────────── */
 .userProfilePill {
   display: flex;
   align-items: center;
@@ -1905,7 +1905,7 @@ h6 {
   opacity: 0.9;
 }
 
-/* â”€â”€â”€ Premium Slow-Flow Loop (5s cycle) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Premium Slow-Flow Loop (5s cycle) ─────────────────── */
 .is-animated .ctHourglassSvg {
   animation: ctHgFlip 5s cubic-bezier(0.85, 0, 0.15, 1) infinite;
 }
@@ -2060,7 +2060,7 @@ h6 {
   }
 }
 
-/* â”€â”€â”€ Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Layout ─────────────────────────────────────────────────── */
 .layout {
   grid-column: 1 / -1;
   display: grid;
@@ -2087,7 +2087,7 @@ h6 {
   }
 }
 
-/* â”€â”€â”€ Sidebar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Sidebar ────────────────────────────────────────────────── */
 .punchClockInBtn {
   width: 100%;
   padding: 18px;
@@ -2139,7 +2139,7 @@ h6 {
   justify-content: space-between;
 }
 
-/* â”€â”€â”€ Nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Nav ────────────────────────────────────────────────────── */
 .nav {
   padding: 0 8px;
   display: flex;
@@ -2367,7 +2367,7 @@ h6 {
   display: none;
 }
 
-/* â”€â”€â”€ Submenu Flyout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Submenu Flyout ────────────────────────────────────────── */
 .submenuFlyout {
   animation: flyoutFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -2424,7 +2424,7 @@ h6 {
   transform: scale(1.05);
 }
 
-/* â”€â”€â”€ Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Content ────────────────────────────────────────────────── */
 .content {
   padding: 24px;
   min-width: 0;
@@ -2437,7 +2437,7 @@ h6 {
   background: #0B1120;
 }
 
-/* â”€â”€â”€ Page Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Page Header ───────────────────────────────────────────── */
 .pageHeader {
   display: flex;
   align-items: flex-end;
@@ -2464,7 +2464,7 @@ h6 {
   animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
 }
 
-/* â”€â”€â”€ Stack Utilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Stack Utilities ───────────────────────────────────────── */
 .stack {
   display: grid;
   gap: 12px;
@@ -2499,7 +2499,7 @@ h6 {
   justify-content: flex-end;
 }
 
-/* â”€â”€â”€ Grid Layouts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Grid Layouts ──────────────────────────────────────────── */
 .grid2 {
   display: grid;
   gap: 16px;
@@ -2539,7 +2539,7 @@ h6 {
   }
 }
 
-/* â”€â”€â”€ Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Card ──────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -2578,7 +2578,7 @@ h6 {
   padding: 18px;
 }
 
-/* â”€â”€â”€ Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Buttons ───────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -2651,7 +2651,7 @@ h6 {
   box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
 }
 
-/* â”€â”€â”€ Form Elements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Form Elements ─────────────────────────────────────────── */
 .field {
   display: grid;
   gap: 6px;
@@ -2723,7 +2723,7 @@ h6 {
   border-color: var(--primary);
 }
 
-/* â”€â”€â”€ Pills / Badges â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Pills / Badges ─────────────────────────────────────────── */
 .pill {
   display: inline-flex;
   align-items: center;
@@ -2754,7 +2754,7 @@ h6 {
   color: var(--bad-text);
 }
 
-/* â”€â”€â”€ Utility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Utility ────────────────────────────────────────────────── */
 .muted {
   color: var(--muted);
 }
@@ -2776,7 +2776,7 @@ h6 {
   color: var(--bad-text);
 }
 
-/* â”€â”€â”€ Table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Table ──────────────────────────────────────────────────── */
 .table {
   display: grid;
   gap: 4px;
@@ -2811,7 +2811,7 @@ h6 {
   border-color: var(--stroke);
 }
 
-/* â”€â”€â”€ Metrics / Stats â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Metrics / Stats ────────────────────────────────────────── */
 .metric {
   display: grid;
   gap: 4px;
@@ -2860,7 +2860,7 @@ h6 {
   letter-spacing: -0.5px;
 }
 
-/* â”€â”€â”€ Settings Page Custom Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Settings Page Custom Styles ────────────────────────────── */
 .settingsPage {
   animation: fadeUp 0.4s ease both;
 }
@@ -3080,7 +3080,7 @@ h6 {
 
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   SETTINGS v2 â€” Horizontal Tab + Profile Card Design
+   SETTINGS v2 — Horizontal Tab + Profile Card Design
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 @keyframes stSpin {
@@ -3129,7 +3129,7 @@ h6 {
   }
 }
 
-/* â”€â”€ Page Shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Page Shell ─────────────────────────────────────────────── */
 .stPage {
   padding: 36px 40px 96px;
   max-width: 1200px;
@@ -3137,7 +3137,7 @@ h6 {
   animation: fadeUp .35s ease both;
 }
 
-/* â”€â”€ Breadcrumb â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Breadcrumb ─────────────────────────────────────────────── */
 .stBreadcrumb {
   display: flex;
   align-items: center;
@@ -3152,7 +3152,7 @@ h6 {
   font-weight: 600;
 }
 
-/* â”€â”€ Top Row: title + tab bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Top Row: title + tab bar ───────────────────────────────── */
 .stTopRow {
   display: flex;
   align-items: center;
@@ -3173,7 +3173,7 @@ h6 {
   padding-bottom: 20px;
 }
 
-/* â”€â”€ Tab Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Tab Bar ────────────────────────────────────────────────── */
 .stTabBar {
   display: flex;
   gap: 0;
@@ -3219,7 +3219,7 @@ h6 {
   font-weight: 700;
 }
 
-/* â”€â”€ Tab Hover Dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Tab Hover Dropdown ─────────────────────────────────────── */
 .stTabDropdown {
   position: absolute;
   top: calc(100% + 6px);
@@ -3280,7 +3280,7 @@ h6 {
   color: #1A56DB;
 }
 
-/* â”€â”€ Body Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Body Layout ────────────────────────────────────────────── */
 .stBody {
   display: grid;
   grid-template-columns: 240px 1fr;
@@ -3294,7 +3294,7 @@ h6 {
   }
 }
 
-/* â”€â”€ Left Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Left Card ──────────────────────────────────────────────── */
 .stLeftCard {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -3421,7 +3421,7 @@ h6 {
   color: #1A56DB;
 }
 
-/* â”€â”€ Main Content Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Main Content Panel ──────────────────────────────────────── */
 .stMain {
   display: flex;
   flex-direction: column;
@@ -3454,7 +3454,7 @@ h6 {
   color: var(--muted);
 }
 
-/* â”€â”€ Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Card ────────────────────────────────────────────────────── */
 .stCard {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -3476,7 +3476,7 @@ h6 {
   border-top: 1px solid var(--stroke);
 }
 
-/* â”€â”€ Form grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Form grid ───────────────────────────────────────────────── */
 .stFormGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3500,7 +3500,7 @@ h6 {
   letter-spacing: .1px;
 }
 
-/* â”€â”€ Inputs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Inputs ───────────────────────────────────────────────────── */
 .stInput {
   width: 100%;
   padding: 10px 12px;
@@ -3624,7 +3624,7 @@ h6 {
   letter-spacing: -.3px;
 }
 
-/* â”€â”€ Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Buttons ─────────────────────────────────────────────────── */
 .stPrimaryBtn {
   display: inline-flex;
   align-items: center;
@@ -3701,7 +3701,7 @@ h6 {
   background: #FEE2E2;
 }
 
-/* â”€â”€ Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Toggle ──────────────────────────────────────────────────── */
 .stToggle {
   width: 44px;
   height: 24px;
@@ -3753,7 +3753,7 @@ h6 {
   line-height: 1.45;
 }
 
-/* â”€â”€ Logo section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Logo section ────────────────────────────────────────────── */
 .stLogoGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3861,7 +3861,7 @@ h6 {
   color: var(--muted);
 }
 
-/* â”€â”€ Locale preview â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Locale preview ──────────────────────────────────────────── */
 .stLocalePreview {
   margin-top: 20px;
   padding: 14px 18px;
@@ -3900,7 +3900,7 @@ h6 {
   color: var(--fg);
 }
 
-/* â”€â”€ Pace slider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Pace slider ─────────────────────────────────────────────── */
 .stPaceScaleLabels {
   display: flex;
   justify-content: space-between;
@@ -3958,7 +3958,7 @@ h6 {
   line-height: 1.5;
 }
 
-/* â”€â”€ Notification table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Notification table ──────────────────────────────────────── */
 .stNotifTable {
   border-radius: 14px;
   overflow: hidden;
@@ -4042,7 +4042,7 @@ h6 {
   transform: scale(1.1);
 }
 
-/* â”€â”€ Activity / Timeline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Activity / Timeline ─────────────────────────────────────── */
 .stLogFilters {
   display: flex;
   gap: 8px;
@@ -4157,7 +4157,7 @@ h6 {
   color: var(--muted);
 }
 
-/* â”€â”€ Users / Roles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Users / Roles ───────────────────────────────────────────── */
 .stRolesLayout {
   display: flex;
   gap: 20px;
@@ -4251,7 +4251,7 @@ h6 {
   background: var(--surface2);
 }
 
-/* â”€â”€ Plans â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Plans ───────────────────────────────────────────────────── */
 .stPlanGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -4398,7 +4398,7 @@ h6 {
   border-color: var(--fg);
 }
 
-/* â”€â”€ Security sessions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Security sessions ───────────────────────────────────────── */
 .stSessionRow {
   display: flex;
   align-items: center;
@@ -4437,7 +4437,7 @@ h6 {
   color: #059669;
 }
 
-/* â”€â”€ Save Bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Save Bar ────────────────────────────────────────────────── */
 .stSaveBar {
   position: fixed;
   bottom: 28px;
@@ -4501,7 +4501,7 @@ h6 {
   cursor: not-allowed;
 }
 
-/* â”€â”€ Toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Toast ───────────────────────────────────────────────────── */
 .stToast {
   position: fixed;
   top: 80px;
@@ -4553,7 +4553,7 @@ h6 {
   background: var(--surface2);
 }
 
-/* â”€â”€ Coming soon â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Coming soon ─────────────────────────────────────────────── */
 .stComingSoon {
   display: flex;
   flex-direction: column;
@@ -5597,7 +5597,7 @@ h6 {
 
 
 
-/* â”€â”€â”€ Dock (Dashboard quick actions) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Dock (Dashboard quick actions) ───────────────────────── */
 .dock {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5632,7 +5632,7 @@ h6 {
   color: var(--fg2);
 }
 
-/* â”€â”€â”€ Auth Pages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Auth Pages ─────────────────────────────────────────────── */
 .auth {
   min-height: 100vh;
   display: flex;
@@ -5698,7 +5698,7 @@ h6 {
   line-height: 1.5;
 }
 
-/* â”€â”€â”€ Offline Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Offline Badge ──────────────────────────────────────────── */
 .offlineBadge {
   display: inline-flex;
   align-items: center;
@@ -5712,7 +5712,7 @@ h6 {
   font-weight: 600;
 }
 
-/* â”€â”€â”€ Theme Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Theme Toggle ───────────────────────────────────────────── */
 .themeToggle {
   width: 34px;
   height: 34px;
@@ -5734,7 +5734,7 @@ h6 {
   border-color: var(--stroke2);
 }
 
-/* â”€â”€â”€ Scrollbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Scrollbar ──────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -5753,7 +5753,7 @@ h6 {
   background: var(--muted);
 }
 
-/* â”€â”€â”€ Status / Time Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Status / Time Page ─────────────────────────────────────── */
 .statusHeader {
   display: flex;
   justify-content: space-between;
@@ -5811,7 +5811,7 @@ h6 {
   letter-spacing: 0.3px;
 }
 
-/* â”€â”€â”€ GPS Accuracy Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── GPS Accuracy Badge ─────────────────────────────────────── */
 .accuracyBadge {
   display: inline-flex;
   align-items: center;
@@ -5850,7 +5850,7 @@ h6 {
   }
 }
 
-/* â”€â”€â”€ Address / Log display â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Address / Log display ──────────────────────────────────── */
 .addressText {
   font-size: 11.5px;
   color: var(--muted);
@@ -5909,7 +5909,7 @@ h6 {
   border-color: var(--primary);
 }
 
-/* â”€â”€â”€ Geolocation Tags â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Geolocation Tags ────────────────────────────────────────── */
 .locationTag {
   font-size: 11px;
   color: var(--primary);
@@ -5936,7 +5936,7 @@ h6 {
   opacity: 1;
 }
 
-/* â”€â”€â”€ Sparkle / Success animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Sparkle / Success animation ───────────────────────────── */
 .sparkle-container {
   position: fixed;
   inset: 0;
@@ -5962,7 +5962,7 @@ h6 {
   }
 }
 
-/* â”€â”€â”€ Particles canvas (hidden in clean theme) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Particles canvas (hidden in clean theme) ───────────────── */
 .particles-canvas {
   display: none;
 }
@@ -5971,7 +5971,7 @@ h6 {
   display: none;
 }
 
-/* â”€â”€â”€ Dark Mode (data-theme="dark") â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Dark Mode (data-theme="dark") ─────────────────────────── */
 :root[data-theme="dark"] {
   --bg: #0F1117;
   --bg2: #161B27;
@@ -6065,7 +6065,7 @@ h6 {
   overflow: hidden;
 }
 
-/* â”€â”€ Status bar â”€â”€ */
+/* ── Status bar ── */
 .punchStatus {
   display: flex;
   align-items: center;
@@ -6122,7 +6122,7 @@ h6 {
   }
 }
 
-/* â”€â”€ Location strip â”€â”€ */
+/* ── Location strip ── */
 .punchLocation {
   display: flex;
   align-items: center;
@@ -6158,12 +6158,12 @@ h6 {
   margin-top: 2px;
 }
 
-/* â”€â”€ Body â”€â”€ */
+/* ── Body ── */
 .punchBody {
   padding: 20px;
 }
 
-/* â”€â”€ Stats row (when clocked in) â”€â”€ */
+/* ── Stats row (when clocked in) ── */
 .punchStats {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -6177,7 +6177,7 @@ h6 {
   padding: 10px 14px;
 }
 
-/* â”€â”€ Field row â”€â”€ */
+/* ── Field row ── */
 .punchField {
   display: grid;
   gap: 5px;
@@ -6202,7 +6202,7 @@ h6 {
   border: 1px solid rgba(217, 119, 6, 0.2);
 }
 
-/* â”€â”€ File input â”€â”€ */
+/* ── File input ── */
 .punchFileLabel {
   display: block;
   cursor: pointer;
@@ -6227,7 +6227,7 @@ h6 {
   color: var(--primary);
 }
 
-/* â”€â”€ Selfie row â”€â”€ */
+/* ── Selfie row ── */
 .punchSelfieRow {
   display: flex;
   align-items: center;
@@ -6300,7 +6300,7 @@ h6 {
   border-radius: 3px;
 }
 
-/* â”€â”€ Actions â”€â”€ */
+/* ── Actions ── */
 .punchActions {
   display: flex;
   gap: 10px;
@@ -6439,7 +6439,7 @@ h6 {
   margin-top: 2px;
 }
 
-/* â”€â”€ Ring â”€â”€ */
+/* ── Ring ── */
 .selfieRingWrap {
   position: relative;
   width: 240px;
@@ -6472,7 +6472,7 @@ h6 {
   stroke-width: 4.5;
   stroke-linecap: round;
   stroke-dasharray: 679;
-  /* full circumference â‰ˆ 2Ï€Ã—108 */
+  /* full circumference â‰ˆ 2Ï€×108 */
   stroke-dashoffset: 679;
   /* start hidden */
   transition: stroke-dashoffset 0.4s ease;
@@ -6541,9 +6541,9 @@ h6 {
   text-align: center;
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ───────────────────────────────────────────────────────────────
    PREMIUM TIME TRACKER UI
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+─────────────────────────────────────────────────────────────── */
 
 .timePageLayout {
   max-width: 1200px;
@@ -6776,9 +6776,9 @@ h6 {
   background: var(--surface2);
 }
 
-/* â”€â”€â”€ Selfie corner avatar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─── Selfie corner avatar ────────────────────────────────────
    Floating circular selfie in top-right corner of punch card.
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+─────────────────────────────────────────────────────────────── */
 .selfieCorner {
   position: absolute;
   top: 14px;
@@ -6830,9 +6830,9 @@ h6 {
   position: relative;
 }
 
-/* â”€â”€â”€ Retake chip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─── Retake chip ─────────────────────────────────────────────
    Shown in the selfie row after capture instead of the thumbnail.
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+─────────────────────────────────────────────────────────────── */
 .punchSelfieRetakeChip {
   display: inline-flex;
   align-items: center;
@@ -6859,7 +6859,7 @@ h6 {
    TASK MANAGEMENT
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* â”€â”€ Admin layout â”€â”€ */
+/* ── Admin layout ── */
 .adminTaskLayout {
   display: grid;
   grid-template-columns: 340px 1fr;
@@ -6873,7 +6873,7 @@ h6 {
   }
 }
 
-/* â”€â”€ Assign panel â”€â”€ */
+/* ── Assign panel ── */
 .assignPanel {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -6920,7 +6920,7 @@ h6 {
   padding: 16px 18px;
 }
 
-/* â”€â”€ Filter row â”€â”€ */
+/* ── Filter row ── */
 .taskFilterRow {
   display: flex;
   gap: 6px;
@@ -6968,14 +6968,14 @@ h6 {
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* â”€â”€ Task grid â”€â”€ */
+/* ── Task grid ── */
 .taskGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 14px;
 }
 
-/* â”€â”€ Task card â”€â”€ */
+/* ── Task card ── */
 .taskCard {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -7127,7 +7127,7 @@ h6 {
   font-weight: 500;
 }
 
-/* â”€â”€ Delete button in admin table â”€â”€ */
+/* ── Delete button in admin table ── */
 .taskDeleteBtn {
   background: none;
   border: 1px solid transparent;
@@ -7143,7 +7143,7 @@ h6 {
   border-color: rgba(220, 38, 38, 0.2);
 }
 
-/* â”€â”€ Tab row (admin) â”€â”€ */
+/* ── Tab row (admin) ── */
 .taskTabRow {
   display: flex;
   gap: 6px;
@@ -7170,7 +7170,7 @@ h6 {
   font-weight: 600;
 }
 
-/* â”€â”€ Empty state â”€â”€ */
+/* ── Empty state ── */
 .taskEmpty {
   display: flex;
   flex-direction: column;
@@ -7199,7 +7199,7 @@ h6 {
 
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   QuickTIMS â€” Jibble-style Login Page
+   QuickTIMS — Jibble-style Login Page
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 /* Root layout: two-column full-page split */
@@ -7210,7 +7210,7 @@ h6 {
   font-family: var(--font);
 }
 
-/* â”€â”€ LEFT PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── LEFT PANEL ─────────────────────────────────────────────── */
 .qt-left-panel {
   background: #ffffff;
   display: flex;
@@ -7294,7 +7294,7 @@ h6 {
   white-space: nowrap;
 }
 
-/* â”€â”€ Review Carousel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Review Carousel ────────────────────────────────────────── */
 .qt-review-wrap {
   background: #FAFAFA;
   border: 1px solid #E5E7EB;
@@ -7413,7 +7413,7 @@ h6 {
   color: #4F46E5;
 }
 
-/* â”€â”€ RIGHT PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── RIGHT PANEL ─────────────────────────────────────────────── */
 .qt-right-panel {
   background: #ffffff;
   display: flex;
@@ -7497,7 +7497,7 @@ h6 {
   background: #E5E7EB;
 }
 
-/* â”€â”€ FORM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── FORM ────────────────────────────────────────────────────── */
 .qt-form {
   display: flex;
   flex-direction: column;
@@ -7666,7 +7666,7 @@ h6 {
   color: #7C3AED;
 }
 
-/* â”€â”€ reCAPTCHA box â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── reCAPTCHA box ──────────────────────────────────────────── */
 .qt-captcha-box {
   display: flex;
   align-items: center;
@@ -7784,7 +7784,7 @@ h6 {
   color: #6B7280;
 }
 
-/* â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Responsive ──────────────────────────────────────────────── */
 @media (max-width: 900px) {
   .qt-login-root {
     grid-template-columns: 1fr;
@@ -7805,7 +7805,7 @@ h6 {
   }
 }
 
-/* â”€â”€ Mode toggle (Sign In / Create Account) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Mode toggle (Sign In / Create Account) ─────────────────── */
 .qt-mode-toggle {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -7865,7 +7865,7 @@ h6 {
   overflow: hidden;
 }
 
-/* â”€â”€ Break Logs â”€â”€ */
+/* ── Break Logs ── */
 .breakLogsSection {
   margin-top: 16px;
   background: var(--bg2);
@@ -7965,9 +7965,9 @@ h6 {
   }
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ───────────────────────────────────────────────────────────────
    PREMIUM TIME TRACKER UI
-â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+─────────────────────────────────────────────────────────────── */
 .verifIcon {
   border-radius: 12px;
   display: flex;
@@ -8313,7 +8313,7 @@ h6 {
   background: rgba(255, 255, 255, 0.02);
 }
 
-/* â”€â”€â”€ CAPSULE UI EXTENSIONS â”€â”€â”€ */
+/* ─── CAPSULE UI EXTENSIONS ─── */
 .centeredActionCard {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -8594,7 +8594,7 @@ h6 {
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   TIME PAGE â€” PREMIUM REDESIGN (tp-*)
+   TIME PAGE — PREMIUM REDESIGN (tp-*)
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 /* Spin animation for loader */
@@ -8608,7 +8608,7 @@ h6 {
   animation: tp-spin 0.8s linear infinite;
 }
 
-/* â”€â”€ Layout â”€â”€ */
+/* ── Layout ── */
 .tp-layout {
   max-width: 1400px;
   width: 100%;
@@ -8620,7 +8620,7 @@ h6 {
   animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* â”€â”€ Content Grid (Employee) â”€â”€ */
+/* ── Content Grid (Employee) ── */
 .tp-content-grid {
   display: grid;
   grid-template-columns: 1.8fr 1.2fr;
@@ -8634,7 +8634,7 @@ h6 {
   }
 }
 
-/* â”€â”€ Page header â”€â”€ */
+/* ── Page header ── */
 .tp-header {
   grid-column: 1 / -1;
   display: flex;
@@ -8671,7 +8671,7 @@ h6 {
   padding-top: 4px;
 }
 
-/* â”€â”€ Shared card â”€â”€ */
+/* ── Shared card ── */
 .tp-card {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -8680,7 +8680,7 @@ h6 {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
 
-/* â”€â”€ Status Card â”€â”€ */
+/* ── Status Card ── */
 .tp-status-card {
   margin-bottom: 12px;
 }
@@ -8774,7 +8774,7 @@ h6 {
   border-radius: 20px;
 }
 
-/* â”€â”€ Action Card â”€â”€ */
+/* ── Action Card ── */
 .tp-action-card {
   margin-bottom: 36px;
 }
@@ -8825,7 +8825,7 @@ h6 {
   color: var(--fg);
 }
 
-/* â”€â”€ Selfie row â”€â”€ */
+/* ── Selfie row ── */
 .tp-selfie-row {
   display: flex;
   align-items: center;
@@ -8899,7 +8899,7 @@ h6 {
   color: #6366F1;
 }
 
-/* â”€â”€ Form field â”€â”€ */
+/* ── Form field ── */
 .tp-field {
   display: flex;
   flex-direction: column;
@@ -8940,7 +8940,7 @@ h6 {
   color: var(--subtle);
 }
 
-/* â”€â”€ Attachment â”€â”€ */
+/* ── Attachment ── */
 .tp-attach-wrap {
   display: flex;
   flex-direction: column;
@@ -8987,7 +8987,7 @@ h6 {
   color: #6366F1;
 }
 
-/* â”€â”€ Clock In Button â”€â”€ */
+/* ── Clock In Button ── */
 .tp-clock-in-btn {
   width: 100%;
   padding: 15px;
@@ -9020,7 +9020,7 @@ h6 {
   cursor: not-allowed;
 }
 
-/* â”€â”€ Action buttons (clocked-in) â”€â”€ */
+/* ── Action buttons (clocked-in) ── */
 .tp-actions {
   display: flex;
   gap: 10px;
@@ -9073,7 +9073,7 @@ h6 {
   background: #FEE2E2;
 }
 
-/* â”€â”€ Error box â”€â”€ */
+/* ── Error box ── */
 .tp-error {
   margin-bottom: 14px;
   padding: 10px 14px;
@@ -9084,7 +9084,7 @@ h6 {
   color: #B91C1C;
 }
 
-/* â”€â”€ Recent Logs section â”€â”€ */
+/* ── Recent Logs section ── */
 .tp-logs {
   display: flex;
   flex-direction: column;
@@ -9138,7 +9138,7 @@ h6 {
   color: var(--fg);
 }
 
-/* â”€â”€ Logs table â”€â”€ */
+/* ── Logs table ── */
 .tp-table-wrap {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -9241,7 +9241,7 @@ h6 {
   font-size: 13px;
 }
 
-/* â”€â”€ Dark mode â”€â”€ */
+/* ── Dark mode ── */
 :root[data-theme='dark'] .tp-card {
   background: var(--surface);
 }
@@ -9317,10 +9317,10 @@ h6 {
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   TIME PAGE â€” PRO ENHANCEMENTS
+   TIME PAGE — PRO ENHANCEMENTS
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* â”€â”€ Skeleton loader â”€â”€ */
+/* ── Skeleton loader ── */
 @keyframes shimmer {
   0% {
     background-position: -400px 0;
@@ -9337,7 +9337,7 @@ h6 {
   animation: shimmer 1.4s infinite;
 }
 
-/* â”€â”€ Live clock in header â”€â”€ */
+/* ── Live clock in header ── */
 .tp-header-right {
   display: flex;
   flex-direction: column;
@@ -9366,7 +9366,7 @@ h6 {
   color: #A5B4FC;
 }
 
-/* â”€â”€ GPS accuracy badge states â”€â”€ */
+/* ── GPS accuracy badge states ── */
 .tp-accuracy {
   display: flex;
   align-items: center;
@@ -9416,7 +9416,7 @@ h6 {
   color: #F87171;
 }
 
-/* â”€â”€ Today's progress bar â”€â”€ */
+/* ── Today's progress bar ── */
 .tp-progress-wrap {
   padding: 12px 20px 14px;
   border-top: 1px solid var(--stroke);
@@ -9448,7 +9448,7 @@ h6 {
   transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* â”€â”€ Weekly stats row â”€â”€ */
+/* ── Weekly stats row ── */
 .tp-stats-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -9510,7 +9510,7 @@ h6 {
   background: var(--surface);
 }
 
-/* â”€â”€ Clocked-in: 3-col meta â”€â”€ */
+/* ── Clocked-in: 3-col meta ── */
 .tp-clocked-meta {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -9522,7 +9522,7 @@ h6 {
   font-family: "SF Mono", "Fira Code", monospace;
 }
 
-/* â”€â”€ Break banner â”€â”€ */
+/* ── Break banner ── */
 .tp-break-banner {
   display: flex;
   align-items: center;
@@ -9542,7 +9542,7 @@ h6 {
   color: #FCD34D;
 }
 
-/* â”€â”€ GPS hints â”€â”€ */
+/* ── GPS hints ── */
 .tp-gps-hint {
   display: flex;
   align-items: center;
@@ -9562,7 +9562,7 @@ h6 {
   color: #B91C1C;
 }
 
-/* â”€â”€ Selfie captured state â”€â”€ */
+/* ── Selfie captured state ── */
 .tp-open-camera-btn--done {
   border-color: #10B981;
   color: #059669;
@@ -9575,7 +9575,7 @@ h6 {
   color: #065F46;
 }
 
-/* â”€â”€ Logs subtitle â”€â”€ */
+/* ── Logs subtitle ── */
 .tp-logs-subtitle {
   font-size: 12px;
   color: var(--muted);
@@ -9583,7 +9583,7 @@ h6 {
   font-weight: 500;
 }
 
-/* â”€â”€ Live session in logs table â”€â”€ */
+/* ── Live session in logs table ── */
 .tp-pending-badge {
   display: inline-flex;
   align-items: center;
@@ -9600,7 +9600,7 @@ h6 {
   animation: pulseOpacity 1.5s ease-in-out infinite;
 }
 
-/* â”€â”€ Responsive â”€â”€ */
+/* ── Responsive ── */
 @media (max-width: 700px) {
   .tp-status-row {
     flex-wrap: wrap;
@@ -9636,7 +9636,7 @@ h6 {
   }
 }
 
-/* â”€â”€ Employee badge (header) â”€â”€ */
+/* ── Employee badge (header) ── */
 .tp-employee-badge {
   display: flex;
   align-items: center;
@@ -9688,7 +9688,7 @@ h6 {
   border-color: var(--stroke2);
 }
 
-/* â”€â”€ Live break panel â”€â”€ */
+/* ── Live break panel ── */
 .tp-break-panel {
   border: 1.5px solid #FDE68A;
   background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
@@ -9755,7 +9755,7 @@ h6 {
   background: rgba(217, 119, 6, 0.15);
 }
 
-/* â”€â”€ Break history panel â”€â”€ */
+/* ── Break history panel ── */
 .tp-break-history {
   background: var(--surface2);
   border: 1px solid var(--stroke);
@@ -9842,7 +9842,7 @@ h6 {
   color: #FCD34D;
 }
 
-/* â”€â”€ Date filter row â”€â”€ */
+/* ── Date filter row ── */
 .tp-date-filter {
   display: flex;
   align-items: center;
@@ -9929,7 +9929,7 @@ h6 {
   background: rgba(99, 102, 241, 0.12);
 }
 
-/* â”€â”€ Employee name cell in table â”€â”€ */
+/* ── Employee name cell in table ── */
 .tp-emp-cell {
   display: flex;
   align-items: center;
@@ -9967,7 +9967,7 @@ h6 {
    ADMIN TIME DASHBOARD
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* â”€â”€ Stat card pulse indicator â”€â”€ */
+/* ── Stat card pulse indicator ── */
 .tp-stat-icon {
   position: relative;
 }
@@ -9983,7 +9983,7 @@ h6 {
   animation: punchPulse 1.5s ease-in-out infinite;
 }
 
-/* â”€â”€ Admin badge in header â”€â”€ */
+/* ── Admin badge in header ── */
 .tp-emp-badge-admin {
   display: flex;
   align-items: center;
@@ -9994,7 +9994,7 @@ h6 {
   padding: 5px 14px 5px 5px;
 }
 
-/* â”€â”€ Live section â”€â”€ */
+/* ── Live section ── */
 .adm-live-section {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -10041,7 +10041,7 @@ h6 {
   color: #34D399;
 }
 
-/* â”€â”€ Employee status grid â”€â”€ */
+/* ── Employee status grid ── */
 .adm-emp-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -10126,7 +10126,7 @@ h6 {
   font-weight: 600;
 }
 
-/* â”€â”€ Filters row â”€â”€ */
+/* ── Filters row ── */
 .adm-filters-row {
   display: flex;
   align-items: center;
@@ -10137,7 +10137,7 @@ h6 {
   border-bottom: 1px solid var(--stroke);
 }
 
-/* â”€â”€ Employee dropdown â”€â”€ */
+/* ── Employee dropdown ── */
 .adm-select-wrap {
   display: flex;
   align-items: center;
@@ -10167,7 +10167,7 @@ h6 {
   background: var(--surface2);
 }
 
-/* â”€â”€ Status tabs â”€â”€ */
+/* ── Status tabs ── */
 .adm-status-tabs {
   display: flex;
   gap: 4px;
@@ -10204,7 +10204,7 @@ h6 {
   background: var(--surface2);
 }
 
-/* â”€â”€ Search â”€â”€ */
+/* ── Search ── */
 .adm-search-wrap {
   display: flex;
   align-items: center;
@@ -10233,7 +10233,7 @@ h6 {
   background: var(--surface2);
 }
 
-/* â”€â”€ Logs refresh button â”€â”€ */
+/* ── Logs refresh button ── */
 .tp-logs-refresh {
   display: flex;
   align-items: center;
@@ -10253,7 +10253,7 @@ h6 {
   color: #6366F1;
 }
 
-/* â”€â”€ Sortable column headers â”€â”€ */
+/* ── Sortable column headers ── */
 .adm-table th {
   cursor: default;
 }
@@ -10267,7 +10267,7 @@ h6 {
   color: #6366F1;
 }
 
-/* â”€â”€ Live row highlight â”€â”€ */
+/* ── Live row highlight ── */
 .adm-row-live {
   background: rgba(16, 185, 129, 0.04);
 }
@@ -10276,7 +10276,7 @@ h6 {
   background: rgba(16, 185, 129, 0.07);
 }
 
-/* â”€â”€ Break cell in admin table â”€â”€ */
+/* ── Break cell in admin table ── */
 .adm-break-cell {
   display: flex;
   align-items: center;
@@ -10312,7 +10312,7 @@ h6 {
   color: #FCD34D;
 }
 
-/* â”€â”€ Responsive â”€â”€ */
+/* ── Responsive ── */
 @media (max-width: 768px) {
   .adm-emp-grid {
     grid-template-columns: 1fr 1fr;
@@ -10338,7 +10338,7 @@ h6 {
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   DASHBOARD â€” PROFESSIONAL UPGRADE
+   DASHBOARD — PROFESSIONAL UPGRADE
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .dash-layout {
   max-width: 1400px;
@@ -10523,14 +10523,14 @@ h6 {
   font-weight: 500;
 }
 
-/* â”€â”€ Content Split â”€â”€ */
+/* ── Content Split ── */
 .dash-content-grid {
   display: grid;
   grid-template-columns: 1.25fr 1fr;
   gap: 24px;
 }
 
-/* â”€â”€ Panel Box â”€â”€ */
+/* ── Panel Box ── */
 .dash-panel {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -10939,7 +10939,7 @@ h6 {
   font-weight: 600;
 }
 
-/* â”€â”€ List Items (Payroll, Next Shift) â”€â”€ */
+/* ── List Items (Payroll, Next Shift) ── */
 .dash-list-item {
   display: flex;
   align-items: center;
@@ -10991,7 +10991,7 @@ h6 {
   text-align: right;
 }
 
-/* â”€â”€ Admin Mini Overview â”€â”€ */
+/* ── Admin Mini Overview ── */
 .dash-admin-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -11019,7 +11019,7 @@ h6 {
   margin-top: 4px;
 }
 
-/* â”€â”€ Responsive â”€â”€ */
+/* ── Responsive ── */
 @media (max-width: 1024px) {
   .dash-stats-grid {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -11041,7 +11041,7 @@ h6 {
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   TASKS MODULE â€” PROFESSIONAL UPGRADE
+   TASKS MODULE — PROFESSIONAL UPGRADE
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 .tsk-layout {
   max-width: 1400px;
@@ -11054,7 +11054,7 @@ h6 {
   animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* â”€â”€ Header Area â”€â”€ */
+/* ── Header Area ── */
 .tsk-header {
   display: flex;
   align-items: flex-end;
@@ -11077,7 +11077,7 @@ h6 {
   font-weight: 500;
 }
 
-/* â”€â”€ Task Admin Grid â”€â”€ */
+/* ── Task Admin Grid ── */
 .tsk-admin-grid {
   display: grid;
   grid-template-columns: 350px 1fr;
@@ -11091,7 +11091,7 @@ h6 {
   }
 }
 
-/* â”€â”€ Panel Box (used in Admin assign & filters) â”€â”€ */
+/* ── Panel Box (used in Admin assign & filters) ── */
 .tsk-panel {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -11122,7 +11122,7 @@ h6 {
   gap: 16px;
 }
 
-/* â”€â”€ Form Inputs â”€â”€ */
+/* ── Form Inputs ── */
 .tsk-label {
   font-size: 12px;
   font-weight: 700;
@@ -11152,14 +11152,14 @@ h6 {
   background: var(--surface);
 }
 
-/* â”€â”€ Task Grid (Employee) â”€â”€ */
+/* ── Task Grid (Employee) ── */
 .tsk-kanban {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 24px;
 }
 
-/* â”€â”€ Task Card â”€â”€ */
+/* ── Task Card ── */
 .tsk-card {
   background: var(--surface);
   border: 1px solid var(--stroke);
@@ -11228,7 +11228,7 @@ h6 {
   gap: 5px;
 }
 
-/* â”€â”€ Admin Table â”€â”€ */
+/* ── Admin Table ── */
 .tsk-table-wrap {
   overflow-x: auto;
   background: var(--surface);
@@ -11278,7 +11278,7 @@ h6 {
   gap: 4px;
 }
 
-/* â”€â”€ Filter Pills â”€â”€ */
+/* ── Filter Pills ── */
 .tsk-filters {
   display: flex;
   gap: 8px;
@@ -11319,7 +11319,7 @@ h6 {
   font-size: 11px;
 }
 
-/* â”€â”€ Avatars â”€â”€ */
+/* ── Avatars ── */
 .tsk-avatar {
   width: 28px;
   height: 28px;
@@ -11580,9 +11580,9 @@ h6 {
   text-transform: none !important;
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-/* â”€â”€â”€ TIME TRACKER DASHBOARD LAYOUT REFACTOR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ───────────────────────────────────────────────────────── */
+/* ─── TIME TRACKER DASHBOARD LAYOUT REFACTOR ────────────── */
+/* ───────────────────────────────────────────────────────── */
 
 .tp-desktop-layout {
   max-width: 100%;
@@ -11643,7 +11643,7 @@ h6 {
   }
 }
 
-/* â”€â”€â”€ ACTION PANEL (STICKY RIGHT) â”€â”€â”€ */
+/* ─── ACTION PANEL (STICKY RIGHT) ─── */
 .tp-action-panel-sticky {
   position: sticky;
   top: 90px;
@@ -11726,7 +11726,7 @@ h6 {
   padding: 24px;
 }
 
-/* â”€â”€â”€ NEW BLOCKS & GRIDS â”€â”€â”€ */
+/* ─── NEW BLOCKS & GRIDS ─── */
 .tp-clocked-meta-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -11942,7 +11942,7 @@ h6 {
   outline: none !important;
 }
 
-/* â”€â”€â”€ FULL WIDTH LEFT COMPONENTS â”€â”€â”€ */
+/* ─── FULL WIDTH LEFT COMPONENTS ─── */
 .tp-logs {
   background: transparent;
   border: none;
@@ -11985,9 +11985,9 @@ h6 {
   background: rgba(16, 185, 129, 0.06);
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-/* â”€â”€â”€ TYPOGRAPHY: PLAYFAIR DISPLAY INTEGRATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ───────────────────────────────────────────────────────── */
+/* ─── TYPOGRAPHY: PLAYFAIR DISPLAY INTEGRATION ──────────── */
+/* ───────────────────────────────────────────────────────── */
 
 /* 1. Reset everything structurally back to var(--font) */
 body,
@@ -12060,9 +12060,9 @@ h4,
   margin-bottom: 20px !important;
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-/* â”€â”€â”€ FULL WIDTH EXPANSIVE LAYOUT FIXES (USER REQUEST) â”€â”€â”€â”€ */
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ───────────────────────────────────────────────────────── */
+/* ─── FULL WIDTH EXPANSIVE LAYOUT FIXES (USER REQUEST) ──── */
+/* ───────────────────────────────────────────────────────── */
 
 /* 1. Global Height & Width Expansion */
 html,
@@ -12171,7 +12171,7 @@ body,
   gap: 20px !important;
 }
 
-/* â”€â”€â”€ Get Started Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Get Started Page ───────────────────────────────────────── */
 .gs-page {
   display: flex;
   flex-direction: column;
@@ -12500,7 +12500,7 @@ body,
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-/* â”€â”€â”€ NEW TIME TRACKER LAYOUT (FULL-WIDTH + SLIDE PANEL) â”€â”€â”€â”€â”€â”€ */
+/* ─── NEW TIME TRACKER LAYOUT (FULL-WIDTH + SLIDE PANEL) ────── */
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .tp-new-layout {
@@ -12524,7 +12524,7 @@ body,
   gap: 16px;
 }
 
-/* â”€â”€â”€ Floating Timer Bar â”€â”€â”€ */
+/* ─── Floating Timer Bar ─── */
 .tp-timer-bar {
   display: flex;
   align-items: center;
@@ -12587,7 +12587,7 @@ body,
   background: var(--surface2);
 }
 
-/* â”€â”€â”€ Clock In Button â”€â”€â”€ */
+/* ─── Clock In Button ─── */
 .tp-clock-in-btn {
   display: inline-flex;
   align-items: center;
@@ -12616,7 +12616,7 @@ body,
   cursor: not-allowed;
 }
 
-/* â”€â”€â”€ Logs Section (Full-Width) â”€â”€â”€ */
+/* ─── Logs Section (Full-Width) ─── */
 .tp-logs-section {
   width: 100%;
 }
@@ -12639,7 +12639,7 @@ body,
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
 }
 
-/* â”€â”€â”€ Right Slide-Out Panel â”€â”€â”€ */
+/* ─── Right Slide-Out Panel ─── */
 .tp-panel-overlay {
   position: fixed;
   inset: 0;

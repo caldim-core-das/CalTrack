@@ -39,19 +39,23 @@ def update_customer_profile(user, validated_data):
     update_fields = []
 
     for field, value in validated_data.items():
-        if field not in allowed_fields:
+        if field not in allowed_fields or field == "avatar":
             continue
         setattr(user, field, value)
         update_fields.append(field)
 
     if "avatar" in validated_data and validated_data["avatar"] is not None:
-        user.avatar = validated_data["avatar"]
+        avatar_val = validated_data["avatar"]
+        if isinstance(avatar_val, str):
+            if "/media/" in avatar_val:
+                user.avatar.name = avatar_val.split("/media/")[-1]
+            else:
+                user.avatar.name = avatar_val
+        else:
+            user.avatar = avatar_val
         update_fields.append("avatar")
 
     if update_fields:
-        update_fields.append("updated_at") if hasattr(user, "updated_at") else None
-        user.save(update_fields=[f for f in update_fields if f != "updated_at"] + ["first_name", "last_name", "phone"][:len(update_fields)])
-        # Safe save — let Django decide which fields changed
         user.save()
 
     return get_customer_profile(user)

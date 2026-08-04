@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useCallback } from "react"
 import { createPortal } from "react-dom"
 import html2pdf from "html2pdf.js"
 import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useRole } from "../../state/auth/useRole.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { Banknote, X, ChevronDown, ChevronUp, AlertTriangle, CheckCircle2, Clock, Users, TrendingUp, DollarSign, Loader2, FileText, Download, Printer, Share2, Globe, Mail, Eye, Palette, Layout, Type, Sparkles, User, MapPin, Calendar, Filter } from "lucide-react"
+import { EmployeeWalletSection } from "../components/payroll/EmployeeWalletSection.jsx"
 
 // Custom hook to detect if dark mode is active
 function useDarkMode() {
@@ -429,18 +430,18 @@ export function EmployeeInvoiceHubModal({ record, autoPrint = false, onClose, in
 
   const invoiceItems = isIndiaRecord
     ? (bd.breakdown
-        ? bd.breakdown.filter(b => b.type === "revenue" || b.type === "earning" || b.type === "bonus").map(b => ({ desc: b.label, hours: "—", rate: "—", total: b.amount }))
-        : [
-            { desc: "Service Revenue", hours: "—", rate: "—", total: bd.service_revenue || record.gross_salary || 0 },
-            { desc: "Employee Share", hours: "—", rate: "—", total: bd.employee_gross || record.gross_salary || 0 },
-          ])
+      ? bd.breakdown.filter(b => b.type === "revenue" || b.type === "earning" || b.type === "bonus").map(b => ({ desc: b.label, hours: "—", rate: "—", total: b.amount }))
+      : [
+        { desc: "Service Revenue", hours: "—", rate: "—", total: bd.service_revenue || record.gross_salary || 0 },
+        { desc: "Employee Share", hours: "—", rate: "—", total: bd.employee_gross || record.gross_salary || 0 },
+      ])
     : [
-        { desc: "Regular Hours worked", hours: record.regular_hours, rate: record.hourly_rate, total: Number(record.regular_hours || 0) * Number(record.hourly_rate || 0) },
-        Number(record.overtime_hours) > 0 && { desc: "Overtime hours (1.5× rate)", hours: record.overtime_hours, rate: Number(record.hourly_rate) * 1.5, total: Number(record.overtime_hours) * Number(record.hourly_rate) * 1.5 },
-        Number(record.daily_ot_hours) > 0 && { desc: "Daily Overtime (1.5× rate)", hours: record.daily_ot_hours, rate: Number(record.hourly_rate) * 1.5, total: Number(record.daily_ot_hours) * Number(record.hourly_rate) * 1.5 },
-        Number(record.double_time_hours) > 0 && { desc: "Double Time hours (2× rate)", hours: record.double_time_hours, rate: Number(record.hourly_rate) * 2, total: Number(record.double_time_hours) * Number(record.hourly_rate) * 2 },
-        Number(record.paid_leave_hours) > 0 && { desc: "Paid Leave coverage", hours: record.paid_leave_hours, rate: record.hourly_rate, total: Number(record.paid_leave_hours) * Number(record.hourly_rate) },
-      ].filter(Boolean)
+      { desc: "Regular Hours worked", hours: record.regular_hours, rate: record.hourly_rate, total: Number(record.regular_hours || 0) * Number(record.hourly_rate || 0) },
+      Number(record.overtime_hours) > 0 && { desc: "Overtime hours (1.5× rate)", hours: record.overtime_hours, rate: Number(record.hourly_rate) * 1.5, total: Number(record.overtime_hours) * Number(record.hourly_rate) * 1.5 },
+      Number(record.daily_ot_hours) > 0 && { desc: "Daily Overtime (1.5× rate)", hours: record.daily_ot_hours, rate: Number(record.hourly_rate) * 1.5, total: Number(record.daily_ot_hours) * Number(record.hourly_rate) * 1.5 },
+      Number(record.double_time_hours) > 0 && { desc: "Double Time hours (2× rate)", hours: record.double_time_hours, rate: Number(record.hourly_rate) * 2, total: Number(record.double_time_hours) * Number(record.hourly_rate) * 2 },
+      Number(record.paid_leave_hours) > 0 && { desc: "Paid Leave coverage", hours: record.paid_leave_hours, rate: record.hourly_rate, total: Number(record.paid_leave_hours) * Number(record.hourly_rate) },
+    ].filter(Boolean)
 
   const epfVal = record.extras?.india_epf_employee || bd.pf_deduction
   const esicVal = record.extras?.india_esic_employee || bd.esi_deduction
@@ -448,16 +449,16 @@ export function EmployeeInvoiceHubModal({ record, autoPrint = false, onClose, in
 
   const deductionItems = isIndiaRecord
     ? (bd.breakdown
-        ? bd.breakdown.filter(b => b.type === "deduction").map(b => ({ desc: b.label, total: b.amount }))
-        : [
-            Number(epfVal) > 0 && { desc: "Employees' Provident Fund (PF)", total: epfVal },
-            Number(esicVal) > 0 && { desc: "Employees' State Insurance (ESI)", total: esicVal },
-            Number(ptVal) > 0 && { desc: "Tax Deducted at Source (TDS)", total: ptVal },
-          ].filter(Boolean))
+      ? bd.breakdown.filter(b => b.type === "deduction").map(b => ({ desc: b.label, total: b.amount }))
+      : [
+        Number(epfVal) > 0 && { desc: "Employees' Provident Fund (PF)", total: epfVal },
+        Number(esicVal) > 0 && { desc: "Employees' State Insurance (ESI)", total: esicVal },
+        Number(ptVal) > 0 && { desc: "Tax Deducted at Source (TDS)", total: ptVal },
+      ].filter(Boolean))
     : [
-        Number(record.uk_income_tax) > 0 && { desc: "Income Tax (PAYE)", total: record.uk_income_tax },
-        Number(record.uk_employee_ni) > 0 && { desc: "National Insurance (EE)", total: record.uk_employee_ni },
-      ].filter(Boolean)
+      Number(record.uk_income_tax) > 0 && { desc: "Income Tax (PAYE)", total: record.uk_income_tax },
+      Number(record.uk_employee_ni) > 0 && { desc: "National Insurance (EE)", total: record.uk_employee_ni },
+    ].filter(Boolean)
 
   const printStyle = `
     /* Custom Scrollbars for Invoice Studio */
@@ -1746,7 +1747,7 @@ export function EmployeeInvoiceHubModal({ record, autoPrint = false, onClose, in
 
 function FilterDropdown({ options, value, onChange, isDark }) {
   const [open, setOpen] = useState(false)
-  
+
   useEffect(() => {
     if (!open) return
     const handle = () => setOpen(false)
@@ -1807,21 +1808,23 @@ export function PayrollPage() {
   const isDark = useDarkMode()
   const { isAdmin } = useRole()
   const { user } = useAuth()
+  const [activeTab, setActiveTab] = useState("payroll") // "payroll" | "wallet"
+
   if (user?.companyCurrencySymbol) {
     window.__currencySymbol = user.companyCurrencySymbol;
   }
 
   // ── Region detection ──────────────────────────────────────────
-  const rawCountry = user?.companyCountry || user?.company_country || user?.companyRegion || user?.primaryCountry || "US"
-  const orgRegion  = (rawCountry === "IN" || rawCountry === "India") ? "IN" : (rawCountry === "UK" || rawCountry === "United Kingdom") ? "UK" : "US"
-  const isIndia    = orgRegion === "IN"
-  const isUK       = orgRegion === "UK"
+  const rawCountry = user?.companyCountry || user?.company_country || user?.companyRegion || user?.primaryCountry || "IN"
+  const orgRegion = (rawCountry === "IN" || rawCountry === "India") ? "IN" : (rawCountry === "UK" || rawCountry === "United Kingdom") ? "UK" : "IN"
+  const isIndia = orgRegion === "IN"
+  const isUK = orgRegion === "UK"
   const regionMeta = {
-    IN: { label: "India",         flag: "🇮🇳", currency: "₹", code: "INR", color: "#f97316", subtitle: "India Region — Service revenue split & statutory deductions (PF, ESI, TDS)." },
+    IN: { label: "India", flag: "🇮🇳", currency: "₹", code: "INR", color: "#f97316", subtitle: "India Region — Service revenue split & statutory deductions (PF, ESI, TDS)." },
     US: { label: "United States", flag: "🇺🇸", currency: "$", code: "USD", color: "#3b82f6", subtitle: "US Region — FLSA overtime, CA/AK daily OT & hourly payroll." },
-    UK: { label: "United Kingdom",flag: "🇬🇧", currency: "£", code: "GBP", color: "#8b5cf6", subtitle: "UK Region — PAYE Income Tax, National Insurance & WTR holiday accrual." },
+    UK: { label: "United Kingdom", flag: "🇬🇧", currency: "£", code: "GBP", color: "#8b5cf6", subtitle: "UK Region — PAYE Income Tax, National Insurance & WTR holiday accrual." },
   }
-  const meta = regionMeta[orgRegion] || regionMeta.US
+  const meta = regionMeta[orgRegion] || regionMeta.IN
   const curr = meta.currency
 
   const [records, setRecords] = useState([])
@@ -1843,7 +1846,7 @@ export function PayrollPage() {
   // India-specific: month/year vs custom date range picker
   const now = new Date()
   const [indiaMonth, setIndiaMonth] = useState(now.getMonth() + 1)
-  const [indiaYear,  setIndiaYear]  = useState(now.getFullYear())
+  const [indiaYear, setIndiaYear] = useState(now.getFullYear())
   const [indiaDateMode, setIndiaDateMode] = useState("month") // "month" | "custom"
 
   const [activeEmployees, setActiveEmployees] = useState([])
@@ -1876,14 +1879,14 @@ export function PayrollPage() {
 
   useEffect(() => {
     const today = new Date()
-    
+
     // Fix local timezone offset issue when converting to YYYY-MM-DD
     const formatDate = (d) => {
       const offset = d.getTimezoneOffset()
-      const localDate = new Date(d.getTime() - (offset*60*1000))
+      const localDate = new Date(d.getTime() - (offset * 60 * 1000))
       return localDate.toISOString().split("T")[0]
     }
-    
+
     if (dateFilterMode === "today") {
       setFilterStartDate(formatDate(today))
       setFilterEndDate(formatDate(today))
@@ -2037,11 +2040,11 @@ export function PayrollPage() {
     return list
   }, [records, filterEmp, sortField, sortDir, dateFilterMode, filterStartDate, filterEndDate, isIndia, isUK])
 
-  const totalGross  = filtered.reduce((s, r) => s + Number(r.gross_pay || r.gross_salary || 0), 0)
-  const totalNet    = filtered.reduce((s, r) => s + Number(r.net_pay || r.net_salary || 0), 0)
+  const totalGross = filtered.reduce((s, r) => s + Number(r.gross_pay || r.gross_salary || 0), 0)
+  const totalNet = filtered.reduce((s, r) => s + Number(r.net_pay || r.net_salary || 0), 0)
   const totalRegHrs = filtered.reduce((s, r) => s + Number(r.regular_hours || 0), 0)
-  const uniqueEmps  = new Set(filtered.map(r => r.employee || r.employee_id_code)).size
-  const flagged     = filtered.filter(r => !r.wage_floor_compliant).length
+  const uniqueEmps = new Set(filtered.map(r => r.employee || r.employee_id_code)).size
+  const flagged = filtered.filter(r => !r.wage_floor_compliant).length
 
   function toggleSort(f) {
     if (sortField === f) setSortDir(d => d === "asc" ? "desc" : "asc")
@@ -2060,8 +2063,37 @@ export function PayrollPage() {
   })
 
   const tableColumns = isIndia
-    ? [["Employee","employee"],["Period","month"],["Service Revenue","gross_salary"],["Emp Share","employee_gross"],["Config","config_source"],["PF","pf"],["ESI","esi"],["TDS","tds"],["Net Pay","net_salary"],["Status","status"]]
-    : [["Employee","employee"],["Period","period"],["Region","region"],["Rate/hr","hourly_rate"],["Gross","gross_pay"],["Net Pay","net_pay"],["Reg Hrs","regular_hours"],["OT Hrs","overtime_hours"],["Daily OT","daily_ot_hours"],["2× Time","double_time_hours"],["Tax","uk_income_tax"],["Emp NI","uk_employee_ni"],["Holiday","holiday_hours_accrued"],["Status","wage_floor_compliant"]]
+    ? [["Employee", "employee"], ["Period", "month"], ["Service Revenue", "gross_salary"], ["Emp Share", "employee_gross"], ["Config", "config_source"], ["PF", "pf"], ["ESI", "esi"], ["TDS", "tds"], ["Net Pay", "net_salary"], ["Status", "status"]]
+    : [["Employee", "employee"], ["Period", "period"], ["Region", "region"], ["Rate/hr", "hourly_rate"], ["Gross", "gross_pay"], ["Net Pay", "net_pay"], ["Reg Hrs", "regular_hours"], ["OT Hrs", "overtime_hours"], ["Daily OT", "daily_ot_hours"], ["2× Time", "double_time_hours"], ["Tax", "uk_income_tax"], ["Emp NI", "uk_employee_ni"], ["Holiday", "holiday_hours_accrued"], ["Status", "wage_floor_compliant"]]
+  if (!isAdmin || activeTab === "wallet") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", background: isDark ? "#0B111D" : "#f8fafc", overflow: "auto" }}>
+        {isAdmin && (
+          <div style={{ padding: "16px 32px 0", display: "flex", gap: 10 }}>
+            <button
+              onClick={() => setActiveTab("payroll")}
+              style={{
+                padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 800, border: "none", cursor: "pointer",
+                background: isDark ? "#1f2937" : "#e2e8f0", color: isDark ? "#9ca3af" : "#64748b"
+              }}
+            >
+              🏢 Company Payroll View
+            </button>
+            <button
+              onClick={() => setActiveTab("wallet")}
+              style={{
+                padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 800, border: "none", cursor: "pointer",
+                background: "#4f46e5", color: "#fff", boxShadow: "0 2px 6px rgba(79,70,229,0.3)"
+              }}
+            >
+              💳 My Wallet & Payslips
+            </button>
+          </div>
+        )}
+        <EmployeeWalletSection isDark={isDark} />
+      </div>
+    )
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: isDark ? "#0B111D" : "#f8fafc", overflow: "auto" }}>
@@ -2083,6 +2115,27 @@ export function PayrollPage() {
               </p>
             </div>
           </div>
+
+          {/* Admin view switcher */}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setActiveTab("payroll")}
+              style={{
+                padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 800, border: "none", cursor: "pointer",
+                background: "#4f46e5", color: "#fff"
+              }}
+            >
+              🏢 Company Payroll
+            </button>
+            <button
+              onClick={() => setActiveTab("wallet")}
+              style={{
+                padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 800, border: "none", cursor: "pointer",
+                background: isDark ? "#1f2937" : "#e2e8f0", color: isDark ? "#f9fafb" : "#0f172a"
+              }}
+            >
+              💳 My Wallet
+            </button>
         </div>
       </div>
 
@@ -2170,8 +2223,8 @@ export function PayrollPage() {
                     <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>Month</label>
                     <select value={indiaMonth} onChange={e => setIndiaMonth(parseInt(e.target.value))}
                       style={{ padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", cursor: "pointer" }}>
-                      {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m, i) => (
-                        <option key={i+1} value={i+1}>{m}</option>
+                      {["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"].map((m, i) => (
+                        <option key={i + 1} value={i + 1}>{m}</option>
                       ))}
                     </select>
                   </div>
@@ -2179,7 +2232,7 @@ export function PayrollPage() {
                     <label style={{ fontSize: 12, fontWeight: 600, color: isDark ? "#94a3b8" : "#475569", display: "block", marginBottom: 8 }}>Year</label>
                     <select value={indiaYear} onChange={e => setIndiaYear(parseInt(e.target.value))}
                       style={{ padding: "10px 12px", border: `1px solid ${isDark ? "#475569" : "#cbd5e1"}`, borderRadius: 8, fontSize: 13, color: isDark ? "#f8fafc" : "#0f172a", background: isDark ? "#0f172a" : "#fff", outline: "none", cursor: "pointer" }}>
-                      {[now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1].map(y => (
+                      {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map(y => (
                         <option key={y} value={y}>{y}</option>
                       ))}
                     </select>
@@ -2231,8 +2284,8 @@ export function PayrollPage() {
                 {submitting ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />}
                 {isIndia
                   ? (indiaDateMode === "custom"
-                      ? `Generate ₹ Payroll — ${filterStartDate || "Start"} → ${filterEndDate || "End"}`
-                      : `Generate ₹ Payroll — ${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][indiaMonth-1]} ${indiaYear}`)
+                    ? `Generate ₹ Payroll — ${filterStartDate || "Start"} → ${filterEndDate || "End"}`
+                    : `Generate ₹ Payroll — ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][indiaMonth - 1]} ${indiaYear}`)
                   : (generateEmpId === "all" ? "Batch Generate" : "Generate")}
               </button>
             </div>
@@ -2295,21 +2348,21 @@ export function PayrollPage() {
 
                     // India breakdown fields from breakdown JSON
                     const bd = r.breakdown || {}
-                    const empShare  = bd.employee_gross ?? r.gross_salary ?? r.gross_pay
-                    const pfAmt     = bd.pf_deduction  ?? 0
-                    const esiAmt    = bd.esi_deduction ?? 0
-                    const tdsAmt    = bd.tds_deduction ?? 0
-                    const netAmt    = bd.net_pay ?? r.net_salary ?? r.net_pay
-                    const svcRev    = bd.service_revenue ?? r.gross_salary ?? r.gross_pay
-                    const cfgSrc    = r.config_snapshot?.source || bd.config_source || "default"
-                    const cfgColor  = cfgSrc === "individual" ? "#4f46e5" : cfgSrc === "group" ? "#16a34a" : "#64748b"
-                    const cfgLabel  = cfgSrc === "individual" ? "INDIVIDUAL" : cfgSrc === "group" ? "GROUP" : "DEFAULT"
+                    const empShare = bd.employee_gross ?? r.gross_salary ?? r.gross_pay
+                    const pfAmt = bd.pf_deduction ?? 0
+                    const esiAmt = bd.esi_deduction ?? 0
+                    const tdsAmt = bd.tds_deduction ?? 0
+                    const netAmt = bd.net_pay ?? r.net_salary ?? r.net_pay
+                    const svcRev = bd.service_revenue ?? r.gross_salary ?? r.gross_pay
+                    const cfgSrc = r.config_snapshot?.source || bd.config_source || "default"
+                    const cfgColor = cfgSrc === "individual" ? "#4f46e5" : cfgSrc === "group" ? "#16a34a" : "#64748b"
+                    const cfgLabel = cfgSrc === "individual" ? "INDIVIDUAL" : cfgSrc === "group" ? "GROUP" : "DEFAULT"
 
                     // Period display for India (date range if available, else month/year)
                     const periodDisplay = isIndia
                       ? (bd.start_date && bd.end_date
-                          ? `${bd.start_date} → ${bd.end_date}`
-                          : `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][(r.month||1)-1]} ${r.year || ""}`)
+                        ? `${bd.start_date} → ${bd.end_date}`
+                        : `${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][(r.month || 1) - 1]} ${r.year || ""}`)
                       : null
 
                     return (
@@ -2329,10 +2382,10 @@ export function PayrollPage() {
                             {/* Period: date range or month/year */}
                             <td style={{ padding: "14px 14px", fontSize: 11, fontWeight: 700, color: isDark ? "#9ca3af" : "#64748b", whiteSpace: "nowrap" }}>{periodDisplay}</td>
                             {/* Service Revenue */}
-                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 13, fontWeight: 900, color: isDark ? "#f9fafb" : "#0f172a" }}>₹{Number(svcRev||0).toFixed(2)}</td>
+                            <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 13, fontWeight: 900, color: isDark ? "#f9fafb" : "#0f172a" }}>₹{Number(svcRev || 0).toFixed(2)}</td>
                             {/* Employee Share */}
                             <td style={{ padding: "14px 14px", textAlign: "right", fontSize: 13, fontWeight: 900, color: isDark ? "#34d399" : "#059669", background: isDark ? "rgba(52,211,153,0.05)" : "#f0fdf4" }}>
-                              ₹{Number(empShare||0).toFixed(2)}
+                              ₹{Number(empShare || 0).toFixed(2)}
                             </td>
                             {/* Config source */}
                             <td style={{ padding: "14px 14px", textAlign: "center" }}>
@@ -2354,7 +2407,7 @@ export function PayrollPage() {
                             </td>
                             {/* Net Pay */}
                             <td style={{ padding: "14px 14px", textAlign: "right" }}>
-                              <span style={{ fontSize: 13, fontWeight: 900, color: isDark ? "#34d399" : "#059669", background: isDark ? "rgba(52,211,153,0.1)" : "#ecfdf5", padding: "4px 10px", borderRadius: 8 }}>₹{Number(netAmt||0).toFixed(2)}</span>
+                              <span style={{ fontSize: 13, fontWeight: 900, color: isDark ? "#34d399" : "#059669", background: isDark ? "rgba(52,211,153,0.1)" : "#ecfdf5", padding: "4px 10px", borderRadius: 8 }}>₹{Number(netAmt || 0).toFixed(2)}</span>
                             </td>
                             {/* Status */}
                             <td style={{ padding: "14px 14px", textAlign: "center", position: "relative" }}>
@@ -2440,6 +2493,7 @@ export function PayrollPage() {
           transform: translateZ(28px) rotateZ(10deg) !important;
         }
       `}</style>
+    </div>
     </div>
   )
 }

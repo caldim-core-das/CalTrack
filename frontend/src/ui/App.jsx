@@ -366,6 +366,7 @@ export function App() {
             <Route path={routes.mileage} element={<MileagePage />} />
             <Route path={routes.employee_jobs} element={<EmployeeJobsPage />} />
             <Route path={routes.employee_feedback} element={<EmployeeFeedbackPage />} />
+            <Route path={routes.payroll} element={<PayrollPage />} />
 
             {/* Employee profile settings — accessible to everyone */}
             <Route path={routes.settings} element={<SettingsPage />} />
@@ -383,9 +384,6 @@ export function App() {
               </Route>
               <Route element={<RequireModulePermission module="live_location" action="view" />}>
                 <Route path={routes.live_locations} element={<LiveLocationsPage />} />
-              </Route>
-              <Route element={<RequireModulePermission module="payroll" action="view" />}>
-                <Route path={routes.payroll} element={<PayrollPage />} />
               </Route>
               <Route path={routes.scheduling} element={<SchedulingPage />} />
               <Route path={routes.employees} element={<EmployeesPage />} />

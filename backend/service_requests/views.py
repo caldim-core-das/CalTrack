@@ -969,62 +969,89 @@ class EmployeeJobCompleteView(APIView):
                 400,
             )
 
-        with transaction.atomic():
-            sr = job.service_request
+        from payroll.exceptions import PayrollConfigMissingException
+        from .services import process_booking_completion_and_payout
 
-            # Resolve all same-tech accepted extensions attached to this job
-            accepted_same_tech_extensions = job.extensions.filter(
-                status=WorkExtension.Status.CUSTOMER_ACCEPTED,
-                requires_specialist=False,
-            )
-            for ext in accepted_same_tech_extensions:
-                ext.status = WorkExtension.Status.RESOLVED
-                ext.save()
+        is_sr_completed = False
+        feedback_token = None
+        try:
+            with transaction.atomic():
+                sr = job.service_request
 
-            # Mark this job completed
-            job.status = EmployeeJob.Status.COMPLETED
-            job.completed_date = timezone.now()
-            job.save(update_fields=["status", "completed_date"])
+                # Resolve all same-tech accepted extensions attached to this job
+                accepted_same_tech_extensions = job.extensions.filter(
+                    status=WorkExtension.Status.CUSTOMER_ACCEPTED,
+                    requires_specialist=False,
+                )
+                for ext in accepted_same_tech_extensions:
+                    ext.status = WorkExtension.Status.RESOLVED
+                    ext.save()
 
-            # Phase 2 State Machine Guard: Evaluate whether the entire ServiceRequest is ready to complete
-            if sr.is_ready_to_complete():
-                S = ServiceRequest.Status
-                COMPLETION_PATH = [
-                    S.ACCEPTED,
-                    S.IN_PROGRESS,
-                    S.COMPLETED,
-                    S.AWAITING_VERIFICATION,
-                    S.VERIFIED,
-                    S.FEEDBACK_PENDING,
-                ]
-                from service_requests.state_machine import ALLOWED_TRANSITIONS
-                max_steps = 10
-                while sr.status != S.FEEDBACK_PENDING and max_steps > 0:
-                    max_steps -= 1
-                    allowed = ALLOWED_TRANSITIONS.get(sr.status, set())
-                    next_step = None
-                    for candidate in COMPLETION_PATH:
-                        if candidate in allowed:
-                            next_step = candidate
+                if not sr.assigned_employee and hasattr(job, "employee"):
+                    sr.assigned_employee = job.employee
+
+                # Execute completion transition and credit employee wallet
+                process_booking_completion_and_payout(sr, actor=request.user)
+
+                # Phase 2 State Machine Guard: Evaluate whether the entire ServiceRequest is ready to complete
+                is_sr_completed = not hasattr(sr, "is_ready_to_complete") or sr.is_ready_to_complete()
+                if is_sr_completed:
+                    S = ServiceRequest.Status
+                    COMPLETION_PATH = [
+                        S.ACCEPTED,
+                        S.IN_PROGRESS,
+                        S.COMPLETED,
+                        S.AWAITING_VERIFICATION,
+                        S.VERIFIED,
+                        S.FEEDBACK_PENDING,
+                    ]
+                    from service_requests.state_machine import ALLOWED_TRANSITIONS
+                    max_steps = 10
+                    while sr.status != S.FEEDBACK_PENDING and max_steps > 0:
+                        max_steps -= 1
+                        allowed = ALLOWED_TRANSITIONS.get(sr.status, set())
+                        next_step = None
+                        for candidate in COMPLETION_PATH:
+                            if candidate in allowed:
+                                next_step = candidate
+                                break
+                        if next_step is None:
                             break
-                    if next_step is None:
-                        break
-                    apply_transition(sr, next_step)
+                        apply_transition(sr, next_step)
 
                 sr.save(update_fields=["status", "updated_at"])
+
+                job.status = EmployeeJob.Status.COMPLETED
+                job.completed_date = timezone.now()
+                job.save(update_fields=["status", "completed_date"])
+
+                # Create feedback model record (generates token)
                 feedback, _ = ServiceFeedback.objects.get_or_create(service_request=sr)
                 feedback_token = str(feedback.feedback_token)
+        except PayrollConfigMissingException as e:
+            return Response(
+                {
+                    "success": False,
+                    "error": {
+                        "code": "PAYROLL_CONFIG_MISSING",
+                        "message": str(e.detail) if hasattr(e, "detail") else str(e),
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-                # Send completion notification outside atomic block safely
-                try:
-                    from .notifications import send_completion_and_feedback_email
-                    send_completion_and_feedback_email(sr, feedback_token)
-                except Exception as e:
-                    pass
+        if is_sr_completed:
+            # Send completion notification outside atomic block safely
+            try:
+                from .notifications import send_completion_and_feedback_email
+                send_completion_and_feedback_email(sr, feedback_token)
+            except Exception:
+                pass
 
-                return _success(message="Work marked as Complete. Feedback request sent to customer.")
-            else:
-                return _success(message="Job completed successfully. Service request remains active for specialist work or unresolved items.")
+            return _success(message="Work marked as Complete. Feedback request sent to customer.")
+        else:
+            return _success(message="Job completed successfully. Service request remains active for specialist work or unresolved items.")
+
 
 
 class EmployeeJobProofView(APIView):
@@ -1067,15 +1094,153 @@ class EmployeePerformanceView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        from tasks.models import Task
+        from django.db.models import Q as Q2
+
+        user = request.user
         employee = _get_employee(request)
-        if not employee:
-            return _error("Employee profile not found.", 404)
 
-        from .signals import recalculate_employee_performance
-        perf = recalculate_employee_performance(employee)
+        # ── 1. Task-based job counts (always available) ───────────────────────
+        task_qs = Task.objects.filter(
+            Q2(assigned_to=user) | Q2(assigned_to_id=user.id)
+        )
+        task_total = task_qs.count()
+        task_completed_qs = task_qs.filter(
+            Q2(status__iexact="completed") |
+            Q2(travel_status__iexact="done") |
+            Q2(completed_at__isnull=False)
+        )
+        task_completed = task_completed_qs.count()
 
-        serializer = EmployeePerformanceSerializer(perf)
-        return _success(data=serializer.data)
+        # ── 2. ServiceFeedback data (if linked through EmployeeJob or ServiceRequest) ─
+        from .models import ServiceFeedback
+        from django.db.models import Avg, Count, Q as Q3
+
+        sr_feedback_qs = ServiceFeedback.objects.none()
+        if employee:
+            sr_feedback_qs = ServiceFeedback.objects.filter(
+                is_submitted=True
+            ).filter(
+                Q3(service_request__assigned_employee=employee) |
+                Q3(service_request__employee_job__employee=employee)
+            ).select_related("service_request")
+
+        feedback_count = sr_feedback_qs.count()
+        agg = sr_feedback_qs.aggregate(
+            avg_rating=Avg("rating"),
+            resolved_count=Count("id", filter=Q3(issue_resolved=True)),
+        )
+        avg_rating_db = float(agg["avg_rating"] or 0)
+        resolved_count = agg["resolved_count"] or 0
+
+        # ── 3. Completion-rate calculation ─────────────────────────────────────
+        sr_total = 0
+        sr_completed = 0
+        if employee:
+            from .models import EmployeeJob, ServiceRequest
+            ej_total = EmployeeJob.objects.filter(employee=employee).count()
+            ej_completed = EmployeeJob.objects.filter(
+                employee=employee
+            ).filter(
+                Q3(status=EmployeeJob.Status.COMPLETED) | Q3(status__iexact="completed")
+            ).count()
+            sr_qs = ServiceRequest.objects.filter(
+                Q3(assigned_employee=employee) | Q3(employee_job__employee=employee)
+            )
+            sr_total = sr_qs.count()
+            sr_completed = sr_qs.filter(status__in=[
+                "completed", "awaiting_verification", "verified",
+                "feedback_pending", "feedback_received", "closed"
+            ]).count()
+            jobs_completed = max(ej_completed, sr_completed, task_completed)
+            total_assigned = max(ej_total, sr_total, task_total)
+        else:
+            jobs_completed = task_completed
+            total_assigned = task_total
+
+        completion_rate = (jobs_completed / total_assigned * 100) if total_assigned > 0 else (
+            100.0 if jobs_completed > 0 else 0.0
+        )
+
+        # ── 4. Average rating & CSAT ──────────────────────────────────────────
+        # Use real ServiceFeedback average if available, else neutral 0.0 (no fake stars)
+        avg_rating = round(avg_rating_db, 2) if feedback_count > 0 else 0.0
+        satisfaction = round((resolved_count / feedback_count * 5), 2) if feedback_count > 0 else 0.0
+
+        # ── 5. Build unified recent_feedback list ─────────────────────────────
+        # Real ServiceFeedback records first
+        service_feedbacks = []
+        for f in sr_feedback_qs.order_by("-submitted_at")[:20]:
+            sr = f.service_request
+            service_feedbacks.append({
+                "id": f.id,
+                "request_id": sr.request_id,
+                "customer_name": sr.customer_name or "Customer",
+                "service_type": sr.service_category or sr.service_type or "",
+                "rating": f.rating,
+                "employee_behaviour": f.employee_behaviour,
+                "work_quality": f.work_quality,
+                "issue_resolved": f.issue_resolved,
+                "comment": f.comment or "",
+                "submitted_at": f.submitted_at.isoformat() if f.submitted_at else None,
+                "source": "service_feedback",
+            })
+
+        # Completed tasks as work history entries (not rated, but real)
+        task_history = []
+        for t in task_completed_qs.order_by("-completed_at")[:20]:
+            task_history.append({
+                "id": f"task-{t.id}",
+                "request_id": f"TASK-{t.id}",
+                "customer_name": t.client_name or "Customer",
+                "service_type": t.service_type or t.category or t.title or "",
+                "rating": None,  # Not yet rated
+                "employee_behaviour": None,
+                "work_quality": None,
+                "issue_resolved": None,
+                "comment": t.employee_notes or "",
+                "submitted_at": t.completed_at.isoformat() if t.completed_at else None,
+                "completed_at": t.completed_at.isoformat() if t.completed_at else None,
+                "source": "task",
+            })
+
+        # Merge: rated feedback first, then task history
+        all_feedback = service_feedbacks + [
+            t for t in task_history
+            if not any(f["customer_name"] == t["customer_name"] for f in service_feedbacks)
+        ]
+
+        data = {
+            "employee_name": user.get_full_name() or user.username,
+            "jobs_completed_count": jobs_completed,
+            "jobs_completed": jobs_completed,
+            "average_rating": avg_rating,
+            "feedback_count": feedback_count,
+            "completion_rate": round(completion_rate, 2),
+            "customer_satisfaction_score": satisfaction,
+            "task_total": task_total,
+            "task_completed": task_completed,
+            "recent_feedback": all_feedback,
+            "feedback_list": all_feedback,
+        }
+
+        # If we have an employee record, also update the EmployeePerformance cache
+        if employee:
+            from .models import EmployeePerformance
+            EmployeePerformance.objects.update_or_create(
+                employee=employee,
+                defaults={
+                    "jobs_completed_count": jobs_completed,
+                    "average_rating": avg_rating,
+                    "feedback_count": feedback_count,
+                    "completion_rate": round(completion_rate, 2),
+                    "customer_satisfaction_score": satisfaction,
+                },
+            )
+
+        return _success(data=data)
+
+
 
 
 class PublicFeedbackListView(APIView):
@@ -1688,7 +1853,7 @@ def _serialize_complaint(c, include_messages=False):
 # ════════════════════════════════════════════════════════════════════
 
 class CustomerComplaintCreateView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+    permission_classes = [permissions.IsAuthenticated]
     parser_classes = [FormParser, MultiPartParser, JSONParser]
 
     def post(self, request):
@@ -1709,14 +1874,15 @@ class CustomerComplaintCreateView(APIView):
                     padded = f"SR-{int(booking_id):04d}"
                     q |= Q(request_id__iexact=padded)
                 
-                if not ServiceRequest.objects.filter(q).exists():
-                    return _error("Booking not found in the system.", 404)
-                    
-                booking = ServiceRequest.objects.get(q, customer=request.user)
-            except ServiceRequest.DoesNotExist:
-                return _error("Booking found, but it does not belong to your account.", 403)
-            except ServiceRequest.MultipleObjectsReturned:
-                booking = ServiceRequest.objects.filter(q, customer=request.user).first()
+                b = ServiceRequest.objects.filter(q).first()
+                if b:
+                    # Link customer if unassigned
+                    if not b.customer:
+                        b.customer = request.user
+                        b.save(update_fields=["customer"])
+                    booking = b
+            except Exception as exc:
+                logger.error(f"Error matching booking for complaint: {exc}")
 
         attachment_files = request.FILES.getlist("attachments")
 
@@ -1734,7 +1900,7 @@ class CustomerComplaintCreateView(APIView):
 
 
 class CustomerComplaintListView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         qs = sr_services.list_customer_complaints(request.user, request.GET)
@@ -1742,7 +1908,7 @@ class CustomerComplaintListView(APIView):
 
 
 class CustomerComplaintDetailView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, pk):
         try:
@@ -1755,7 +1921,7 @@ class CustomerComplaintDetailView(APIView):
 
 
 class CustomerComplaintMessageCreateView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsCustomer]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
         try:
@@ -1810,12 +1976,19 @@ class AdminComplaintDetailView(APIView):
     def get(self, request, pk):
         try:
             c = _get_complaint_admin(pk)
-            score, reasons = sr_services.compute_risk_score(c)
+            try:
+                score, reasons = sr_services.compute_risk_score(c)
+            except Exception as e:
+                logger.error(f"Risk score calculation error for complaint {pk}: {e}")
+                score, reasons = c.risk_score or 0, []
             data = _serialize_complaint(c, include_messages=True)
             data["risk_analysis"] = {"score": score, "reasons": reasons}
             return _success(data)
         except Complaint.DoesNotExist:
             return _error("Complaint not found.", 404)
+        except Exception as e:
+            logger.error(f"Error fetching complaint detail {pk}: {e}")
+            return _error(f"Failed to load complaint: {str(e)}", 500)
 
 
 class AdminComplaintAssignView(APIView):

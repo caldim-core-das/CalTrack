@@ -121,7 +121,15 @@ class TaskSerializer(serializers.ModelSerializer):
             ret['payment_status'] = 'pending'
             ret['total_amount'] = 0.0
             ret['service_category'] = instance.category
-            
+
+        # Clean start_photo and end_photo URLs to avoid demo.localhost connection errors
+        for p_field in ('start_photo', 'end_photo'):
+            val = ret.get(p_field)
+            if val and isinstance(val, str) and 'demo.localhost' in val:
+                idx = val.find('/media/')
+                if idx != -1:
+                    ret[p_field] = "http://localhost:8000" + val[idx:]
+
         return ret
 
     class Meta:

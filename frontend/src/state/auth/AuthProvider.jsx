@@ -53,12 +53,12 @@ export function AuthProvider({ children }) {
         avatar_url:me.avatar_url ?? null,
         two_fa_enabled: me.two_fa_enabled ?? false,
         employee_roles: me.employee_roles ?? [],
-        companyCountry: me.company_country ?? me.companyCountry ?? "US",
-        company_country: me.company_country ?? me.companyCountry ?? "US",
-        companyRegion: me.company_region ?? me.company_country ?? me.companyCountry ?? "US",
-        primaryCountry: me.primaryCountry ?? me.company_country ?? me.companyCountry ?? "US",
-        companyCurrency: me.company_currency ?? "USD",
-        companyCurrencySymbol: me.company_currency_symbol ?? "$",
+        companyCountry: me.company_country ?? me.companyCountry ?? "IN",
+        company_country: me.company_country ?? me.companyCountry ?? "IN",
+        companyRegion: me.company_region ?? me.company_country ?? me.companyCountry ?? "IN",
+        primaryCountry: me.primaryCountry ?? me.company_country ?? me.companyCountry ?? "IN",
+        companyCurrency: me.company_currency ?? ((me.company_country || me.companyCountry || "IN") === "IN" ? "INR" : "USD"),
+        companyCurrencySymbol: me.company_currency_symbol ?? ((me.company_country || me.companyCountry || "IN") === "IN" ? "₹" : "$"),
       }
       setUser(u)
       if (me.company_name) {

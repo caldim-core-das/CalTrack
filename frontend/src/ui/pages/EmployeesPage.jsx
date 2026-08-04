@@ -68,7 +68,7 @@ function EditEmployeeModal({ employee, availableRoles, onClose, onSave, saving, 
   const [lastName, setLastName] = useState(employee.user?.last_name || "")
   const [title, setTitle] = useState(employee.title || "")
   const [hourlyRate, setHourlyRate] = useState(employee.hourly_rate ?? "")
-  const [country, setCountry] = useState(employee.country || user?.companyCountry || "US")
+  const [country, setCountry] = useState(employee.country || user?.companyCountry || "IN")
   const [state, setState] = useState(employee.state || "")
   const [exemptStatus, setExemptStatus] = useState(employee.exempt_status || "non_exempt")
   const [weeklySalary, setWeeklySalary] = useState(employee.weekly_salary ?? "")
@@ -1089,7 +1089,7 @@ export function EmployeesPage() {
   const [taxCategory, setTaxCategory] = useState("")
 
   // Compliance fields
-  const orgCountry = user?.companyCountry || user?.company_country || user?.companyRegion || user?.primaryCountry || "US"
+  const orgCountry = user?.companyCountry || user?.company_country || user?.companyRegion || user?.primaryCountry || "IN"
   const orgRegion = (orgCountry === "IN" || orgCountry === "India") ? "IN" : (orgCountry === "UK" || orgCountry === "United Kingdom") ? "UK" : "US"
   const [country, setCountry] = useState(orgCountry)
   const [state, setState] = useState(orgCountry === "IN" ? "MH" : (orgCountry === "US" ? "NY" : ""))
@@ -1115,9 +1115,9 @@ export function EmployeesPage() {
   // Update defaults when user object loads
   useEffect(() => {
     if (user) {
-      const cCountry = user?.companyCountry || user?.company_country || "US"
-      if (!currency || currency === "USD") setCurrency(user.companyCurrency || user.company_currency || "USD")
-      if (!country || country === "US") {
+      const cCountry = user?.companyCountry || user?.company_country || "IN"
+      if (!currency || currency === "USD") setCurrency(user.companyCurrency || user.company_currency || "INR")
+      if (!country) {
         setCountry(cCountry)
         setState(cCountry === "IN" ? "MH" : (cCountry === "US" ? "NY" : ""))
       }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react"
 import { apiRequest } from "../../api/client.js"
+import { MessageSquare, AlertTriangle, CheckCircle, Clock, User, Shield, Send, RefreshCw, AlertCircle, FileText, Check } from "lucide-react"
 
 const STATUS_TABS = [
   { key: "ALL",                        label: "All" },
@@ -974,7 +975,7 @@ export function EmployeeComplaintsPanel({ showToast }) {
               <span className="font-bold text-sm text-slate-900">{c.category_display}</span>
               <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${c.status === 'OPEN' ? 'bg-rose-100 text-rose-700' : c.status === 'CLOSED' || c.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{c.status_display}</span>
             </div>
-            <div className="text-xs text-slate-500 truncate">{c.customer_name} â€¢ Booking: {c.booking_request_id || 'N/A'}</div>
+            <div className="text-xs text-slate-500 truncate">{c.customer_name} • Booking: {c.booking_request_id || 'N/A'}</div>
             <div className="text-xs text-slate-600 mt-2 line-clamp-2">{c.description}</div>
           </div>
         ))}

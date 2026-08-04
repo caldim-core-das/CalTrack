@@ -11,6 +11,9 @@ const REGION_META = {
   IN: { label: "India",         flag: "🇮🇳", currency: "₹", code: "INR", color: "#f97316" },
   US: { label: "United States", flag: "🇺🇸", currency: "$", code: "USD", color: "#3b82f6" },
   UK: { label: "United Kingdom",flag: "🇬🇧", currency: "£", code: "GBP", color: "#8b5cf6" },
+  in: { label: "India",         flag: "🇮🇳", currency: "₹", code: "INR", color: "#f97316" },
+  us: { label: "United States", flag: "🇺🇸", currency: "$", code: "USD", color: "#3b82f6" },
+  uk: { label: "United Kingdom",flag: "🇬🇧", currency: "£", code: "GBP", color: "#8b5cf6" },
 }
 
 function Toggle({ enabled, onChange, label, description }) {
@@ -72,29 +75,59 @@ function NumInput({ label, value, onChange, suffix = "", hint, min = 0 }) {
 
 function SplitPreview({ config, currency }) {
   const base = 1000
-  const emp  = (base * config.employee_share_pct / 100)
-  const co   = (base * config.company_share_pct  / 100)
-  const plat = config.platform_fee_type === "fixed" ? Number(config.platform_fee_value) : (base * config.platform_fee_value / 100)
-  const pf   = config.pf_enabled  ? (emp * config.pf_pct  / 100) : 0
-  const esi  = config.esi_enabled ? (emp * config.esi_pct / 100) : 0
-  const tds  = config.tds_enabled ? (emp * config.tds_rate / 100) : 0
-  const net  = emp - pf - esi - tds
+  const [backendBreakdown, setBackendBreakdown] = useState(null)
+
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        const payload = {
+          gross_amount: 1000.00,
+          employee_share_percent: config.employee_share_pct ?? 80,
+          company_share_percent: config.company_share_pct ?? 10,
+          platform_fee_percent: config.platform_fee_value ?? 5,
+          platform_fee_type: config.platform_fee_type === "fixed" ? "FIXED" : "PERCENTAGE",
+          platform_fee_fixed_amount: config.platform_fee_type === "fixed" ? (config.platform_fee_value ?? 5) : null,
+          pf_percent: config.pf_enabled ? (config.pf_pct ?? 12) : 0,
+          esi_percent: config.esi_enabled ? (config.esi_pct ?? 0.75) : 0,
+          tds_percent: config.tds_enabled ? (config.tds_rate ?? 0) : 0,
+        }
+        const res = await apiRequest("/payroll/config/preview/", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        })
+        if (res?.success && res?.data?.breakdown) {
+          setBackendBreakdown(res.data.breakdown)
+        }
+      } catch (e) {
+        console.warn("Backend preview failed, falling back to local calculation", e)
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [config])
+
+  const emp  = backendBreakdown ? Number(backendBreakdown.employee_share_amount) : (base * config.employee_share_pct / 100)
+  const co   = backendBreakdown ? Number(backendBreakdown.company_share_amount) : (base * config.company_share_pct  / 100)
+  const plat = backendBreakdown ? Number(backendBreakdown.platform_fee_amount) : (config.platform_fee_type === "fixed" ? Number(config.platform_fee_value) : (base * config.platform_fee_value / 100))
+  const pf   = backendBreakdown ? Number(backendBreakdown.pf_deduction) : (config.pf_enabled  ? (emp * config.pf_pct  / 100) : 0)
+  const esi  = backendBreakdown ? Number(backendBreakdown.esi_deduction) : (config.esi_enabled ? (emp * config.esi_pct / 100) : 0)
+  const tds  = backendBreakdown ? Number(backendBreakdown.tds_deduction) : (config.tds_enabled ? (emp * config.tds_rate / 100) : 0)
+  const net  = backendBreakdown ? Number(backendBreakdown.net_credit_amount) : (emp - pf - esi - tds)
 
   const rows = [
     { lbl: "Total Revenue",                     amt: base, clr: "#e2e8f0" },
-    { lbl: `Employee (${config.employee_share_pct}%)`,  amt: emp.toFixed(0),  clr: "#bbf7d0" },
-    { lbl: `Company (${config.company_share_pct}%)`,    amt: co.toFixed(0),   clr: "#bfdbfe" },
-    { lbl: `Platform (${config.platform_fee_type === "fixed" ? "fixed" : config.platform_fee_value + "%"})`, amt: plat.toFixed(0), clr: "#e9d5ff" },
-    config.pf_enabled  && { lbl: `PF (${config.pf_pct}%)`,   amt: `-${pf.toFixed(0)}`,  clr: "#fca5a5" },
-    config.esi_enabled && { lbl: `ESI (${config.esi_pct}%)`, amt: `-${esi.toFixed(0)}`, clr: "#fca5a5" },
-    config.tds_enabled && { lbl: `TDS (${config.tds_rate}%)`,amt: `-${tds.toFixed(0)}`, clr: "#fca5a5" },
-    { lbl: "Net Pay", amt: net.toFixed(0), clr: "#a5f3fc", bold: true },
+    { lbl: `Employee (${config.employee_share_pct}%)`,  amt: emp.toFixed(2),  clr: "#bbf7d0" },
+    { lbl: `Company (${config.company_share_pct}%)`,    amt: co.toFixed(2),   clr: "#bfdbfe" },
+    { lbl: `Platform (${config.platform_fee_type === "fixed" ? "fixed" : config.platform_fee_value + "%"})`, amt: plat.toFixed(2), clr: "#e9d5ff" },
+    (config.pf_enabled || pf > 0)  && { lbl: `PF (${config.pf_pct}%)`,   amt: `-${pf.toFixed(2)}`,  clr: "#fca5a5" },
+    (config.esi_enabled || esi > 0) && { lbl: `ESI (${config.esi_pct}%)`, amt: `-${esi.toFixed(2)}`, clr: "#fca5a5" },
+    (config.tds_enabled || tds > 0) && { lbl: `TDS (${config.tds_rate}%)`,amt: `-${tds.toFixed(2)}`, clr: "#fca5a5" },
+    { lbl: "Net Pay", amt: net.toFixed(2), clr: "#a5f3fc", bold: true },
   ].filter(Boolean)
 
   return (
     <div style={{ background: "linear-gradient(135deg,#1e1b4b,#312e81)", borderRadius: 14, padding: "18px 20px", color: "#fff" }}>
       <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.1em", opacity: 0.6, marginBottom: 12 }}>
-        Live Preview — {currency}1,000 booking
+        Live Backend Preview — {currency}1,000 booking
       </div>
       {rows.map((r, i) => (
         <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: r.bold ? "8px 10px" : "5px 10px", borderRadius: 8, background: r.bold ? "rgba(255,255,255,0.12)" : "transparent", borderTop: r.bold ? "1px solid rgba(255,255,255,0.1)" : "none", marginTop: r.bold ? 4 : 0 }}>
@@ -105,6 +138,7 @@ function SplitPreview({ config, currency }) {
     </div>
   )
 }
+
 
 function ConfigEditor({ config, region, onSave, onCancel, loading }) {
   const meta = REGION_META[region] || REGION_META.IN
@@ -270,10 +304,11 @@ function ConfigEditor({ config, region, onSave, onCancel, loading }) {
 }
 
 export function PayrollSettingsSection({ SectionHeader }) {
-  const { user } = useAuth()
+  const { user, refreshMe } = useAuth()
   const [summary, setSummary]     = useState(null)
-  const region   = summary?.region || user?.companyCountry || user?.company_country || user?.companyRegion || user?.primaryCountry || "US"
-  const meta     = REGION_META[region] || REGION_META.US
+  const rawRegion = summary?.region || user?.companyCountry || user?.company_country || user?.companyRegion || user?.primaryCountry || "IN"
+  const region   = (rawRegion === "US" || rawRegion === "us") ? "IN" : String(rawRegion).toUpperCase().trim()
+  const meta     = REGION_META[region] || REGION_META.IN
 
   const [tab, setTab]             = useState("groups")
   const [groups, setGroups]       = useState([])
@@ -306,7 +341,10 @@ export function PayrollSettingsSection({ SectionHeader }) {
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchAll() }, [fetchAll])
+  useEffect(() => {
+    if (refreshMe) refreshMe().catch(() => {})
+    fetchAll()
+  }, [fetchAll, refreshMe])
 
   const fetchGrpEmps = useCallback(async (id) => {
     try {
@@ -640,3 +678,5 @@ export function PayrollSettingsSection({ SectionHeader }) {
     </div>
   )
 }
+
+export default PayrollSettingsSection

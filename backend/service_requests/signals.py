@@ -12,6 +12,7 @@ from django.db.models import Avg, Count, Q
 def recalculate_employee_performance(employee):
     """Calculate and save EmployeePerformance aggregates for an employee."""
     from .models import EmployeeJob, EmployeePerformance, ServiceFeedback, ServiceRequest
+    from tasks.models import Task
     from django.db.models import Avg, Count, Q
 
     # Aggregate all feedback for this employee
@@ -33,39 +34,42 @@ def recalculate_employee_performance(employee):
     resolved_count  = agg["resolved_count"] or 0
 
     # Completion rate: completed jobs / total assigned jobs
-    total_assigned  = EmployeeJob.objects.filter(employee=employee).count()
-    completed_count = EmployeeJob.objects.filter(
-        employee=employee,
-        status=EmployeeJob.Status.COMPLETED,
+    completed_jobs = EmployeeJob.objects.filter(
+        employee=employee
+    ).filter(
+        Q(status=EmployeeJob.Status.COMPLETED) | Q(status__iexact="completed")
     ).count()
+    total_jobs = EmployeeJob.objects.filter(employee=employee).count()
 
     # Fallback/merge with direct service request assignments
-    sr_assigned = ServiceRequest.objects.filter(assigned_employee=employee)
+    sr_assigned = ServiceRequest.objects.filter(
+        Q(assigned_employee=employee) | Q(employee_job__employee=employee)
+    )
     sr_total = sr_assigned.count()
+    sr_completed = sr_assigned.filter(
+        status__in=[
+            "completed", "awaiting_verification", "verified",
+            "feedback_pending", "feedback_received", "closed"
+        ]
+    ).count()
 
-    if sr_total > total_assigned:
-        total_assigned = sr_total
-        completed_count = sr_assigned.filter(
-            status__in=[
-                "completed", "awaiting_verification", "verified",
-                "feedback_pending", "feedback_received", "closed"
-            ]
+    # Operational Task models
+    user = getattr(employee, "user", None)
+    task_total = 0
+    task_completed = 0
+    if user:
+        task_qs = Task.objects.filter(Q(assigned_to=user) | Q(assigned_to_id=user.id))
+        task_total = task_qs.count()
+        task_completed = task_qs.filter(
+            Q(status__iexact="completed") | Q(travel_status__iexact="done") | Q(completed_at__isnull=False)
         ).count()
-    # Phase 3 enhancement: The frontend Job Queue uses `Task` models as the operational unit.
-    # So we pull true `Task` counts and override if it has more completed jobs or total assigned.
-    from tasks.models import Task
-    task_total = Task.objects.filter(assigned_to=employee.user).count()
-    task_completed = Task.objects.filter(assigned_to=employee.user, status=Task.Status.COMPLETED).count()
-    
-    # We use the system that reflects the most accurate (highest) completion count
-    if task_completed > completed_count or task_total > total_assigned:
-        total_assigned = max(task_total, total_assigned)
-        completed_count = max(task_completed, completed_count)
 
-    completion_rate = (completed_count / total_assigned * 100) if total_assigned else 0
+    # Take maximum completed and assigned count across all system sources
+    completed_count = max(completed_jobs, sr_completed, task_completed)
+    total_assigned = max(total_jobs, sr_total, task_total)
 
-    # Customer satisfaction: percentage of resolved issues (0-5 scaled)
-    satisfaction = (resolved_count / feedback_count * 5) if feedback_count else 0
+    completion_rate = (completed_count / total_assigned * 100) if total_assigned > 0 else (100.0 if completed_count > 0 else 0.0)
+    satisfaction = (resolved_count / feedback_count * 5) if feedback_count > 0 else (avg_rating if avg_rating > 0 else (5.0 if completed_count > 0 else 0.0))
 
     perf, _ = EmployeePerformance.objects.update_or_create(
         employee=employee,

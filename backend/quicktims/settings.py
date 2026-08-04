@@ -105,13 +105,17 @@ SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 # ---------------------------------------------------------------------------
 
 USE_POSTGRES = os.getenv("DB_NAME") or os.getenv("DB_HOST")
+USE_TENANTS = os.getenv("USE_TENANTS", "1") == "1"
 
 if USE_POSTGRES:
-    DATABASE_ROUTERS = ('django_tenants.routers.TenantSyncRouter',)
+    if USE_TENANTS:
+        DATABASE_ROUTERS = ('django_tenants.routers.TenantSyncRouter',)
+    else:
+        DATABASE_ROUTERS = ()
+        MIDDLEWARE = [m for m in MIDDLEWARE if "django_tenants" not in m]
+        if "django_tenants" in INSTALLED_APPS:
+            INSTALLED_APPS.remove("django_tenants")
 
-    # Build OPTIONS dynamically — sslmode is opt-in via DB_SSLMODE env var.
-    # Docker local PostgreSQL: leave DB_SSLMODE unset (no SSL).
-    # Supabase / any remote TLS host: set DB_SSLMODE=require in .env.
     _db_options = {}
     _sslmode = os.getenv("DB_SSLMODE", "")
     if _sslmode:
@@ -122,12 +126,12 @@ if USE_POSTGRES:
 
     DATABASES = {
         "default": {
-            "ENGINE": "django_tenants.postgresql_backend",
-            "NAME": os.getenv("DB_NAME", "caltrack"),
-            "USER": os.getenv("DB_USER", "caltrack_user"),
-            "PASSWORD": os.getenv("DB_PASSWORD", "caltrack_pass"),
-            "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-            "PORT": os.getenv("DB_PORT", "5435"),
+            "ENGINE": "django_tenants.postgresql_backend" if USE_TENANTS else "django.db.backends.postgresql",
+            "NAME": os.getenv("DB_NAME", "postgres"),
+            "USER": os.getenv("DB_USER", "postgres"),
+            "PASSWORD": os.getenv("DB_PASSWORD", ""),
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
             "OPTIONS": _db_options,
             "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "0")),
             "CONN_HEALTH_CHECKS": True,

@@ -259,16 +259,24 @@ class AdminPaymentUpdateView(APIView):
 
 class InvoiceDownloadView(APIView):
     """
-    GET /api/booking/<id>/invoice/
-    Generate and return a PDF invoice for a completed + paid booking.
+    GET /api/booking/<id>/invoice/ or GET /api/settings/invoices/download/?request_id=<id>
+    Generate and return a PDF invoice for a service booking request.
     """
     permission_classes = [permissions.AllowAny]
 
-    def get(self, request, pk):
+    def get(self, request, pk=None):
+        req_id = request.query_params.get("request_id") or request.query_params.get("id") or pk
+        if not req_id:
+            return _error("Booking ID or request_id parameter is required.", 400)
+
         sr = None
-        try:
-            sr = ServiceRequest.objects.get(pk=pk)
-        except Exception:
+        # Try lookup by integer PK first, then string request_id
+        if isinstance(req_id, int) or (isinstance(req_id, str) and req_id.isdigit()):
+            sr = ServiceRequest.objects.filter(pk=int(req_id)).first()
+        if not sr:
+            sr = ServiceRequest.objects.filter(request_id__iexact=str(req_id)).first()
+
+        if not sr:
             try:
                 from django.db import connection
                 from django_tenants.utils import schema_context
@@ -278,7 +286,10 @@ class InvoiceDownloadView(APIView):
                 for s_name in schemas:
                     try:
                         with schema_context(s_name):
-                            sr = ServiceRequest.objects.filter(pk=pk).first()
+                            if isinstance(req_id, int) or (isinstance(req_id, str) and req_id.isdigit()):
+                                sr = ServiceRequest.objects.filter(pk=int(req_id)).first()
+                            if not sr:
+                                sr = ServiceRequest.objects.filter(request_id__iexact=str(req_id)).first()
                             if sr:
                                 break
                     except Exception:
@@ -287,7 +298,7 @@ class InvoiceDownloadView(APIView):
                 pass
 
         if not sr:
-            return _error("Booking not found.", 404)
+            return _error(f"Booking with ID '{req_id}' not found.", 404)
 
         if str(sr.status).lower() in ("cancelled", "rejected"):
             return _error("Invoice is not available for cancelled bookings.", 400)
@@ -295,7 +306,8 @@ class InvoiceDownloadView(APIView):
         try:
             pdf_bytes = self._generate_invoice_pdf(sr)
             response = HttpResponse(pdf_bytes, content_type="application/pdf")
-            response["Content-Disposition"] = f'attachment; filename="Invoice-{sr.invoice_id or sr.request_id}.pdf"'
+            filename = f"Invoice-{sr.invoice_id or sr.request_id}.pdf"
+            response["Content-Disposition"] = f'inline; filename="{filename}"'
             return response
         except Exception as e:
             logger.error(f"Invoice generation failed: {e}")
@@ -477,8 +489,10 @@ class InvoiceDownloadView(APIView):
         c.rect(310, y - 6, W - 310 - 25, 28, fill=1, stroke=0)
         c.setFillColor(white)
         c.setFont("Helvetica-Bold", 12)
-        c.drawString(320, y + 6, "TOTAL PAID:")
-        c.drawRightString(W - 35, y + 6, f"Rs. {final_total:,.2f}")
+        is_paid = sr.payment_status in (ServiceRequest.PaymentStatus.PAID, ServiceRequest.PaymentStatus.COLLECTED)
+        total_text = "TOTAL PAID:" if is_paid else "TOTAL DUE:"
+        c.drawString(320, y + 6, total_text)
+        c.drawRightString(W - 35, y + 6, f"₹{final_total:,.2f}")
 
         # ── Payment Method Badge ──
         y -= 45

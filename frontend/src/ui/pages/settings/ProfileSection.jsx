@@ -127,7 +127,7 @@ export default function ProfileSection({ markDirty, showToast, Field, SectionHea
           <div style={{ position: "relative" }}>
             <div className="stIdentityAvatar" style={{ width: 72, height: 72, borderRadius: 16, fontSize: 26 }}>
               {avatarPreview
-                ? <img src={avatarPreview} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }} />
+                ? <img src={avatarPreview.includes("demo.localhost") ? "http://localhost:8000" + avatarPreview.substring(avatarPreview.indexOf('/media/')) : avatarPreview} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 16 }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                 : initials}
             </div>
             <button

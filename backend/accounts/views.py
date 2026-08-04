@@ -8,10 +8,18 @@ from django.db.models import Q
 from companies.models import Company
 from settings_hub.models import TeamInvite
 
+from contextlib import contextmanager
+
 try:
-    from django_tenants.utils import schema_context
+    from django_tenants.utils import schema_context as _django_tenants_schema_context
+    @contextmanager
+    def schema_context(schema_name):
+        if hasattr(connection, "tenant"):
+            with _django_tenants_schema_context(schema_name):
+                yield
+        else:
+            yield
 except ImportError:
-    from contextlib import contextmanager
     @contextmanager
     def schema_context(schema_name):
         yield
@@ -415,11 +423,17 @@ class GoogleLoginView(APIView):
 
         # Check if there is a pending team invitation for this email across all companies
         invite = None
-        for company in Company.objects.exclude(schema_name="public"):
-            with schema_context(company.schema_name):
-                invite = TeamInvite.objects.filter(email__iexact=email_clean, status="pending").first()
-                if invite:
-                    break
+        try:
+            for company in Company.objects.exclude(schema_name="public"):
+                try:
+                    with schema_context(company.schema_name):
+                        invite = TeamInvite.objects.filter(email__iexact=email_clean, status="pending").first()
+                        if invite:
+                            break
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
         # ── HIGH 2: Invite Gate ──────────────────────────────────────────────
         # Block account creation for unknown emails that have no pending invite.
@@ -762,15 +776,43 @@ class MeView(APIView):
 
 class ProfileUpdateView(APIView):
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [__import__("rest_framework").parsers.MultiPartParser, __import__("rest_framework").parsers.FormParser, __import__("rest_framework").parsers.JSONParser]
 
     def patch(self, request):
-        from .serializers import ProfileUpdateSerializer
-        serializer = ProfileUpdateSerializer(request.user, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"success": True, "data": UserSerializer(request.user, context={"request": request}).data})
-        return Response({"success": False, "message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            from .serializers import ProfileUpdateSerializer
+            data = request.data.dict() if hasattr(request.data, 'dict') else dict(request.data)
+
+            avatar_val = data.pop('avatar', None)
+            data.pop('profile_picture', None)
+
+            if avatar_val:
+                if isinstance(avatar_val, str) and avatar_val.strip():
+                    if '/media/' in avatar_val:
+                        request.user.avatar.name = avatar_val.split('/media/')[-1]
+                    else:
+                        request.user.avatar.name = avatar_val
+                    try:
+                        request.user.save(update_fields=['avatar'])
+                    except Exception:
+                        request.user.save()
+
+            avatar_file = request.FILES.get('avatar') or request.FILES.get('image')
+            if avatar_file:
+                request.user.avatar = avatar_file
+                try:
+                    request.user.save(update_fields=['avatar'])
+                except Exception:
+                    request.user.save()
+
+            serializer = ProfileUpdateSerializer(request.user, data=data, partial=True, context={"request": request})
+            if serializer.is_valid():
+                serializer.save()
+                return Response({"success": True, "data": UserSerializer(request.user, context={"request": request}).data})
+            return Response({"success": False, "message": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as err:
+            import logging
+            logging.getLogger(__name__).error(f"Error updating profile: {err}", exc_info=True)
+            return Response({"success": False, "message": str(err)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class PasswordChangeView(APIView):

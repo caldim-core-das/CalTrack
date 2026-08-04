@@ -14,6 +14,8 @@ from .views import (
     DataExportView, AccountDeletionView, WorkspaceDeletionView, OwnerTransferView,
 )
 
+from service_requests.payment_views import InvoiceDownloadView
+
 urlpatterns = [
     # Notifications
     path("notifications/", NotificationPreferenceView.as_view(), name="notification-prefs"),
@@ -41,6 +43,7 @@ urlpatterns = [
     # Billing
     path("billing/subscription/", BillingSubscriptionView.as_view(), name="billing-subscription"),
     path("invoices/", InvoiceListView.as_view(), name="invoice-list"),
+    path("invoices/download/", InvoiceDownloadView.as_view(), name="settings-invoice-download"),
 
     # Catalog
     path("catalog/categories/", AdminCatalogCategoryListView.as_view(), name="settings-catalog-categories-list"),

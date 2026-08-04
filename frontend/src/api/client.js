@@ -84,8 +84,13 @@ async function _executeRequest(path, init = {}, attemptRefresh = true) {
     headers.set("Content-Type", "application/json")
   }
 
+  let cleanPath = path
+  if (cleanPath.startsWith("/api/")) {
+    cleanPath = cleanPath.slice(4)
+  }
+
   try {
-    const res = await fetch(`${API_BASE_URL}${path}`, {
+    const res = await fetch(`${API_BASE_URL}${cleanPath}`, {
       ...init,
       credentials: "include",               // always send auth cookies
       cache: "no-store",                    // prevent aggressive browser caching
