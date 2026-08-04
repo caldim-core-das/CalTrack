@@ -44,6 +44,10 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    watch: {
+      usePolling: true,
+      interval: 100,
+    },
     // Warm up the most-visited pages so the first dev request is instant
     warmup: {
       clientFiles: [

@@ -90,6 +90,10 @@ export function GetStartedPage() {
 
   useEffect(() => {
     async function checkOnboardingStatus() {
+      if (!user || user.role === 'customer') {
+        setLoading(false)
+        return
+      }
       try {
         const completed = new Set()
 
@@ -241,9 +245,20 @@ export function GetStartedPage() {
             <p className="text-sm text-white/80 dark:text-slate-400 font-bold m-0 uppercase tracking-widest">
               {doneCount} of {totalSteps} steps completed
             </p>
-            <div className="mt-4 px-3 py-1 bg-white/20 dark:bg-slate-800 rounded-full text-[10px] font-black text-white dark:text-indigo-400 uppercase tracking-widest w-fit">
-              Keep going!
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const nextStep = STEPS.find(s => !completedSteps.has(s.id))
+                if (nextStep) {
+                  navigate(nextStep.to)
+                } else {
+                  handleDismiss()
+                }
+              }}
+              className="mt-4 px-4 py-1.5 bg-white/20 hover:bg-white/30 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full text-[10px] font-black text-white dark:text-indigo-400 uppercase tracking-widest w-fit cursor-pointer transition-all duration-300 active:scale-95 shadow-sm flex items-center gap-1"
+            >
+              Keep going! →
+            </button>
           </div>
         </motion.div>
       </div>

@@ -16,7 +16,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError, NotFound, PermissionDenied
 
 from employees.models import Employee
-from .models import (
+from service_requests.models import (
     RescheduleRequest, RescheduleStatus, RescheduleReason, TimeSlotChoices, RescheduleAttachment,
     RescheduleRejectionReason, EmployeeResponseChoices, EmployeeRejectionReason,
     RefundRequest, RefundStatus, RefundType, RefundReason, RefundInfoTarget, RefundEvidence, RefundInvestigationNote,
@@ -342,7 +342,7 @@ def apply_reschedule_transition(reschedule_request, new_status, actor=None, note
 
     # Audit log in RescheduleStatusHistory
     try:
-        from .models import RescheduleStatusHistory
+        from service_requests.models import RescheduleStatusHistory
         RescheduleStatusHistory.objects.create(
             request=reschedule_request,
             from_status=from_status,
@@ -449,7 +449,7 @@ def create_reschedule_request(booking, requested_by, new_date, new_time_slot, re
     )
 
     try:
-        from .models import RescheduleStatusHistory
+        from service_requests.models import RescheduleStatusHistory
         RescheduleStatusHistory.objects.create(
             request=rr,
             from_status="NONE",
@@ -621,7 +621,7 @@ def admin_approve_reschedule(admin, request_id, notes=""):
                 pass
         else:
             # No employee found at all — reject
-            from .models import RescheduleRejectionReason
+            from service_requests.models import RescheduleRejectionReason
             rr.rejection_reason = RescheduleRejectionReason.EMPLOYEE_UNAVAILABLE
             rr.rejection_notes = "No available employee found for the requested time slot."
             rr.save(update_fields=["rejection_reason", "rejection_notes"])
@@ -1167,7 +1167,7 @@ def employee_submit_investigation(employee_user, refund_id, explanation, work_co
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
-from .models import ComplaintStatusHistory
+from service_requests.models import ComplaintStatusHistory
 
 COMPLAINT_ALLOWED_TRANSITIONS = {
     "OPEN": ["ASSIGNED", "CLOSED"],
@@ -1509,7 +1509,7 @@ from payroll.models import PayrollConfig
 from payroll.exceptions import PayrollConfigMissingException
 from payroll import services as payroll_services
 from payroll.signals import wallet_credited
-from .state_machine import apply_transition
+from service_requests.state_machine import apply_transition
 
 
 def process_booking_completion_and_payout(booking, actor=None):

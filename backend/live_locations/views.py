@@ -522,6 +522,23 @@ class SOSView(APIView):
             lng=lng_d,
         )
 
+        # ── Automatically Suspend Active Task for Emergency Reassignment ──
+        try:
+            from tasks.models import Task
+            active_tasks = Task.objects.filter(
+                assigned_to=request.user,
+                company=company,
+                status__in=[Task.Status.IN_PROGRESS, Task.Status.PENDING]
+            )
+            for active_task in active_tasks:
+                active_task.status = Task.Status.SUSPENDED
+                emp_name = employee.user.get_full_name() or employee.user.username
+                active_task.suspend_reason = f"🆘 EMERGENCY SOS: Work halted due to technician injury/emergency alert ({emp_name}). Reassignment required."
+                active_task.save(update_fields=['status', 'suspend_reason'])
+                print(f"DEBUG: Task {active_task.id} auto-suspended due to SOS alert")
+        except Exception as t_err:
+            print(f"DEBUG: Auto-suspend task failed: {t_err}")
+
         # Also push via WebSocket channel layer if available
         try:
             from channels.layers import get_channel_layer

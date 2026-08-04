@@ -63,4 +63,5 @@ export const routes = {
   employee_jobs: "/employee/jobs",
   employee_feedback: "/employee/feedback",
   audit_ledger: "/audit-ledger",
+  customer_work_extension: "/customer/work-extensions/:token",
 }

@@ -128,7 +128,7 @@ def push_task_notification(user, title, body, task=None, notif_type="info"):
 
 # ── Module 2: Pause / Resume ────────────────────────────────────────────────
 
-def suspend_job(task_id, worker, reason=None, reason_category=None, resume_deadline=None):
+def suspend_job(task_id, worker, reason=None, reason_category=None, resume_deadline=None, admin_override=False):
     """
     Suspends an InProgress task belonging to the worker.
     - Validates SLA safety (blocks if breach imminent).
@@ -148,14 +148,14 @@ def suspend_job(task_id, worker, reason=None, reason_category=None, resume_deadl
 
     # ── SLA safety check ────────────────────────────────────────────────────
     is_sla_safe, mins_remaining = check_sla_safe(task)
-    if not is_sla_safe:
+    if not is_sla_safe and not admin_override:
         raise SLABreachError(
             f"Cannot pause — SLA breach in {mins_remaining:.0f} minutes. "
             f"Contact admin to override or complete the job first."
         )
 
     # ── Priority guard ──────────────────────────────────────────────────────
-    if task.priority in (Task.Priority.URGENT, Task.Priority.HIGH):
+    if not admin_override and task.priority in (Task.Priority.URGENT, Task.Priority.HIGH):
         raise ValidationError(
             f"Cannot pause a {task.priority}-priority task. "
             f"Only Low/Medium priority tasks can be paused without admin approval."

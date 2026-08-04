@@ -22,11 +22,19 @@ class InventoryItem(models.Model):
     location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, blank=True, related_name='inventory_stock')
     total_quantity = models.PositiveIntegerField(default=0)
     available_quantity = models.PositiveIntegerField(default=0)
+    reserved_quantity = models.PositiveIntegerField(default=0)
     unit_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     reorder_threshold = models.PositiveIntegerField(default=0)
+    reorder_quantity = models.PositiveIntegerField(default=10)
+    pending_purchase_quantity = models.PositiveIntegerField(default=0)
+    expected_delivery_date = models.DateField(null=True, blank=True)
     is_returnable = models.BooleanField(default=True)
     requires_photo_on_issue = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    @property
+    def effective_available_quantity(self):
+        return max(0, self.total_quantity - self.reserved_quantity)
 
     def __str__(self):
         return f"{self.name} ({self.sku})"

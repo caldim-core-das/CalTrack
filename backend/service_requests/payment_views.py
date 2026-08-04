@@ -275,9 +275,33 @@ class InvoiceDownloadView(APIView):
             sr = ServiceRequest.objects.filter(pk=int(req_id)).first()
         if not sr:
             sr = ServiceRequest.objects.filter(request_id__iexact=str(req_id)).first()
-        
+
+        if not sr:
+            try:
+                from django.db import connection
+                from django_tenants.utils import schema_context
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT table_schema FROM information_schema.tables WHERE table_name = 'service_requests_servicerequest'")
+                    schemas = [row[0] for row in cursor.fetchall()]
+                for s_name in schemas:
+                    try:
+                        with schema_context(s_name):
+                            if isinstance(req_id, int) or (isinstance(req_id, str) and req_id.isdigit()):
+                                sr = ServiceRequest.objects.filter(pk=int(req_id)).first()
+                            if not sr:
+                                sr = ServiceRequest.objects.filter(request_id__iexact=str(req_id)).first()
+                            if sr:
+                                break
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
         if not sr:
             return _error(f"Booking with ID '{req_id}' not found.", 404)
+
+        if str(sr.status).lower() in ("cancelled", "rejected"):
+            return _error("Invoice is not available for cancelled bookings.", 400)
 
         try:
             pdf_bytes = self._generate_invoice_pdf(sr)
@@ -365,7 +389,7 @@ class InvoiceDownloadView(APIView):
         c.rect(25, y, W - 50, 24, fill=1, stroke=0)
         c.setFillColor(white)
         c.setFont("Helvetica-Bold", 10)
-        c.drawString(35, y + 7, "Service")
+        c.drawString(35, y + 7, "Service & Additional Scope")
         c.drawString(320, y + 7, "Qty")
         c.drawString(370, y + 7, "Rate")
         c.drawRightString(W - 35, y + 7, "Amount")
@@ -380,6 +404,7 @@ class InvoiceDownloadView(APIView):
             except Exception:
                 cart = []
 
+        base_total = 0.0
         if cart:
             for i, item in enumerate(cart):
                 y -= 22
@@ -393,23 +418,62 @@ class InvoiceDownloadView(APIView):
                 qty = item.get("quantity", 1)
                 c.drawString(320, y + 4, str(qty))
                 price = float(item.get("price", 0))
-                c.drawString(370, y + 4, f"\u20b9{price:,.0f}")
-                c.drawRightString(W - 35, y + 4, f"\u20b9{price * qty:,.0f}")
+                c.drawString(370, y + 4, f"Rs. {price:,.0f}")
+                c.drawRightString(W - 35, y + 4, f"Rs. {price * qty:,.0f}")
+                base_total += price * qty
         else:
+            base_total = float(getattr(sr, "base_amount", 0) or 599.0)
             y -= 22
             c.setFont("Helvetica", 10)
-            c.drawString(35, y + 4, sr.issue_title)
+            c.drawString(35, y + 4, sr.issue_title or "Standard Service Package")
             c.drawString(320, y + 4, "1")
-            c.drawString(370, y + 4, f"\u20b9{float(sr.total_amount):,.0f}")
-            c.drawRightString(W - 35, y + 4, f"\u20b9{float(sr.total_amount):,.0f}")
+            c.drawString(370, y + 4, f"Rs. {base_total:,.0f}")
+            c.drawRightString(W - 35, y + 4, f"Rs. {base_total:,.0f}")
+
+        # Check for accepted WorkExtension
+        ext_amount = 0.0
+        ext_reason = ""
+        try:
+            from service_requests.models import WorkExtension
+            ext = WorkExtension.objects.filter(
+                service_request=sr,
+                status__in=[WorkExtension.Status.CUSTOMER_ACCEPTED, WorkExtension.Status.RESOLVED]
+            ).first()
+            if ext:
+                ext_amount = float(ext.admin_approved_amount or ext.technician_estimate or 0)
+                ext_reason = ext.reason or "Additional Repair & Spare Replacement"
+        except Exception:
+            pass
+
+        if ext_amount > 0:
+            y -= 22
+            c.setFillColor(HexColor("#FFFBEB"))
+            c.rect(25, y - 4, W - 50, 22, fill=1, stroke=0)
+            c.setFillColor(HexColor("#B45309"))
+            c.setFont("Helvetica-Bold", 9)
+            reason_clean = ext_reason[:42] if ext_reason else "Approved Extension"
+            c.drawString(35, y + 4, f"Approved Extension: {reason_clean}")
+            c.drawString(320, y + 4, "1")
+            c.drawString(370, y + 4, f"Rs. {ext_amount:,.0f}")
+            c.drawRightString(W - 35, y + 4, f"Rs. {ext_amount:,.0f}")
+
+        final_total = base_total + ext_amount
 
         # ── Totals ──
         y -= 35
         c.setStrokeColor(HexColor("#E2E8F0"))
         c.line(25, y + 20, W - 25, y + 20)
         c.setFont("Helvetica", 10)
-        c.drawString(320, y + 4, "Subtotal:")
-        c.drawRightString(W - 35, y + 4, f"\u20b9{float(sr.total_amount):,.0f}")
+        c.drawString(320, y + 4, "Base Subtotal:")
+        c.drawRightString(W - 35, y + 4, f"Rs. {base_total:,.0f}")
+        
+        if ext_amount > 0:
+            y -= 18
+            c.drawString(320, y + 4, "Work Extension:")
+            c.setFillColor(HexColor("#B45309"))
+            c.drawRightString(W - 35, y + 4, f"Rs. {ext_amount:,.0f}")
+            c.setFillColor(black)
+
         y -= 18
         c.drawString(320, y + 4, "Platform Fee:")
         c.setFillColor(HexColor("#059669"))
@@ -424,10 +488,11 @@ class InvoiceDownloadView(APIView):
         c.setFillColor(HexColor("#7C3AED"))
         c.rect(310, y - 6, W - 310 - 25, 28, fill=1, stroke=0)
         c.setFillColor(white)
+        c.setFont("Helvetica-Bold", 12)
         is_paid = sr.payment_status in (ServiceRequest.PaymentStatus.PAID, ServiceRequest.PaymentStatus.COLLECTED)
         total_text = "TOTAL PAID:" if is_paid else "TOTAL DUE:"
         c.drawString(320, y + 6, total_text)
-        c.drawRightString(W - 35, y + 6, f"₹{float(sr.total_amount):,.2f}")
+        c.drawRightString(W - 35, y + 6, f"₹{final_total:,.2f}")
 
         # ── Payment Method Badge ──
         y -= 45

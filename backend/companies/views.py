@@ -87,6 +87,8 @@ class CompanyCreateView(views.APIView):
                             'inviter_name': user.get_full_name() or user.username,
                             'role': invite.role,
                             'invite_link': invite_link,
+                            'region': invite.region or getattr(company, 'primary_country', 'IN') or 'IN',
+                            'default_state': invite.default_state or getattr(company, 'default_state', '') or 'Tamil Nadu',
                         }
                         
                         html_message = render_to_string('emails/team_invite.html', context)

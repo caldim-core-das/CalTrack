@@ -147,10 +147,11 @@ function EmployeeDashboard() {
     async function load() {
       setLoading(true)
       try {
+        const isStaffOrEmp = user && user.role !== 'customer'
         const [t, l, emp] = await Promise.all([
           apiRequest("/tasks/my/").catch(() => []),
           apiRequest("/leaves/").catch(() => []),
-          apiRequest("/employees/me/").catch(() => null),
+          isStaffOrEmp ? apiRequest("/employees/me/").catch(() => null) : Promise.resolve(null),
         ])
         setTasks(Array.isArray(t) ? t : unwrapResults(t))
         setLeaves(Array.isArray(l) ? l : unwrapResults(l))
@@ -160,7 +161,7 @@ function EmployeeDashboard() {
       }
     }
     load()
-  }, [])
+  }, [user])
 
   const [dateFilter, setDateFilter] = useState("all") // "all", "today", "week", "month", "custom"
   const [customDate, setCustomDate] = useState(new Date().toISOString().split("T")[0])

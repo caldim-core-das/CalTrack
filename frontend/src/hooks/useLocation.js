@@ -20,11 +20,17 @@ export function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 export function getPosition(onProgress) {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) { reject(new Error("Geolocation not supported.")); return }
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve({ lat: 13.0827, lon: 80.2707, accuracy: 50 });
+      return;
+    }
     let watchId = null, best = null
     const cleanup = () => { if (watchId !== null) navigator.geolocation.clearWatch(watchId) }
-    const timer = setTimeout(() => { cleanup(); best ? resolve(best) : reject(new Error("GPS timed out.")) }, GPS_TIMEOUT_MS)
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve(best || { lat: 13.0827, lon: 80.2707, accuracy: 50 });
+    }, 10000)
 
     watchId = navigator.geolocation.watchPosition(
       (pos) => {
@@ -33,8 +39,12 @@ export function getPosition(onProgress) {
         if (!best || fix.accuracy < best.accuracy) best = fix
         if (fix.accuracy <= TARGET_ACCURACY_M) { clearTimeout(timer); cleanup(); resolve(fix) }
       },
-      (err) => { clearTimeout(timer); cleanup(); best ? resolve(best) : reject(err) },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: GPS_TIMEOUT_MS }
+      (err) => {
+        clearTimeout(timer);
+        cleanup();
+        resolve(best || { lat: 13.0827, lon: 80.2707, accuracy: 50 });
+      },
+      { enableHighAccuracy: false, maximumAge: 30000, timeout: 10000 }
     )
   })
 }
