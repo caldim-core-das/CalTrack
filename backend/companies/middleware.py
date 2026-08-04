@@ -50,15 +50,15 @@ class CompanyMiddleware(MiddlewareMixin):
                 token = AccessToken(token_str)
                 company_id = token.get('company_id')
                 user_id = token.get('user_id')
-                if company_id:
-                    from companies.models import Company
-                    company = Company.objects.filter(id=company_id).first()
-                elif user_id:
+                if user_id:
                     from django.contrib.auth import get_user_model
                     User = get_user_model()
                     u = User.objects.filter(id=user_id).first()
                     if u and u.company:
                         company = u.company
+                if not company and company_id:
+                    from companies.models import Company
+                    company = Company.objects.filter(id=company_id).first()
                 if company:
                     print(f"DEBUG: CompanyMiddleware - Found company via JWT: {company.schema_name}")
             except Exception as e:

@@ -25,7 +25,8 @@ import {
   Users, BarChart3, MapPin, Settings, Search, LogOut,
   ChevronLeft, ChevronRight, Rocket, ShieldAlert, Globe, Package, Award,
   FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Car, X,
-  Wrench, MessageSquare, UserCheck, Activity, ArrowUpRight, Repeat2
+  Wrench, MessageSquare, UserCheck, Activity, ArrowUpRight, Repeat2, User,
+  Shield, Palette, CreditCard, Building2, ShieldCheck
 } from "lucide-react"
 
 const ADMIN_NAV_ITEMS = [
@@ -102,13 +103,25 @@ const ADMIN_NAV_ITEMS = [
     ]
   },
   { label: "Inventory", to: routes.inventory, icon: <Package size={20} />, color: "#8B5CF6" },
-  { label: "Organization", to: "/settings/organization", icon: <Globe size={20} />, color: "#38BDF8", adminOnly: true },
-  { label: "Reports", to: "/reports", icon: <BarChart3 size={20} />, color: "#FACC15", adminOnly: true },
-  { label: "Settings", to: "/settings", icon: <Settings size={20} />, color: "#64748B" },
+  {
+    label: "Settings",
+    to: "/settings",
+    icon: <Settings size={20} />,
+    color: "#64748B",
+    children: [
+      { label: "My Profile", to: "/settings?section=profile", icon: <User size={16} />, color: "#3B82F6" },
+      { label: "Security", to: "/settings?section=security", icon: <Shield size={16} />, color: "#10B981" },
+      { label: "Appearance", to: "/settings?section=appearance", icon: <Palette size={16} />, color: "#8B5CF6" },
+      { label: "Payroll Config", to: "/settings?section=payroll", icon: <Banknote size={16} />, color: "#6366F1", adminOnly: true },
+      { label: "Billing", to: "/settings?section=billing", icon: <CreditCard size={16} />, color: "#EC4899", adminOnly: true },
+      { label: "Workspace", to: "/settings?section=organization", icon: <Building2 size={16} />, color: "#06B6D4", adminOnly: true },
+    ]
+  },
 ]
 
 const EMPLOYEE_NAV_ITEMS = [
   { label: "Dashboard", to: routes.dashboard, icon: <Home size={20} />, color: "#10B981" },
+  { label: "My Wallet", to: routes.payroll, icon: <Banknote size={20} />, color: "#059669" },
   { label: "Feedback", to: routes.employee_feedback, icon: <MessageSquare size={20} />, color: "#F59E0B" },
   { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1" },
   { label: "Jobs", to: routes.tasks, icon: <CheckSquare size={20} />, color: "#14B8A6" },
@@ -550,7 +563,12 @@ export function AppShell() {
             >
               <div className="relative w-10 h-10 flex items-center justify-center rounded-xl bg-blue-600 dark:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
                 {user.avatar_url ? (
-                  <img src={user.avatar_url} alt="avatar" className="w-full h-full object-cover rounded-xl" />
+                  <img
+                    src={user.avatar_url.includes("demo.localhost") ? "http://localhost:8000" + user.avatar_url.substring(user.avatar_url.indexOf('/media/')) : user.avatar_url}
+                    alt="avatar"
+                    className="w-full h-full object-cover rounded-xl"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
                 ) : (
                   initials(user.username)
                 )}

@@ -39,6 +39,10 @@ export default defineConfig({
           });
         },
       },
+      "/media": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
     },
     // Warm up the most-visited pages so the first dev request is instant
     warmup: {

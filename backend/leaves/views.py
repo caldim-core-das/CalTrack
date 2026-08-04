@@ -16,17 +16,25 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        if not hasattr(self.request, 'company'):
+        user = self.request.user
+        company = getattr(self.request, 'company', None) or getattr(user, 'company', None)
+        
+        if is_admin_role(user):
+            if company:
+                return LeaveRequest.objects.filter(company=company).select_related(
+                    "employee", "employee__user", "approved_by"
+                ).order_by("-created_at")
+            return LeaveRequest.objects.select_related(
+                "employee", "employee__user", "approved_by"
+            ).order_by("-created_at")
+
+        employee = getattr(user, "employee_profile", None) or Employee.objects.filter(user=user).first()
+        if not employee:
             return LeaveRequest.objects.none()
-        qs = LeaveRequest.objects.filter(company=self.request.company).select_related(
+
+        return LeaveRequest.objects.filter(employee=employee).select_related(
             "employee", "employee__user", "approved_by"
         ).order_by("-created_at")
-        if is_admin_role(self.request.user):
-            return qs
-        employee = Employee.objects.filter(user=self.request.user, company=self.request.company).first()
-        if not employee:
-            return qs.none()
-        return qs.filter(employee=employee)
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -34,10 +42,12 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         return LeaveRequestSerializer
 
     def perform_create(self, serializer):
-        employee = Employee.objects.filter(user=self.request.user, company=self.request.company).first()
+        user = self.request.user
+        employee = getattr(user, "employee_profile", None) or Employee.objects.filter(user=user).first()
         if not employee:
             raise ValidationError({"detail": "Employee profile not found."})
-        serializer.save(employee=employee, company=self.request.company)
+        company = getattr(self.request, 'company', None) or employee.company or getattr(user, 'company', None)
+        serializer.save(employee=employee, company=company)
 
     def perform_update(self, serializer):
         instance = serializer.instance

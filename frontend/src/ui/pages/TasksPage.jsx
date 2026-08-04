@@ -20,7 +20,7 @@ import { ClipboardList, Clock, CheckCircle2, AlertCircle, MapPin, Calendar as Ca
 import { SelfieCapture } from "./TimePage.jsx"
 import { getPosition, useLocationTracker } from "../../hooks/useLocation.js"
 import ActiveSessionContainer from "../components/ActiveSessionContainer.jsx"
-import { verifyFaces } from "../../utils/faceVerify.js"
+import { verifyFaces, hasFace } from "../../utils/faceVerify.js"
 import { CATEGORY_TO_ROLES_MAP } from "../../utils/roles.js"
 
 const BACKEND_HTTP_HOST = import.meta.env.PROD
@@ -891,13 +891,17 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     if (wsRef.current !== null) {
       wsRef.current.onclose = null;
       wsRef.current.onerror = null;
-      wsRef.current.onopen = null;
-      if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+      if (wsRef.current.readyState === WebSocket.OPEN) {
         try {
           wsRef.current.close(1000);
         } catch (e) {
           // ignore
         }
+      } else if (wsRef.current.readyState === WebSocket.CONNECTING) {
+        const socketToClose = wsRef.current;
+        socketToClose.onopen = () => {
+          try { socketToClose.close(1000); } catch (e) { }
+        };
       }
       wsRef.current = null;
       console.log("[LiveTracking] Closed traveling WebSocket.");
@@ -943,10 +947,32 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     }
   }
 
+  const [beforeFaceStatus, setBeforeFaceStatus] = useState(null) // 'verifying', 'verified', 'no_face', 'skipped'
+  const [beforeFaceError, setBeforeFaceError] = useState("")
+
+  async function performBeforeFaceCheck(photoPreviewUrl) {
+    if (!photoPreviewUrl) return
+    setBeforeFaceStatus("verifying")
+    setBeforeFaceError("")
+    try {
+      const faceFound = await hasFace(photoPreviewUrl)
+      if (faceFound) {
+        setBeforeFaceStatus("verified")
+      } else {
+        setBeforeFaceStatus("no_face")
+        setBeforeFaceError("No real face detected in photo! Please retake a clear face selfie.")
+      }
+    } catch (e) {
+      console.error("Before photo face check error:", e)
+      setBeforeFaceStatus("skipped")
+    }
+  }
+
   function handleBeforePhotoCapture(file, previewUrl) {
     setBeforePhoto(file)
     setBeforePhotoPreview(previewUrl)
     setShowSelfieCamera(false)
+    performBeforeFaceCheck(previewUrl)
   }
 
   function handleBeforePhotoFileChange(e) {
@@ -957,6 +983,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
       const reader = new FileReader()
       reader.onloadend = () => {
         setBeforePhotoPreview(reader.result)
+        performBeforeFaceCheck(reader.result)
       }
       reader.readAsDataURL(file)
     }
@@ -1021,16 +1048,25 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     setIsPaymentConfirmed(task.payment_status === "paid")
   }, [task.payment_status])
 
+  function getValidPhotoUrl(photoPath) {
+    if (!photoPath || typeof photoPath !== 'string') return null
+    let url = photoPath
+    if (url.includes("demo.localhost")) {
+      const idx = url.indexOf('/media/')
+      if (idx !== -1) {
+        url = `${BACKEND_HTTP_HOST}${url.substring(idx)}`
+      }
+    } else if (url.startsWith('/')) {
+      url = `${BACKEND_HTTP_HOST}${url}`
+    }
+    return url
+  }
+
   async function performFaceMatching(endingPhotoPreview) {
     setFaceVerifyStatus("verifying")
     setFaceVerifyError("")
     
-    let startPhotoUrl = task.start_photo
-    if (startPhotoUrl && startPhotoUrl.startsWith('/')) {
-      const host = BACKEND_HTTP_HOST
-
-      startPhotoUrl = `${host}${startPhotoUrl}`;
-    }
+    let startPhotoUrl = getValidPhotoUrl(beforePhotoPreview || task.start_photo)
 
     if (!startPhotoUrl) {
       setFaceVerifyStatus("skipped")
@@ -2367,7 +2403,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-205">
                             <button
                               type="button"
-                              onClick={() => { setBeforePhoto(null); setBeforePhotoPreview(null) }}
+                              onClick={() => { setBeforePhoto(null); setBeforePhotoPreview(null); setBeforeFaceStatus(null); setBeforeFaceError(""); }}
                               className="px-4 py-2 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-red-705 transition-colors shadow-lg"
                             >
                               Remove Photo
@@ -2394,6 +2430,32 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                               className="hidden"
                             />
                           </label>
+                        </div>
+                      )}
+
+                      {/* Before Photo Face Verification Badge */}
+                      {beforePhotoPreview && (
+                        <div className="mt-1 flex flex-col items-center">
+                          {beforeFaceStatus === "verifying" && (
+                            <span className="px-4 py-2 rounded-full text-xs font-black bg-indigo-50 border border-indigo-200 text-indigo-700 animate-pulse flex items-center gap-1.5 shadow-sm">
+                              <Loader2 size={13} className="animate-spin text-indigo-600" /> Verifying Real Face Model...
+                            </span>
+                          )}
+                          {beforeFaceStatus === "verified" && (
+                            <span className="px-4 py-2 rounded-full text-xs font-black bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-1.5 shadow-sm">
+                              ✅ Real Face Verified & Locked
+                            </span>
+                          )}
+                          {beforeFaceStatus === "no_face" && (
+                            <span className="px-4 py-2 rounded-full text-xs font-black bg-red-50 border border-red-200 text-red-800 flex items-center gap-1.5 shadow-sm">
+                              🔴 Real Face Protection: No face detected in photo! Please retake.
+                            </span>
+                          )}
+                          {beforeFaceStatus === "skipped" && (
+                            <span className="px-4 py-2 rounded-full text-xs font-black bg-amber-50 border border-amber-200 text-amber-800 flex items-center gap-1.5 shadow-sm">
+                              🟡 Face Detection Model Skipped
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2601,65 +2663,88 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                           <span>Start Work Action</span>
                         </div>
                         
-                        {(!beforePhoto || !startNotes.trim()) && (
-                          <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400/90 leading-relaxed flex flex-col gap-2 bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10">
-                            {!beforePhoto && (
-                              <div className="flex items-center gap-2">
-                                <Camera size={13} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
-                                <span>Capture a Before Photo above first</span>
-                              </div>
-                            )}
-                            {!startNotes.trim() && (
-                              <div className="flex items-center gap-2">
-                                <ClipboardList size={13} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
-                                <span>Fill in Work Notes / Objectives above first</span>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        {(() => {
+                          const isBeforeFaceValid = beforeFaceStatus === "verified" || beforeFaceStatus === "skipped" || (!beforeFaceStatus && !!beforePhoto);
+                          const canStart = beforePhoto && isBeforeFaceValid && beforeFaceStatus !== "verifying" && beforeFaceStatus !== "no_face" && startNotes.trim() && precGPS && isInventoryOk;
 
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            if (!isInventoryOk) {
-                              alert("Cannot start work until required inventory is fulfilled. Please visit the nearest stock location.");
-                              return;
-                            }
-                            if (!beforePhoto) { alert("Please capture a Before Photo first."); return; }
-                            if (!startNotes.trim()) { alert("Please enter Work Notes / Objectives first."); return; }
-                            if (!precGPS) { alert("GPS is still locking. Please wait a moment and try again."); return; }
-                            await handleStartWorkNew();
-                          }}
-                          disabled={localBusy || busy || !isInventoryOk}
-                          style={{
-                            width: "100%",
-                            padding: "15px 0",
-                            borderRadius: 14,
-                            border: "none",
-                            background: (beforePhoto && startNotes.trim() && precGPS && isInventoryOk)
-                              ? "linear-gradient(135deg, #059669 0%, #047857 100%)"
-                              : "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)",
-                            color: "#fff",
-                            fontSize: 13,
-                            fontWeight: 900,
-                            cursor: (localBusy || busy || !isInventoryOk) ? "not-allowed" : "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: 10,
-                            letterSpacing: "0.06em",
-                            textTransform: "uppercase",
-                            boxShadow: (beforePhoto && startNotes.trim() && precGPS && isInventoryOk)
-                              ? "0 6px 20px rgba(5,150,105,0.4)"
-                              : "0 4px 12px rgba(100,116,139,0.2)",
-                            transition: "all 0.25s ease",
-                            opacity: (localBusy || busy || !isInventoryOk) ? 0.6 : 1,
-                          }}
-                        >
-                          <Hammer size={16} />
-                          <span>{localBusy ? "Starting Work…" : "Start Work"}</span>
-                          {!localBusy && <ChevronRight size={16} />}
-                        </button>
+                          return (
+                            <>
+                              {(!beforePhoto || !startNotes.trim() || beforeFaceStatus === "no_face" || beforeFaceStatus === "verifying") && (
+                                <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400/90 leading-relaxed flex flex-col gap-2 bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10">
+                                  {!beforePhoto && (
+                                    <div className="flex items-center gap-2">
+                                      <Camera size={13} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                      <span>Capture a Before Photo above first</span>
+                                    </div>
+                                  )}
+                                  {beforeFaceStatus === "verifying" && (
+                                    <div className="flex items-center gap-2 text-indigo-700">
+                                      <Loader2 size={13} className="shrink-0 animate-spin text-indigo-600" />
+                                      <span>Verifying face model in captured photo...</span>
+                                    </div>
+                                  )}
+                                  {beforeFaceStatus === "no_face" && (
+                                    <div className="flex items-center gap-2 text-red-600">
+                                      <AlertTriangle size={13} className="shrink-0 text-red-600" />
+                                      <span>No face detected! Retake photo with clear face visibility to unlock</span>
+                                    </div>
+                                  )}
+                                  {!startNotes.trim() && (
+                                    <div className="flex items-center gap-2">
+                                      <ClipboardList size={13} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                      <span>Fill in Work Notes / Objectives above first</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!isInventoryOk) {
+                                    alert("Cannot start work until required inventory is fulfilled. Please visit the nearest stock location.");
+                                    return;
+                                  }
+                                  if (!beforePhoto) { alert("Please capture a Before Photo first."); return; }
+                                  if (beforeFaceStatus === "verifying") { alert("Please wait for real face verification to complete."); return; }
+                                  if (beforeFaceStatus === "no_face") { alert("Real face verification failed! Please retake a clear photo of your face."); return; }
+                                  if (!startNotes.trim()) { alert("Please enter Work Notes / Objectives first."); return; }
+                                  if (!precGPS) { alert("GPS is still locking. Please wait a moment and try again."); return; }
+                                  await handleStartWorkNew();
+                                }}
+                                disabled={localBusy || busy || !isInventoryOk || !canStart}
+                                style={{
+                                  width: "100%",
+                                  padding: "15px 0",
+                                  borderRadius: 14,
+                                  border: "none",
+                                  background: canStart
+                                    ? "linear-gradient(135deg, #059669 0%, #047857 100%)"
+                                    : "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)",
+                                  color: "#fff",
+                                  fontSize: 13,
+                                  fontWeight: 900,
+                                  cursor: (localBusy || busy || !isInventoryOk || !canStart) ? "not-allowed" : "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  gap: 10,
+                                  letterSpacing: "0.06em",
+                                  textTransform: "uppercase",
+                                  boxShadow: canStart
+                                    ? "0 6px 20px rgba(5,150,105,0.4)"
+                                    : "0 4px 12px rgba(100,116,139,0.2)",
+                                  transition: "all 0.25s ease",
+                                  opacity: (localBusy || busy || !isInventoryOk || !canStart) ? 0.6 : 1,
+                                }}
+                              >
+                                <Hammer size={16} />
+                                <span>{localBusy ? "Starting Work…" : "Start Work"}</span>
+                                {!localBusy && <ChevronRight size={16} />}
+                              </button>
+                            </>
+                          )
+                        })()}
 
                         {!precGPS && (
                           <div className="text-[9px] text-emerald-650 dark:text-emerald-500/80 font-bold text-center flex items-center justify-center gap-1.5">
@@ -2771,9 +2856,12 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                             <div className="flex flex-col gap-1 items-center">
                               <span className="text-[9px] font-black text-slate-400 uppercase">Start Photo</span>
                               <div className="w-full h-32 rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
-                                {task.start_photo ? (
-                                  <img src={`${BACKEND_HTTP_HOST}${task.start_photo}`} className="w-full h-full object-contain" />
-
+                                {(beforePhotoPreview || task.start_photo) ? (
+                                  <img
+                                    src={getValidPhotoUrl(beforePhotoPreview || task.start_photo)}
+                                    className="w-full h-full object-contain"
+                                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                  />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-400 font-bold uppercase">No Start Photo</div>
                                 )}

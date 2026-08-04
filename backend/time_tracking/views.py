@@ -23,7 +23,7 @@ class JobSiteViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
-            return [permissions.IsAuthenticated(), RequireModuleAccess("locations", "view")]
+            return [permissions.IsAuthenticated()]
         return [IsAdminRole(), RequireModuleAccess("locations", "modify")]
 
     def get_queryset(self):
@@ -515,16 +515,13 @@ class AdminEmployeeTimeLogsView(APIView):
 
 
 class TimeGeofenceStatusView(APIView):
-    permission_classes = [permissions.IsAuthenticated, RequireModuleAccess("attendance", "view")]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         company = getattr(request, 'company', None)
-        employee = Employee.objects.filter(user=request.user, company=company).first()
-        if not employee:
-            return Response({"detail": "Employee profile not found."}, status=404)
+        employee = Employee.objects.filter(user=request.user, company=company).first() if company else None
         
-        job_site = employee.assigned_job_site
-        company = getattr(request, 'company', None)
+        job_site = employee.assigned_job_site if employee else None
         
         data = {
             "geofence_enabled": company.geofence_enabled if company else False,
@@ -538,11 +535,10 @@ class TimeGeofenceStatusView(APIView):
             data["job_site"] = {
                 "id": str(job_site.id),
                 "name": job_site.name,
-                "lat": float(job_site.lat),
-                "lng": float(job_site.lng),
-                "radius_override": job_site.geofence_radius
+                "latitude": float(job_site.latitude) if job_site.latitude is not None else None,
+                "longitude": float(job_site.longitude) if job_site.longitude is not None else None,
+                "radius_meters": job_site.radius_meters or 200,
             }
-            
         return Response(data)
 
 

@@ -362,3 +362,45 @@ class TaskRequiredItem(models.Model):
         unique_together = ('task', 'inventory_item')
 
 
+class TaskFeedback(models.Model):
+    """Customer feedback / rating for a completed task, submitted via a secure token link."""
+
+    RATING_CHOICES = [
+        (1, '1 Star – Poor'),
+        (2, '2 Stars – Below Average'),
+        (3, '3 Stars – Average'),
+        (4, '4 Stars – Good'),
+        (5, '5 Stars – Excellent'),
+    ]
+
+    task = models.OneToOneField(
+        Task,
+        on_delete=models.CASCADE,
+        related_name='customer_feedback',
+    )
+
+    # Customer details (auto-filled from task, editable on submission)
+    customer_name  = models.CharField(max_length=200, blank=True)
+    customer_email = models.EmailField(blank=True)
+    customer_phone = models.CharField(max_length=50, blank=True)
+
+    # Ratings (submitted by customer)
+    rating        = models.PositiveSmallIntegerField(choices=RATING_CHOICES, null=True, blank=True)
+    work_quality  = models.PositiveSmallIntegerField(null=True, blank=True, help_text="1-5 quality score")
+    punctuality   = models.PositiveSmallIntegerField(null=True, blank=True, help_text="1-5 on-time score")
+    behaviour     = models.PositiveSmallIntegerField(null=True, blank=True, help_text="1-5 behaviour score")
+    issue_resolved = models.BooleanField(null=True, blank=True)
+    comment       = models.TextField(blank=True)
+
+    # Token for public URL (generated when admin sends feedback request)
+    feedback_token = models.UUIDField(unique=True, null=True, blank=True, default=None)
+
+    is_submitted  = models.BooleanField(default=False)
+    submitted_at  = models.DateTimeField(null=True, blank=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-submitted_at']
+
+    def __str__(self):
+        return f"TaskFeedback(task={self.task_id}, rating={self.rating}, submitted={self.is_submitted})"

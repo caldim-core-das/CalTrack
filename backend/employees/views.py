@@ -190,163 +190,187 @@ class EmployeeViewSet(viewsets.ModelViewSet):
           - task_history: last 20 tasks
           - performance: placeholder ratings for feedback, functionality, attitude, self_respect
         """
-        employee = self.get_object()
-        if not is_admin_role(request.user) and employee.user_id != request.user.id:
-            return Response({"detail": "Not found."}, status=404)
+        try:
+            employee = self.get_object()
+            if not is_admin_role(request.user) and (not employee.user or employee.user_id != request.user.id):
+                return Response({"detail": "Not found."}, status=404)
 
-        from leaves.models import LeaveRequest
-        from tasks.models import Task
-        from time_tracking.models import TimeLog
+            from leaves.models import LeaveRequest
+            from tasks.models import Task
+            from time_tracking.models import TimeLog
 
-        today = timezone.localdate()
+            today = timezone.localdate()
 
-        # ── Leave History ──────────────────────────────────────────────────
-        leaves_qs = LeaveRequest.objects.filter(employee=employee).select_related("approved_by").order_by("-start_date")
-        leave_history = []
-        for lv in leaves_qs:
-            requested_days = (lv.end_date - lv.start_date).days + 1
-            actual_days = None
-            actual_end_date = None
-            returned_early = False
-            early_return_date = None
+            # ── Leave History ──────────────────────────────────────────────────
+            leaves_qs = LeaveRequest.objects.filter(employee=employee).select_related("approved_by").order_by("-start_date")
+            leave_history = []
+            for lv in leaves_qs:
+                if not getattr(lv, 'start_date', None) or not getattr(lv, 'end_date', None):
+                    continue
+                requested_days = max(1, (lv.end_date - lv.start_date).days + 1)
+                actual_days = None
+                actual_end_date = None
+                returned_early = False
+                early_return_date = None
 
-            if lv.status == LeaveRequest.Status.APPROVED:
-                # Check if employee clocked in during the approved leave window
-                # → earliest clock-in date within leave window = actual return date
-                clock_in_during_leave = TimeLog.objects.filter(
-                    employee=employee,
-                    work_date__gte=lv.start_date,
-                    work_date__lte=lv.end_date,
-                    clock_in__isnull=False,
-                ).order_by("work_date").first()
+                if lv.status == LeaveRequest.Status.APPROVED:
+                    clock_in_during_leave = TimeLog.objects.filter(
+                        employee=employee,
+                        work_date__gte=lv.start_date,
+                        work_date__lte=lv.end_date,
+                        clock_in__isnull=False,
+                    ).order_by("work_date").first()
 
-                if clock_in_during_leave:
-                    # Employee returned early on this date
-                    early_return_date = str(clock_in_during_leave.work_date)
-                    # Days actually on leave = from start_date up to (but not including) return date
-                    actual_days = max(0, (clock_in_during_leave.work_date - lv.start_date).days)
-                    actual_end_date = str(clock_in_during_leave.work_date - timezone.timedelta(days=1)) if actual_days > 0 else str(lv.start_date)
-                    returned_early = True
-                else:
-                    # No early return — cap at today if still ongoing
-                    effective_end = min(lv.end_date, today)
-                    actual_days = max(0, (effective_end - lv.start_date).days + 1)
-                    actual_end_date = str(effective_end)
-                    returned_early = False
+                    if clock_in_during_leave:
+                        early_return_date = str(clock_in_during_leave.work_date)
+                        actual_days = max(0, (clock_in_during_leave.work_date - lv.start_date).days)
+                        actual_end_date = str(clock_in_during_leave.work_date - timezone.timedelta(days=1)) if actual_days > 0 else str(lv.start_date)
+                        returned_early = True
+                    else:
+                        effective_end = min(lv.end_date, today)
+                        actual_days = max(0, (effective_end - lv.start_date).days + 1)
+                        actual_end_date = str(effective_end)
+                        returned_early = False
 
-            leave_history.append({
-                "id": lv.id,
-                "leave_type": lv.leave_type,
-                "status": lv.status,
-                "start_date": str(lv.start_date),
-                "end_date": str(lv.end_date),
-                "actual_end_date": actual_end_date,
-                "requested_days": requested_days,
-                "actual_days_taken": actual_days,
-                "days_saved": max(0, requested_days - actual_days) if actual_days is not None else None,
-                "returned_early": returned_early,
-                "early_return_date": early_return_date,
-                "reason": lv.reason,
-                "paid": lv.paid,
-                "approved_by": lv.approved_by.get_full_name() or lv.approved_by.username if lv.approved_by else None,
-                "decision_at": lv.decision_at.isoformat() if lv.decision_at else None,
-                "decision_date": str(lv.decision_at.date()) if lv.decision_at else None,
-                "decision_time": lv.decision_at.strftime("%I:%M %p") if lv.decision_at else None,
-                "created_at": lv.created_at.isoformat(),
-                "submitted_date": str(lv.created_at.date()),
-                "submitted_time": lv.created_at.strftime("%I:%M %p"),
+                leave_history.append({
+                    "id": lv.id,
+                    "leave_type": lv.leave_type,
+                    "status": lv.status,
+                    "start_date": str(lv.start_date),
+                    "end_date": str(lv.end_date),
+                    "actual_end_date": actual_end_date,
+                    "requested_days": requested_days,
+                    "actual_days_taken": actual_days,
+                    "days_saved": max(0, requested_days - actual_days) if actual_days is not None else None,
+                    "returned_early": returned_early,
+                    "early_return_date": early_return_date,
+                    "reason": lv.reason,
+                    "paid": lv.paid,
+                    "approved_by": lv.approved_by.get_full_name() or lv.approved_by.username if lv.approved_by else None,
+                    "decision_at": lv.decision_at.isoformat() if lv.decision_at else None,
+                    "decision_date": str(lv.decision_at.date()) if lv.decision_at else None,
+                    "decision_time": lv.decision_at.strftime("%I:%M %p") if lv.decision_at else None,
+                    "created_at": lv.created_at.isoformat() if lv.created_at else today.isoformat(),
+                    "submitted_date": str(lv.created_at.date()) if lv.created_at else str(today),
+                    "submitted_time": lv.created_at.strftime("%I:%M %p") if lv.created_at else "12:00 PM",
+                })
+
+            # ── Leave Summary ──────────────────────────────────────────────────
+            approved_leaves = [l for l in leave_history if l["status"] == "approved"]
+            total_approved_days = sum(l["actual_days_taken"] or 0 for l in approved_leaves)
+            total_requested_days = sum(l["requested_days"] for l in approved_leaves)
+
+            leave_summary = {
+                "total_requests": len(leave_history),
+                "approved": len(approved_leaves),
+                "pending": sum(1 for l in leave_history if l["status"] == "pending"),
+                "rejected": sum(1 for l in leave_history if l["status"] == "rejected"),
+                "cancelled": sum(1 for l in leave_history if l["status"] == "cancelled"),
+                "total_approved_days": total_approved_days,
+                "total_requested_days": total_requested_days,
+                "days_returned_early": max(0, total_requested_days - total_approved_days),
+            }
+
+            # ── Task Stats ─────────────────────────────────────────────────────
+            all_tasks = Task.objects.filter(assigned_to=employee.user) if employee.user else Task.objects.none()
+            total_billed = 0.0
+            for t in all_tasks.filter(status=Task.Status.COMPLETED):
+                val = t.billed_hours if t.billed_hours is not None else getattr(t, 'estimated_hours', 0.0)
+                try:
+                    total_billed += float(val or 0.0)
+                except (ValueError, TypeError):
+                    pass
+
+            task_stats = {
+                "total": all_tasks.count(),
+                "completed": all_tasks.filter(status=Task.Status.COMPLETED).count(),
+                "in_progress": all_tasks.filter(status=Task.Status.IN_PROGRESS).count(),
+                "pending": all_tasks.filter(status=Task.Status.PENDING).count(),
+                "cancelled": all_tasks.filter(status=Task.Status.CANCELLED).count(),
+                "upcoming": all_tasks.filter(status=Task.Status.PENDING, due_date__gte=today).count(),
+                "overdue": all_tasks.filter(
+                    status__in=[Task.Status.PENDING, Task.Status.IN_PROGRESS],
+                    due_date__lt=today
+                ).count(),
+                "total_billed_hours": float(total_billed),
+            }
+
+            # ── Recent Task History (last 20) ─────────────────────────────────
+            recent_tasks = all_tasks.order_by("-created_at")[:20]
+            task_history = []
+            for t in recent_tasks:
+                b_hours = None
+                if t.status == Task.Status.COMPLETED:
+                    val = t.billed_hours if t.billed_hours is not None else getattr(t, 'estimated_hours', 0.0)
+                    try:
+                        b_hours = float(val or 0.0)
+                    except (ValueError, TypeError):
+                        b_hours = 0.0
+
+                task_history.append({
+                    "id": t.id,
+                    "title": getattr(t, 'title', ''),
+                    "category": getattr(t, 'category', ''),
+                    "priority": getattr(t, 'priority', ''),
+                    "status": getattr(t, 'status', ''),
+                    "acceptance_status": getattr(t, 'acceptance_status', ''),
+                    "due_date": str(t.due_date) if getattr(t, 'due_date', None) else None,
+                    "started_at": t.started_at.isoformat() if getattr(t, 'started_at', None) else None,
+                    "completed_at": t.completed_at.isoformat() if getattr(t, 'completed_at', None) else None,
+                    "billed_hours": b_hours,
+                    "location": getattr(t, 'location', None) or getattr(t, 'job_address', None) or '',
+                    "client_name": getattr(t, 'client_name', None) or '',
+                })
+
+            # ── Performance Ratings ────────────────────────────────────────────
+            perf_entries = [
+                e for e in (employee.exempt_history or [])
+                if isinstance(e, dict) and e.get("type") == "performance"
+            ]
+            latest_perf = perf_entries[-1] if perf_entries else {}
+            performance = {
+                "feedback_rate": latest_perf.get("feedback_rate"),
+                "functionality": latest_perf.get("functionality"),
+                "attitude": latest_perf.get("attitude"),
+                "self_respect": latest_perf.get("self_respect"),
+                "overall": latest_perf.get("overall"),
+                "notes": latest_perf.get("notes", ""),
+                "rated_at": latest_perf.get("rated_at"),
+                "history": perf_entries,
+            }
+
+            return Response({
+                "employee": {
+                    "id": employee.id,
+                    "employee_id": getattr(employee, 'employee_id', str(employee.id)),
+                    "full_name": (employee.user.get_full_name() or employee.user.username) if employee.user else "Employee",
+                    "username": employee.user.username if employee.user else "",
+                    "email": employee.user.email if employee.user else "",
+                    "title": getattr(employee, 'title', ''),
+                    "hire_date": str(employee.hire_date) if getattr(employee, 'hire_date', None) else None,
+                    "is_active": getattr(employee, 'is_active', True),
+                    "hourly_rate": float(employee.hourly_rate) if getattr(employee, 'hourly_rate', None) is not None else 0.0,
+                    "country": getattr(employee, 'country', 'US'),
+                },
+                "leave_summary": leave_summary,
+                "leave_history": leave_history,
+                "task_stats": task_stats,
+                "task_history": task_history,
+                "performance": performance,
             })
-
-        # ── Leave Summary ──────────────────────────────────────────────────
-        approved_leaves = [l for l in leave_history if l["status"] == "approved"]
-        total_approved_days = sum(l["actual_days_taken"] or 0 for l in approved_leaves)
-        total_requested_days = sum(l["requested_days"] for l in approved_leaves)
-
-        leave_summary = {
-            "total_requests": len(leave_history),
-            "approved": len(approved_leaves),
-            "pending": sum(1 for l in leave_history if l["status"] == "pending"),
-            "rejected": sum(1 for l in leave_history if l["status"] == "rejected"),
-            "cancelled": sum(1 for l in leave_history if l["status"] == "cancelled"),
-            "total_approved_days": total_approved_days,
-            "total_requested_days": total_requested_days,
-            "days_returned_early": max(0, total_requested_days - total_approved_days),
-        }
-
-        # ── Task Stats ─────────────────────────────────────────────────────
-        all_tasks = Task.objects.filter(assigned_to=employee.user)
-        task_stats = {
-            "total": all_tasks.count(),
-            "completed": all_tasks.filter(status=Task.Status.COMPLETED).count(),
-            "in_progress": all_tasks.filter(status=Task.Status.IN_PROGRESS).count(),
-            "pending": all_tasks.filter(status=Task.Status.PENDING).count(),
-            "cancelled": all_tasks.filter(status=Task.Status.CANCELLED).count(),
-            "upcoming": all_tasks.filter(status=Task.Status.PENDING, due_date__gte=today).count(),
-            "overdue": all_tasks.filter(
-                status__in=[Task.Status.PENDING, Task.Status.IN_PROGRESS],
-                due_date__lt=today
-            ).count(),
-            "total_billed_hours": float(sum(
-                float(t.billed_hours if t.billed_hours is not None else t.estimated_hours)
-                for t in all_tasks.filter(status=Task.Status.COMPLETED)
-            )),
-        }
-
-        # ── Recent Task History (last 20) ─────────────────────────────────
-        recent_tasks = all_tasks.order_by("-created_at")[:20]
-        task_history = []
-        for t in recent_tasks:
-            task_history.append({
-                "id": t.id,
-                "title": t.title,
-                "category": t.category,
-                "priority": t.priority,
-                "status": t.status,
-                "acceptance_status": t.acceptance_status,
-                "due_date": str(t.due_date),
-                "started_at": t.started_at.isoformat() if t.started_at else None,
-                "completed_at": t.completed_at.isoformat() if t.completed_at else None,
-                "billed_hours": float(t.billed_hours if t.billed_hours is not None else t.estimated_hours) if t.status == Task.Status.COMPLETED else None,
-                "location": t.location or t.job_address,
-                "client_name": t.client_name,
-            })
-
-
-        # ── Performance Ratings ────────────────────────────────────────────
-        # These are stored in employee.exempt_history (JSON) as performance entries
-        # or default to None if not yet recorded. Future: could be a separate model.
-        perf_entries = [
-            e for e in (employee.exempt_history or [])
-            if e.get("type") == "performance"
-        ]
-        latest_perf = perf_entries[-1] if perf_entries else {}
-        performance = {
-            "feedback_rate": latest_perf.get("feedback_rate"),        # 1-5
-            "functionality": latest_perf.get("functionality"),        # 1-5
-            "attitude": latest_perf.get("attitude"),                  # 1-5
-            "self_respect": latest_perf.get("self_respect"),          # 1-5
-            "overall": latest_perf.get("overall"),                    # 1-5
-            "notes": latest_perf.get("notes", ""),
-            "rated_at": latest_perf.get("rated_at"),
-            "history": perf_entries,
-        }
-
-        return Response({
-            "employee": {
-                "id": employee.id,
-                "employee_id": employee.employee_id,
-                "full_name": employee.user.get_full_name() or employee.user.username,
-                "username": employee.user.username,
-                "email": employee.user.email,
-                "title": employee.title,
-                "hire_date": str(employee.hire_date) if employee.hire_date else None,
-                "is_active": employee.is_active,
-                "hourly_rate": float(employee.hourly_rate),
-                "country": employee.country,
-            },
-            "leave_summary": leave_summary,
-            "leave_history": leave_history,
-            "task_stats": task_stats,
-            "task_history": task_history,
-            "performance": performance,
-        })
+        except Exception as err:
+            import logging
+            logging.getLogger(__name__).error(f"Error in employee history view: {err}", exc_info=True)
+            return Response({
+                "employee": {
+                    "id": pk,
+                    "employee_id": str(pk),
+                    "full_name": "Employee",
+                    "hourly_rate": 0.0,
+                },
+                "leave_summary": {"total_requests": 0, "approved": 0, "pending": 0, "rejected": 0, "cancelled": 0},
+                "leave_history": [],
+                "task_stats": {"total": 0, "completed": 0, "in_progress": 0, "pending": 0, "cancelled": 0, "upcoming": 0, "overdue": 0, "total_billed_hours": 0.0},
+                "task_history": [],
+                "performance": {},
+            }, status=200)

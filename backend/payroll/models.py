@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -353,4 +355,384 @@ class PayrollGeneration(models.Model):
 
     def __str__(self):
         return f"{self.employee.employee_id} - {self.month}/{self.year}"
+
+
+# ---------------------------------------------------------------------------
+# Organization Payroll Config (Org-level split & deductions)
+# ---------------------------------------------------------------------------
+
+class PayrollConfig(models.Model):
+    """
+    Org-level payroll calculation config for service split and statutory deductions.
+    Only one is_active=True PayrollConfig per org is permitted at a time (enforced in service layer).
+    """
+    class PlatformFeeType(models.TextChoices):
+        PERCENTAGE = "PERCENTAGE", "Percentage"
+        FIXED = "FIXED", "Fixed Amount"
+
+    org = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name="org_payroll_configs"
+    )
+    employee_share_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=80.00,
+        help_text="% of service revenue paid to employee"
+    )
+    company_share_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=10.00,
+        help_text="% of service revenue retained by company"
+    )
+    platform_fee_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=5.00,
+        help_text="% platform fee"
+    )
+    platform_fee_type = models.CharField(
+        max_length=20,
+        choices=PlatformFeeType.choices,
+        default=PlatformFeeType.PERCENTAGE
+    )
+    platform_fee_fixed_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Fixed platform fee amount if platform_fee_type is FIXED"
+    )
+    pf_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=12.00,
+        help_text="PF deduction % from employee share"
+    )
+    esi_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0.75,
+        help_text="ESI deduction % from employee share"
+    )
+    tds_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0.00,
+        help_text="TDS deduction % from employee share"
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"PayrollConfig #{self.pk} ({self.org}) - Active: {self.is_active}"
+
+
+# ---------------------------------------------------------------------------
+# Settlement Cycle Accounting
+# ---------------------------------------------------------------------------
+
+class SettlementCycle(models.Model):
+    class Status(models.TextChoices):
+        OPEN = "OPEN", "Open"
+        PROCESSING = "PROCESSING", "Processing"
+        SETTLED = "SETTLED", "Settled"
+
+    org = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name="settlement_cycles"
+    )
+    cycle_start = models.DateField()
+    cycle_end = models.DateField()
+    settlement_date = models.DateField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OPEN
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"SettlementCycle #{self.pk} ({self.org}) - {self.cycle_start} to {self.cycle_end} [{self.status}]"
+
+
+# ---------------------------------------------------------------------------
+# Bank Account
+# ---------------------------------------------------------------------------
+
+class BankAccount(models.Model):
+    class VerificationStatus(models.TextChoices):
+        UNVERIFIED = "UNVERIFIED", "Unverified"
+        PENDING = "PENDING", "Pending"
+        VERIFIED = "VERIFIED", "Verified"
+        REJECTED = "REJECTED", "Rejected"
+
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="bank_accounts"
+    )
+    org = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name="bank_accounts"
+    )
+    account_number = models.CharField(max_length=100)
+    ifsc_code = models.CharField(max_length=20)
+    upi_id = models.CharField(max_length=100, null=True, blank=True)
+    is_primary = models.BooleanField(default=True)
+    verification_status = models.CharField(
+        max_length=20,
+        choices=VerificationStatus.choices,
+        default=VerificationStatus.PENDING
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_primary", "-created_at"]
+
+    def apply_transition(self, target_status, reason=None):
+        allowed_transitions = {
+            self.VerificationStatus.PENDING: [self.VerificationStatus.VERIFIED, self.VerificationStatus.REJECTED, self.VerificationStatus.UNVERIFIED],
+            self.VerificationStatus.UNVERIFIED: [self.VerificationStatus.PENDING],
+            self.VerificationStatus.VERIFIED: [self.VerificationStatus.REJECTED, self.VerificationStatus.UNVERIFIED],
+            self.VerificationStatus.REJECTED: [self.VerificationStatus.PENDING, self.VerificationStatus.UNVERIFIED],
+        }
+        if target_status not in allowed_transitions.get(self.verification_status, []):
+            raise ValidationError(
+                f"Cannot transition BankAccount #{self.pk} from {self.verification_status} to {target_status}."
+            )
+        self.verification_status = target_status
+        if target_status == self.VerificationStatus.VERIFIED:
+            from django.utils import timezone
+            self.verified_at = timezone.now()
+            self.rejection_reason = None
+        elif target_status == self.VerificationStatus.REJECTED:
+            self.rejection_reason = reason or "Verification rejected"
+
+    def masked_account_number(self):
+        acc = str(self.account_number or "")
+        if len(acc) > 4:
+            return "*" * (len(acc) - 4) + acc[-4:]
+        return acc
+
+    def __str__(self):
+        return f"BankAccount ({self.masked_account_number()}) - {self.employee} ({self.verification_status})"
+
+
+# ---------------------------------------------------------------------------
+# KYC Verification Status
+# ---------------------------------------------------------------------------
+
+class KYCStatus(models.Model):
+    class OverallStatus(models.TextChoices):
+        UNVERIFIED = "UNVERIFIED", "Unverified"
+        PARTIAL = "PARTIAL", "Partial"
+        VERIFIED = "VERIFIED", "Verified"
+
+    employee = models.OneToOneField(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="kyc_status"
+    )
+    org = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name="kyc_statuses"
+    )
+    pan_verified = models.BooleanField(default=False)
+    aadhaar_verified = models.BooleanField(default=False)
+    overall_status = models.CharField(
+        max_length=20,
+        choices=OverallStatus.choices,
+        default=OverallStatus.UNVERIFIED
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"KYCStatus for {self.employee}: {self.overall_status}"
+
+
+# ---------------------------------------------------------------------------
+# Wallet Transaction Ledger
+# ---------------------------------------------------------------------------
+
+class WalletTransaction(models.Model):
+    """
+    Immutable ledger entry for service booking splits credited to employee wallet.
+    Snapshots the PayrollConfig active at calculation time.
+    State transitions must pass through apply_transition().
+    """
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        CREDITED = "CREDITED", "Credited"
+        REVERSED = "REVERSED", "Reversed"
+
+    class Category(models.TextChoices):
+        SERVICE_PAYOUT = "SERVICE_PAYOUT", "Service Payout"
+        BONUS = "BONUS", "Bonus"
+        INCENTIVE = "INCENTIVE", "Incentive"
+        ADJUSTMENT = "ADJUSTMENT", "Adjustment"
+
+    org = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name="wallet_transactions"
+    )
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="wallet_transactions"
+    )
+    booking = models.ForeignKey(
+        'service_requests.ServiceRequest',
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="wallet_transactions"
+    )
+    payroll_config = models.ForeignKey(
+        PayrollConfig,
+        on_delete=models.PROTECT,
+        related_name="wallet_transactions",
+        help_text="Snapshot reference to config active at calculation time"
+    )
+    category = models.CharField(
+        max_length=30,
+        choices=Category.choices,
+        default=Category.SERVICE_PAYOUT
+    )
+    settlement_cycle = models.ForeignKey(
+        SettlementCycle,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="wallet_transactions"
+    )
+    gross_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    employee_share_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    company_share_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    platform_fee_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    pf_deduction = models.DecimalField(max_digits=12, decimal_places=2)
+    esi_deduction = models.DecimalField(max_digits=12, decimal_places=2)
+    tds_deduction = models.DecimalField(max_digits=12, decimal_places=2)
+    net_credit_amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    credited_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def apply_transition(self, target_status):
+        allowed_transitions = {
+            self.Status.PENDING: [self.Status.CREDITED, self.Status.REVERSED],
+            self.Status.CREDITED: [self.Status.REVERSED],
+            self.Status.REVERSED: [],
+        }
+        if target_status not in allowed_transitions.get(self.status, []):
+            raise ValidationError(
+                f"Cannot transition transaction #{self.pk} from {self.status} to {target_status}."
+            )
+        self.status = target_status
+
+    def __str__(self):
+        return f"WalletTransaction #{self.pk} - {self.employee} - ₹{self.net_credit_amount} ({self.status})"
+
+
+# ---------------------------------------------------------------------------
+# Employee Wallet Balance
+# ---------------------------------------------------------------------------
+
+class EmployeeWalletBalance(models.Model):
+    """
+    Denormalized running total wallet balance maintained exclusively by service layer
+    when WalletTransactions move to CREDITED and SETTLED.
+    """
+    org = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name="employee_wallet_balances"
+    )
+    employee = models.OneToOneField(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="wallet_balance"
+    )
+    available_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    pending_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["org", "employee"],
+                name="unique_wallet_balance_per_org_employee"
+            )
+        ]
+
+    @property
+    def total_balance(self):
+        return (self.available_balance or Decimal("0.00")) + (self.pending_balance or Decimal("0.00"))
+
+    def __str__(self):
+        return f"Wallet balance for {self.employee}: Available ₹{self.available_balance}, Pending ₹{self.pending_balance} (Total ₹{self.total_balance})"
+
+
+# ---------------------------------------------------------------------------
+# Payout Dispute
+# ---------------------------------------------------------------------------
+
+class PayoutDispute(models.Model):
+    class Status(models.TextChoices):
+        OPEN = "OPEN", "Open"
+        IN_REVIEW = "IN_REVIEW", "In Review"
+        RESOLVED = "RESOLVED", "Resolved"
+
+    transaction = models.ForeignKey(
+        WalletTransaction,
+        on_delete=models.CASCADE,
+        related_name="disputes"
+    )
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.CASCADE,
+        related_name="payout_disputes"
+    )
+    org = models.ForeignKey(
+        'companies.Company',
+        on_delete=models.CASCADE,
+        related_name="payout_disputes"
+    )
+    reason = models.TextField()
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OPEN
+    )
+    admin_notes = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def apply_transition(self, target_status, admin_notes=None):
+        allowed_transitions = {
+            self.Status.OPEN: [self.Status.IN_REVIEW, self.Status.RESOLVED],
+            self.Status.IN_REVIEW: [self.Status.RESOLVED, self.Status.OPEN],
+            self.Status.RESOLVED: [],
+        }
+        if target_status not in allowed_transitions.get(self.status, []):
+            raise ValidationError(
+                f"Cannot transition dispute #{self.pk} from {self.status} to {target_status}."
+            )
+        self.status = target_status
+        if admin_notes:
+            self.admin_notes = admin_notes
+
+    def __str__(self):
+        return f"PayoutDispute #{self.pk} for TX #{self.transaction_id} ({self.status})"
+
 

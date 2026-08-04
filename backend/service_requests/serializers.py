@@ -22,37 +22,49 @@ class CatalogServiceSerializer(serializers.ModelSerializer):
 
 class CatalogCategorySerializer(serializers.ModelSerializer):
     services = CatalogServiceSerializer(many=True, read_only=True)
-    rating = serializers.SerializerMethodField()
-    jobs_count_str = serializers.SerializerMethodField()
     
     class Meta:
         model = CatalogCategory
         fields = '__all__'
         
-    def get_rating(self, obj):
-        from django.db import models
-        from .models import ServiceFeedback
-        avg = ServiceFeedback.objects.filter(
-            service_request__service_category=str(obj.id),
-            is_submitted=True,
-            rating__isnull=False
-        ).aggregate(models.Avg("rating"))["rating__avg"]
-        return str(round(avg, 1)) if avg else "4.8"
+    def to_internal_value(self, data):
+        data_copy = data.copy() if hasattr(data, 'copy') else dict(data)
+        if 'desc' in data_copy and not data_copy.get('description'):
+            data_copy['description'] = data_copy['desc']
+        if 'jobs' in data_copy and not data_copy.get('jobs_count_str'):
+            data_copy['jobs_count_str'] = data_copy['jobs']
+        return super().to_internal_value(data_copy)
 
-    def get_jobs_count_str(self, obj):
-        from .models import ServiceRequest
-        cnt = ServiceRequest.objects.filter(
-            service_category=str(obj.id),
-            status__in=["completed", "closed", "verified", "awaiting_verification"]
-        ).count()
-        if cnt == 0:
-            return "New"
-        elif cnt < 100:
-            return f"{cnt} bookings"
-        elif cnt < 1000:
-            return f"{cnt//100 * 100}+ bookings"
-        else:
-            return f"{round(cnt/1000, 1)}K+ bookings"
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if not ret.get('rating'):
+            from django.db import models
+            from .models import ServiceFeedback
+            avg = ServiceFeedback.objects.filter(
+                service_request__service_category=str(instance.id),
+                is_submitted=True,
+                rating__isnull=False
+            ).aggregate(models.Avg("rating"))["rating__avg"]
+            ret['rating'] = str(round(avg, 1)) if avg else "4.8"
+            
+        if not ret.get('jobs_count_str'):
+            from .models import ServiceRequest
+            cnt = ServiceRequest.objects.filter(
+                service_category=str(instance.id),
+                status__in=["completed", "closed", "verified", "awaiting_verification"]
+            ).count()
+            if cnt == 0:
+                ret['jobs_count_str'] = "10K+"
+            elif cnt < 100:
+                ret['jobs_count_str'] = f"{cnt} bookings"
+            elif cnt < 1000:
+                ret['jobs_count_str'] = f"{cnt//100 * 100}+ bookings"
+            else:
+                ret['jobs_count_str'] = f"{round(cnt/1000, 1)}K+ bookings"
+                
+        ret['desc'] = instance.description or ""
+        ret['jobs'] = ret['jobs_count_str']
+        return ret
 
 
 # ── Public ────────────────────────────────────────────────────────────────────

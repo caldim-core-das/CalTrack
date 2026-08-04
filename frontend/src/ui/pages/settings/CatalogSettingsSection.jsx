@@ -65,16 +65,29 @@ export default function CatalogSettingsSection({ showToast, SectionHeader }) {
   const handleSaveCategory = async (e) => {
     e.preventDefault()
     try {
+      const payload = {
+        name: editingCategory.name,
+        slug: editingCategory.slug || editingCategory.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        description: editingCategory.desc || editingCategory.description || "",
+        desc: editingCategory.desc || editingCategory.description || "",
+        rating: editingCategory.rating || "4.8",
+        jobs_count_str: editingCategory.jobs || editingCategory.jobs_count_str || "10K+",
+        jobs: editingCategory.jobs || editingCategory.jobs_count_str || "10K+",
+        image: editingCategory.image || ""
+      }
       if (editingCategory.id) {
-        const res = await apiRequest(`/settings/catalog/categories/${editingCategory.id}/`, { method: "PUT", json: editingCategory })
-        showToast("Category updated successfully")
+        const res = await apiRequest(`/settings/catalog/categories/${editingCategory.id}/`, { method: "PUT", json: payload })
+        showToast("Category updated successfully", "success")
         if (selectedCategory?.id === editingCategory.id && res.success) {
           setSelectedCategory(res.data)
         }
       } else {
-        const newSlug = editingCategory.slug || editingCategory.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-        await apiRequest(`/settings/catalog/categories/`, { method: "POST", json: { ...editingCategory, slug: newSlug } })
-        showToast("Category created successfully")
+        const res = await apiRequest(`/settings/catalog/categories/`, { method: "POST", json: payload })
+        if (res.success) {
+          showToast("Category created successfully", "success")
+        } else {
+          showToast(res.message || "Failed to create category", "error")
+        }
       }
       setEditingCategory(null)
       fetchCatalog()
@@ -165,8 +178,8 @@ export default function CatalogSettingsSection({ showToast, SectionHeader }) {
               {services.map(s => (
                 <div key={s.id} className="border border-stroke dark:border-slate-700 p-4 rounded-lg flex items-center justify-between hover:border-indigo-200 dark:hover:border-indigo-900/50 transition-colors">
                   <div className="flex items-center gap-4">
-                    {s.image ? (
-                      <img src={s.image} alt={s.name} className="w-12 h-12 rounded-lg object-cover shadow-sm border border-slate-200 dark:border-slate-700 flex-shrink-0" onError={e => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=100&q=80&fit=crop" }} />
+                    {s.image || selectedCategory?.image ? (
+                      <img src={s.image || selectedCategory?.image} alt={s.name} className="w-12 h-12 rounded-lg object-cover shadow-sm border border-slate-200 dark:border-slate-700 flex-shrink-0" onError={e => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=100&q=80&fit=crop" }} />
                     ) : (
                       <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex-shrink-0 flex flex-col items-center justify-center text-slate-400">
                         <span className="text-[9px] font-bold tracking-wider">NO IMG</span>
@@ -299,8 +312,8 @@ export default function CatalogSettingsSection({ showToast, SectionHeader }) {
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Description</label>
               <textarea 
                 className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                value={editingCategory.desc || ""} 
-                onChange={e => setEditingCategory({...editingCategory, desc: e.target.value})} 
+                value={editingCategory.desc ?? editingCategory.description ?? ""} 
+                onChange={e => setEditingCategory({...editingCategory, desc: e.target.value, description: e.target.value})} 
                 rows={3}
               />
             </div>
@@ -312,8 +325,8 @@ export default function CatalogSettingsSection({ showToast, SectionHeader }) {
               />
               <Input 
                 label="Jobs Completed (e.g. 10K+)" 
-                value={editingCategory.jobs || ""} 
-                onChange={e => setEditingCategory({...editingCategory, jobs: e.target.value})} 
+                value={editingCategory.jobs ?? editingCategory.jobs_count_str ?? ""} 
+                onChange={e => setEditingCategory({...editingCategory, jobs: e.target.value, jobs_count_str: e.target.value})} 
               />
             </div>
             
@@ -347,7 +360,7 @@ export default function CatalogSettingsSection({ showToast, SectionHeader }) {
                           body: formData
                         });
                         if (res.success) {
-                          setEditingCategory({...editingCategory, image: res.url});
+                          setEditingCategory(prev => ({ ...prev, image: res.url }));
                           showToast("Image uploaded successfully!", "success");
                         } else {
                           showToast(res.message || "Failed to upload image", "error");

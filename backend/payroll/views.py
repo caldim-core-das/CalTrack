@@ -860,9 +860,12 @@ class EmployeePayrollConfigViewSet(viewsets.ModelViewSet):
         GET /api/payroll/configs/resolve/{employee_id}/
         Returns the effective config for an employee (individual → group → default).
         """
-        employee = Employee.objects.filter(
-            employee_id=employee_id, company=request.company
-        ).first()
+        company = getattr(request, "company", None) or getattr(request.user, "company", None)
+        employee = None
+        if company:
+            employee = Employee.objects.filter(employee_id=employee_id, company=company).first()
+        if not employee:
+            employee = Employee.objects.filter(employee_id=employee_id).first() or Employee.objects.filter(id=employee_id).first()
         if not employee:
             return Response({"detail": "Employee not found."}, status=404)
 
@@ -907,8 +910,14 @@ class PayrollRegionSummaryView(APIView):
     permission_classes = [permissions.IsAuthenticated, IsAdminRole]
 
     def get(self, request):
-        company = request.company
-        region_code = getattr(company.region, "code", None) or company.primary_country or "US"
+        user = request.user
+        company = getattr(request, 'company', None) or getattr(user, 'company', None)
+        region_code = (
+            getattr(company, "primary_country", None) or
+            (getattr(company, "region", None) and getattr(company.region, "code", None)) or
+            getattr(user, "company_country", None) or
+            "IN"
+        )
 
         # Employee counts
         total_employees = Employee.objects.filter(company=company, is_active=True).count()
@@ -1098,4 +1107,585 @@ class IndiaPayrollGenerateView(APIView):
             "currency": "INR",
             "currency_symbol": "₹",
         }, status=201 if results else 400)
+
+
+# ── Org Payroll Config ViewSet (Admin Only) ──────────────────────────────────
+
+from .models import PayrollConfig
+from .serializers import PayrollConfigSerializer, PayrollConfigPreviewSerializer
+from .services import calculate_service_split, save_payroll_config
+from rest_framework import status as http_status
+from django.core.exceptions import ValidationError as DjangoValidationError
+
+
+def _get_org(request):
+    """Resolve tenant organization (Company instance) from request context."""
+    if hasattr(request, "company") and request.company:
+        return request.company
+    if hasattr(request.user, "company") and request.user.company:
+        return request.user.company
+    if hasattr(request.user, "employee_profile") and request.user.employee_profile and request.user.employee_profile.company:
+        return request.user.employee_profile.company
+    return None
+
+
+class PayrollConfigViewSet(viewsets.ModelViewSet):
+    """
+    Admin-only, org-scoped management of organization PayrollConfig.
+    All mutations execute through service layer save_payroll_config().
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    serializer_class = PayrollConfigSerializer
+
+    def get_queryset(self):
+        org = _get_org(self.request)
+        if not org:
+            return PayrollConfig.objects.none()
+        return PayrollConfig.objects.filter(org=org)
+
+    def list(self, request, *args, **kwargs):
+        org = _get_org(request)
+        if not org:
+            return Response(
+                {"success": False, "data": None, "error": "Organization missing from request context.", "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        config = PayrollConfig.objects.filter(org=org, is_active=True).first()
+        if not config:
+            config = save_payroll_config(PayrollConfig(org=org, is_active=True), org)
+
+        serializer = self.get_serializer(config)
+        return Response({
+            "success": True,
+            "data": serializer.data,
+            "error": None,
+            "meta": {"active": True}
+        })
+
+    def create(self, request, *args, **kwargs):
+        org = _get_org(request)
+        if not org:
+            return Response(
+                {"success": False, "data": None, "error": "Organization missing from request context.", "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "data": None, "error": serializer.errors, "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        config_instance = PayrollConfig(**serializer.validated_data)
+        try:
+            saved_config = save_payroll_config(config_instance, org)
+        except (DjangoValidationError, ValueError) as e:
+            err_msg = str(e.detail) if hasattr(e, 'detail') else str(e)
+            return Response(
+                {"success": False, "data": None, "error": err_msg, "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({
+            "success": True,
+            "data": self.get_serializer(saved_config).data,
+            "error": None,
+            "meta": {}
+        }, status=http_status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        org = _get_org(request)
+        if not org:
+            return Response(
+                {"success": False, "data": None, "error": "Organization missing.", "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=kwargs.get('partial', False))
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "data": None, "error": serializer.errors, "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        for attr, value in serializer.validated_data.items():
+            setattr(instance, attr, value)
+
+        try:
+            saved_config = save_payroll_config(instance, org)
+        except (DjangoValidationError, ValueError) as e:
+            err_msg = str(e.detail) if hasattr(e, 'detail') else str(e)
+            return Response(
+                {"success": False, "data": None, "error": err_msg, "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({
+            "success": True,
+            "data": self.get_serializer(saved_config).data,
+            "error": None,
+            "meta": {}
+        })
+
+    @action(detail=False, methods=["post"], url_path="preview", permission_classes=[permissions.IsAuthenticated, IsAdminRole])
+    def preview(self, request):
+        """
+        POST /api/payroll/config/preview/
+        Calculates service revenue split on hypothetical config payload without saving to DB.
+        """
+        serializer = PayrollConfigPreviewSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(
+                {"success": False, "data": None, "error": serializer.errors, "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        data = serializer.validated_data
+        gross_amount = data.pop("gross_amount")
+
+        temp_config = PayrollConfig(**data)
+        try:
+            breakdown = calculate_service_split(gross_amount, temp_config)
+        except (DjangoValidationError, ValueError) as e:
+            return Response(
+                {"success": False, "data": None, "error": str(e), "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response({
+            "success": True,
+            "data": {
+                "gross_amount": str(gross_amount),
+                "breakdown": {k: str(v) for k, v in breakdown.items()}
+            },
+            "error": None,
+            "meta": {}
+        })
+
+
+# ── Employee Wallet & Payslip Views ──────────────────────────────────────────
+
+import datetime
+from django.utils import timezone
+from django.db.models import Sum, Count
+from django.http import HttpResponse
+from .models import WalletTransaction, EmployeeWalletBalance, SettlementCycle
+from .services import _round2, get_payout_eligibility
+
+
+class EmployeeWalletView(APIView):
+    """
+    GET /api/payroll/my-wallet/?period=today|week|month|all
+    Scoped exclusively to request.user's employee record and organization.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        employee = getattr(request.user, "employee_profile", None)
+        if not employee:
+            return Response(
+                {"success": False, "data": None, "error": "Employee profile required to view wallet.", "meta": {}},
+                status=http_status.HTTP_403_FORBIDDEN,
+            )
+
+        org = employee.company
+        wallet_balance = EmployeeWalletBalance.objects.filter(org=org, employee=employee).first()
+        available_balance = str(wallet_balance.available_balance) if wallet_balance else "0.00"
+        pending_balance = str(wallet_balance.pending_balance) if wallet_balance else "0.00"
+        total_balance = str(wallet_balance.total_balance) if wallet_balance else "0.00"
+
+        next_cycle = SettlementCycle.objects.filter(
+            org=org,
+            status__in=[SettlementCycle.Status.OPEN, SettlementCycle.Status.PROCESSING]
+        ).order_by("settlement_date").first()
+        next_settlement_date = next_cycle.settlement_date.strftime("%Y-%m-%d") if next_cycle else None
+
+        eligibility = get_payout_eligibility(employee)
+
+        period = (request.query_params.get("period") or "month").lower()
+        today = timezone.localdate()
+
+        qs = WalletTransaction.objects.filter(org=org, employee=employee)
+
+        if period == "today":
+            qs = qs.filter(created_at__date=today)
+        elif period == "week":
+            start_of_week = today - datetime.timedelta(days=today.weekday())
+            qs = qs.filter(created_at__date__gte=start_of_week)
+        elif period == "month":
+            qs = qs.filter(created_at__year=today.year, created_at__month=today.month)
+        elif period == "all":
+            pass
+        else:
+            period = "all"
+
+        # Calculate summary for CREDITED transactions only
+        credited_qs = qs.filter(status=WalletTransaction.Status.CREDITED)
+        agg = credited_qs.aggregate(
+            gross=Sum("gross_amount"),
+            pf=Sum("pf_deduction"),
+            esi=Sum("esi_deduction"),
+            tds=Sum("tds_deduction"),
+            net=Sum("net_credit_amount"),
+            completed_count=Count("id"),
+        )
+
+        period_summary = {
+            "period": period,
+            "gross_earnings": str(_round2(agg["gross"] or Decimal("0.00"))),
+            "pf_deducted": str(_round2(agg["pf"] or Decimal("0.00"))),
+            "esi_deducted": str(_round2(agg["esi"] or Decimal("0.00"))),
+            "tds_deducted": str(_round2(agg["tds"] or Decimal("0.00"))),
+            "net_credited": str(_round2(agg["net"] or Decimal("0.00"))),
+            "completed_jobs_count": agg["completed_count"] or 0,
+        }
+
+        transactions_data = []
+        for tx in qs.order_by("-created_at"):
+            transactions_data.append({
+                "id": tx.id,
+                "created_at": tx.created_at.isoformat() if tx.created_at else None,
+                "booking_reference": tx.booking.request_id if tx.booking else f"TXN-{tx.id}",
+                "booking_id": tx.booking.id if tx.booking else None,
+                "gross_amount": str(tx.gross_amount),
+                "employee_share_amount": str(tx.employee_share_amount),
+                "company_share_amount": str(tx.company_share_amount),
+                "platform_fee_amount": str(tx.platform_fee_amount),
+                "pf_deduction": str(tx.pf_deduction),
+                "esi_deduction": str(tx.esi_deduction),
+                "tds_deduction": str(tx.tds_deduction),
+                "net_credit_amount": str(tx.net_credit_amount),
+                "status": tx.status,
+            })
+
+        return Response({
+            "success": True,
+            "data": {
+                "total_balance": total_balance,
+                "available_balance": available_balance,
+                "pending_balance": pending_balance,
+                "next_settlement_date": next_settlement_date,
+                "payout_eligibility": eligibility,
+                "period_summary": period_summary,
+                "transactions": transactions_data,
+            },
+            "error": None,
+            "meta": {}
+        })
+
+
+class EmployeePayslipDownloadView(APIView):
+    """
+    GET /api/payroll/download-payslip/<transaction_id>/
+    Generates and returns downloadable ReportLab PDF payslip for a transaction.
+    Guarded to ensure employee persona can only access their own transactions.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, transaction_id):
+        employee = getattr(request.user, "employee_profile", None)
+        if not employee:
+            return Response(
+                {"success": False, "data": None, "error": "Employee profile required.", "meta": {}},
+                status=http_status.HTTP_403_FORBIDDEN,
+            )
+
+        tx = WalletTransaction.objects.filter(pk=transaction_id).first()
+        if not tx:
+            return Response(
+                {"success": False, "data": None, "error": f"Transaction #{transaction_id} not found.", "meta": {}},
+                status=http_status.HTTP_404_NOT_FOUND,
+            )
+
+        # Cross-employee authorization guard
+        if tx.employee != employee:
+            return Response(
+                {"success": False, "data": None, "error": "Forbidden. You cannot download another employee's payslip.", "meta": {}},
+                status=http_status.HTTP_403_FORBIDDEN,
+            )
+
+        if tx.status != WalletTransaction.Status.CREDITED:
+            return Response(
+                {"success": False, "data": None, "error": "Payslips are available only for CREDITED transactions.", "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            pdf_bytes = self._generate_payslip_pdf(tx)
+            response = HttpResponse(pdf_bytes, content_type="application/pdf")
+            filename = f"Payslip-TXN-{tx.id}.pdf"
+            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            return response
+        except Exception as exc:
+            return Response(
+                {"success": False, "data": None, "error": f"Failed to generate payslip PDF: {str(exc)}", "meta": {}},
+                status=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def _generate_payslip_pdf(self, tx):
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.colors import HexColor, black, white
+        from io import BytesIO
+
+        buffer = BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        W, H = A4
+
+        # Header banner
+        c.setFillColor(HexColor("#4F46E5"))
+        c.rect(0, H - 80, W, 80, fill=1, stroke=0)
+
+        c.setFillColor(white)
+        c.setFont("Helvetica-Bold", 20)
+        c.drawString(30, H - 45, "CALTRACK PAYSLIP")
+        c.setFont("Helvetica", 10)
+        company_name = tx.org.company_name if tx.org else "CalTrack Services"
+        c.drawString(30, H - 62, f"Organization: {company_name}")
+
+        c.setFont("Helvetica-Bold", 12)
+        c.drawRightString(W - 30, H - 45, f"Transaction #{tx.id}")
+        c.setFont("Helvetica", 9)
+        date_str = tx.credited_at.strftime("%Y-%m-%d %H:%M") if tx.credited_at else (tx.created_at.strftime("%Y-%m-%d") if tx.created_at else "-")
+        c.drawRightString(W - 30, H - 62, f"Credited: {date_str}")
+
+        # Employee Info Card
+        y = H - 120
+        c.setFillColor(HexColor("#F8FAFC"))
+        c.rect(25, y - 50, W - 50, 60, fill=1, stroke=0)
+
+        c.setFillColor(black)
+        c.setFont("Helvetica-Bold", 10)
+        emp_name = tx.employee.user.get_full_name() or tx.employee.user.username if tx.employee and tx.employee.user else "Employee"
+        c.drawString(35, y - 12, f"Employee: {emp_name} ({tx.employee.employee_id if tx.employee else 'N/A'})")
+        booking_ref = tx.booking.request_id if tx.booking else f"TXN-{tx.id}"
+        c.drawString(35, y - 28, f"Booking Reference: {booking_ref}")
+        c.drawString(35, y - 44, f"Status: {tx.status}")
+
+        # Breakdown Table
+        y -= 90
+        c.setFillColor(HexColor("#4F46E5"))
+        c.rect(25, y, W - 50, 24, fill=1, stroke=0)
+        c.setFillColor(white)
+        c.setFont("Helvetica-Bold", 10)
+        c.drawString(35, y + 7, "Component")
+        c.drawRightString(W - 35, y + 7, "Amount (₹)")
+
+        y -= 20
+        c.setFillColor(black)
+        c.setFont("Helvetica", 10)
+
+        rows = [
+            ("Gross Customer Payment", f"₹{tx.gross_amount}"),
+            ("Employee Revenue Share", f"₹{tx.employee_share_amount}"),
+            ("Company Share", f"₹{tx.company_share_amount}"),
+            ("Platform Fee", f"₹{tx.platform_fee_amount}"),
+            ("PF Deduction", f"-₹{tx.pf_deduction}"),
+            ("ESI Deduction", f"-₹{tx.esi_deduction}"),
+            ("TDS Deduction", f"-₹{tx.tds_deduction}"),
+        ]
+
+        for item_label, item_val in rows:
+            c.drawString(35, y, item_label)
+            c.drawRightString(W - 35, y, item_val)
+            c.setStrokeColor(HexColor("#E2E8F0"))
+            c.line(25, y - 4, W - 25, y - 4)
+            y -= 20
+
+        # Net Credit Row
+        y -= 10
+        c.setFillColor(HexColor("#ECFDF5"))
+        c.rect(25, y - 10, W - 50, 30, fill=1, stroke=0)
+        c.setFillColor(HexColor("#047857"))
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(35, y, "Net Credited to Wallet")
+        c.drawRightString(W - 35, y, f"₹{tx.net_credit_amount}")
+
+        # Footer
+        c.setFillColor(HexColor("#64748B"))
+        c.setFont("Helvetica-Oblique", 8)
+        c.drawString(30, 30, "This is an official system-generated payslip from CalTrack Payroll System.")
+        c.drawRightString(W - 30, 30, "No physical signature required.")
+
+        c.showPage()
+        c.save()
+
+        pdf_value = buffer.getvalue()
+        buffer.close()
+        return pdf_value
+
+
+from rest_framework.decorators import action
+from .models import BankAccount, KYCStatus, SettlementCycle, PayoutDispute
+from .serializers import (
+    BankAccountSerializer,
+    KYCStatusSerializer,
+    SettlementCycleSerializer,
+    PayoutDisputeSerializer,
+)
+from .services import (
+    run_settlement_cycle,
+    get_payout_eligibility,
+    recompute_kyc_status,
+    generate_statement,
+    create_dispute,
+)
+
+
+class BankAccountViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = BankAccountSerializer
+
+    def get_queryset(self):
+        emp = _resolve_employee(self.request.user)
+        if emp:
+            return BankAccount.objects.filter(employee=emp)
+        org = getattr(self.request.user, "company", None)
+        if org:
+            return BankAccount.objects.filter(org=org)
+        return BankAccount.objects.none()
+
+    def perform_create(self, serializer):
+        emp = _resolve_employee(self.request.user)
+        if not emp:
+            raise exceptions.ValidationError("Employee profile required to add bank account.")
+        org = emp.company
+        existing_count = BankAccount.objects.filter(employee=emp).count()
+        is_primary = self.request.data.get("is_primary", existing_count == 0)
+        if is_primary:
+            BankAccount.objects.filter(employee=emp).update(is_primary=False)
+        serializer.save(
+            employee=emp,
+            org=org,
+            is_primary=is_primary,
+            verification_status=BankAccount.VerificationStatus.PENDING,
+        )
+
+    @action(detail=True, methods=["post"], url_path="set-primary")
+    def set_primary(self, request, pk=None):
+        account = self.get_object()
+        BankAccount.objects.filter(employee=account.employee).update(is_primary=False)
+        account.is_primary = True
+        account.save()
+        return Response({"success": True, "data": BankAccountSerializer(account).data})
+
+
+class KYCStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        emp = _resolve_employee(request.user)
+        if not emp:
+            return Response(
+                {"success": False, "data": None, "error": "Employee profile required.", "meta": {}},
+                status=http_status.HTTP_403_FORBIDDEN,
+            )
+        kyc, _ = KYCStatus.objects.get_or_create(employee=emp, defaults={"org": emp.company})
+        return Response({"success": True, "data": KYCStatusSerializer(kyc).data, "error": None, "meta": {}})
+
+
+class SettlementCycleRunView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        org = getattr(request.user, "company", None)
+        if not org:
+            return Response(
+                {"success": False, "data": None, "error": "Organization context required.", "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        cycle_end_date = request.data.get("cycle_end_date") or timezone.now().strftime("%Y-%m-%d")
+        try:
+            cycle = run_settlement_cycle(org, cycle_end_date)
+            return Response({
+                "success": True,
+                "data": {
+                    "cycle_id": cycle.id,
+                    "cycle_start": cycle.cycle_start,
+                    "cycle_end": cycle.cycle_end,
+                    "settlement_date": cycle.settlement_date,
+                    "status": cycle.status,
+                    "settled_transaction_count": getattr(cycle, "employee_count", 0),
+                    "total_settled_amount": str(getattr(cycle, "total_settled_amount", "0.00")),
+                },
+                "error": None,
+                "meta": {}
+            })
+        except Exception as exc:
+            return Response(
+                {"success": False, "data": None, "error": str(exc), "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class WalletStatementDownloadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        emp = _resolve_employee(request.user)
+        if not emp:
+            return Response(
+                {"success": False, "data": None, "error": "Employee profile required.", "meta": {}},
+                status=http_status.HTTP_403_FORBIDDEN,
+            )
+        period = request.query_params.get("period", "month")
+        fmt = request.query_params.get("format", "csv").lower()
+        try:
+            content = generate_statement(emp, emp.company, period, fmt)
+            content_type = "text/csv" if fmt == "csv" else "application/pdf"
+            ext = "csv" if fmt == "csv" else "pdf"
+            response = HttpResponse(content, content_type=content_type)
+            response["Content-Disposition"] = f'attachment; filename="wallet-statement-{period}.{ext}"'
+            return response
+        except Exception as exc:
+            return Response(
+                {"success": False, "data": None, "error": str(exc), "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+
+class PayoutDisputeViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class = PayoutDisputeSerializer
+
+    def get_queryset(self):
+        emp = _resolve_employee(self.request.user)
+        if emp:
+            return PayoutDispute.objects.filter(employee=emp)
+        org = getattr(self.request.user, "company", None)
+        if org:
+            return PayoutDispute.objects.filter(org=org)
+        return PayoutDispute.objects.none()
+
+    def create(self, request, *args, **kwargs):
+        emp = _resolve_employee(request.user)
+        if not emp:
+            return Response(
+                {"success": False, "data": None, "error": "Employee profile required.", "meta": {}},
+                status=http_status.HTTP_403_FORBIDDEN,
+            )
+        transaction_id = request.data.get("transaction")
+        reason = request.data.get("reason")
+        if not transaction_id or not reason:
+            return Response(
+                {"success": False, "data": None, "error": "transaction and reason are required.", "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            dispute = create_dispute(transaction_id, emp, emp.company, reason)
+            return Response(
+                {"success": True, "data": PayoutDisputeSerializer(dispute).data, "error": None, "meta": {}},
+                status=http_status.HTTP_201_CREATED,
+            )
+        except Exception as exc:
+            return Response(
+                {"success": False, "data": None, "error": str(exc), "meta": {}},
+                status=http_status.HTTP_400_BAD_REQUEST,
+            )
+
+
+
 

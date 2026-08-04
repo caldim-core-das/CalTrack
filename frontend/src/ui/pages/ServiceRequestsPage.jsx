@@ -228,6 +228,64 @@ export function ServiceRequestsPage() {
   const [statusFilter, setStatusFilter] = useState("")
   const [priorityFilter, setPriorityFilter] = useState("")
 
+  // Document Vault State
+  const [docSearch, setDocSearch] = useState("")
+  const [docStatusFilter, setDocStatusFilter] = useState("all")
+  const [docCategoryFilter, setDocCategoryFilter] = useState("all")
+  const [docSort, setDocSort] = useState("newest")
+  const [previewInvoice, setPreviewInvoice] = useState(null)
+
+  const documentVaultData = useMemo(() => {
+    let list = [...allRequests]
+    if (docSearch.trim()) {
+      const q = docSearch.toLowerCase()
+      list = list.filter(r =>
+        r.request_id?.toLowerCase().includes(q) ||
+        r.customer_name?.toLowerCase().includes(q) ||
+        r.email?.toLowerCase().includes(q) ||
+        r.issue_title?.toLowerCase().includes(q) ||
+        r.service_category?.toString().toLowerCase().includes(q)
+      )
+    }
+    if (docStatusFilter === "paid") {
+      list = list.filter(r => r.payment_status === "paid" || r.payment_status === "collected")
+    } else if (docStatusFilter === "pending") {
+      list = list.filter(r => r.payment_status !== "paid" && r.payment_status !== "collected")
+    }
+    if (docCategoryFilter !== "all") {
+      list = list.filter(r => r.service_category?.toString() === docCategoryFilter)
+    }
+
+    if (docSort === "newest") {
+      list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+    } else if (docSort === "oldest") {
+      list.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0))
+    } else if (docSort === "amount_high") {
+      list.sort((a, b) => parseFloat(b.total_amount || 0) - parseFloat(a.total_amount || 0))
+    } else if (docSort === "amount_low") {
+      list.sort((a, b) => parseFloat(a.total_amount || 0) - parseFloat(b.total_amount || 0))
+    }
+
+    const totalCount = allRequests.length
+    const totalAmount = allRequests.reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0)
+    const paidItems = allRequests.filter(r => r.payment_status === "paid" || r.payment_status === "collected")
+    const paidCount = paidItems.length
+    const paidAmount = paidItems.reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0)
+    const pendingItems = allRequests.filter(r => r.payment_status !== "paid" && r.payment_status !== "collected")
+    const pendingCount = pendingItems.length
+    const pendingAmount = pendingItems.reduce((sum, r) => sum + parseFloat(r.total_amount || 0), 0)
+
+    return {
+      filteredList: list,
+      totalCount,
+      totalAmount,
+      paidCount,
+      paidAmount,
+      pendingCount,
+      pendingAmount
+    }
+  }, [allRequests, docSearch, docStatusFilter, docCategoryFilter, docSort])
+
   /* Load list */
   const loadRequests = async () => {
     setLoading(true)
@@ -529,43 +587,256 @@ export function ServiceRequestsPage() {
   }
 
   if (path === "/customers/documents") {
+    const { filteredList, totalCount, totalAmount, paidCount, paidAmount, pendingCount, pendingAmount } = documentVaultData
+
     return (
       <div className="p-6 md:p-8 space-y-6 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 min-h-screen">
         <SrStyles />
-        <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white leading-tight">Customer Invoice Vault</h1>
-          <p className="text-xs font-semibold text-slate-500 mt-1">
-            Access client billing documents, generated receipt invoices, and proof logs.
-          </p>
+        
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 dark:text-white leading-tight flex items-center gap-2">
+              <FileText className="text-indigo-600 dark:text-indigo-400" size={26} />
+              Customer Invoice Vault
+            </h1>
+            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1">
+              Access client billing documents, generated receipt invoices, and proof logs.
+            </p>
+          </div>
+          <button
+            onClick={loadRequests}
+            className="self-start md:self-auto px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 transition-all shadow-sm"
+          >
+            <RefreshCw size={14} className={loading ? "sr-spin" : ""} />
+            Refresh Vault
+          </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {allRequests.map((r) => (
-            <div key={r.id} className="p-5 bg-surface dark:bg-slate-900/40 rounded-3xl border border-stroke dark:border-slate-800 shadow-sm flex flex-col gap-4">
-              <div className="flex justify-between items-start">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600">
-                  <FileText size={20} />
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Vault Documents</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-2xl font-black text-slate-900 dark:text-white">{totalCount}</span>
+              <span className="text-xs font-extrabold text-indigo-600 dark:text-indigo-400">₹{totalAmount.toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+
+          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Paid / Collected Invoices</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{paidCount}</span>
+              <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">₹{paidAmount.toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+
+          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+            <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Pending Payment</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-2xl font-black text-amber-600 dark:text-amber-400">{pendingCount}</span>
+              <span className="text-xs font-extrabold text-amber-600 dark:text-amber-400">₹{pendingAmount.toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+
+          <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+            <span className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">Active Search Results</span>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="text-2xl font-black text-blue-600 dark:text-blue-400">{filteredList.length}</span>
+              <span className="text-xs font-bold text-slate-400">Filtered</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Search, Filter & Sort Toolbar */}
+        <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-3 items-center justify-between">
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+            <input
+              type="text"
+              placeholder="Search customer, ID, issue..."
+              value={docSearch}
+              onChange={(e) => setDocSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            {docSearch && (
+              <button onClick={() => setDocSearch("")} className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+            {/* Status Filter */}
+            <select
+              value={docStatusFilter}
+              onChange={(e) => setDocStatusFilter(e.target.value)}
+              className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none"
+            >
+              <option value="all">All Statuses</option>
+              <option value="paid">Paid & Collected</option>
+              <option value="pending">Pending / Unpaid</option>
+            </select>
+
+            {/* Sort */}
+            <select
+              value={docSort}
+              onChange={(e) => setDocSort(e.target.value)}
+              className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none"
+            >
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="amount_high">Amount: High → Low</option>
+              <option value="amount_low">Amount: Low → High</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Invoice Grid */}
+        {filteredList.length === 0 ? (
+          <div className="p-12 text-center bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800">
+            <FileText className="mx-auto text-slate-300 dark:text-slate-700 mb-3" size={48} />
+            <h3 className="font-bold text-slate-700 dark:text-slate-300">No matching invoices found</h3>
+            <p className="text-xs text-slate-400 mt-1">Try adjusting your search query or status filter.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredList.map((r) => {
+              const catInfo = getCategoryInfo(r.service_category)
+              const isPaid = r.payment_status === "paid" || r.payment_status === "collected"
+              
+              return (
+                <div key={r.id} className="p-5 bg-white dark:bg-slate-900/60 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                        <FileText size={20} />
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-[11px] font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-900/30">
+                          {r.request_id}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                          isPaid ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                        }`}>
+                          {isPaid ? "PAID" : "PENDING"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="font-bold text-base text-slate-900 dark:text-white leading-snug">{r.customer_name}</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-semibold flex items-center gap-1.5">
+                        <span>{catInfo.emoji}</span>
+                        <span>{r.issue_title || catInfo.name}</span>
+                      </p>
+                      {r.phone && <p className="text-[11px] text-slate-400 mt-0.5">📞 {r.phone}</p>}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-end">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Amount</span>
+                        <span className="text-lg font-black text-slate-900 dark:text-white">₹{parseFloat(r.total_amount || 0).toLocaleString("en-IN")}</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg uppercase">
+                        {r.payment_method || "COD"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      onClick={() => setPreviewInvoice(r)}
+                      className="px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-1"
+                      title="Quick Preview"
+                    >
+                      <Eye size={14} />
+                      Preview
+                    </button>
+                    <a
+                      href={`/api/booking/${r.id}/invoice/`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex-1 text-center py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-500/20 flex items-center justify-center gap-1.5"
+                    >
+                      <FileText size={14} />
+                      Download Invoice
+                    </a>
+                  </div>
                 </div>
-                <span className="text-[10px] font-mono font-bold text-slate-400">{r.request_id}</span>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Invoice Preview Modal */}
+        {previewInvoice && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 max-w-lg w-full p-6 space-y-5 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+              <button
+                onClick={() => setPreviewInvoice(null)}
+                className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold">
+                  <FileText size={24} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 dark:text-white">Invoice #{previewInvoice.request_id}</h2>
+                  <p className="text-xs text-slate-500 font-semibold">CalTrack Customer Billing Document</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">{r.customer_name}</h3>
-                <p className="text-xs text-slate-500 mt-1 font-semibold">{r.service_category}</p>
-                <div className="text-sm font-extrabold text-slate-800 dark:text-slate-200 mt-2">₹{parseFloat(r.total_amount || 0).toLocaleString("en-IN")}</div>
+
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-bold">Customer Name:</span>
+                  <span className="font-extrabold text-slate-800 dark:text-slate-200">{previewInvoice.customer_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-bold">Phone / Email:</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{previewInvoice.phone} {previewInvoice.email ? `• ${previewInvoice.email}` : ""}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-bold">Service Title:</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">{previewInvoice.issue_title || getCategoryInfo(previewInvoice.service_category).name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-bold">Payment Method:</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400">{previewInvoice.payment_method || "COD"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-bold">Payment Status:</span>
+                  <span className={`font-black uppercase ${
+                    previewInvoice.payment_status === "paid" || previewInvoice.payment_status === "collected" ? "text-emerald-600" : "text-amber-600"
+                  }`}>
+                    {previewInvoice.payment_status || "PENDING"}
+                  </span>
+                </div>
               </div>
-              <div className="flex gap-2.5 pt-2 border-t border-stroke dark:border-slate-800">
+
+              <div className="p-4 border border-slate-200 dark:border-slate-800 rounded-2xl flex justify-between items-center">
+                <div>
+                  <span className="text-xs text-slate-400 font-bold block uppercase">Grand Total</span>
+                  <span className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                    ₹{parseFloat(previewInvoice.total_amount || 0).toLocaleString("en-IN")}
+                  </span>
+                </div>
                 <a
-                  href={`/api/settings/invoices/download/?request_id=${r.id}`}
+                  href={`/api/booking/${previewInvoice.id}/invoice/`}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex-1 text-center py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-500/10"
+                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-md shadow-indigo-500/20 flex items-center gap-2"
                 >
-                  Download Invoice
+                  <FileText size={15} />
+                  Download PDF
                 </a>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
     )
   }

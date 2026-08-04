@@ -97,7 +97,10 @@ function LeaveTypeTag({ type }) {
 
 function daysBetween(start, end) {
   if (!start || !end) return 0
-  return Math.max(1, Math.round((new Date(end) - new Date(start)) / 86400000) + 1)
+  const d1 = new Date(start + "T00:00:00")
+  const d2 = new Date(end + "T00:00:00")
+  if (isNaN(d1) || isNaN(d2) || d2 < d1) return 0
+  return Math.round((d2 - d1) / 86400000) + 1
 }
 
 function formatDate(dateStr) {
@@ -161,6 +164,10 @@ export function LeavesPage() {
 
   async function submit(e) {
     e.preventDefault()
+    if (startDate && endDate && endDate < startDate) {
+      setError("End date cannot be earlier than start date.")
+      return
+    }
     setSubmitting(true)
     setError("")
     try {
@@ -175,7 +182,7 @@ export function LeavesPage() {
       fireSparkleFromEl(submitBtnRef.current)
       await load()
     } catch (err) {
-      const msg = err?.body?.detail || err?.body?.end_date || (typeof err?.body === "string" ? err.body : "") || "Failed to submit leave request."
+      const msg = err?.body?.detail || err?.body?.end_date || err?.body?.non_field_errors || (typeof err?.body === "string" ? err.body : "") || "Failed to submit leave request."
       setError(Array.isArray(msg) ? msg.join(" ") : String(msg))
     } finally {
       setSubmitting(false)
@@ -574,6 +581,14 @@ export function LeavesPage() {
             </div>
 
             <form onSubmit={submit} style={{ padding: "28px" }}>
+              {/* Error banner inside modal */}
+              {error && (
+                <div style={{ padding: "12px 16px", borderRadius: 14, background: "#fef2f2", border: "1.5px solid #fecaca", color: "#b91c1c", fontSize: 13, fontWeight: 700, marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+                  <AlertTriangle size={16} style={{ color: "#ef4444", flexShrink: 0 }} />
+                  <span>{error}</span>
+                </div>
+              )}
+
               {/* Leave type cards */}
               <div style={{ marginBottom: 22 }}>
                 <div style={{ fontSize: 11, fontWeight: 800, color: isDark ? "#9ca3af" : "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Leave Type</div>
@@ -600,23 +615,31 @@ export function LeavesPage() {
               </div>
 
               {/* Dates */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 22 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                 {[
-                  { label: "Start Date", value: startDate, onChange: v => setStartDate(v) },
-                  { label: "End Date", value: endDate, onChange: v => setEndDate(v) },
+                  { label: "Start Date", value: startDate, onChange: v => { setStartDate(v); setError("") } },
+                  { label: "End Date", value: endDate, onChange: v => { setEndDate(v); setError("") } },
                 ].map(f => (
                   <div key={f.label}>
                     <label style={{ display: "block", fontSize: 11, fontWeight: 800, color: isDark ? "#9ca3af" : "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>{f.label}</label>
                     <input
                       type="date" value={f.value} onChange={e => f.onChange(e.target.value)} required
-                      style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `1.5px solid ${isDark ? "#374151" : "#e2e8f0"}`, fontSize: 14, fontWeight: 700, color: isDark ? "#f9fafb" : "#0f172a", background: isDark ? "#1f2937" : "#f8fafc", outline: "none", boxSizing: "border-box" }}
+                      style={{ width: "100%", padding: "12px 14px", borderRadius: 14, border: `1.5px solid ${startDate && endDate && endDate < startDate ? "#ef4444" : (isDark ? "#374151" : "#e2e8f0")}`, fontSize: 14, fontWeight: 700, color: isDark ? "#f9fafb" : "#0f172a", background: isDark ? "#1f2937" : "#f8fafc", outline: "none", boxSizing: "border-box" }}
                     />
                   </div>
                 ))}
               </div>
 
+              {/* Invalid date warning */}
+              {startDate && endDate && endDate < startDate && (
+                <div style={{ padding: "10px 14px", borderRadius: 12, background: "#fff1f2", border: "1.5px solid #fecdd3", color: "#e11d48", fontSize: 12, fontWeight: 700, marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
+                  <AlertTriangle size={15} />
+                  <span>End date cannot be earlier than start date ({formatDate(endDate)} is before {formatDate(startDate)}).</span>
+                </div>
+              )}
+
               {/* Duration preview */}
-              {startDate && endDate && days > 0 && (
+              {startDate && endDate && endDate >= startDate && days > 0 && (
                 <div style={{ padding: "12px 18px", borderRadius: 14, background: isDark ? "rgba(99,102,241,0.15)" : "linear-gradient(135deg, #ede9fe, #e0e7ff)", border: `1.5px solid ${isDark ? "rgba(99,102,241,0.3)" : "#c7d2fe"}`, marginBottom: 22, display: "flex", alignItems: "center", gap: 10 }}>
                   <Clock size={16} style={{ color: isDark ? "#818cf8" : "#4f46e5" }} />
                   <span style={{ fontSize: 13, fontWeight: 800, color: isDark ? "#818cf8" : "#4338ca" }}>
@@ -642,8 +665,8 @@ export function LeavesPage() {
                 <button
                   ref={submitBtnRef}
                   type="submit"
-                  disabled={submitting}
-                  style={{ flex: 2, padding: "14px", borderRadius: 16, border: "none", background: "linear-gradient(135deg, #4338ca, #7c3aed)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: "pointer", boxShadow: "0 8px 24px rgba(79,70,229,0.3)", opacity: submitting ? 0.7 : 1 }}
+                  disabled={submitting || Boolean(startDate && endDate && endDate < startDate)}
+                  style={{ flex: 2, padding: "14px", borderRadius: 16, border: "none", background: (startDate && endDate && endDate < startDate) ? "#94a3b8" : "linear-gradient(135deg, #4338ca, #7c3aed)", color: "#fff", fontSize: 13, fontWeight: 800, cursor: (startDate && endDate && endDate < startDate) ? "not-allowed" : "pointer", boxShadow: "0 8px 24px rgba(79,70,229,0.3)", opacity: submitting ? 0.7 : 1 }}
                 >
                   {submitting ? "Submitting…" : "Submit Request ✨"}
                 </button>

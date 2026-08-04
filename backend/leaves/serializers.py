@@ -5,9 +5,10 @@ from .models import LeaveRequest
 
 class LeaveRequestSerializer(serializers.ModelSerializer):
     id = serializers.CharField(read_only=True)
-    employee = serializers.CharField(source="employee.employee_id", read_only=True)
-    employee_name = serializers.CharField(source='employee.user.get_full_name', read_only=True)
-    approved_by = serializers.CharField(source='approved_by.id', read_only=True)
+    employee = serializers.CharField(source="employee.employee_id", read_only=True, default="")
+    employee_name = serializers.SerializerMethodField()
+    approved_by = serializers.CharField(source='approved_by.id', read_only=True, default=None, allow_null=True)
+    approved_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = LeaveRequest
@@ -22,11 +23,22 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
             "paid",
             "status",
             "approved_by",
+            "approved_by_name",
             "decision_at",
             "created_at",
             "updated_at",
         )
         read_only_fields = ("id", "paid", "status", "approved_by", "decision_at", "created_at", "updated_at")
+
+    def get_employee_name(self, obj):
+        if obj.employee and obj.employee.user:
+            return obj.employee.user.get_full_name() or obj.employee.user.username
+        return ""
+
+    def get_approved_by_name(self, obj):
+        if obj.approved_by:
+            return obj.approved_by.get_full_name() or obj.approved_by.username
+        return ""
 
 
 class LeaveRequestCreateSerializer(serializers.ModelSerializer):

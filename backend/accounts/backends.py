@@ -13,20 +13,17 @@ class EmailOrUsernameModelBackend(ModelBackend):
         if username is None:
             username = kwargs.get(User.USERNAME_FIELD)
             
-        try:
-            # Case-insensitive match for either username or email
-            user = User.objects.get(
-                Q(username__iexact=username) | Q(email__iexact=username)
-            )
-        except User.DoesNotExist:
-            # Run the default password hasher once to reduce timing attacks
+        users = User.objects.filter(
+            Q(username__iexact=username) | Q(email__iexact=username)
+        ).order_by('role', 'id')
+        
+        user = None
+        for u in users:
+            if u.check_password(password) and self.user_can_authenticate(u):
+                return u
+                
+        if not users.exists():
             User().set_password(password)
-            return None
-        except User.MultipleObjectsReturned:
-            # Should not happen if email is unique, but just in case, get the first active one
-            user = User.objects.filter(
-                Q(username__iexact=username) | Q(email__iexact=username)
-            ).order_by('id').first()
 
         if user and user.check_password(password) and self.user_can_authenticate(user):
             return user

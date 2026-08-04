@@ -149,3 +149,131 @@ class EmployeePayrollConfigSerializer(serializers.ModelSerializer):
         )
 
 
+# ── Org Payroll Config & Preview Serializers ───────────────────────────────
+
+from .models import PayrollConfig, WalletTransaction, EmployeeWalletBalance
+from decimal import Decimal
+
+
+class PayrollConfigSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PayrollConfig
+        fields = (
+            "id",
+            "org",
+            "employee_share_percent",
+            "company_share_percent",
+            "platform_fee_percent",
+            "platform_fee_type",
+            "platform_fee_fixed_amount",
+            "pf_percent",
+            "esi_percent",
+            "tds_percent",
+            "is_active",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "org", "created_at", "updated_at")
+
+    def validate(self, data):
+        emp_share = data.get("employee_share_percent", getattr(self.instance, "employee_share_percent", Decimal("80.00")))
+        comp_share = data.get("company_share_percent", getattr(self.instance, "company_share_percent", Decimal("10.00")))
+        fee_type = data.get("platform_fee_type", getattr(self.instance, "platform_fee_type", PayrollConfig.PlatformFeeType.PERCENTAGE))
+
+        if fee_type == PayrollConfig.PlatformFeeType.PERCENTAGE:
+            plat_fee = data.get("platform_fee_percent", getattr(self.instance, "platform_fee_percent", Decimal("5.00")))
+        else:
+            plat_fee = Decimal("0.00")
+
+        total = Decimal(str(emp_share or 0)) + Decimal(str(comp_share or 0)) + Decimal(str(plat_fee or 0))
+        if total > Decimal("100.00"):
+            raise serializers.ValidationError(
+                f"Total share percentages ({total}%) exceed 100%."
+            )
+        return data
+
+
+class PayrollConfigPreviewSerializer(serializers.Serializer):
+    gross_amount = serializers.DecimalField(max_digits=12, decimal_places=2, required=True)
+    employee_share_percent = serializers.DecimalField(max_digits=5, decimal_places=2, default=Decimal("80.00"))
+    company_share_percent = serializers.DecimalField(max_digits=5, decimal_places=2, default=Decimal("10.00"))
+    platform_fee_percent = serializers.DecimalField(max_digits=5, decimal_places=2, default=Decimal("5.00"))
+    platform_fee_type = serializers.ChoiceField(choices=PayrollConfig.PlatformFeeType.choices, default=PayrollConfig.PlatformFeeType.PERCENTAGE)
+    platform_fee_fixed_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    pf_percent = serializers.DecimalField(max_digits=5, decimal_places=2, default=Decimal("12.00"))
+    esi_percent = serializers.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.75"))
+    tds_percent = serializers.DecimalField(max_digits=5, decimal_places=2, default=Decimal("0.00"))
+
+    def validate(self, data):
+        fee_type = data.get("platform_fee_type", PayrollConfig.PlatformFeeType.PERCENTAGE)
+        emp_share = Decimal(str(data.get("employee_share_percent", 0)))
+        comp_share = Decimal(str(data.get("company_share_percent", 0)))
+
+        if fee_type == PayrollConfig.PlatformFeeType.PERCENTAGE:
+            plat_fee = Decimal(str(data.get("platform_fee_percent", 0)))
+        else:
+            plat_fee = Decimal("0.00")
+
+        if emp_share + comp_share + plat_fee > Decimal("100.00"):
+            raise serializers.ValidationError("Total revenue shares exceed 100%.")
+        return data
+
+
+from .models import BankAccount, KYCStatus, SettlementCycle, PayoutDispute
+
+
+class BankAccountSerializer(serializers.ModelSerializer):
+    masked_account_number = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BankAccount
+        fields = (
+            "id", "account_number", "masked_account_number", "ifsc_code",
+            "upi_id", "is_primary", "verification_status", "verified_at",
+            "rejection_reason", "created_at", "updated_at"
+        )
+        read_only_fields = ("id", "verification_status", "verified_at", "rejection_reason", "created_at", "updated_at")
+        extra_kwargs = {
+            "account_number": {"write_only": True}
+        }
+
+    def get_masked_account_number(self, obj):
+        return obj.masked_account_number()
+
+
+class KYCStatusSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KYCStatus
+        fields = ("id", "employee", "pan_verified", "aadhaar_verified", "overall_status", "updated_at")
+        read_only_fields = ("id", "employee", "overall_status", "updated_at")
+
+
+class SettlementCycleSerializer(serializers.ModelSerializer):
+    employee_count = serializers.IntegerField(read_only=True, required=False)
+    total_settled_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True, required=False)
+
+    class Meta:
+        model = SettlementCycle
+        fields = ("id", "org", "cycle_start", "cycle_end", "settlement_date", "status", "created_at", "employee_count", "total_settled_amount")
+        read_only_fields = ("id", "org", "status", "created_at")
+
+
+class PayoutDisputeSerializer(serializers.ModelSerializer):
+    booking_reference = serializers.SerializerMethodField()
+
+    def get_booking_reference(self, obj):
+        if obj.transaction and obj.transaction.booking:
+            return obj.transaction.booking.request_id
+        return f"TXN-{obj.transaction_id}"
+
+    class Meta:
+        model = PayoutDispute
+        fields = (
+            "id", "transaction", "booking_reference", "employee", "org",
+            "reason", "status", "admin_notes", "created_at", "updated_at"
+        )
+        read_only_fields = ("id", "employee", "org", "status", "admin_notes", "created_at", "updated_at")
+
+
+
+

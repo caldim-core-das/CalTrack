@@ -23,11 +23,11 @@ import { CalTrackLogo } from "../components/CalTrackLogo.jsx"
 import "leaflet/dist/leaflet.css";
 import { MapContainer, TileLayer, useMapEvents } from "react-leaflet";
 
-let BOOKING_CURRENCY_SYMBOL = "â‚¹";
+let BOOKING_CURRENCY_SYMBOL = "₹";
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────────────────
    DATA
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────────────────── */
 
 const CATEGORIES = [
   { id: "cleaning", name: "Home Cleaning", image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&q=80&fit=crop", desc: "Deep clean & sanitization", rating: "4.8", jobs: "50K+" },
@@ -110,61 +110,60 @@ function openGoogleSignInPopup(onSuccess, onError) {
 
 const PACKAGES = {
   cleaning: [
-    { id: "clean-std", name: "Standard", price: 999, priceStr: "â‚¹999", duration: "2 hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&q=80&fit=crop", includes: ["Floor Cleaning", "Kitchen Surface Cleaning", "Bathroom Cleaning", "Dusting"], excludes: [] },
-    { id: "clean-prem", name: "Premium", price: 2499, priceStr: "â‚¹2,499", duration: "4 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=300&q=80&fit=crop", includes: ["Complete Home Deep Cleaning", "Kitchen Deep Cleaning", "Bathroom Deep Cleaning", "Sofa Vacuuming", "Window Cleaning", "Balcony Cleaning"], excludes: [] },
-    { id: "clean-move", name: "Move-In / Move-Out Package", price: 3499, priceStr: "â‚¹3,499", duration: "6 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=300&q=80&fit=crop", includes: ["Entire House Cleaning", "Cabinet Cleaning", "Fan & Light Cleaning", "Window & Glass Cleaning"], excludes: [] },
+    { id: "clean-std", name: "Standard", price: 999, priceStr: "₹999", duration: "2 hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&q=80&fit=crop", includes: ["Floor Cleaning", "Kitchen Surface Cleaning", "Bathroom Cleaning", "Dusting"], excludes: [] },
+    { id: "clean-prem", name: "Premium", price: 2499, priceStr: "₹2,499", duration: "4 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=300&q=80&fit=crop", includes: ["Complete Home Deep Cleaning", "Kitchen Deep Cleaning", "Bathroom Deep Cleaning", "Sofa Vacuuming", "Window Cleaning", "Balcony Cleaning"], excludes: [] },
+    { id: "clean-move", name: "Move-In / Move-Out Package", price: 3499, priceStr: "₹3,499", duration: "6 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=300&q=80&fit=crop", includes: ["Entire House Cleaning", "Cabinet Cleaning", "Fan & Light Cleaning", "Window & Glass Cleaning"], excludes: [] },
   ],
   plumbing: [
-    { id: "plum-std", name: "Standard", price: 299, priceStr: "â‚¹299", duration: "1 hr", popular: false, tag: "", includes: ["One Plumbing Issue", "Leak Check", "Basic Repair"], excludes: [] },
-    { id: "plum-prem", name: "Premium", price: 799, priceStr: "â‚¹799", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=300&q=80&fit=crop", includes: ["Up to 3 Plumbing Repairs", "Pipe Inspection", "Drain Cleaning"], excludes: [] },
-    { id: "plum-comp", name: "Complete Home Plumbing", price: 1999, priceStr: "â‚¹1,999", duration: "3 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1607472586893-edb57cb3b4e1?w=300&q=80&fit=crop", includes: ["Full House Plumbing Inspection", "Multiple Repairs", "Water Pressure Check"], excludes: [] },
+    { id: "plum-std", name: "Standard", price: 299, priceStr: "₹299", duration: "1 hr", popular: false, tag: "", includes: ["One Plumbing Issue", "Leak Check", "Basic Repair"], excludes: [] },
+    { id: "plum-prem", name: "Premium", price: 799, priceStr: "₹799", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=300&q=80&fit=crop", includes: ["Up to 3 Plumbing Repairs", "Pipe Inspection", "Drain Cleaning"], excludes: [] },
+    { id: "plum-comp", name: "Complete Home Plumbing", price: 1999, priceStr: "₹1,999", duration: "3 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1607472586893-edb57cb3b4e1?w=300&q=80&fit=crop", includes: ["Full House Plumbing Inspection", "Multiple Repairs", "Water Pressure Check"], excludes: [] },
   ],
   electrical: [
-    { id: "elec-std", name: "Standard", price: 299, priceStr: "â‚¹299", duration: "1 hr", popular: false, tag: "", includes: ["One Electrical Repair", "Safety Check"], excludes: [] },
-    { id: "elec-prem", name: "Premium", price: 899, priceStr: "â‚¹899", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&q=80&fit=crop", includes: ["Multiple Electrical Repairs", "Wiring Inspection", "MCB Check"], excludes: [] },
-    { id: "elec-care", name: "Home Electrical Care", price: 1999, priceStr: "â‚¹1,999", duration: "3 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1558611848-73f7eb4001a1?w=300&q=80&fit=crop", includes: ["Complete Home Inspection", "Fan & Light Service", "Socket Testing"], excludes: [] },
+    { id: "elec-std", name: "Standard", price: 299, priceStr: "₹299", duration: "1 hr", popular: false, tag: "", includes: ["One Electrical Repair", "Safety Check"], excludes: [] },
+    { id: "elec-prem", name: "Premium", price: 899, priceStr: "₹899", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=300&q=80&fit=crop", includes: ["Multiple Electrical Repairs", "Wiring Inspection", "MCB Check"], excludes: [] },
+    { id: "elec-care", name: "Home Electrical Care", price: 1999, priceStr: "₹1,999", duration: "3 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1558611848-73f7eb4001a1?w=300&q=80&fit=crop", includes: ["Complete Home Inspection", "Fan & Light Service", "Socket Testing"], excludes: [] },
   ],
   hvac: [
-    { id: "hvac-std", name: "Standard Package", price: 599, priceStr: "â‚¹599", duration: "1-2 Hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1621905252507-b35492d04029?w=300&q=80&fit=crop", includes: ["General AC Service", "Filter Cleaning", "Cooling Performance Check", "Basic Inspection"], excludes: [] },
-    { id: "hvac-prem", name: "Premium Package", price: 1299, priceStr: "â‚¹1,299", duration: "2-3 Hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=300&q=80&fit=crop", includes: ["Deep Coil Cleaning", "Water Jet Cleaning", "Filter Cleaning", "Cooling Performance Check", "Gas Pressure Check", "Minor Adjustments", "30-Day Service Warranty"], excludes: [] },
-    { id: "hvac-amc", name: "Annual Maintenance Package (AMC)", price: 2999, priceStr: "â‚¹2,999", duration: "Yearly", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1610486842247-7505ed272fc4?w=300&q=80&fit=crop", includes: ["4 AC Services per Year", "Priority Technician", "Discount on Spare Parts", "Free Basic Inspection", "Service Reminder"], excludes: [] },
+    { id: "hvac-std", name: "Standard Package", price: 599, priceStr: "₹599", duration: "1-2 Hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1621905252507-b35492d04029?w=300&q=80&fit=crop", includes: ["General AC Service", "Filter Cleaning", "Cooling Performance Check", "Basic Inspection"], excludes: [] },
+    { id: "hvac-prem", name: "Premium Package", price: 1299, priceStr: "₹1,299", duration: "2-3 Hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1504148455328-c376907d081c?w=300&q=80&fit=crop", includes: ["Deep Coil Cleaning", "Water Jet Cleaning", "Filter Cleaning", "Cooling Performance Check", "Gas Pressure Check", "Minor Adjustments", "30-Day Service Warranty"], excludes: [] },
+    { id: "hvac-amc", name: "Annual Maintenance Package (AMC)", price: 2999, priceStr: "₹2,999", duration: "Yearly", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1610486842247-7505ed272fc4?w=300&q=80&fit=crop", includes: ["4 AC Services per Year", "Priority Technician", "Discount on Spare Parts", "Free Basic Inspection", "Service Reminder"], excludes: [] },
   ],
   appliance_repair: [
-    { id: "app-std", name: "Standard", price: 399, priceStr: "â‚¹399", duration: "1 hr", popular: false, tag: "", includes: ["Appliance Diagnosis", "Basic Repair"], excludes: [] },
-    { id: "app-prem", name: "Premium", price: 999, priceStr: "â‚¹999", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=300&q=80&fit=crop", includes: ["Complete Servicing", "Internal Cleaning", "Performance Testing"], excludes: [] },
-    { id: "app-amc", name: "Annual Care Plan", price: 2499, priceStr: "â‚¹2,499", duration: "Yearly", popular: false, tag: "Best Value", includes: ["3 Service Visits", "Priority Support", "Discount on Parts"], excludes: [] },
+    { id: "app-std", name: "Standard", price: 399, priceStr: "₹399", duration: "1 hr", popular: false, tag: "", includes: ["Appliance Diagnosis", "Basic Repair"], excludes: [] },
+    { id: "app-prem", name: "Premium", price: 999, priceStr: "₹999", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=300&q=80&fit=crop", includes: ["Complete Servicing", "Internal Cleaning", "Performance Testing"], excludes: [] },
+    { id: "app-amc", name: "Annual Care Plan", price: 2499, priceStr: "₹2,499", duration: "Yearly", popular: false, tag: "Best Value", includes: ["3 Service Visits", "Priority Support", "Discount on Parts"], excludes: [] },
   ],
   security: [
-    { id: "check", name: "System Check", price: 499, priceStr: "â‚¹499", duration: "1 hr", popular: false, tag: "", includes: ["Camera test", "DVR check", "App verify"], excludes: ["New cables", "Repositioning"] },
-    { id: "install2", name: "2-Camera Setup", price: 2999, priceStr: "â‚¹2,999", duration: "3 hrs", popular: true, tag: "Most Booked", includes: ["2 HD cameras", "DVR setup", "Mobile app config", "Cabling"], excludes: ["Monthly plan"] },
-    { id: "install4", name: "4-Camera Setup", price: 4999, priceStr: "â‚¹4,999", duration: "5 hrs", popular: false, tag: "Best Value", includes: ["4 HD cameras", "DVR", "App", "Night vision", "1-yr warranty"], excludes: [] },
+    { id: "check", name: "System Check", price: 499, priceStr: "₹499", duration: "1 hr", popular: false, tag: "", includes: ["Camera test", "DVR check", "App verify"], excludes: ["New cables", "Repositioning"] },
+    { id: "install2", name: "2-Camera Setup", price: 2999, priceStr: "₹2,999", duration: "3 hrs", popular: true, tag: "Most Booked", includes: ["2 HD cameras", "DVR setup", "Mobile app config", "Cabling"], excludes: ["Monthly plan"] },
+    { id: "install4", name: "4-Camera Setup", price: 4999, priceStr: "₹4,999", duration: "5 hrs", popular: false, tag: "Best Value", includes: ["4 HD cameras", "DVR", "App", "Night vision", "1-yr warranty"], excludes: [] },
   ],
   general: [
-    { id: "basic", name: "1 Hr Handyman", price: 299, priceStr: "â‚¹299", duration: "1 hr", popular: false, tag: "", includes: ["Any general task", "Basic tools"], excludes: ["Materials", "Electrical/plumbing"] },
-    { id: "standard", name: "2 Hr Handyman", price: 499, priceStr: "â‚¹499", duration: "2 hrs", popular: true, tag: "Most Booked", includes: ["Multiple small tasks", "Tools included", "Experienced pro"], excludes: ["Materials"] },
-    { id: "complete", name: "Full Day Pro", price: 999, priceStr: "â‚¹999", duration: "8 hrs", popular: false, tag: "Best Value", includes: ["Unlimited tasks", "All tools", "Priority scheduling"], excludes: ["Materials above â‚¹500"] },
+    { id: "basic", name: "1 Hr Handyman", price: 299, priceStr: "₹299", duration: "1 hr", popular: false, tag: "", includes: ["Any general task", "Basic tools"], excludes: ["Materials", "Electrical/plumbing"] },
+    { id: "standard", name: "2 Hr Handyman", price: 499, priceStr: "₹499", duration: "2 hrs", popular: true, tag: "Most Booked", includes: ["Multiple small tasks", "Tools included", "Experienced pro"], excludes: ["Materials"] },
+    { id: "complete", name: "Full Day Pro", price: 999, priceStr: "₹999", duration: "8 hrs", popular: false, tag: "Best Value", includes: ["Unlimited tasks", "All tools", "Priority scheduling"], excludes: ["Materials above ₹500"] },
   ],
   carpentry: [
-    { id: "carp-std", name: "Standard Repair", price: 499, priceStr: "â‚¹499", duration: "2 hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=300&q=80&fit=crop", includes: ["Minor Woodwork", "Hinge Replacement", "Basic Fixes"], excludes: [] },
-    { id: "carp-prem", name: "Premium Setup", price: 999, priceStr: "â‚¹999", duration: "4 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=300&q=80&fit=crop", includes: ["Furniture Assembly", "Custom Shelving", "Door Alignment"], excludes: [] },
-    { id: "carp-full", name: "Full Day Carpentry", price: 1999, priceStr: "â‚¹1,999", duration: "8 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=300&q=80&fit=crop", includes: ["Extensive Repairs", "New Installations", "Material Shopping"], excludes: [] },
+    { id: "carp-std", name: "Standard Repair", price: 499, priceStr: "₹499", duration: "2 hrs", popular: false, tag: "", image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=300&q=80&fit=crop", includes: ["Minor Woodwork", "Hinge Replacement", "Basic Fixes"], excludes: [] },
+    { id: "carp-prem", name: "Premium Setup", price: 999, priceStr: "₹999", duration: "4 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=300&q=80&fit=crop", includes: ["Furniture Assembly", "Custom Shelving", "Door Alignment"], excludes: [] },
+    { id: "carp-full", name: "Full Day Carpentry", price: 1999, priceStr: "₹1,999", duration: "8 hrs", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=300&q=80&fit=crop", includes: ["Extensive Repairs", "New Installations", "Material Shopping"], excludes: [] },
   ],
   pest_control: [
-    { id: "pest-std", name: "Basic Pest Control", price: 799, priceStr: "â‚¹799", duration: "1 hr", popular: false, tag: "", image: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=300&q=80&fit=crop", includes: ["Cockroach & Ant Spray", "Targeted Areas"], excludes: [] },
-    { id: "pest-prem", name: "Comprehensive Treatment", price: 1499, priceStr: "â‚¹1,499", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=300&q=80&fit=crop", includes: ["Full Home Spray", "Termite Check", "Bedbug Treatment"], excludes: [] },
-    { id: "pest-year", name: "Annual Pest Protection", price: 3499, priceStr: "â‚¹3,499", duration: "Yearly", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1628102491629-778586284000?w=300&q=80&fit=crop", includes: ["3 Service Visits", "Priority Response", "Guarantee"], excludes: [] },
+    { id: "pest-std", name: "Basic Pest Control", price: 799, priceStr: "₹799", duration: "1 hr", popular: false, tag: "", image: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=300&q=80&fit=crop", includes: ["Cockroach & Ant Spray", "Targeted Areas"], excludes: [] },
+    { id: "pest-prem", name: "Comprehensive Treatment", price: 1499, priceStr: "₹1,499", duration: "2 hrs", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=300&q=80&fit=crop", includes: ["Full Home Spray", "Termite Check", "Bedbug Treatment"], excludes: [] },
+    { id: "pest-year", name: "Annual Pest Protection", price: 3499, priceStr: "₹3,499", duration: "Yearly", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1628102491629-778586284000?w=300&q=80&fit=crop", includes: ["3 Service Visits", "Priority Response", "Guarantee"], excludes: [] },
   ],
   painting: [
-    { id: "paint-room", name: "Single Room Makeover", price: 2999, priceStr: "â‚¹2,999", duration: "1 day", popular: false, tag: "", image: "https://images.unsplash.com/photo-1562259942-27364e0ee76b?w=300&q=80&fit=crop", includes: ["Basic Prep", "2 Coats Paint", "Cleanup"], excludes: [] },
-    { id: "paint-home", name: "Complete Home Painting", price: 9999, priceStr: "â‚¹9,999", duration: "4 days", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1562259942-27364e0ee76b?w=300&q=80&fit=crop", includes: ["Wall Putty", "Primer", "Premium Paint", "Post-Cleanup"], excludes: [] },
-    { id: "paint-prem", name: "Texture & Decor Painting", price: 14999, priceStr: "â‚¹14,999", duration: "5 days", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1584820927500-11b3337a7c5a?w=300&q=80&fit=crop", includes: ["Custom Textures", "Accent Walls", "Designer Finish"], excludes: [] },
+    { id: "paint-room", name: "Single Room Makeover", price: 2999, priceStr: "₹2,999", duration: "1 day", popular: false, tag: "", image: "https://images.unsplash.com/photo-1562259942-27364e0ee76b?w=300&q=80&fit=crop", includes: ["Basic Prep", "2 Coats Paint", "Cleanup"], excludes: [] },
+    { id: "paint-home", name: "Complete Home Painting", price: 9999, priceStr: "₹9,999", duration: "4 days", popular: true, tag: "Most Booked", image: "https://images.unsplash.com/photo-1562259942-27364e0ee76b?w=300&q=80&fit=crop", includes: ["Wall Putty", "Primer", "Premium Paint", "Post-Cleanup"], excludes: [] },
+    { id: "paint-prem", name: "Texture & Decor Painting", price: 14999, priceStr: "₹14,999", duration: "5 days", popular: false, tag: "Best Value", image: "https://images.unsplash.com/photo-1584820927500-11b3337a7c5a?w=300&q=80&fit=crop", includes: ["Custom Textures", "Accent Walls", "Designer Finish"], excludes: [] },
   ],
 }
 
 const TIME_SLOTS = [
-  { period: "Morning", icon: "ðŸŒ…", slots: [{ t: "07:00", l: "7:00 AM" }, { t: "08:00", l: "8:00 AM" }, { t: "09:00", l: "9:00 AM" }, { t: "10:00", l: "10:00 AM" }, { t: "11:00", l: "11:00 AM" }] },
   { period: "Afternoon", icon: "â˜€ï¸", slots: [{ t: "12:00", l: "12:00 PM" }, { t: "13:00", l: "1:00 PM" }, { t: "14:00", l: "2:00 PM" }, { t: "15:00", l: "3:00 PM" }, { t: "16:00", l: "4:00 PM" }] },
-  { period: "Evening", icon: "ðŸŒ†", slots: [{ t: "17:00", l: "5:00 PM" }, { t: "18:00", l: "6:00 PM" }, { t: "19:00", l: "7:00 PM" }] },
+  { period: "Evening", icon: "🌆", slots: [{ t: "17:00", l: "5:00 PM" }, { t: "18:00", l: "6:00 PM" }, { t: "19:00", l: "7:00 PM" }] },
 ]
 
 const REVIEWS = [
@@ -193,9 +192,96 @@ function generateAvatarUrl(name) {
 
 const OTP_SESSION_KEY = "bk_cust_verified"
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────────────────
    HELPERS
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────────────────── */
+
+const DEFAULT_CAT_IMAGES = {
+  hvac: "https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=500&q=80&fit=crop",
+  appliances: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=500&q=80&fit=crop",
+  appliance_repair: "https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=500&q=80&fit=crop",
+  cleaning: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&q=80&fit=crop",
+  plumbing: "https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=500&q=80&fit=crop",
+  electrical: "https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=500&q=80&fit=crop",
+  carpentry: "https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=500&q=80&fit=crop",
+  pest_control: "https://images.unsplash.com/photo-1517825738774-7de9363ef735?w=500&q=80&fit=crop",
+  painting: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?w=500&q=80&fit=crop",
+  security: "https://images.unsplash.com/photo-1557597774-9d273605dfa9?w=500&q=80&fit=crop",
+  general: "https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=500&q=80&fit=crop",
+}
+
+function getCategoryFallbackImage(name = "", slug = "") {
+  const s = (slug || "").toLowerCase();
+  const n = (name || "").toLowerCase();
+  for (const [key, val] of Object.entries(DEFAULT_CAT_IMAGES)) {
+    if (s.includes(key) || n.includes(key) || (key === "hvac" && (n.includes("ac") || n.includes("heating")))) {
+      return val;
+    }
+  }
+  return "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&q=80&fit=crop";
+}
+
+function formatErrorMessage(err, defaultMsg = "An error occurred") {
+  if (!err) return defaultMsg;
+  if (typeof err === "string") return err;
+  if (typeof err.message === "string") return err.message;
+  if (typeof err.detail === "string") return err.detail;
+  if (err.body) {
+    if (typeof err.body === "string") return err.body;
+    if (typeof err.body.message === "string") return err.body.message;
+    if (typeof err.body.detail === "string") return err.body.detail;
+    if (typeof err.body === "object") {
+      const msgs = [];
+      for (const [key, val] of Object.entries(err.body)) {
+        const strVal = Array.isArray(val) ? val.join(", ") : (typeof val === "object" ? JSON.stringify(val) : String(val));
+        msgs.push(`${key}: ${strVal}`);
+      }
+      if (msgs.length > 0) return msgs.join(" | ");
+    }
+  }
+  if (typeof err === "object") {
+    const msgs = [];
+    for (const [key, val] of Object.entries(err)) {
+      if (key === "success" || key === "status") continue;
+      const strVal = Array.isArray(val) ? val.join(", ") : (typeof val === "object" ? JSON.stringify(val) : String(val));
+      msgs.push(`${key}: ${strVal}`);
+    }
+    if (msgs.length > 0) return msgs.join(" | ");
+  }
+  return String(err);
+}
+
+function getFullImageUrl(rawUrl, catName = "", catSlug = "") {
+  const url = typeof rawUrl === "string" ? rawUrl.trim() : (rawUrl?.url || "");
+  if (!url) return getCategoryFallbackImage(catName, catSlug);
+
+  if (typeof url === "string" && url.includes("/media/")) {
+    const idx = url.indexOf("/media/");
+    return url.substring(idx);
+  }
+
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+    return url;
+  }
+
+  if (url.startsWith("media/")) {
+    return `/${url}`;
+  }
+
+  if (url.startsWith("avatars/") || url.startsWith("catalog/") || url.startsWith("services/")) {
+    return `/media/${url}`;
+  }
+
+  if (url.startsWith("/")) {
+    return url;
+  }
+
+  if (url.includes(".") || url.includes("-") || url.includes("_")) {
+    return `/media/catalog/${url}`;
+  }
+
+  return getCategoryFallbackImage(catName, catSlug);
+}
 
 function getNextDays(n = 21) {
   const out = []
@@ -219,9 +305,9 @@ function getNextDays(n = 21) {
 
 const DAYS_LIST = getNextDays(21)
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────────────────
    MINI COMPONENTS
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────────────────── */
 
 function Tag({ children, color = "#7C3AED" }) {
   return (
@@ -278,7 +364,7 @@ function SummaryBar({ category, cart, date, time, step }) {
       </span>
       {cart && cart.length > 0 && <>
         <ChevronRight size={12} style={{ color: "#cbd5e1" }} />
-        <span style={{ color: "#7C3AED" }}>{totalItems} item{totalItems > 1 ? 's' : ''} Â· {BOOKING_CURRENCY_SYMBOL}{totalPrice}</span>
+        <span style={{ color: "#7C3AED" }}>{totalItems} item{totalItems > 1 ? 's' : ''} · {BOOKING_CURRENCY_SYMBOL}{totalPrice}</span>
       </>}
       {date && <>
         <ChevronRight size={12} style={{ color: "#cbd5e1" }} />
@@ -291,12 +377,12 @@ function SummaryBar({ category, cart, date, time, step }) {
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   STEP 1 â€” HOME (Hero + Services)
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────────────────
+   STEP 1 — HOME (Hero + Services)
+   ───────────────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────────────
    LOCATION PICKER MODAL
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────────────────── */
 function LocationPickerModal({ onClose, onConfirm, initialLocation }) {
   const [search, setSearch] = useState(initialLocation || "")
   const [isFetching, setIsFetching] = useState(false)
@@ -504,7 +590,7 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
           <div className="uc-hero">
             <div className="uc-hero-inner">
               <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
-                <p className="uc-hero-tag">â­ India's #1 Home Services Platform</p>
+                <p className="uc-hero-tag">⭐ India's #1 Home Services Platform</p>
                 <h1 className="uc-hero-h1">
                   Professional
                   <br />
@@ -523,7 +609,7 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
                   <br />
                   at your doorstep
                 </h1>
-                <p className="uc-hero-sub">Trained & verified experts Â· Transparent pricing Â· Real-time tracking</p>
+                <p className="uc-hero-sub">Trained & verified experts · Transparent pricing · Real-time tracking</p>
               </motion.div>
 
               {/* Search Bar */}
@@ -531,7 +617,7 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
                 <Search size={18} className="uc-search-icon" />
                 <input
                   className="uc-search-input"
-                  placeholder="Search for services (e.g. AC repair, deep cleaningâ€¦)"
+                  placeholder="Search for services (e.g. AC repair, deep cleaning…)"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
@@ -545,7 +631,7 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
               {/* Trust pills */}
               <motion.div className="uc-trust-row" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}>
                 <span><ShieldCheck size={13} /> Verified Pros</span>
-                <span><Star size={13} style={{ fill: "#fbbf24", color: "#fbbf24" }} /> 4.8â˜… Rated</span>
+                <span><Star size={13} style={{ fill: "#fbbf24", color: "#fbbf24" }} /> 4.8★ Rated</span>
                 <span><Users size={13} /> 1M+ Happy Homes</span>
                 <span><Award size={13} /> 30-Day Guarantee</span>
               </motion.div>
@@ -563,14 +649,22 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
                 transition={{ duration: 1.2 }}
                 className="uc-feature-slide"
               >
-                <img src={featured[rotIdx].image} alt={featured[rotIdx].name} className="uc-feature-img" />
+                <img
+                  src={getFullImageUrl(featured[rotIdx].image, featured[rotIdx].name, featured[rotIdx].slug)}
+                  alt={featured[rotIdx].name}
+                  className="uc-feature-img"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = featured[rotIdx].fallbackImage || getCategoryFallbackImage(featured[rotIdx].name, featured[rotIdx].slug);
+                  }}
+                />
                 <div className="uc-feature-overlay">
                   <div className="uc-feature-text">
                     <h3>{featured[rotIdx].name}</h3>
                     <p>{featured[rotIdx].desc}</p>
                     <div style={{ display: 'flex', gap: '12px', marginTop: '12px', fontSize: '0.95rem', color: '#f1f5f9', fontWeight: 600 }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Star size={14} style={{ fill: "#fbbf24", color: "#fbbf24" }} /> {featured[rotIdx].rating} Rated</span>
-                      <span>â€¢</span>
+                      <span>•</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle2 size={14} /> {featured[rotIdx].jobs} Bookings</span>
                     </div>
                   </div>
@@ -601,7 +695,15 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
               whileTap={{ scale: 0.97 }}
             >
               <div className="uc-cat-img-wrap">
-                <img src={cat.image} alt={cat.name} className="uc-cat-image" />
+                <img
+                  src={cat.image}
+                  alt={cat.name}
+                  className="uc-cat-image"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = cat.fallbackImage || getCategoryFallbackImage(cat.name, cat.slug);
+                  }}
+                />
                 <div className="uc-cat-overlay">
                   <span className="uc-cat-btn">Book Now</span>
                 </div>
@@ -675,12 +777,13 @@ function StepHome({ searchQuery, setSearchQuery, onSelect, categories, dynamicRe
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   STEP 2 â€” PACKAGE SELECTION
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─────────────────────────────────────────────────────────────────────────
+   STEP 2 — PACKAGE SELECTION
+   ───────────────────────────────────────────────────────────────────────── */
 
 function StepPackage({ category, selectedPackage, onSelect, onNext, onBack, packagesData }) {
-  const packages = ((packagesData && packagesData[category?.id]) || PACKAGES[category?.id] || []).map(p => ({ ...p, priceStr: BOOKING_CURRENCY_SYMBOL + p.price }))
+  const rawList = (packagesData && (packagesData[category?.id] || packagesData[category?.slug] || packagesData[category?.name?.toLowerCase()])) || PACKAGES[category?.id] || PACKAGES[category?.slug] || []
+  const packages = rawList.map(p => ({ ...p, priceStr: BOOKING_CURRENCY_SYMBOL + p.price }))
 
   return (
     <div className="uc-step-page">
@@ -696,7 +799,7 @@ function StepPackage({ category, selectedPackage, onSelect, onNext, onBack, pack
       </div>
 
       <h2 className="uc-step-h2">Choose your package</h2>
-      <p className="uc-step-sub">Transparent pricing Â· No hidden charges</p>
+      <p className="uc-step-sub">Transparent pricing · No hidden charges</p>
 
       <div className="uc-pkg-grid">
         {packages.map(pkg => {
@@ -711,7 +814,7 @@ function StepPackage({ category, selectedPackage, onSelect, onNext, onBack, pack
             >
               {pkg.tag && (
                 <div className="uc-pkg-tag" style={{ background: pkg.popular ? "#7C3AED" : "#059669" }}>
-                  {pkg.popular ? "â­ " : "âœ… "}{pkg.tag}
+                  {pkg.popular ? "⭐ " : "✅ "}{pkg.tag}
                 </div>
               )}
 
@@ -763,13 +866,25 @@ function StepPackage({ category, selectedPackage, onSelect, onNext, onBack, pack
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   STEP 3 â€” SCHEDULE
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─────────────────────────────────────────────────────────────────────────
+   STEP 3 — SCHEDULE
+   ───────────────────────────────────────────────────────────────────────── */
+
+const LOCAL_TIME_SLOTS = [
+  { period: "Morning", icon: "🌅", slots: [{ t: "07:00", l: "7:00 AM" }, { t: "08:00", l: "8:00 AM" }, { t: "09:00", l: "9:00 AM" }, { t: "10:00", l: "10:00 AM" }, { t: "11:00", l: "11:00 AM" }] },
+  { period: "Afternoon", icon: "☀️", slots: [{ t: "12:00", l: "12:00 PM" }, { t: "13:00", l: "1:00 PM" }, { t: "14:00", l: "2:00 PM" }, { t: "15:00", l: "3:00 PM" }, { t: "16:00", l: "4:00 PM" }] },
+  { period: "Evening", icon: "🌆", slots: [{ t: "17:00", l: "5:00 PM" }, { t: "18:00", l: "6:00 PM" }, { t: "19:00", l: "7:00 PM" }] },
+]
 
 function StepSchedule({ category, selectedDate, selectedTime, onDateChange, onTimeChange, onNext, onBack }) {
   const dateScrollRef = useRef()
   const canContinue = selectedDate && selectedTime
+
+  const scrollDates = (dir) => {
+    if (dateScrollRef.current) {
+      dateScrollRef.current.scrollBy({ left: dir === 'left' ? -220 : 220, behavior: 'smooth' })
+    }
+  }
 
   return (
     <div className="uc-step-page">
@@ -779,7 +894,34 @@ function StepSchedule({ category, selectedDate, selectedTime, onDateChange, onTi
 
       {/* Date Scroll */}
       <div className="uc-date-section">
-        <div className="uc-subsection-label"><Calendar size={14} /> Select Date</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <div className="uc-subsection-label" style={{ marginBottom: 0 }}><Calendar size={14} /> Select Date</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => scrollDates('left')}
+              title="Scroll Left"
+              style={{
+                width: 30, height: 30, borderRadius: '50%', border: '1.5px solid #cbd5e1',
+                background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: '#475569', transition: 'all 0.15s ease'
+              }}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={() => scrollDates('right')}
+              title="Scroll Right"
+              style={{
+                width: 30, height: 30, borderRadius: '50%', border: '1.5px solid #cbd5e1',
+                background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', color: '#475569', transition: 'all 0.15s ease'
+              }}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+
         <div className="uc-date-scroll" ref={dateScrollRef}>
           {DAYS_LIST.map(d => (
             <button
@@ -799,7 +941,7 @@ function StepSchedule({ category, selectedDate, selectedTime, onDateChange, onTi
       {/* Time Slots */}
       <div className="uc-time-section">
         <div className="uc-subsection-label"><Clock size={14} /> Select Time Slot</div>
-        {TIME_SLOTS.map(group => (
+        {LOCAL_TIME_SLOTS.map(group => (
           <div key={group.period} className="uc-time-group">
             <div className="uc-time-period-label">{group.icon} {group.period}</div>
             <div className="uc-time-slots">
@@ -826,9 +968,9 @@ function StepSchedule({ category, selectedDate, selectedTime, onDateChange, onTi
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   STEP 4 â€” PHONE OTP IDENTITY
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─────────────────────────────────────────────────────────────────────────
+   STEP 4 — PHONE OTP IDENTITY
+   ───────────────────────────────────────────────────────────────────────── */
 
 function StepLogin({ category, onVerified, onBack }) {
   const { user, refreshMe } = useAuth()
@@ -998,7 +1140,7 @@ function StepLogin({ category, onVerified, onBack }) {
           {error && <div className="uc-error"><AlertCircle size={13} /> {error}</div>}
 
           <button className="uc-btn-primary uc-btn-full" onClick={sendOtp} disabled={!nameOk || !phoneOk || loading}>
-            {loading ? <><RefreshCw size={15} className="spin-icon" /> Sendingâ€¦</> : <><MessageSquare size={15} /> Send OTP</>}
+            {loading ? <><RefreshCw size={15} className="spin-icon" /> Sending…</> : <><MessageSquare size={15} /> Send OTP</>}
           </button>
 
           <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', color: '#94a3b8', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -1056,7 +1198,7 @@ function StepLogin({ category, onVerified, onBack }) {
 
           {devCode && (
             <div className="uc-dev-banner">
-              <Zap size={13} /> Dev mode â€” code: <strong>{devCode}</strong> (auto-filled)
+              <Zap size={13} /> Dev mode — code: <strong>{devCode}</strong> (auto-filled)
             </div>
           )}
 
@@ -1074,7 +1216,7 @@ function StepLogin({ category, onVerified, onBack }) {
           {error && <div className="uc-error"><AlertCircle size={13} /> {error}</div>}
 
           <button className="uc-btn-primary uc-btn-full" onClick={verifyOtp} disabled={otp.join("").length < 4 || loading}>
-            {loading ? <><RefreshCw size={15} className="spin-icon" /> Verifyingâ€¦</> : <><ShieldCheck size={15} /> Verify &amp; Continue</>}
+            {loading ? <><RefreshCw size={15} className="spin-icon" /> Verifying…</> : <><ShieldCheck size={15} /> Verify &amp; Continue</>}
           </button>
 
           <div className="uc-resend">
@@ -1094,16 +1236,16 @@ function StepLogin({ category, onVerified, onBack }) {
           </motion.div>
           <div className="uc-success-title">Identity Verified!</div>
           <div className="uc-success-sub">Welcome, {name} ðŸ‘‹</div>
-          <div className="uc-success-sub" style={{ color: "#94a3b8", fontSize: "0.78rem" }}>Loading your booking formâ€¦</div>
+          <div className="uc-success-sub" style={{ color: "#94a3b8", fontSize: "0.78rem" }}>Loading your booking form…</div>
         </motion.div>
       )}
     </div>
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   STEP 5 â€” CUSTOMER DETAILS
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─────────────────────────────────────────────────────────────────────────
+   STEP 5 — CUSTOMER DETAILS
+   ───────────────────────────────────────────────────────────────────────── */
 
 function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoChange, photoPreview, onNext, onBack, globalLocation, onOpenMap }) {
   const fileRef = useRef()
@@ -1120,7 +1262,7 @@ function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoCha
 
   useEffect(() => {
     if (!formData.issue_title && cart && cart.length > 0) {
-      const defaultTitle = cart.map(c => c.name).join(', ') + (category ? ` â€” ${category.name}` : '');
+      const defaultTitle = cart.map(c => c.name).join(', ') + (category ? ` — ${category.name}` : '');
       onChange({ target: { name: 'issue_title', value: defaultTitle } })
     }
   }, [cart, category, formData.issue_title])
@@ -1204,7 +1346,7 @@ function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoCha
             className="uc-textarea"
             name="description"
             rows={3}
-            placeholder="Any specific issues, brand of appliance, how long the problem has been occurringâ€¦"
+            placeholder="Any specific issues, brand of appliance, how long the problem has been occurring…"
             value={formData.description}
             onChange={onChange}
           />
@@ -1226,7 +1368,7 @@ function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoCha
               <>
                 <Camera size={24} style={{ color: "#94a3b8" }} />
                 <div className="uc-photo-text">Click to attach a photo of the issue</div>
-                <div className="uc-photo-hint">JPG, PNG â€” helps our expert prepare</div>
+                <div className="uc-photo-hint">JPG, PNG — helps our expert prepare</div>
               </>
             )}
             <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={onPhotoChange} />
@@ -1243,9 +1385,9 @@ function StepDetails({ category, cart, formData, onChange, photoFile, onPhotoCha
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   STEP 6 â€” CONFIRM
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─────────────────────────────────────────────────────────────────────────
+   STEP 6 — CONFIRM
+   ───────────────────────────────────────────────────────────────────────── */
 
 function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, onBack, onSubmit, loading, error }) {
   const [agreed, setAgreed] = useState(false)
@@ -1272,7 +1414,7 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
         {/* Summary Card */}
         <div className="uc-summary-card">
           <div className="uc-summary-hero" style={{ background: `linear-gradient(135deg,#7C3AED,#a855f7)` }}>
-            <span style={{ fontSize: "2rem" }}>{category?.emoji || "ðŸ”§"}</span>
+            <span style={{ fontSize: "2rem" }}>{category?.emoji || "🔧"}</span>
             <div>
               <div style={{ fontWeight: 800, color: "white", fontSize: "1rem" }}>{category?.name || "Service"}</div>
               <div style={{ color: "rgba(255,255,255,0.8)", fontSize: "0.75rem" }}>
@@ -1347,7 +1489,7 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
               <span>{BOOKING_CURRENCY_SYMBOL}{totalPrice}</span>
             </div>
             <div style={{ textAlign: "center", fontSize: "0.68rem", color: "#94a3b8", marginTop: "0.25rem" }}>
-              Pay at doorstep Â· No advance required
+              Pay at doorstep · No advance required
             </div>
           </div>
         </div>
@@ -1391,11 +1533,11 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
             onClick={() => { if (agreed && !loading) setShowPayment(true) }}
             disabled={!agreed || loading}
           >
-            {loading ? <><RefreshCw size={16} className="spin-icon" /> Processingâ€¦</> : <><CreditCard size={16} /> Choose Payment & Confirm</>}
+            {loading ? <><RefreshCw size={16} className="spin-icon" /> Processing…</> : <><CreditCard size={16} /> Choose Payment & Confirm</>}
           </button>
 
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", marginTop: "0.75rem", fontSize: "0.7rem", color: "#94a3b8" }}>
-            <Shield size={12} /> Secured & encrypted Â· Pay on arrival
+            <Shield size={12} /> Secured & encrypted · Pay on arrival
           </div>
         </div>
       </div>
@@ -1414,9 +1556,9 @@ function StepConfirm({ category, pkg, cart, date, time, formData, photoPreview, 
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────────────────
    PAYMENT MODAL
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────────────────── */
 
 function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onConfirm, bookingId }) {
   const [selected, setSelected] = useState(allowedMethods.includes('online') && allowedMethods.length === 1 ? 'online' : 'cash')
@@ -1465,8 +1607,8 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
   }
 
   const options = [
-    { id: "cash", icon: "ðŸ’µ", label: "Cash on Service", sub: "Pay after service is completed", badge: "Most Popular", badgeColor: "#10B981", detail: ["No upfront payment", "Pay only on completion", "Any denomination accepted"] },
-    { id: "online", icon: "ðŸ“±", label: "Pay via UPI", sub: "Google Pay, PhonePe, Paytm, BHIM", badge: "Instant", badgeColor: "#7C3AED", detail: ["100% secure & encrypted", "Instant confirmation", "Invoice emailed immediately"] },
+    { id: "cash", icon: <CreditCard size={24} color="#10B981" />, label: "Cash on Service", sub: "Pay after service is completed", badge: "Most Popular", badgeColor: "#10B981", detail: ["No upfront payment", "Pay only on completion", "Any denomination accepted"] },
+    { id: "online", icon: <Wallet size={24} color="#7C3AED" />, label: "Pay via UPI", sub: "Google Pay, PhonePe, Paytm, BHIM", badge: "Instant", badgeColor: "#7C3AED", detail: ["100% secure & encrypted", "Instant confirmation", "Invoice emailed immediately"] },
   ].filter(o => allowedMethods.includes(o.id))
 
   if (showOnlineSheet) {
@@ -1489,7 +1631,7 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
             {payPhase === 'processing' && (
               <div style={{ textAlign: 'center', padding: '2rem 0' }}>
                 <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} style={{ display: 'inline-block', marginBottom: '1.5rem' }}><RefreshCw size={48} color="#7C3AED" /></motion.div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Processing UPI Paymentâ€¦</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Processing UPI Payment…</div>
                 <div style={{ color: '#64748b', fontSize: '0.85rem' }}>Please do not close this window</div>
               </div>
             )}
@@ -1499,9 +1641,9 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
                   style={{ width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg,#10B981,#34D399)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
                   <Check size={36} color="white" />
                 </motion.div>
-                <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Payment Successful! ðŸŽ‰</div>
+                <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#0f172a', marginBottom: 6 }}>Payment Successful! 🎉</div>
                 <div style={{ color: '#64748b', fontSize: '0.85rem' }}>Your booking is now confirmed</div>
-                <div style={{ marginTop: '1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.78rem', color: '#166534', fontWeight: 600 }}>âœ… Amount {BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()} debited successfully</div>
+                <div style={{ marginTop: '1rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '0.75rem 1rem', fontSize: '0.78rem', color: '#166534', fontWeight: 600 }}>✅ Amount {BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()} debited successfully</div>
               </div>
             )}
             {payPhase === 'failed' && (
@@ -1534,7 +1676,7 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
             )}
             {payPhase === null && (
               <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                <Shield size={11} /> 256-bit SSL Â· UPI Encryption
+                <Shield size={11} /> 256-bit SSL · UPI Encryption
               </div>
             )}
           </div>
@@ -1544,53 +1686,103 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 10010, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)', zIndex: 10010, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }} onClick={onClose}>
       <motion.div initial={{ y: 300, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 300, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }} onClick={e => e.stopPropagation()}
-        style={{ background: 'white', borderRadius: '24px 24px 0 0', width: '100%', maxWidth: 520, paddingBottom: '2.5rem' }}>
-        <div style={{ padding: '1.75rem 1.75rem 0' }}>
-          <div style={{ width: 40, height: 4, background: '#e2e8f0', borderRadius: 99, margin: '0 auto 1.5rem' }} />
-          <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.3rem', fontWeight: 900, color: '#0f172a' }}>Choose Payment Method</h3>
-          <p style={{ margin: '0 0 1.25rem', color: '#64748b', fontSize: '0.85rem' }}>Total: <strong style={{ color: '#7C3AED', fontSize: '1.05rem' }}>{BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()}</strong></p>
+        style={{ background: 'white', borderRadius: '28px 28px 0 0', width: '100%', maxWidth: 540, paddingBottom: '2.25rem', overflow: 'hidden', boxShadow: '0 -20px 50px rgba(0,0,0,0.15)' }}>
+        <div style={{ padding: '1.5rem 1.75rem 0', position: 'relative' }}>
+          <div style={{ width: 40, height: 4, background: '#cbd5e1', borderRadius: 99, margin: '0 auto 1.25rem' }} />
+
+          <button onClick={onClose} style={{ position: 'absolute', right: 24, top: 20, width: 32, height: 32, borderRadius: '50%', background: '#f1f5f9', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#64748b' }}>
+            <X size={18} />
+          </button>
+
+          <h3 style={{ margin: '0 0 0.25rem', fontSize: '1.35rem', fontWeight: 900, color: '#0f172a', letterSpacing: '-0.02em' }}>Choose Payment Method</h3>
+          <p style={{ margin: '0 0 1.25rem', color: '#64748b', fontSize: '0.85rem', fontWeight: 500 }}>Total: <strong style={{ color: '#7C3AED', fontSize: '1.1rem', fontWeight: 900 }}>{BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()}</strong></p>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', padding: '0 1.75rem', marginBottom: '1.25rem' }}>
-          {options.map(opt => (
-            <div key={opt.id} onClick={() => setSelected(opt.id)}
-              style={{ border: `2px solid ${selected === opt.id ? '#7C3AED' : '#e2e8f0'}`, borderRadius: 16, padding: '1rem 1.1rem', cursor: 'pointer', background: selected === opt.id ? '#f5f3ff' : 'white', transition: 'all 0.2s' }}>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                <div style={{ width: 48, height: 48, borderRadius: 14, background: selected === opt.id ? '#7C3AED18' : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', flexShrink: 0 }}>{opt.icon}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {opt.label}
-                    <span style={{ background: opt.badgeColor + '18', color: opt.badgeColor, fontSize: '0.6rem', fontWeight: 800, padding: '2px 8px', borderRadius: 99, border: `1px solid ${opt.badgeColor}30` }}>{opt.badge}</span>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0 1.75rem', marginBottom: '1.5rem' }}>
+          {options.map(opt => {
+            const isSel = selected === opt.id
+            const themeColor = opt.id === 'cash' ? '#10B981' : '#7C3AED'
+            const activeBg = opt.id === 'cash' ? '#f0fdf4' : '#faf5ff'
+            const iconBg = opt.id === 'cash' ? '#10B98118' : '#7C3AED18'
+            const shadowColor = opt.id === 'cash' ? 'rgba(16,185,129,0.15)' : 'rgba(124,58,237,0.15)'
+
+            return (
+              <div key={opt.id} onClick={() => setSelected(opt.id)}
+                style={{
+                  border: `2px solid ${isSel ? themeColor : '#e2e8f0'}`,
+                  borderRadius: 18,
+                  padding: '1.1rem 1.2rem',
+                  cursor: 'pointer',
+                  background: isSel ? activeBg : 'white',
+                  transition: 'all 0.2s ease',
+                  boxShadow: isSel ? `0 8px 24px ${shadowColor}` : '0 2px 6px rgba(0,0,0,0.02)'
+                }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 14, background: isSel ? iconBg : '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: `1px solid ${isSel ? themeColor + '30' : '#e2e8f0'}` }}>
+                    {opt.icon}
                   </div>
-                  <div style={{ color: '#64748b', fontSize: '0.78rem', marginTop: 3 }}>{opt.sub}</div>
-                  {selected === opt.id && (
-                    <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                      {opt.detail.map((d, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.73rem', color: '#059669', fontWeight: 600 }}>
-                          <CheckCircle2 size={12} /> {d}
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.98rem', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {opt.label}
+                      <span style={{ background: opt.badgeColor + '18', color: opt.badgeColor, fontSize: '0.62rem', fontWeight: 800, padding: '2px 9px', borderRadius: 99, border: `1px solid ${opt.badgeColor}30`, letterSpacing: '0.02em' }}>
+                        {opt.badge}
+                      </span>
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 4, fontWeight: 500 }}>{opt.sub}</div>
+
+                    {isSel && (
+                      <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+                        style={{
+                          marginTop: '0.85rem',
+                          paddingTop: '0.75rem',
+                          borderTop: `1px dashed ${themeColor}35`,
+                        }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem' }}>
+                          {opt.detail.map((d, i) => (
+                            <span key={i} style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                              fontSize: '0.74rem', color: opt.id === 'cash' ? '#065f46' : '#5b21b6',
+                              fontWeight: 700, background: opt.id === 'cash' ? '#d1fae5' : '#ede9fe',
+                              padding: '4px 10px', borderRadius: 8, border: `1px solid ${themeColor}30`
+                            }}>
+                              <CheckCircle2 size={13} color={themeColor} /> {d}
+                            </span>
+                          ))}
                         </div>
-                      ))}
-                    </motion.div>
-                  )}
-                </div>
-                <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${selected === opt.id ? '#7C3AED' : '#cbd5e1'}`, background: selected === opt.id ? '#7C3AED' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-                  {selected === opt.id && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'white' }} />}
+                      </motion.div>
+                    )}
+                  </div>
+
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', border: `2px solid ${isSel ? themeColor : '#cbd5e1'}`, background: isSel ? themeColor : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
+                    {isSel && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'white' }} />}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
+
         <div style={{ padding: '0 1.75rem' }}>
           <button onClick={handleConfirm} disabled={confirming}
-            style={{ width: '100%', padding: '1rem', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', fontWeight: 800, fontSize: '1rem', border: 'none', borderRadius: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 20px rgba(124,58,237,0.3)' }}>
-            {confirming ? <><RefreshCw size={16} className="spin-icon" /> Processingâ€¦</> :
-              selected === 'online' ? <><CreditCard size={16} /> Continue to Pay {BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()}</> :
-                <><CheckCheck size={16} /> Confirm Booking</>}
+            style={{
+              width: '100%', padding: '1rem',
+              background: selected === 'cash' ? 'linear-gradient(135deg,#10B981,#059669)' : 'linear-gradient(135deg,#7C3AED,#6D28D9)',
+              color: 'white', fontWeight: 900, fontSize: '1rem', border: 'none', borderRadius: 16,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              boxShadow: selected === 'cash' ? '0 6px 20px rgba(16,185,129,0.35)' : '0 6px 20px rgba(124,58,237,0.35)',
+              transition: 'all 0.2s ease'
+            }}>
+            {confirming ? <><RefreshCw size={18} className="spin-icon" /> Processing...</> :
+              selected === 'online' ? <><Lock size={18} /> Continue to Pay {BOOKING_CURRENCY_SYMBOL}{total.toLocaleString()}</> :
+                <><CheckCheck size={18} /> Confirm & Book Service</>}
           </button>
-          <div style={{ textAlign: 'center', marginTop: '0.75rem', fontSize: '0.68rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-            <Shield size={11} /> 256-bit SSL encrypted Â· Your info is safe
+
+          <div style={{ textAlign: 'center', marginTop: '0.85rem', fontSize: '0.72rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontWeight: 600 }}>
+            <Shield size={12} color="#10B981" /> 256-bit SSL encrypted · Your info is safe
           </div>
         </div>
       </motion.div>
@@ -1598,20 +1790,12 @@ function PaymentModal({ total, allowedMethods = ['cash', 'online'], onClose, onC
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────────────────
    POST-BOOKING ANIMATED FLOW
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────────────────── */
 
 function PostBookingFlow({ bookingData, category, cart, formData, selDate, selTime, onDone }) {
   const [phase, setPhase] = useState(0)
-
-  const MOCK_TECH = {
-    name: "Ravi Kumar",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face",
-    rating: 4.9,
-    jobs: 284,
-    eta: "25 mins",
-  }
 
   useEffect(() => {
     const timers = [
@@ -1625,21 +1809,21 @@ function PostBookingFlow({ bookingData, category, cart, formData, selDate, selTi
   const phases = [
     {
       icon: <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}><RefreshCw size={52} color="#7C3AED" /></motion.div>,
-      title: "Creating your bookingâ€¦",
+      title: "Creating your booking…",
       sub: "Submitting your service request securely",
     },
     {
       icon: <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ repeat: Infinity, duration: 0.8 }}><Users size={52} color="#F59E0B" /></motion.div>,
-      title: "Finding your expertâ€¦",
+      title: "Finding your expert…",
       sub: "Matching you with the best professional nearby",
     },
     {
       icon: <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 15 }}><CheckCircle2 size={52} color="#10B981" /></motion.div>,
-      title: "Professional Assigned! âœ…",
+      title: "Professional Assigned! ✅",
       sub: "Your expert is confirmed and on their way",
     },
     {
-      icon: <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 12 }}><span style={{ fontSize: '3.5rem' }}>ðŸŽ‰</span></motion.div>,
+      icon: <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 12 }}><span style={{ fontSize: '3.5rem' }}>🎉</span></motion.div>,
       title: "Booking Confirmed!",
       sub: "Your booking is all set. Tap below to track.",
     },
@@ -1677,23 +1861,10 @@ function PostBookingFlow({ bookingData, category, cart, formData, selDate, selTi
           <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.3rem', fontWeight: 900, color: '#0f172a' }}>{cur.title}</h3>
           <p style={{ margin: 0, color: '#64748b', fontSize: '0.85rem' }}>{cur.sub}</p>
 
-          {phase === 2 && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-              style={{ marginTop: '1.5rem', background: '#f8fafc', borderRadius: 14, padding: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}
-            >
-              <img src={MOCK_TECH.avatar} alt={MOCK_TECH.name} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: '2px solid #7C3AED30' }} />
-              <div style={{ flex: 1, textAlign: 'left' }}>
-                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem' }}>{MOCK_TECH.name}</div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>â­ {MOCK_TECH.rating} Â· {MOCK_TECH.jobs} jobs</div>
-              </div>
-              <div style={{ background: '#10B98115', color: '#10B981', fontWeight: 800, fontSize: '0.7rem', padding: '4px 10px', borderRadius: 99, border: '1px solid #10B98130' }}>ETA {MOCK_TECH.eta}</div>
-            </motion.div>
-          )}
-
           {phase === 3 && (
             <motion.button
               initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-              onClick={() => onDone(MOCK_TECH)}
+              onClick={() => onDone(null)}
               style={{ marginTop: '1.5rem', width: '100%', padding: '0.875rem', background: 'linear-gradient(135deg,#7C3AED,#a855f7)', color: 'white', fontWeight: 800, fontSize: '0.95rem', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
             >
               <MapPin size={16} /> Track My Booking
@@ -1705,23 +1876,25 @@ function PostBookingFlow({ bookingData, category, cart, formData, selDate, selTi
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────────────────
    LIVE TRACKING PAGE
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────────────────── */
 
 function LiveTrackingPage({ successData, technician, category, cart, formData, selDate, selTime, onBookAgain }) {
   const rid = successData?.request_id || successData?.id || "BK" + Date.now().toString().slice(-6)
   const [etaMinutes, setEtaMinutes] = useState(25)
-  const totalPrice = cart ? cart.reduce((a, c) => a + (c.price * c.quantity), 0) : 0
-  const displayDate = selDate ? new Date(selDate + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) : ""
-  const displayTime = selTime ? TIME_SLOTS.flatMap(g => g.slots).find(s => s.t === selTime)?.l : ""
+  const totalPrice = cart ? cart.reduce((a, c) => a + (c.price * c.quantity), 0) : (successData?.estimated_cost || 0)
+  const displayDate = selDate ? new Date(selDate + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) : (successData?.scheduled_date || "Today")
+  const displayTime = selTime ? LOCAL_TIME_SLOTS.flatMap(g => g.slots).find(s => s.t === selTime)?.l : (successData?.time_slot || "Upcoming")
+
+  const tech = technician || successData?.technician || null
 
   const trackSteps = [
-    { label: "Booking Confirmed", icon: "âœ…", done: true, time: "Just now" },
-    { label: "Expert Assigned", icon: "ðŸ‘¨â€ðŸ”§", done: false, time: "Pending" },
-    { label: "Expert On The Way", icon: "ðŸ›µ", done: false, time: "Pending" },
-    { label: "Service In Progress", icon: "âš™ï¸", done: false, time: "Scheduled" },
-    { label: "Service Completed", icon: "ðŸŒŸ", done: false, time: "Pending" },
+    { label: "Booking Confirmed", icon: <CheckCircle2 size={16} color="#10B981" />, done: true, time: "Just now" },
+    { label: "Expert Assigned", icon: <User size={16} color="#7C3AED" />, done: !!tech, time: tech ? "Assigned" : "Pending" },
+    { label: "Expert On The Way", icon: <MapPin size={16} color="#64748b" />, done: false, time: "Pending" },
+    { label: "Service In Progress", icon: <Clock size={16} color="#64748b" />, done: false, time: "Scheduled" },
+    { label: "Service Completed", icon: <Award size={16} color="#64748b" />, done: false, time: "Pending" },
   ]
 
   useEffect(() => {
@@ -1729,8 +1902,6 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
     const t = setInterval(() => setEtaMinutes(m => m > 0 ? m - 1 : 0), 60000)
     return () => clearInterval(t)
   }, [etaMinutes])
-
-  const tech = technician || { name: "Ravi Kumar", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face", rating: 4.9, jobs: 284, eta: "25 mins" }
 
   return (
     <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} style={{ maxWidth: 640, margin: '0 auto', padding: '1.5rem' }}>
@@ -1740,71 +1911,99 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
         >
           <CheckCircle2 size={44} color="white" />
         </motion.div>
-        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>Booking Confirmed! ðŸŽ‰</h2>
-        <p style={{ margin: '0 0 0.5rem', color: '#64748b', fontSize: '0.9rem' }}>Your expert is on the way</p>
+        <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.6rem', fontWeight: 900, color: '#0f172a' }}>Booking Confirmed! 🎉</h2>
+        <p style={{ margin: '0 0 0.5rem', color: '#64748b', fontSize: '0.9rem' }}>{tech ? `${tech.name} has been assigned` : "Your request is registered & being assigned"}</p>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f5f3ff', border: '1px solid #7C3AED30', borderRadius: 99, padding: '6px 16px' }}>
           <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#7C3AED', textTransform: 'uppercase' }}>Booking Ref</span>
           <span style={{ fontSize: '0.9rem', fontWeight: 900, color: '#0f172a', fontFamily: 'monospace' }}>#{rid}</span>
         </div>
       </div>
 
+      {/* Technician Info or Assignment in Progress Card */}
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-        style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}
+        style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ position: 'relative' }}>
-            <img src={tech.avatar} alt={tech.name} style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '3px solid #7C3AED30' }} />
-            <div style={{ position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, borderRadius: '50%', background: '#10B981', border: '2px solid white' }} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.05rem' }}>{tech.name}</div>
-            <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 2 }}>â­ {tech.rating} Â· {tech.jobs} jobs completed</div>
-            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-              <span style={{ background: '#10B98112', color: '#10B981', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 99, border: '1px solid #10B98125' }}>Verified Pro</span>
-              <span style={{ background: '#7C3AED12', color: '#7C3AED', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 99, border: '1px solid #7C3AED25' }}>Background Checked</span>
+        {tech ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ position: 'relative' }}>
+                <img src={tech.avatar || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop&crop=face"} alt={tech.name} style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '3px solid #7C3AED30' }} />
+                <div style={{ position: 'absolute', bottom: 0, right: 0, width: 18, height: 18, borderRadius: '50%', background: '#10B981', border: '2px solid white' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 900, color: '#0f172a', fontSize: '1.05rem' }}>{tech.name}</div>
+                {tech.rating && <div style={{ color: '#64748b', fontSize: '0.8rem', marginTop: 2 }}>⭐  {tech.rating} · {tech.jobs || '50+'} jobs completed</div>}
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <span style={{ background: '#10B98112', color: '#10B981', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 99, border: '1px solid #10B98125' }}>Verified Pro</span>
+                  <span style={{ background: '#7C3AED12', color: '#7C3AED', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: 99, border: '1px solid #7C3AED25' }}>Background Checked</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', background: 'linear-gradient(135deg,#F59E0B,#FBBF24)', borderRadius: 12, padding: '0.6rem 1rem', color: 'white' }}>
+                <div style={{ fontSize: '1.4rem', fontWeight: 900 }}>{etaMinutes}</div>
+                <div style={{ fontSize: '0.65rem', fontWeight: 700 }}>MIN ETA</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+              <button onClick={() => alert(`Calling ${tech.name}...`)}
+                style={{ flex: 1, padding: '0.7rem', background: '#7C3AED', color: 'white', fontWeight: 700, fontSize: '0.85rem', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <Phone size={15} /> Call Expert
+              </button>
+              <button onClick={() => alert("Chat feature coming soon!")}
+                style={{ flex: 1, padding: '0.7rem', background: '#f1f5f9', color: '#0f172a', fontWeight: 700, fontSize: '0.85rem', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <MessageSquare size={15} /> Chat
+              </button>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', padding: '0.35rem 0' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: '#7C3AED12', border: '1.5px solid #7C3AED25', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <RefreshCw size={26} color="#7C3AED" className="spin-icon" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: 900, color: '#0f172a', fontSize: '1rem' }}>Matching Expert</span>
+                <span style={{ background: '#7C3AED15', color: '#7C3AED', fontSize: '0.65rem', fontWeight: 800, padding: '2px 9px', borderRadius: 99, border: '1px solid #7C3AED30' }}>
+                  Assignment Pending
+                </span>
+              </div>
+              <div style={{ color: '#64748b', fontSize: '0.82rem', lineHeight: 1.45 }}>
+                Admin is finding the best verified technician in your area. You will receive notification details shortly.
+              </div>
             </div>
           </div>
-          <div style={{ textAlign: 'center', background: 'linear-gradient(135deg,#F59E0B,#FBBF24)', borderRadius: 12, padding: '0.6rem 1rem', color: 'white' }}>
-            <div style={{ fontSize: '1.4rem', fontWeight: 900 }}>{etaMinutes}</div>
-            <div style={{ fontSize: '0.65rem', fontWeight: 700 }}>MIN ETA</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-          <button onClick={() => alert(`Calling ${tech.name}...`)}
-            style={{ flex: 1, padding: '0.7rem', background: '#7C3AED', color: 'white', fontWeight: 700, fontSize: '0.85rem', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <Phone size={15} /> Call Expert
-          </button>
-          <button onClick={() => alert("Chat feature coming soon!")}
-            style={{ flex: 1, padding: '0.7rem', background: '#f1f5f9', color: '#0f172a', fontWeight: 700, fontSize: '0.85rem', border: 'none', borderRadius: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <MessageSquare size={15} /> Chat
-          </button>
-        </div>
+        )}
       </motion.div>
 
+      {/* Booking Details Card */}
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-        style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}
+        style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1rem', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}
       >
-        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>ðŸ“‹ Booking Details</div>
+        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <FileText size={16} color="#7C3AED" /> Booking Details
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', fontSize: '0.8rem' }}>
           {[
-            { label: 'Service', value: category?.name },
+            { label: 'Service', value: category?.name || cart?.[0]?.name },
             { label: 'Date', value: displayDate },
             { label: 'Time', value: displayTime },
-            { label: 'Address', value: formData?.address, span: true },
+            { label: 'Address', value: formData?.address || formData?.location, span: true },
             { label: 'Total Amount', value: `${BOOKING_CURRENCY_SYMBOL}${totalPrice}`, highlight: true },
           ].map((r, i) => (
             <div key={i} style={{ ...(r.span ? { gridColumn: '1/-1' } : {}), background: '#f8fafc', borderRadius: 10, padding: '0.5rem 0.75rem' }}>
               <div style={{ color: '#94a3b8', fontSize: '0.68rem', fontWeight: 700, textTransform: 'uppercase' }}>{r.label}</div>
-              <div style={{ fontWeight: 700, color: r.highlight ? '#7C3AED' : '#0f172a', marginTop: 2 }}>{r.value || 'â€”'}</div>
+              <div style={{ fontWeight: 700, color: r.highlight ? '#7C3AED' : '#0f172a', marginTop: 2 }}>{r.value || '—'}</div>
             </div>
           ))}
         </div>
       </motion.div>
 
+      {/* Live Tracking Timeline Card */}
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-        style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' }}
+        style={{ background: 'white', borderRadius: 20, padding: '1.25rem', marginBottom: '1.5rem', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}
       >
-        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', marginBottom: '0.75rem' }}>ðŸ—ºï¸ Live Tracking</div>
+        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <MapPin size={16} color="#7C3AED" /> Live Tracking
+        </div>
         {trackSteps.map((s, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.5rem 0', position: 'relative' }}>
             {i < trackSteps.length - 1 && <div style={{ position: 'absolute', left: 18, top: 36, width: 2, height: 24, background: s.done ? '#10B981' : '#e2e8f0' }} />}
@@ -1827,9 +2026,9 @@ function LiveTrackingPage({ successData, technician, category, cart, formData, s
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────────────────
    STEP INDICATOR BAR
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────────────────── */
 
 const STEP_LABELS = ["Service", "Package", "Schedule", "Identity", "Details", "Confirm"]
 
@@ -1856,13 +2055,13 @@ function StepBar({ step, total }) {
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────────────────
    MAIN PAGE
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────────────────── */
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────────────────
    CUSTOMER ACCOUNT MODAL
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────────────────── */
 
 function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
   const { user, refreshMe, loginWithGoogle, loginWithCustomerGoogle } = useAuth()
@@ -1941,9 +2140,11 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
   const [profileName, setProfileName] = useState('')
   const [profilePhone, setProfilePhone] = useState('')
   const [profileEmail, setProfileEmail] = useState('')
+  const [profileAvatar, setProfileAvatar] = useState(user?.avatar_url || user?.avatar || user?.profile_picture || null)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState('')
   const [profileSuccess, setProfileSuccess] = useState('')
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     if (user) {
@@ -1951,8 +2152,42 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
       setProfileName(uFullName)
       setProfilePhone(user?.phone || '')
       setProfileEmail(user?.email || '')
+      setProfileAvatar(user?.avatar_url || user?.avatar || user?.profile_picture || null)
     }
   }, [user])
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setProfileError('')
+    setProfileSuccess('')
+    try {
+      const formData = new FormData()
+      formData.append("image", file)
+      const res = await apiRequest("/settings/catalog/upload-image/", {
+        method: "POST",
+        body: formData
+      })
+      const uploadedUrl = typeof res?.url === "string" ? res.url : (res?.url?.url || "");
+      if (res.success && uploadedUrl) {
+        setProfileAvatar(uploadedUrl)
+        try {
+          await apiRequest("/auth/profile/", {
+            method: "PATCH",
+            json: { avatar: uploadedUrl, profile_picture: uploadedUrl }
+          })
+        } catch (patchErr) {
+          console.warn("Profile avatar patch warning:", patchErr)
+        }
+        await refreshMe()
+        setProfileSuccess("Profile photo updated successfully!")
+      } else {
+        setProfileError(formatErrorMessage(res, "Failed to upload photo"))
+      }
+    } catch (err) {
+      setProfileError(formatErrorMessage(err, "Error uploading photo"))
+    }
+  }
 
   const handleSaveProfile = async () => {
     setProfileError('')
@@ -1963,23 +2198,28 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
     const lastName = nameParts.slice(1).join(' ')
 
     try {
+      const payload = {
+        first_name: firstName,
+        last_name: lastName,
+        phone: profilePhone,
+        email: profileEmail
+      }
+      if (profileAvatar && typeof profileAvatar === "string") {
+        payload.avatar = profileAvatar
+        payload.profile_picture = profileAvatar
+      }
       const res = await apiRequest("/auth/profile/", {
         method: "PATCH",
-        json: {
-          first_name: firstName,
-          last_name: lastName,
-          phone: profilePhone,
-          email: profileEmail
-        }
+        json: payload
       })
-      if (res.success || res.id) {
+      if (res.success || res.id || res.data || res.email) {
         await refreshMe()
         setProfileSuccess("Changes saved successfully!")
       } else {
-        setProfileError(res.message || "Failed to update profile")
+        setProfileError(formatErrorMessage(res, "Failed to update profile"))
       }
     } catch (e) {
-      setProfileError(e.body?.message || "Failed to update profile")
+      setProfileError(formatErrorMessage(e, "Failed to update profile"))
     } finally {
       setIsSavingProfile(false)
     }
@@ -1995,7 +2235,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
     }
   }, [activeTab, user])
 
-  // â”€â”€ Reschedule State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Reschedule State ──────────────────────────────────────────────────────
   // ── Reschedule State ────────────────────────────────────────────────────────
   const [reschedules, setReschedules] = useState([])
   const [reschedulesLoading, setReschedulesLoading] = useState(false)
@@ -2008,7 +2248,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
   const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false)
   const [rescheduleError, setRescheduleError] = useState('')
   const [rescheduleSuccess, setRescheduleSuccess] = useState('')
-  
+
   const [activeBookings, setActiveBookings] = useState([])
   const [availableSlots, setAvailableSlots] = useState([])
   const [slotsLoading, setSlotsLoading] = useState(false)
@@ -2206,7 +2446,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
         try {
           const updated = await apiRequest('/customer/reschedules/')
           setReschedules(updated.data || [])
-        } catch(e) {
+        } catch (e) {
           const updated = await apiRequest('/booking/reschedule/')
           setReschedules(updated.data || [])
         }
@@ -2272,8 +2512,14 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
         setShowComplaintForm(false); setComplaintBookingId(''); setComplaintCategory('OTHER'); setComplaintDesc('')
         const updated = await apiRequest('/booking/complaints/')
         setComplaints(updated.data || [])
-      } else { setComplaintError(res.message || 'Failed to submit') }
-    } catch (e) { setComplaintError(e?.body?.message || 'Failed to submit') }
+      } else {
+        const msg = typeof res.message === 'string' ? res.message : (res.message?.detail || res.error || 'Failed to submit complaint.')
+        setComplaintError(msg)
+      }
+    } catch (e) {
+      const msg = typeof e?.body?.message === 'string' ? e.body.message : (e?.body?.detail || e?.message || 'Failed to submit complaint.')
+      setComplaintError(msg)
+    }
     finally { setComplaintSubmitting(false) }
   }
 
@@ -2351,17 +2597,26 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
             <h3 style={{ margin: '0 0 1.5rem', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>My Profile</h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 32, paddingBottom: 32, borderBottom: '1px solid #e2e8f0' }}>
-              <div style={{ width: 88, height: 88, borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #e2e8f0' }}>
-                <User size={36} color="#94a3b8" />
+              <div style={{ width: 88, height: 88, borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #e2e8f0', overflow: 'hidden' }}>
+                {profileAvatar || user?.avatar_url || user?.avatar || user?.profile_picture ? (
+                  <img src={getFullImageUrl(profileAvatar || user?.avatar_url || user?.avatar || user?.profile_picture)} alt={userFullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                ) : (
+                  <span style={{ fontSize: '1.8rem', fontWeight: 800, color: '#7C3AED' }}>
+                    {userFullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'C'}
+                  </span>
+                )}
               </div>
               <div>
                 <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', marginBottom: 4 }}>{userFullName}</div>
                 <div style={{ color: '#64748b', fontSize: '0.85rem', marginBottom: 12 }}>{userEmail || userPhone}</div>
-                <button style={{ padding: '0.5rem 1.25rem', background: 'white', color: '#0f172a', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer' }}>Change Photo</button>
+                <input type="file" ref={fileInputRef} onChange={handleAvatarChange} accept="image/*" style={{ display: 'none' }} />
+                <button onClick={() => fileInputRef.current?.click()} style={{ padding: '0.5rem 1.25rem', background: 'white', color: '#7C3AED', border: '1.5px solid #7C3AED30', borderRadius: 8, fontWeight: 700, fontSize: '0.8rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  📷 Change Photo
+                </button>
               </div>
             </div>
 
-            {profileError && <div style={{ background: '#fef2f2', color: '#ef4444', padding: '10px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 600, marginBottom: 16 }}>{profileError}</div>}
+            {profileError && <div style={{ background: '#fef2f2', color: '#ef4444', padding: '10px 14px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 600, marginBottom: 16 }}>⚠️ {typeof profileError === 'string' ? profileError : formatErrorMessage(profileError)}</div>}
             {profileSuccess && <div style={{ background: '#f0fdf4', color: '#15803d', padding: '10px', borderRadius: 8, fontSize: '0.8rem', fontWeight: 600, marginBottom: 16 }}>{profileSuccess}</div>}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
@@ -2412,11 +2667,11 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                     <div style={{ border: '1px solid #e2e8f0', borderRadius: 16, padding: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)', position: 'relative', zIndex: 1 }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                          <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem' }}>{(b.service_category_display || b.issue_title || 'Service Booking').replace(/â€“/g, ' - ').replace(/â€”/g, ' - ').replace(/&amp;/g, '&')}</span>
+                          <span style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem' }}>{(b.service_category_display || b.issue_title || 'Service Booking').replace(/â€“/g, ' - ').replace(/—/g, ' - ').replace(/&amp;/g, '&')}</span>
                           <span style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: 99, fontWeight: 800, background: b.status === 'completed' ? '#10B98115' : '#7C3AED15', color: b.status === 'completed' ? '#10B981' : '#7C3AED', border: `1px solid ${b.status === 'completed' ? '#10B98130' : '#7C3AED30'}` }}>{b.status_display || b.status}</span>
                         </div>
                         <div style={{ fontSize: '0.85rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}><Calendar size={13} /> {b.preferred_date || 'N/A'} &nbsp;•&nbsp; <span style={{ fontFamily: 'monospace' }}>{b.request_id}</span></div>
-                        
+
                         {/* Reschedule Action for Eligible Bookings (Pending Confirmation, Confirmed, Employee Assigned) */}
                         {isRescheduleEligible && (
                           <div style={{ marginTop: 6 }}>
@@ -2801,7 +3056,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                             justify: 'space-between',
                             position: 'relative'
                           }}>
-                          
+
                           <div>
                             {/* Card Header: Icon, Label, Default Badge */}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -2949,7 +3204,9 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                 gap: 16,
                 alignItems: 'center'
               }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#10B98115', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>ðŸ’µ</div>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#10B98115', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <CreditCard size={22} color="#10B981" />
+                </div>
                 <div>
                   <h4 style={{ margin: '0 0 4px', color: '#0f172a', fontSize: '1rem', fontWeight: 800 }}>Cash on Service (COD)</h4>
                   <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>
@@ -2969,7 +3226,9 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                 gap: 16,
                 alignItems: 'center'
               }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#7C3AED15', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', flexShrink: 0 }}>📱</div>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#7C3AED15', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Wallet size={22} color="#7C3AED" />
+                </div>
                 <div>
                   <h4 style={{ margin: '0 0 4px', color: '#0f172a', fontSize: '1rem', fontWeight: 800 }}>UPI Payments</h4>
                   <p style={{ margin: 0, color: '#64748b', fontSize: '0.82rem', lineHeight: 1.5 }}>
@@ -3063,7 +3322,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
             {showRescheduleForm && (
               <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }}
                 style={{ border: '1.5px solid #7C3AED30', borderRadius: 20, padding: '1.75rem', background: '#faf5ff', marginBottom: 24, boxShadow: '0 10px 25px -5px rgba(124,58,237,0.08)' }}>
-                
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
                   <h4 style={{ margin: 0, fontWeight: 800, fontSize: '1.1rem', color: '#0f172a' }}>New Reschedule Request</h4>
                   <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '4px 10px', borderRadius: 99, background: '#7C3AED15', color: '#7C3AED' }}>Guided Workflow</span>
@@ -3076,7 +3335,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                  
+
                   {/* 1. Select Booking */}
                   <div>
                     <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -3091,7 +3350,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                         style={{ width: '100%', padding: '0.85rem 1rem', borderRadius: 12, border: '1.5px solid #cbd5e1', fontSize: '0.9rem', color: '#0f172a', fontWeight: 700, background: 'white', outline: 'none' }}>
                         {activeBookings.map(b => {
                           const rawTitle = b.issue_title || b.service_category || 'Service Booking'
-                          const cleanTitle = rawTitle.replace(/â€“/g, ' - ').replace(/â€”/g, ' - ').replace(/&amp;/g, '&')
+                          const cleanTitle = rawTitle.replace(/â€“/g, ' - ').replace(/—/g, ' - ').replace(/&amp;/g, '&')
                           return (
                             <option key={b.id} value={b.id}>
                               {cleanTitle} ({b.request_id || `SR-${b.id}`}) — Current: {b.preferred_date || b.created_at?.split('T')[0]}
@@ -3254,17 +3513,17 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {reschedules.map(r => {
                   const statusConfig = {
-                    PENDING:                    { bg: '#FEF3C7', color: '#D97706', label: 'Pending Admin Review' },
-                    ADMIN_REVIEW:               { bg: '#E0E7FF', color: '#4F46E5', label: 'Under Admin Review' },
-                    SLOT_SUGGESTED:             { bg: '#F5F3FF', color: '#7C3AED', label: 'Admin Suggested New Slot' },
+                    PENDING: { bg: '#FEF3C7', color: '#D97706', label: 'Pending Admin Review' },
+                    ADMIN_REVIEW: { bg: '#E0E7FF', color: '#4F46E5', label: 'Under Admin Review' },
+                    SLOT_SUGGESTED: { bg: '#F5F3FF', color: '#7C3AED', label: 'Admin Suggested New Slot' },
                     AWAITING_EMPLOYEE_RESPONSE: { bg: '#EFF6FF', color: '#2563EB', label: 'Awaiting Technician Confirmation' },
-                    REASSIGNMENT_NEEDED:        { bg: '#FFF7ED', color: '#C2410C', label: 'Finding Another Technician' },
-                    RESCHEDULED:                { bg: '#D1FAE5', color: '#059669', label: '✓ Rescheduled Successfully' },
-                    REJECTED:                   { bg: '#FEE2E2', color: '#DC2626', label: 'Rejected' },
-                    CANCELLED:                  { bg: '#F1F5F9', color: '#64748B', label: 'Cancelled' },
-                    APPROVED:                   { bg: '#D1FAE5', color: '#059669', label: 'Approved' },
-                    CUSTOMER_NOTIFIED:          { bg: '#D1FAE5', color: '#059669', label: 'Confirmed & Updated' },
-                    TECHNICIAN_CONFIRMATION:    { bg: '#F3E8FF', color: '#7C3AED', label: 'Awaiting Tech Confirmation' },
+                    REASSIGNMENT_NEEDED: { bg: '#FFF7ED', color: '#C2410C', label: 'Finding Another Technician' },
+                    RESCHEDULED: { bg: '#D1FAE5', color: '#059669', label: '✓ Rescheduled Successfully' },
+                    REJECTED: { bg: '#FEE2E2', color: '#DC2626', label: 'Rejected' },
+                    CANCELLED: { bg: '#F1F5F9', color: '#64748B', label: 'Cancelled' },
+                    APPROVED: { bg: '#D1FAE5', color: '#059669', label: 'Approved' },
+                    CUSTOMER_NOTIFIED: { bg: '#D1FAE5', color: '#059669', label: 'Confirmed & Updated' },
+                    TECHNICIAN_CONFIRMATION: { bg: '#F3E8FF', color: '#7C3AED', label: 'Awaiting Tech Confirmation' },
                   }
                   const sc = statusConfig[r.status] || { bg: '#F1F5F9', color: '#64748B', label: r.status_display || r.status }
                   const currentDisplay = r.current_date ? `${r.current_date} (${r.current_time || '09-10'})` : 'N/A'
@@ -3340,11 +3599,11 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                             ].map(st => {
                               const stepIdx = r.step_index || (
                                 r.status === 'RESCHEDULED' ? 8 :
-                                r.status === 'EMPLOYEE_ACCEPTED' ? 7 :
-                                (r.status === 'AWAITING_EMPLOYEE_RESPONSE' || r.status === 'AWAITING_EMPLOYEE_CONFIRMATION') ? 6 :
-                                (r.status === 'EMPLOYEE_ASSIGNED') ? 5 :
-                                (r.status === 'ADMIN_APPROVED' || r.status === 'REASSIGNMENT_NEEDED') ? 4 :
-                                (r.status === 'ADMIN_REVIEW') ? 2 : 1
+                                  r.status === 'EMPLOYEE_ACCEPTED' ? 7 :
+                                    (r.status === 'AWAITING_EMPLOYEE_RESPONSE' || r.status === 'AWAITING_EMPLOYEE_CONFIRMATION') ? 6 :
+                                      (r.status === 'EMPLOYEE_ASSIGNED') ? 5 :
+                                        (r.status === 'ADMIN_APPROVED' || r.status === 'REASSIGNMENT_NEEDED') ? 4 :
+                                          (r.status === 'ADMIN_REVIEW') ? 2 : 1
                               )
                               const isCompleted = stepIdx > st.num || r.status === 'RESCHEDULED'
                               const isCurrent = stepIdx === st.num && r.status !== 'RESCHEDULED'
@@ -3518,7 +3777,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                  
+
                   {/* 1. Select Booking */}
                   <div>
                     <label style={{ display: 'block', fontSize: '0.78rem', color: '#334155', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -3701,15 +3960,26 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: 14, padding: '1.5rem', background: 'white', marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                     <div>
-                      <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', marginBottom: 4 }}>{selectedComplaint.category_display}</div>
-                      {selectedComplaint.booking_request_id && <div style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace' }}>{selectedComplaint.booking_request_id}</div>}
+                      <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#0f172a', marginBottom: 2 }}>{selectedComplaint.category_display}</div>
+                      <div style={{ fontSize: '0.78rem', color: '#64748b', fontFamily: 'monospace' }}>
+                        Ticket #{selectedComplaint.complaint_number || selectedComplaint.id} {selectedComplaint.booking_request_id ? `• Booking: ${selectedComplaint.booking_request_id}` : ''}
+                      </div>
                     </div>
                     {(() => {
-                      const sc = { OPEN: '#F59E0B', IN_PROGRESS: '#3B82F6', RESOLVED: '#10B981', ESCALATED: '#EF4444', CLOSED: '#94a3b8' }[selectedComplaint.status] || '#64748b'
-                      return <span style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: 99, fontWeight: 800, background: sc + '18', color: sc, border: `1px solid ${sc}30` }}>{selectedComplaint.status_display}</span>
+                      const sc = { OPEN: '#F59E0B', IN_PROGRESS: '#3B82F6', UNDER_INVESTIGATION: '#3B82F6', RESOLVED: '#10B981', ESCALATED: '#EF4444', CLOSED: '#94a3b8' }[selectedComplaint.status] || '#64748b'
+                      return <span style={{ fontSize: '0.7rem', padding: '4px 10px', borderRadius: 99, fontWeight: 800, background: sc + '18', color: sc, border: `1px solid ${sc}30` }}>{selectedComplaint.status_display || selectedComplaint.status}</span>
                     })()}
                   </div>
-                  <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.6 }}>{selectedComplaint.description}</div>
+                  <div style={{ fontSize: '0.85rem', color: '#475569', lineHeight: 1.6, background: '#f8fafc', padding: 12, borderRadius: 10, border: '1px solid #f1f5f9' }}>
+                    <strong style={{ color: '#0f172a', display: 'block', marginBottom: 4 }}>Reported Issue Details:</strong>
+                    {selectedComplaint.description}
+                  </div>
+                  {selectedComplaint.resolution_notes && (
+                    <div style={{ marginTop: 12, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: 12, color: '#166534', fontSize: '0.85rem' }}>
+                      <strong style={{ display: 'block', marginBottom: 2 }}>✅ Support Team Resolution:</strong>
+                      {selectedComplaint.resolution_notes}
+                    </div>
+                  )}
                 </div>
                 <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem', marginBottom: 12 }}>Conversation Thread</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20, maxHeight: 300, overflowY: 'auto', paddingRight: 4 }}>
@@ -3721,7 +3991,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                     return (
                       <div key={resp.id} style={{ display: 'flex', justifyContent: isCustomer ? 'flex-end' : 'flex-start' }}>
                         <div style={{ maxWidth: '75%', padding: '10px 14px', borderRadius: isCustomer ? '14px 14px 2px 14px' : '14px 14px 14px 2px', background: isCustomer ? 'linear-gradient(135deg,#7C3AED,#a855f7)' : '#f1f5f9', color: isCustomer ? 'white' : '#0f172a', fontSize: '0.85rem', lineHeight: 1.5 }}>
-                          <div style={{ fontWeight: 700, fontSize: '0.7rem', opacity: 0.75, marginBottom: 4 }}>{isCustomer ? 'You' : resp.persona === 'ADMIN' ? 'ðŸ›¡ï¸ Support Team' : 'ðŸ‘· Employee'}</div>
+                          <div style={{ fontWeight: 700, fontSize: '0.7rem', opacity: 0.75, marginBottom: 4 }}>{isCustomer ? 'You' : resp.persona === 'ADMIN' ? 'ðŸ›¡ï¸ Support Team' : '👷 Employee'}</div>
                           {resp.message}
                           <div style={{ fontSize: '0.65rem', opacity: 0.6, marginTop: 4 }}>{new Date(resp.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</div>
                         </div>
@@ -3751,7 +4021,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                   </button>
                 </div>
 
-                {complaintSuccess && <div style={{ background: '#f0fdf4', color: '#15803d', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', fontWeight: 700, marginBottom: 16 }}>âœ… {complaintSuccess}</div>}
+                {complaintSuccess && <div style={{ background: '#f0fdf4', color: '#15803d', padding: '10px 14px', borderRadius: 10, fontSize: '0.82rem', fontWeight: 700, marginBottom: 16 }}>✅ {complaintSuccess}</div>}
 
                 {showComplaintForm && (
                   <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
@@ -3821,13 +4091,13 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                             </div>
                             <div style={{ textAlign: 'right' }}>
                               <span style={{ fontSize: '0.7rem', padding: '3px 9px', borderRadius: 99, fontWeight: 800, background: sc + '18', color: sc, border: `1px solid ${sc}30`, display: 'block', marginBottom: 4 }}>{c.status_display}</span>
-                              {c.attachment_count > 0 && <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>ðŸ“Ž {c.attachment_count} file{c.attachment_count > 1 ? 's' : ''}</span>}
+                              {c.attachment_count > 0 && <span style={{ fontSize: '0.68rem', color: '#94a3b8' }}>📎 {c.attachment_count} file{c.attachment_count > 1 ? 's' : ''}</span>}
                             </div>
                           </div>
                           <div style={{ fontSize: '0.82rem', color: '#475569', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{c.description}</div>
                           <div style={{ marginTop: 10, fontSize: '0.72rem', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <span>{new Date(c.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                            <span style={{ color: '#7C3AED', fontWeight: 700 }}>View Thread â†’</span>
+                            <span style={{ color: '#7C3AED', fontWeight: 700 }}>View Thread →</span>
                           </div>
                         </div>
                       )
@@ -3836,6 +4106,109 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
                 )}
               </div>
             )}
+          </motion.div>
+        )
+
+      case "Payment Methods":
+        return (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>Payment Methods</h3>
+            <p style={{ margin: '0 0 1.5rem', color: '#64748b', fontSize: '0.85rem' }}>Manage your saved cards, UPI IDs, and preferred payment options for instant checkout.</p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ padding: '1.2rem', border: '1.5px solid #10B98130', borderRadius: 14, background: '#f0fdf4', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: '#10B98115', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CreditCard size={22} color="#10B981" />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>Cash on Service (COD)</div>
+                    <div style={{ color: '#059669', fontSize: '0.78rem', fontWeight: 600, marginTop: 2 }}>✓ Active & Preferred</div>
+                  </div>
+                </div>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, background: '#10B981', color: 'white', padding: '4px 10px', borderRadius: 8 }}>Default</span>
+              </div>
+
+              <div style={{ padding: '1.2rem', border: '1px solid #e2e8f0', borderRadius: 14, background: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: 10, background: '#7C3AED10', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Shield size={22} color="#7C3AED" />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>UPI & Net Banking</div>
+                    <div style={{ color: '#64748b', fontSize: '0.78rem', marginTop: 2 }}>Razorpay / PhonePe / Google Pay</div>
+                  </div>
+                </div>
+                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#7C3AED', background: '#7C3AED10', padding: '4px 10px', borderRadius: 8 }}>Verified</span>
+              </div>
+
+              <button onClick={() => alert("Payment method saved successfully!")}
+                style={{ width: '100%', padding: '1rem', background: '#f8fafc', border: '2px dashed #cbd5e1', borderRadius: 14, color: '#475569', fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 }}>
+                + Add New Card or UPI ID
+              </button>
+            </div>
+          </motion.div>
+        )
+
+      case "Notifications":
+        return (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>Notifications</h3>
+            <p style={{ margin: '0 0 1.5rem', color: '#64748b', fontSize: '0.85rem' }}>Recent service alerts, scheduling updates, and support messages.</p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ padding: '1rem 1.25rem', border: '1px solid #e2e8f0', borderRadius: 12, background: 'white', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#7C3AED15', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, fontSize: '0.9rem' }}>🔔</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', marginBottom: 2 }}>Technician Assigned</div>
+                  <div style={{ color: '#475569', fontSize: '0.82rem', lineHeight: 1.4 }}>Your technician has been assigned for your upcoming booking.</div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.72rem', marginTop: 4 }}>Just now</div>
+                </div>
+              </div>
+
+              <div style={{ padding: '1rem 1.25rem', border: '1px solid #e2e8f0', borderRadius: 12, background: 'white', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#10B98115', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontWeight: 800, fontSize: '0.9rem' }}>✅</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.9rem', marginBottom: 2 }}>Booking Confirmed</div>
+                  <div style={{ color: '#475569', fontSize: '0.82rem', lineHeight: 1.4 }}>Your service request is confirmed and scheduled for execution.</div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.72rem', marginTop: 4 }}>Today, 10:30 AM</div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )
+
+      case "Help & Support":
+        return (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.4rem', fontWeight: 800, color: '#0f172a' }}>Help & Support</h3>
+            <p style={{ margin: '0 0 1.5rem', color: '#64748b', fontSize: '0.85rem' }}>We're here 24/7 to assist with your bookings and service inquiries.</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 24 }}>
+              <div style={{ padding: '1.25rem', border: '1px solid #e2e8f0', borderRadius: 14, background: '#faf5ff', textAlign: 'center' }}>
+                <div style={{ fontSize: '1.8rem', marginBottom: 8 }}>📞</div>
+                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>Customer Helpline</div>
+                <div style={{ color: '#7C3AED', fontWeight: 800, fontSize: '0.85rem', marginTop: 4 }}>+91 1800-123-4567</div>
+              </div>
+
+              <div style={{ padding: '1.25rem', border: '1px solid #e2e8f0', borderRadius: 14, background: '#f0fdf4', textAlign: 'center' }}>
+                <div style={{ fontSize: '1.8rem', marginBottom: 8 }}>✉️</div>
+                <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>Email Support</div>
+                <div style={{ color: '#059669', fontWeight: 800, fontSize: '0.85rem', marginTop: 4 }}>support@caltrack.com</div>
+              </div>
+            </div>
+
+            <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem', marginBottom: 12 }}>Frequently Asked Questions</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <details style={{ padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 10, background: 'white', fontSize: '0.85rem' }}>
+                <summary style={{ fontWeight: 700, color: '#0f172a', cursor: 'pointer' }}>How do I cancel or reschedule my booking?</summary>
+                <p style={{ color: '#64748b', marginTop: 8, lineHeight: 1.5 }}>Navigate to 'My Reschedules' tab in this portal to submit a new date and time slot request.</p>
+              </details>
+              <details style={{ padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 10, background: 'white', fontSize: '0.85rem' }}>
+                <summary style={{ fontWeight: 700, color: '#0f172a', cursor: 'pointer' }}>What is the 30-day service warranty?</summary>
+                <p style={{ color: '#64748b', marginTop: 8, lineHeight: 1.5 }}>All completed services are backed by a 30-day quality guarantee. If an issue recurs, file a complaint in 'My Complaints' for a free re-visit.</p>
+              </details>
+            </div>
           </motion.div>
         )
 
@@ -3947,8 +4320,19 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
         {/* Sidebar */}
         <div style={{ width: 280, background: '#f8fafc', borderRight: '1px solid #e2e8f0', padding: '2.5rem 0', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '0 2rem', marginBottom: '2.5rem', display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <User size={24} color="#64748b" />
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid #e2e8f0', overflow: 'hidden', flexShrink: 0 }}>
+              {user?.avatar_url || user?.avatar || user?.profile_picture ? (
+                <img
+                  src={getFullImageUrl(user?.avatar_url || user?.avatar || user?.profile_picture)}
+                  alt={userFullName}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              ) : (
+                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#7C3AED' }}>
+                  {userFullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'C'}
+                </span>
+              )}
             </div>
             <div>
               <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1.05rem' }}>{userFullName}</div>
@@ -4009,6 +4393,7 @@ function CustomerAccountModal({ activeTab, onClose, onChangeTab }) {
 }
 
 export function BookingPage() {
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -4062,16 +4447,18 @@ export function BookingPage() {
       try {
         const catRes = await apiRequest("/catalog/categories/")
         const svcRes = await apiRequest("/catalog/services/")
+        let loadedCats = []
         if (catRes.success) {
-          const cats = catRes.data.map((c, i) => ({
+          loadedCats = catRes.data.map((c, i) => ({
             id: c.id.toString(),
+            slug: c.slug || c.id.toString(),
             name: c.name,
-            desc: c.description || "Expert " + c.name + " service",
+            desc: c.description || c.desc || ("Expert " + c.name + " service"),
             rating: c.rating || "4.8",
-            jobs: c.jobs_count_str || "10K+",
-            image: c.image || "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&q=80&fit=crop"
+            jobs: c.jobs_count_str || c.jobs || "10K+",
+            image: getFullImageUrl(c.image) || "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=500&q=80&fit=crop"
           }))
-          setCategoriesData(cats)
+          setCategoriesData(loadedCats)
         }
         if (svcRes.success) {
           if (svcRes.currency_symbol) {
@@ -4079,21 +4466,38 @@ export function BookingPage() {
           }
           const pkgs = {}
           svcRes.data.forEach(s => {
-            const cid = s.category.toString()
-            if (!pkgs[cid]) pkgs[cid] = []
-            pkgs[cid].push({
+            const cid = s.category ? s.category.toString() : ""
+            if (!cid) return
+
+            const catObj = loadedCats.find(c => c.id === cid || c.slug === cid)
+            const cSlug = catObj?.slug || ""
+            const cName = catObj?.name ? catObj.name.toLowerCase() : ""
+
+            const pkgObj = {
               id: s.id.toString(),
               name: s.name,
               price: parseFloat(s.price),
               priceStr: BOOKING_CURRENCY_SYMBOL + s.price,
-              duration: s.duration || "1 hr",
-              payment_policy: s.payment_policy,
-              image: s.image || "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&q=80&fit=crop",
-              includes: Array.isArray(s.includes) && s.includes.length > 0 ? s.includes : ["Standard inclusions"],
+              duration: s.duration || "1-2 Hrs",
+              payment_policy: s.payment_policy || "BOTH",
+              image: getFullImageUrl(s.image) || getFullImageUrl(catObj?.image) || "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&q=80&fit=crop",
+              includes: Array.isArray(s.includes) && s.includes.length > 0 ? s.includes : [s.name + " Service", "Professional Inspection", "Service Guarantee"],
               excludes: Array.isArray(s.excludes) ? s.excludes : [],
               popular: !!s.popular,
-              tag: s.tag || ""
-            })
+              tag: s.tag || (s.popular ? "Most Booked" : "")
+            }
+
+            if (!pkgs[cid]) pkgs[cid] = []
+            pkgs[cid].push(pkgObj)
+
+            if (cSlug) {
+              if (!pkgs[cSlug]) pkgs[cSlug] = []
+              if (!pkgs[cSlug].some(item => item.id === pkgObj.id)) pkgs[cSlug].push(pkgObj)
+            }
+            if (cName) {
+              if (!pkgs[cName]) pkgs[cName] = []
+              if (!pkgs[cName].some(item => item.id === pkgObj.id)) pkgs[cName].push(pkgObj)
+            }
           })
           setPackagesData(pkgs)
         }
@@ -4102,6 +4506,16 @@ export function BookingPage() {
       }
     }
     loadCatalog()
+
+    // Handle URL search parameters for category/service redirect
+    const catParam = searchParams.get('category') || searchParams.get('cat')
+    if (catParam && categoriesData.length > 0) {
+      const foundCat = categoriesData.find(c => c.id === catParam || c.slug === catParam || c.name.toLowerCase() === catParam.toLowerCase())
+      if (foundCat) {
+        setCategory(foundCat)
+        setShowPackageModal(true)
+      }
+    }
 
     // Fetch initial location
     if (navigator.geolocation) {
@@ -4171,13 +4585,13 @@ export function BookingPage() {
     data.append("phone", formData.phone)
     data.append("email", formData.email || "")
     data.append("service_category", category?.id || "general")
-    data.append("issue_title", formData.issue_title || `${cart.map(c => c.name).join(', ')} â€” ${category?.name}`)
+    data.append("issue_title", formData.issue_title || `${cart.map(c => c.name).join(', ')} — ${category?.name}`)
     data.append("description", formData.description || "")
     data.append("address", formData.landmark ? formData.address + " | " + formData.landmark : formData.address)
     data.append("preferred_date", selDate)
     data.append("preferred_time", selTime)
     data.append("total_amount", cart.reduce((a, c) => a + (c.price * c.quantity), 0))
-    // Serialize cart_data as JSON string â€” backend will parse it robustly
+    // Serialize cart_data as JSON string — backend will parse it robustly
     data.append("cart_data", JSON.stringify(cart.map(c => ({
       id: c.id, name: c.name, price: c.price, quantity: c.quantity,
       categoryName: c.categoryName || category?.name || ""
@@ -4204,7 +4618,7 @@ export function BookingPage() {
       } else setError(res?.message || "Something went wrong. Please try again.")
     } catch (err) {
       if (err?.body?.errors) {
-        const msgs = Object.entries(err.body.errors).map(([f, m]) => `${f}: ${Array.isArray(m) ? m.join(", ") : m}`).join(" Â· ")
+        const msgs = Object.entries(err.body.errors).map(([f, m]) => `${f}: ${Array.isArray(m) ? m.join(", ") : m}`).join(" · ")
         setError(msgs || err.body.message)
       } else setError(err?.body?.message || err?.body?.detail || "Connection error. Try again.")
     } finally { setLoading(false) }
@@ -4320,8 +4734,17 @@ export function BookingPage() {
           <div className="uc-profile-icon" onClick={() => {
             setShowAccountPortal(true);
             setActiveAccountTab("My Profile");
-          }}>
-            <User size={20} color="#1e293b" />
+          }} style={{ overflow: 'hidden', borderRadius: '50%', width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {user?.avatar_url || user?.avatar || user?.profile_picture ? (
+              <img
+                src={getFullImageUrl(user?.avatar_url || user?.avatar || user?.profile_picture)}
+                alt={user?.firstName || 'User'}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            ) : (
+              <User size={20} color="#1e293b" />
+            )}
           </div>
         </div>
       </header>
@@ -4452,9 +4875,9 @@ export function BookingPage() {
 
       {/* Footer */}
       <footer className="uc-footer">
-        <Shield size={12} /> SSL Encrypted &nbsp;Â·&nbsp;
-        <Star size={12} style={{ fill: "#F59E0B", color: "#F59E0B" }} /> 4.8â˜… Rated &nbsp;Â·&nbsp;
-        <CheckCircle2 size={12} /> 1M+ Bookings &nbsp;Â·&nbsp;
+        <Shield size={12} /> SSL Encrypted &nbsp;·&nbsp;
+        <Star size={12} style={{ fill: "#F59E0B", color: "#F59E0B" }} /> 4.8★ Rated &nbsp;·&nbsp;
+        <CheckCircle2 size={12} /> 1M+ Bookings &nbsp;·&nbsp;
         <Award size={12} /> 30-Day Guarantee
       </footer>
 
@@ -4478,7 +4901,8 @@ export function BookingPage() {
 function PackageModal({ category, cart, setCart, onClose, onCheckout, packagesData }) {
   const [activeTab, setActiveTab] = useState(0)
   const [activeFilter, setActiveFilter] = useState("All")
-  const packages = ((packagesData && packagesData[category?.id]) || PACKAGES[category?.id] || []).map(p => ({ ...p, priceStr: BOOKING_CURRENCY_SYMBOL + p.price }))
+  const rawList = (packagesData && (packagesData[category?.id] || packagesData[category?.slug] || packagesData[category?.name?.toLowerCase()])) || PACKAGES[category?.id] || PACKAGES[category?.slug] || []
+  const packages = rawList.map(p => ({ ...p, priceStr: BOOKING_CURRENCY_SYMBOL + p.price }))
   const relatedServices = packages.slice(0, 4);
 
   const filteredPackages = packages.filter(p => {
@@ -4528,7 +4952,7 @@ function PackageModal({ category, cart, setCart, onClose, onCheckout, packagesDa
           <span style={{ fontWeight: 700 }}>4.8</span> <span style={{ color: "#94a3b8", textDecoration: "underline" }}>(113K reviews)</span>
         </div>
         <div className="uc-pkg-uc-price">
-          Starts at {p.priceStr} <span className="uc-pkg-uc-dot">â€¢</span> {p.duration}
+          Starts at {p.priceStr} <span className="uc-pkg-uc-dot">•</span> {p.duration}
         </div>
         <ul className="uc-pkg-uc-includes">
           {p.includes.map(inc => <li key={inc}>{inc}</li>)}
@@ -4594,7 +5018,7 @@ function PackageModal({ category, cart, setCart, onClose, onCheckout, packagesDa
                   />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#1e293b', lineHeight: 1.2, marginBottom: '0.2rem' }}>{s.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>{s.priceStr || (BOOKING_CURRENCY_SYMBOL + '499')} â€¢ {s.duration || '1 hr'}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>{s.priceStr || (BOOKING_CURRENCY_SYMBOL + '499')} • {s.duration || '1 hr'}</div>
 
                     {getCartCount(s.id) > 0 ? (
                       <div className="uc-swiggy-qty" style={{ width: 80, height: 28, fontSize: '0.8rem' }}>
@@ -4653,9 +5077,9 @@ function PackageModal({ category, cart, setCart, onClose, onCheckout, packagesDa
   )
 }
 
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* ─────────────────────────────────────────────────────────────────────────
    STYLES
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────────────────────── */
 
 function BkStyles() {
   return (
@@ -4665,7 +5089,7 @@ function BkStyles() {
       @keyframes bk-spin { to { transform:rotate(360deg); } }
       .spin-icon { animation: bk-spin 0.8s linear infinite; display:inline-block; }
 
-      /* â”€â”€ Root â”€â”€ */
+      /* ── Root ── */
       .uc-root {
         min-height: 100vh;
         background: #ffffff;
@@ -4676,7 +5100,7 @@ function BkStyles() {
         overflow-x: hidden;
       }
 
-      /* â”€â”€ Nav â”€â”€ */
+      /* ── Nav ── */
       .uc-nav {
         position: sticky; top:0; z-index:100;
         background: rgba(255,255,255,0.97);
@@ -4745,7 +5169,7 @@ function BkStyles() {
         opacity: 0.9;
       }
 
-      /* â”€â”€ Nav Search Bar â”€â”€ */
+      /* ── Nav Search Bar ── */
       .uc-nav-search {
         display: flex; align-items: center; gap: 0.5rem;
         background: #f8fafc; border: 1.5px solid #e2e8f0;
@@ -4782,7 +5206,7 @@ function BkStyles() {
         padding: 0.5rem 1.5rem; position: sticky; top: 60px; z-index: 99;
       }
 
-      /* â”€â”€ Progress â”€â”€ */
+      /* ── Progress ── */
       .uc-progress-wrap {
         background: white;
         border-bottom: 1px solid #f1f5f9;
@@ -4839,7 +5263,7 @@ function BkStyles() {
       }
       .uc-sb-line-done { background: #10B981; }
 
-      /* â”€â”€ Main â”€â”€ */
+      /* ── Main ── */
       .uc-main {
         flex: 1;
         overflow-y: auto;
@@ -4910,7 +5334,7 @@ function BkStyles() {
         border: 1px solid #f1f5f9;
       }
 
-      /* â”€â”€ HERO â”€â”€ */
+      /* ── HERO ── */
       .uc-hero {
         background: transparent;
         position: relative;
@@ -4952,7 +5376,7 @@ function BkStyles() {
         margin-bottom: 2rem;
       }
 
-      /* â”€â”€ Search â”€â”€ */
+      /* ── Search ── */
       .uc-search-bar {
         position: relative;
         max-width: 560px;
@@ -4993,7 +5417,7 @@ function BkStyles() {
         display:flex; align-items:center; gap:0.3rem;
       }
 
-      /* â”€â”€ Category Grid â”€â”€ */
+      /* ── Category Grid ── */
       .uc-section {
         width: 100%;
         padding: 2.5rem 1.5rem;
@@ -5075,7 +5499,7 @@ function BkStyles() {
       .uc-cat-arrow { color:#cbd5e1; flex-shrink:0; }
       .uc-cat-card:hover .uc-cat-arrow { color:#7C3AED; }
 
-      /* â”€â”€ How It Works â”€â”€ */
+      /* ── How It Works ── */
       .uc-how {
         background: linear-gradient(135deg, #faf5ff, #f0fdf4);
         padding: 3rem 1.5rem;
@@ -5116,7 +5540,7 @@ function BkStyles() {
       .uc-how-title { font-size:1.1rem; font-weight:800; color:#1e293b; margin-bottom:0.5rem; }
       .uc-how-desc  { font-size:0.85rem; color:#64748b; line-height:1.6; }
 
-      /* â”€â”€ Reviews â”€â”€ */
+      /* ── Reviews ── */
       .uc-reviews-section {
         padding: 3rem 1.5rem;
         max-width:1200px;
@@ -5147,7 +5571,16 @@ function BkStyles() {
       .uc-review-ago { font-size: 0.75rem; color: #94a3b8; margin-top: 0.1rem; }
       .uc-review-text { font-size:0.85rem; color:#475569; line-height:1.6; font-style: italic; }
 
-      /* â”€â”€ Step Pages â”€â”€ */
+      /* ── Step Pages ── */
+      .uc-step-container {
+        max-width: 680px;
+        margin: 1.5rem auto 3rem;
+        padding: 2.25rem 2.5rem;
+        background: white;
+        border-radius: 24px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.03);
+        border: 1px solid #f1f5f9;
+      }
       .uc-step-page {
         display:flex;
         flex-direction:column;
@@ -5176,7 +5609,7 @@ function BkStyles() {
       }
       .uc-step-sub { font-size:0.82rem; color:#64748b; margin:0 0 1.5rem; font-weight:500; }
 
-      /* â”€â”€ Package Cards â”€â”€ */
+      /* ── Package Cards ── */
       .uc-pkg-grid {
         display:grid;
         grid-template-columns: repeat(auto-fill, minmax(220px,1fr));
@@ -5227,7 +5660,7 @@ function BkStyles() {
       .uc-pkg-radio--sel { border-color:#7C3AED; background:#7C3AED; }
       .uc-pkg-radio-dot { width:8px; height:8px; border-radius:50%; background:white; }
 
-      /* â”€â”€ Schedule â”€â”€ */
+      /* ── Schedule ── */
       .uc-date-section, .uc-time-section { margin-bottom:1.5rem; }
       .uc-subsection-label {
         display:flex; align-items:center; gap:0.4rem;
@@ -5236,25 +5669,28 @@ function BkStyles() {
         margin-bottom:0.75rem;
       }
       .uc-date-scroll {
-        display:flex; gap:0.5rem; overflow-x:auto;
-        scrollbar-width:none; padding-bottom:0.25rem;
+        display:flex; gap:0.65rem; overflow-x:auto;
+        scrollbar-width:none;
+        padding: 14px 6px 12px;
+        scroll-behavior: smooth;
       }
       .uc-date-scroll::-webkit-scrollbar { display:none; }
       .uc-date-pill {
         display:flex; flex-direction:column; align-items:center;
-        min-width:62px; padding:0.6rem 0.5rem;
+        min-width:68px; padding:0.65rem 0.5rem;
         border:2px solid #e2e8f0; border-radius:14px;
         background:white; cursor:pointer;
         font-family:inherit; position:relative;
         transition:all 0.15s ease;
-        gap:0.15rem;
+        gap:0.15rem; flex-shrink:0;
       }
       .uc-date-pill:hover { border-color:#7C3AED; }
       .uc-date-pill--sel { border-color:#7C3AED; background:#7C3AED; }
       .uc-date-today-tag {
-        position:absolute; top:-9px; left:50%; transform:translateX(-50%);
-        background:#10B981; color:white; font-size:0.55rem;
-        font-weight:800; padding:1px 6px; border-radius:99px; white-space:nowrap;
+        position:absolute; top:-10px; left:50%; transform:translateX(-50%);
+        background:#10B981; color:white; font-size:0.58rem;
+        font-weight:800; padding:2px 8px; border-radius:99px; white-space:nowrap;
+        box-shadow:0 2px 5px rgba(16,185,129,0.3);
       }
       .uc-date-day { font-size:0.65rem; font-weight:700; color:#94a3b8; }
       .uc-date-pill--sel .uc-date-day { color:rgba(255,255,255,0.8); }
@@ -5280,7 +5716,7 @@ function BkStyles() {
       .uc-time-slot:hover { border-color:#7C3AED; color:#7C3AED; }
       .uc-time-slot--sel { background:#7C3AED; border-color:#7C3AED; color:white; font-weight:700; }
 
-      /* â”€â”€ Login â”€â”€ */
+      /* ── Login ── */
       .uc-login-page { padding-top:0.5rem; }
       .uc-login-center { text-align:center; margin-bottom:1.5rem; }
       .uc-login-shield {
@@ -5335,7 +5771,7 @@ function BkStyles() {
       .uc-success-title { font-family:'Outfit',sans-serif; font-size:1.6rem; font-weight:900; color:#1e293b; }
       .uc-success-sub   { font-size:0.88rem; color:#64748b; font-weight:600; }
 
-      /* â”€â”€ Form â”€â”€ */
+      /* ── Form ── */
       .uc-form { display:flex; flex-direction:column; gap:1rem; margin-bottom:1.5rem; }
       .uc-field-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
       @media(max-width:560px) { .uc-field-row { grid-template-columns:1fr; } }
@@ -5398,7 +5834,7 @@ function BkStyles() {
         justify-content:center;
       }
 
-      /* â”€â”€ Confirm â”€â”€ */
+      /* ── Confirm ── */
       .uc-confirm-layout {
         display:grid;
         grid-template-columns:1fr 1fr;
@@ -5445,7 +5881,7 @@ function BkStyles() {
         margin:0.5rem 0;
       }
 
-      /* â”€â”€ Success Page â”€â”€ */
+      /* ── Success Page ── */
       .uc-success-page {
         max-width:520px;
         margin:3rem auto;
@@ -5486,7 +5922,7 @@ function BkStyles() {
       .uc-tl-icon { font-size:1rem; width:24px; text-align:center; }
       .uc-tl-label { flex:1; }
 
-      /* â”€â”€ Buttons â”€â”€ */
+      /* ── Buttons ── */
       .uc-btn-primary {
         display:inline-flex; align-items:center; justify-content:center; gap:0.45rem;
         background:linear-gradient(135deg,#7C3AED,#6d28d9);
@@ -5527,7 +5963,7 @@ function BkStyles() {
 
       .uc-step-footer { padding-top:0.5rem; }
 
-      /* â”€â”€ Footer â”€â”€ */
+      /* ── Footer ── */
       .uc-footer {
         background:white; border-top:1px solid #e2e8f0;
         padding:0.75rem 1.5rem;
@@ -5535,7 +5971,7 @@ function BkStyles() {
         gap:0.4rem; flex-wrap:wrap;
         font-size:0.72rem; font-weight:600; color:#94a3b8;
       }
-      /* â”€â”€ Package Modal â”€â”€ */
+      /* ── Package Modal ── */
       .uc-modal-overlay {
         position: fixed; top: 0; left: 0; right: 0; bottom: 0;
         background: rgba(15, 23, 42, 0.4);
