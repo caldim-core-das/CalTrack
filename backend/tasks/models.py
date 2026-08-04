@@ -129,6 +129,10 @@ class Task(models.Model):
     # Verification Settings
     require_selfie   = models.BooleanField(default=False)
     require_before_after_photos = models.BooleanField(default=False)
+    start_otp        = models.CharField(max_length=6, blank=True, default="", help_text="Customer OTP required before technician starts work.")
+    otp_created_at   = models.DateTimeField(null=True, blank=True, help_text="Timestamp when customer OTP was generated.")
+    is_otp_verified  = models.BooleanField(default=False, help_text="True when customer OTP has been verified by technician.")
+
 
     # Time tracking link
     time_log = models.OneToOneField(

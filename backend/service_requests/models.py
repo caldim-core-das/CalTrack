@@ -59,6 +59,7 @@ class ServiceRequest(models.Model):
         CLOSED                = "closed",                "Closed"
         REJECTED              = "rejected",              "Rejected"
         REWORK_REQUESTED      = "rework_requested",      "Rework Requested"
+        FOLLOW_UP_REQUIRED    = "follow_up_required",    "Follow-up Required"
 
     class Priority(models.TextChoices):
         LOW    = "low",    "Low"
@@ -159,26 +160,70 @@ class ServiceRequest(models.Model):
             self.request_id = _generate_request_id()
         super().save(*args, **kwargs)
 
+    @property
+    def employee_job(self):
+        """Backwards-compatibility property returning the primary assigned job."""
+        return self.employee_jobs.filter(is_primary=True).first()
+
+    def get_primary_job(self):
+        return self.employee_jobs.filter(is_primary=True).first()
+
+    def is_ready_to_complete(self):
+        """
+        Computed completion engine.
+        Returns True if:
+        1. All assigned jobs are either COMPLETED or UNABLE_TO_COMPLETE.
+        2. All work extensions are RESOLVED, CUSTOMER_DECLINED, or ADMIN_REJECTED.
+        """
+        jobs = self.employee_jobs.all()
+        if not jobs.exists():
+            return False
+
+        for job in jobs:
+            if job.status not in [EmployeeJob.Status.COMPLETED, EmployeeJob.Status.UNABLE_TO_COMPLETE]:
+                return False
+
+        for ext in self.work_extensions.all():
+            if ext.status not in [
+                WorkExtension.Status.RESOLVED,
+                WorkExtension.Status.CUSTOMER_DECLINED,
+                WorkExtension.Status.ADMIN_REJECTED,
+            ]:
+                return False
+
+        return True
+
     def __str__(self):
         return f"{self.request_id} — {self.issue_title}"
 
 
 class EmployeeJob(models.Model):
-    """Created when admin assigns a ServiceRequest to an Employee."""
+    """Created when admin assigns a ServiceRequest to an Employee (Primary or Specialist)."""
 
     class Status(models.TextChoices):
-        ASSIGNED    = "assigned",    "Assigned"
-        ACCEPTED    = "accepted",    "Accepted"
-        ON_THE_WAY  = "on_the_way",  "On The Way"
-        IN_PROGRESS = "in_progress", "In Progress"
-        COMPLETED   = "completed",   "Completed"
-        REJECTED    = "rejected",    "Rejected"
+        ASSIGNED           = "assigned",           "Assigned"
+        ACCEPTED           = "accepted",           "Accepted"
+        ON_THE_WAY         = "on_the_way",         "On The Way"
+        IN_PROGRESS        = "in_progress",        "In Progress"
+        AWAITING_PARTS     = "awaiting_parts",     "Awaiting Parts"
+        COMPLETED          = "completed",          "Completed"
+        UNABLE_TO_COMPLETE = "unable_to_complete", "Unable To Complete"
+        REJECTED           = "rejected",           "Rejected"
 
-    service_request = models.OneToOneField(
+    service_request = models.ForeignKey(
         ServiceRequest,
         on_delete=models.CASCADE,
-        related_name="employee_job",
+        related_name="employee_jobs",
     )
+    is_primary = models.BooleanField(default=True)
+    source_work_extension = models.ForeignKey(
+        "WorkExtension",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="created_jobs",
+    )
+    uncompletion_reason = models.TextField(blank=True, null=True)
+
     employee = models.ForeignKey(
         "employees.Employee",
         on_delete=models.CASCADE,
@@ -191,7 +236,7 @@ class EmployeeJob(models.Model):
         related_name="assigned_jobs",
     )
 
-    status        = models.CharField(max_length=20, choices=Status.choices, default=Status.ASSIGNED)
+    status        = models.CharField(max_length=30, choices=Status.choices, default=Status.ASSIGNED)
     notes         = models.TextField(blank=True)
 
     assigned_date  = models.DateTimeField(default=timezone.now)
@@ -201,9 +246,244 @@ class EmployeeJob(models.Model):
 
     class Meta:
         ordering = ["-assigned_date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["service_request"],
+                condition=models.Q(is_primary=True),
+                name="unique_primary_job_per_service_request",
+            )
+        ]
 
     def __str__(self):
-        return f"Job for {self.service_request.request_id} → {self.employee}"
+        primary_str = " (Primary)" if self.is_primary else " (Specialist)"
+        return f"Job for {self.service_request.request_id} → {self.employee}{primary_str}"
+
+
+class WorkExtension(models.Model):
+    """Reported by technician when scope expansion / additional work / specialist is required."""
+
+    class Status(models.TextChoices):
+        PENDING_ADMIN_REVIEW = "pending_admin_review", "Pending Admin Review"
+        ADMIN_APPROVED       = "admin_approved",       "Admin Approved"
+        ADMIN_REJECTED       = "admin_rejected",       "Admin Rejected"
+        CUSTOMER_ACCEPTED    = "customer_accepted",    "Customer Accepted"
+        CUSTOMER_DECLINED    = "customer_declined",    "Customer Declined"
+        PENDING_ASSIGNMENT   = "pending_assignment",   "Pending Assignment"
+        RESOLVED             = "resolved",             "Resolved"
+
+    class DecisionChannel(models.TextChoices):
+        PORTAL = "portal", "Customer Portal"
+        PHONE  = "phone",  "Customer Support Phone"
+
+    service_request = models.ForeignKey(
+        ServiceRequest,
+        on_delete=models.CASCADE,
+        related_name="work_extensions",
+    )
+    job = models.ForeignKey(
+        EmployeeJob,
+        on_delete=models.CASCADE,
+        related_name="extensions",
+    )
+    reported_by = models.ForeignKey(
+        "employees.Employee",
+        on_delete=models.CASCADE,
+        related_name="reported_extensions",
+    )
+
+    requires_specialist = models.BooleanField(default=False)
+    required_skill = models.CharField(max_length=150, blank=True, null=True)
+
+    status = models.CharField(
+        max_length=30,
+        choices=Status.choices,
+        default=Status.PENDING_ADMIN_REVIEW,
+    )
+
+    # Pricing Audit
+    technician_estimate   = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    admin_approved_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    final_customer_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    # Public tokenized security
+    decision_token   = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    token_expires_at = models.DateTimeField(null=True, blank=True)
+
+    # Decision Audit Details
+    decision_channel     = models.CharField(max_length=15, choices=DecisionChannel.choices, blank=True, null=True)
+    decision_recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="recorded_work_extension_decisions",
+    )
+    decision_notes     = models.TextField(blank=True, default="")
+    decision_timestamp = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Extension #{self.id} for {self.service_request.request_id} ({self.get_status_display()})"
+
+
+class WorkExtensionItem(models.Model):
+    """Specific line item / material required for a WorkExtension."""
+
+    class FulfillmentSource(models.TextChoices):
+        ORGANIZATION_STOCK       = "ORGANIZATION_STOCK",       "Organization Local Stock"
+        ORGANIZATION_TRANSFER    = "ORGANIZATION_TRANSFER",    "Organization Stock Transfer"
+        ORGANIZATION_PROCUREMENT = "ORGANIZATION_PROCUREMENT", "Organization Procurement"
+        TECHNICIAN_PURCHASE      = "TECHNICIAN_PURCHASE",      "Technician Purchase"
+        CUSTOMER_SUPPLIED        = "CUSTOMER_SUPPLIED",        "Customer Supplied"
+
+    class Status(models.TextChoices):
+        PENDING            = "PENDING",            "Pending"
+        RESERVED           = "RESERVED",           "Reserved"
+        AWAITING_PARTS     = "AWAITING_PARTS",     "Awaiting Parts"
+        PURCHASE_REQUESTED = "PURCHASE_REQUESTED", "Purchase Requested"
+        PURCHASE_APPROVED  = "PURCHASE_APPROVED",  "Purchase Approved"
+        FULFILLED          = "FULFILLED",          "Fulfilled"
+        VERIFIED           = "VERIFIED",           "Verified"
+        REJECTED           = "REJECTED",           "Rejected"
+
+    extension = models.ForeignKey(
+        WorkExtension,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    inventory_item = models.ForeignKey(
+        "inventory.InventoryItem",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="extension_items",
+    )
+    item_name = models.CharField(max_length=255)
+    quantity  = models.PositiveIntegerField(default=1)
+    location  = models.ForeignKey(
+        "time_tracking.Location",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="extension_item_locations",
+    )
+
+    fulfillment_source = models.CharField(
+        max_length=30,
+        choices=FulfillmentSource.choices,
+        default=FulfillmentSource.ORGANIZATION_STOCK,
+    )
+    status = models.CharField(
+        max_length=25,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
+
+    # 3-Tier Financial Separation
+    billed_to_customer              = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    actual_cost                     = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    technician_reimbursement_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    # Technician Purchase Prior Approval
+    technician_purchase_approved_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    purchase_approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="approved_technician_purchases",
+    )
+    purchase_receipt = models.FileField(upload_to="service_requests/receipts/", null=True, blank=True)
+
+    # Customer Supplied Verification & Warranty Policy
+    verified_by_tech   = models.BooleanField(default=False)
+    verification_notes = models.TextField(blank=True, default="")
+    warranty_covered   = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"{self.quantity}x {self.item_name} ({self.fulfillment_source})"
+
+
+class JobReschedule(models.Model):
+    """Tracks appointment date changes due to parts delays or scheduling conflicts."""
+
+    class Reason(models.TextChoices):
+        PARTS_UNAVAILABLE      = "parts_unavailable",      "Parts Unavailable"
+        TECHNICIAN_UNAVAILABLE = "technician_unavailable", "Technician Unavailable"
+        CUSTOMER_REQUESTED     = "customer_requested",     "Customer Requested"
+        OTHER                  = "other",                  "Other"
+
+    job = models.ForeignKey(
+        EmployeeJob,
+        on_delete=models.CASCADE,
+        related_name="reschedules",
+    )
+    old_date = models.DateField()
+    new_date = models.DateField()
+    reason   = models.CharField(max_length=30, choices=Reason.choices, default=Reason.PARTS_UNAVAILABLE)
+    notes    = models.TextField(blank=True, default="")
+
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="job_reschedules",
+    )
+
+    customer_notified_at  = models.DateTimeField(null=True, blank=True)
+    customer_confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    delay_count              = models.PositiveIntegerField(default=1)
+    support_callback_created = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Reschedule for {self.job}: {self.old_date} -> {self.new_date}"
+
+
+class SupplementalInvoice(models.Model):
+    """Supplemental invoice issued for approved additional scope / material balance."""
+
+    class Status(models.TextChoices):
+        PENDING   = "pending",   "Pending"
+        PAID      = "paid",      "Paid"
+        CANCELLED = "cancelled", "Cancelled"
+
+    service_request = models.ForeignKey(
+        ServiceRequest,
+        on_delete=models.CASCADE,
+        related_name="supplemental_invoices",
+    )
+    work_extension = models.OneToOneField(
+        WorkExtension,
+        on_delete=models.CASCADE,
+        related_name="supplemental_invoice",
+    )
+    invoice_number = models.CharField(max_length=50, unique=True)
+    amount         = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    status         = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    payment_method = models.CharField(max_length=20, blank=True, default="ONLINE")
+    transaction_id = models.CharField(max_length=200, blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    paid_at    = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Supplemental Invoice {self.invoice_number} ({self.amount})"
 
 
 class JobCompletionProof(models.Model):

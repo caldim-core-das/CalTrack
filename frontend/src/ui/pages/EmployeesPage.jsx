@@ -921,10 +921,12 @@ export function EmployeesPage() {
         first_name: data.first_name || "",
         last_name: data.last_name || "",
         title: data.title || "",
-        hourly_rate: data.hourly_rate === "" || data.hourly_rate === null || typeof data.hourly_rate === "undefined" ? 0 : Number(data.hourly_rate),
+        hourly_rate: (data.hourly_rate === "" || data.hourly_rate === null || typeof data.hourly_rate === "undefined")
+          ? Number(original?.hourly_rate ?? 0)
+          : Number(data.hourly_rate),
         country: data.country || null,
         state: ["US", "IN"].includes(data.country) ? (data.state || null) : null,
-        exempt_status: data.country === "US" ? (data.exempt_status || "non_exempt") : null,
+        exempt_status: data.exempt_status || original?.exempt_status || "non_exempt",
         weekly_salary: data.country === "US" ? (data.weekly_salary === "" || data.weekly_salary === null || typeof data.weekly_salary === "undefined" ? null : Number(data.weekly_salary)) : null,
         uk_tax_code: data.country === "UK" ? (data.uk_tax_code || null) : null,
         uk_ni_category: data.country === "UK" ? (data.uk_ni_category || null) : null,
@@ -947,55 +949,21 @@ export function EmployeesPage() {
         }))
       }
 
-      const verified = await apiRequest(`/employees/${data.id}/`).catch(() => null)
-      const verifiedObj = verified?.data || verified
-      if (verifiedObj && typeof verifiedObj === "object") {
-        const sameTitle = String(verifiedObj.title || "") === String(payload.title || "")
-        const sameRate = Number(verifiedObj.hourly_rate ?? 0) === Number(payload.hourly_rate ?? 0)
-        const sameActive = !!verifiedObj.is_active === !!payload.is_active
-        const sameEmail = String(verifiedObj.user?.email || verifiedObj.email || "") === String(payload.email || "")
-        if (!(sameTitle && sameRate && sameActive && sameEmail) && original) {
-          const putPayload = {
-            employee_id: original.employee_id,
-            username: original.user?.username || payload.username,
-            email: payload.email,
-            first_name: payload.first_name,
-            last_name: payload.last_name,
-            title: payload.title,
-            hourly_rate: payload.hourly_rate,
-            country: payload.country,
-            state: payload.state,
-            exempt_status: payload.exempt_status,
-            weekly_salary: payload.weekly_salary,
-            uk_tax_code: payload.uk_tax_code,
-            uk_ni_category: payload.uk_ni_category,
-            rolled_up_holiday_pay: payload.rolled_up_holiday_pay,
-            department: payload.department,
-            currency: payload.currency,
-            payroll_group: payload.payroll_group,
-            tax_category: payload.tax_category,
-            is_active: payload.is_active,
-            service_roles: payload.service_roles,
-          }
-          const putRes = await apiRequest(`/employees/${data.id}/`, { method: "PUT", json: putPayload })
-          const putUpdated = putRes?.data || putRes
-          if (putUpdated && typeof putUpdated === "object") {
-            setItems(prev => prev.map(emp => {
-              if (emp.id !== data.id) return emp
-              const nextUser = putUpdated.user ? { ...(emp.user || {}), ...putUpdated.user } : emp.user
-              return { ...emp, ...putUpdated, user: nextUser }
-            }))
-          }
-        }
-      }
-
       setSuccessMsg(`Employee "${data.user?.username || data.email || data.id}" updated.`)
       setTimeout(() => setSuccessMsg(""), 6000)
       setShowEditModal(false)
       setEditingEmployee(null)
       await load()
     } catch (err) {
-      setError(err?.body?.detail || "Failed to update employee.")
+      const msg =
+        err?.body?.detail ||
+        (err?.body && typeof err.body === "object"
+          ? Object.entries(err.body)
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+              .join("; ")
+          : "") ||
+        "Failed to update employee."
+      setError(msg)
     } finally {
       setSavingEdit(false)
     }

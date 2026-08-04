@@ -10,6 +10,21 @@ from tasks.serializers.task_serializers import TaskSerializer, TaskStatusUpdateS
 from tasks.services.gap_job_service import push_task_notification
 
 
+def _get_company_for_tasks(request):
+    company = getattr(request, "company", None)
+    if not company and request.user and request.user.is_authenticated:
+        company = getattr(request.user, "company", None)
+    if not company and request.user and request.user.is_authenticated:
+        try:
+            from employees.models import Employee
+            emp = Employee.objects.filter(user=request.user).first()
+            if emp:
+                company = emp.company
+        except Exception:
+            pass
+    return company
+
+
 def _write_task_audit(user, action, task):
     """Write an audit log entry for a task event. Fails silently if audit app not configured."""
     try:
@@ -157,16 +172,39 @@ def sync_task_lifecycle_to_service_request(task, actor=None):
 
             # 4. IN_PROGRESS task
             elif task.status == Task.Status.IN_PROGRESS:
-                if sr.status == ServiceRequest.Status.ACCEPTED:
-                    apply_transition(sr, ServiceRequest.Status.IN_PROGRESS)
-                    sr.save(update_fields=["status", "updated_at"])
-                
+                from service_requests.state_machine import ALLOWED_TRANSITIONS
+                S = ServiceRequest.Status
+                PROGRESS_PATH = [S.ASSIGNED, S.ACCEPTED, S.IN_PROGRESS]
+                max_steps = 5
+                while sr.status != S.IN_PROGRESS and max_steps > 0:
+                    max_steps -= 1
+                    allowed = ALLOWED_TRANSITIONS.get(sr.status, set())
+                    next_step = None
+                    for candidate in PROGRESS_PATH:
+                        if candidate in allowed:
+                            next_step = candidate
+                            break
+                    if next_step is None:
+                        sr.status = S.IN_PROGRESS
+                        break
+                    apply_transition(sr, next_step)
+                sr.save(update_fields=["status", "updated_at"])
+
                 job = _get_or_create_job()
                 if job:
                     job.status = EmployeeJob.Status.IN_PROGRESS
                     if not job.started_date:
                         job.started_date = timezone.now()
                     job.save(update_fields=["status", "started_date"])
+
+            # 5. SUSPENDED task
+            elif task.status == Task.Status.SUSPENDED:
+                sr.status = ServiceRequest.Status.SUSPENDED
+                sr.save(update_fields=["status", "updated_at"])
+                job = _get_or_create_job()
+                if job:
+                    job.status = EmployeeJob.Status.SUSPENDED
+                    job.save(update_fields=["status"])
 
             # 5. ACCEPTED task
             elif task.acceptance_status == Task.AcceptanceStatus.ACCEPTED:
@@ -217,9 +255,10 @@ class AdminTaskListCreateView(GenericAPIView):
     serializer_class = TaskSerializer
 
     def get(self, request):
-        if not hasattr(request, 'company'):
-            return Response([])
-        qs = Task.objects.filter(company=request.company).select_related("assigned_to", "assigned_by")
+        company = _get_company_for_tasks(request)
+        qs = Task.objects.all().select_related("assigned_to", "assigned_by")
+        if company:
+            qs = qs.filter(company=company)
 
         # Optional filters
         employee_id  = request.query_params.get("employee")
@@ -280,8 +319,14 @@ class AdminTaskListCreateView(GenericAPIView):
                         }
                     )
 
-        # Notify assigned employee
+        # Dispatch customer verification OTP
         if task.assigned_to:
+            try:
+                from tasks.services.otp_service import generate_and_send_job_otp
+                generate_and_send_job_otp(task)
+            except Exception as exc:
+                print(f"[AdminTaskListCreateView] Failed to generate/send OTP: {exc}")
+
             push_task_notification(
                 user=task.assigned_to,
                 title="New Job Assigned",
@@ -359,8 +404,14 @@ class AdminTaskDetailView(APIView):
                         }
                     )
 
-            # Notify new assignee
+            # Notify new assignee & dispatch new customer OTP
             if saved_task.assigned_to:
+                try:
+                    from tasks.services.otp_service import generate_and_send_job_otp
+                    generate_and_send_job_otp(saved_task)
+                except Exception as exc:
+                    print(f"[AdminTaskDetailView] Failed to generate/send OTP on reassign: {exc}")
+
                 push_task_notification(
                     user=saved_task.assigned_to,
                     title="Job Reassigned to You",
@@ -479,9 +530,61 @@ class EmployeeTaskListView(GenericAPIView):
     serializer_class = TaskSerializer
 
     def get(self, request):
-        if not hasattr(request, 'company'):
-            return Response([])
-        qs = Task.objects.filter(assigned_to=request.user, company=request.company).select_related("assigned_by")
+        company = _get_company_for_tasks(request)
+
+        from employees.models import Employee
+        employee = Employee.objects.filter(user=request.user).first()
+        if not company and employee:
+            company = employee.company
+
+        # Sync any assigned ServiceRequests for this employee that don't have a Task object yet
+        try:
+            from service_requests.models import ServiceRequest
+            if employee:
+                sr_qs = ServiceRequest.objects.filter(
+                    assigned_employee=employee
+                ).exclude(status__in=[ServiceRequest.Status.CLOSED, ServiceRequest.Status.REJECTED])
+                if company:
+                    sr_qs = sr_qs.filter(company=company)
+
+                for sr in sr_qs:
+                    if not Task.objects.filter(service_request=sr).exists():
+                        cat_val = (sr.service_category or "other").lower().replace(" ", "_")
+                        valid_cats = [c[0] for c in Task.Category.choices]
+                        if cat_val not in valid_cats:
+                            cat_val = "other"
+
+                        new_task = Task.objects.create(
+                            service_request=sr,
+                            company=sr.company or company,
+                            title=f"{sr.request_id} — {sr.issue_title}",
+                            description=sr.description or f"Service Request {sr.request_id} for {sr.customer_name}",
+                            category=cat_val,
+                            priority=sr.priority if sr.priority in [p[0] for p in Task.Priority.choices] else "medium",
+                            status=Task.Status.PENDING,
+                            acceptance_status=Task.AcceptanceStatus.PENDING_ACCEPTANCE,
+                            assigned_to=employee.user,
+                            assigned_by=sr.assigned_employee.invited_by or request.user,
+                            due_date=sr.preferred_date or timezone.now().date(),
+                            preferred_time=sr.preferred_time or "",
+                            job_address=sr.address or "",
+                            client_name=sr.customer_name or "",
+                            client_contact_number=sr.phone or "",
+                            client_email=sr.email or "",
+                        )
+                        try:
+                            from tasks.services.otp_service import generate_and_send_job_otp
+                            generate_and_send_job_otp(new_task)
+                        except Exception as otp_err:
+                            print(f"[EmployeeTaskListView] Auto-sync OTP dispatch failed: {otp_err}")
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).error(f"[EmployeeTaskListView] Auto-sync failed: {exc}", exc_info=True)
+
+        qs = Task.objects.filter(assigned_to=request.user).select_related("assigned_by")
+        if company:
+            qs = qs.filter(company=company)
+
         status_f = request.query_params.get("status")
         if status_f:
             qs = qs.filter(status=status_f)
@@ -560,6 +663,26 @@ class EmployeeTaskActionView(APIView):
                     {"detail": "You must complete or suspend your current active job before starting a new one."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+            # Customer OTP Verification
+            if not task.is_otp_verified:
+                if not task.start_otp:
+                    from tasks.services.otp_service import generate_and_send_job_otp
+                    generate_and_send_job_otp(task)
+                
+                entered_otp = str(request.data.get("otp", "")).strip()
+                if not entered_otp:
+                    return Response(
+                        {"detail": "Customer OTP is required to start work. Please ask the customer for the verification code sent to their SMS/Email."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if entered_otp != task.start_otp:
+                    return Response(
+                        {"detail": "Invalid Customer OTP code. Please verify the 6-digit code received by the customer."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                task.is_otp_verified = True
+                task.save(update_fields=["is_otp_verified", "updated_at"])
             if task.status == Task.Status.PENDING:
                 from time_tracking.models import TimeLog
                 from time_tracking.geo import evaluate
@@ -776,9 +899,43 @@ class EmployeeTaskActionView(APIView):
                 )
             task.travel_status   = Task.TravelStatus.REACHED_SITE
             task.reached_site_at = timezone.now()
+
+            # Auto-generate OTP on reaching site if not verified
+            from tasks.services.otp_service import generate_and_send_job_otp
+            if not task.start_otp or not task.is_otp_verified:
+                generate_and_send_job_otp(task)
+
             task.save(update_fields=["travel_status", "reached_site_at", "updated_at"])
             _write_task_audit(request.user, "task_reached_site", task)
             _broadcast_travel_status(task, request.user, "reached_site")
+
+        # ── Verify OTP ─────────────────────────────────────────────────────
+        elif action == "verify_otp":
+            input_otp = request.data.get("otp") or request.data.get("input_otp")
+            if not input_otp:
+                return Response({"detail": "Please enter the 6-digit OTP code."}, status=status.HTTP_400_BAD_REQUEST)
+
+            from tasks.services.otp_service import verify_task_otp
+            is_valid, msg = verify_task_otp(task, input_otp, expiry_minutes=10)
+            if not is_valid:
+                return Response({"verified": False, "detail": msg}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({
+                "verified": True,
+                "message": msg,
+                "task": TaskSerializer(task, context={"request": request}).data
+            })
+
+        # ── Resend OTP ─────────────────────────────────────────────────────
+        elif action == "resend_otp":
+            from tasks.services.otp_service import generate_and_send_job_otp
+            generate_and_send_job_otp(task)
+            _broadcast_travel_status(task, request.user, "otp_resent")
+            return Response({
+                "success": True,
+                "message": "A new Customer OTP has been generated and sent via SMS/Email.",
+                "task": TaskSerializer(task, context={"request": request}).data
+            })
 
         # ── Start Work ─────────────────────────────────────────────────────
         elif action == "start_work":
@@ -794,6 +951,20 @@ class EmployeeTaskActionView(APIView):
                     {"detail": "You must complete or suspend your current active job before starting a new one."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+
+            # Customer OTP Verification
+            if not task.is_otp_verified:
+                entered_otp = str(request.data.get("otp", "")).strip()
+                if entered_otp:
+                    from tasks.services.otp_service import verify_task_otp
+                    is_valid, msg = verify_task_otp(task, entered_otp, expiry_minutes=10)
+                    if not is_valid:
+                        return Response({"detail": msg}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    return Response(
+                        {"detail": "Customer OTP must be verified before starting work. Please enter the OTP and click Verify."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
             if task.status == Task.Status.PENDING:
                 from time_tracking.models import TimeLog
@@ -866,8 +1037,18 @@ class EmployeeTaskActionView(APIView):
                 if request.data.get("notes"):
                     task.employee_notes = request.data.get("notes")
                 task.save()
+                sync_task_lifecycle_to_service_request(task, actor=request.user)
                 _write_task_audit(request.user, "task_work_started", task)
                 _broadcast_travel_status(task, request.user, "working")
+
+        # ── Resend Customer OTP ───────────────────────────────────────────
+        elif action in ("resend_otp", "resend-otp"):
+            from tasks.services.otp_service import generate_and_send_job_otp
+            generate_and_send_job_otp(task)
+            return Response({
+                "detail": "Customer verification OTP has been dispatched via SMS and Email.",
+                "task": TaskSerializer(task).data
+            })
 
         # ── Notes ─────────────────────────────────────────────────────────
         elif action == "notes":
@@ -880,10 +1061,73 @@ class EmployeeTaskActionView(APIView):
             if task.status != Task.Status.IN_PROGRESS:
                 return Response({"detail": "Only active tasks can be suspended."}, status=status.HTTP_400_BAD_REQUEST)
             reason = request.data.get("reason", "").strip()
+            amount = request.data.get("amount") or request.data.get("additional_amount") or 0
+            try:
+                amount = float(amount)
+            except (ValueError, TypeError):
+                amount = 0
+
+            if amount == 0 and reason:
+                import re
+                match = re.search(r'(?:₹|Rs\.?|INR|\b)\s*(\d+(?:\.\d{1,2})?)', reason)
+                if match:
+                    try:
+                        amount = float(match.group(1))
+                    except ValueError:
+                        pass
+
             task.status = Task.Status.SUSPENDED
             task.suspended_at = timezone.now()
             task.suspend_reason = reason
             task.save(update_fields=["status", "suspended_at", "suspend_reason", "updated_at"])
+
+            if task.service_request:
+                try:
+                    from service_requests.models import WorkExtension, WorkExtensionItem, EmployeeJob
+                    sr = task.service_request
+                    job = EmployeeJob.objects.filter(service_request=sr).first()
+                    emp = getattr(request.user, "employee_profile", None) or (job.employee if job else None)
+                    if not emp:
+                        from employees.models import Employee
+                        emp = Employee.objects.first()
+                    if job and emp:
+                        ext, created = WorkExtension.objects.get_or_create(
+                            service_request=sr,
+                            job=job,
+                            defaults={
+                                "reported_by": emp,
+                                "status": WorkExtension.Status.ADMIN_APPROVED,
+                                "technician_estimate": amount,
+                                "admin_approved_amount": amount,
+                                "decision_notes": reason,
+                            }
+                        )
+                        if not created:
+                            ext.status = WorkExtension.Status.ADMIN_APPROVED
+                            ext.decision_notes = reason
+                            if amount > 0:
+                                ext.technician_estimate = amount
+                                ext.admin_approved_amount = amount
+                            ext.save()
+
+                        clean_title = reason
+                        if "(" in clean_title:
+                            clean_title = clean_title.split("(")[0].strip()
+                        if "Requires" in clean_title:
+                            clean_title = clean_title.split("Requires")[-1].strip()
+
+                        WorkExtensionItem.objects.update_or_create(
+                            extension=ext,
+                            defaults={
+                                "title": clean_title or reason,
+                                "description": reason,
+                                "estimated_price": amount,
+                            }
+                        )
+                except Exception as e:
+                    print(f"Error creating WorkExtension on suspend: {e}")
+
+            sync_task_lifecycle_to_service_request(task, actor=request.user)
             _write_task_audit(request.user, "task_suspended", task)
 
         # ── Resume ────────────────────────────────────────────────────────

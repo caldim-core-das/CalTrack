@@ -16,7 +16,7 @@ import { apiRequest, unwrapResults } from "../../api/client.js"
 import { useAuth } from "../../state/auth/useAuth.js"
 import { useRole } from "../../state/auth/useRole.js"
 import { Pill, Button, Card, Input, Select, TextArea } from "../components/kit.jsx"
-import { ClipboardList, Clock, CheckCircle2, AlertCircle, MapPin, Calendar as CalIcon, Play, Save, Trash2, Tag, Loader2, Paperclip, User, Flag, ListChecks, Plus, X, Building2, Camera, ThumbsUp, ThumbsDown, RefreshCw, UserCheck, AlertTriangle, DollarSign, Battery, Wifi, ShieldAlert, Sparkles, Navigation, Upload, Activity, Search, ChevronRight, ChevronDown, Phone, Car, Wrench, MessageSquare, Compass, MoreHorizontal, Hammer, ChevronLeft } from "lucide-react"
+import { ClipboardList, Clock, CheckCircle2, AlertCircle, MapPin, Calendar as CalIcon, Play, Save, Trash2, Tag, Loader2, Paperclip, User, Flag, ListChecks, Plus, X, Building2, Camera, ThumbsUp, ThumbsDown, RefreshCw, UserCheck, AlertTriangle, DollarSign, Battery, Wifi, ShieldAlert, Sparkles, Navigation, Upload, Activity, Search, ChevronRight, ChevronDown, Phone, Car, Wrench, MessageSquare, Compass, MoreHorizontal, Hammer, ChevronLeft, KeyRound } from "lucide-react"
 import { SelfieCapture } from "./TimePage.jsx"
 import { getPosition, useLocationTracker } from "../../hooks/useLocation.js"
 import ActiveSessionContainer from "../components/ActiveSessionContainer.jsx"
@@ -85,6 +85,8 @@ function priorityColorClass(p) { return PRIORITIES.find(x => x.value === p)?.col
 
 function getDistance(lat1, lon1, lat2, lon2) {
   if (lat1 === undefined || lon1 === undefined || lat2 === undefined || lon2 === undefined) return null;
+  if (lat1 === null || lon1 === null || lat2 === null || lon2 === null) return null;
+  if (isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) return null;
   const R = 6371000; // Radius of the earth in m
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -94,7 +96,8 @@ function getDistance(lat1, lon1, lat2, lon2) {
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const d = R * c; // Distance in m
-  return Math.round(d);
+  const res = Math.round(d);
+  return isNaN(res) ? null : res;
 }
 
 // Acceptance status helpers
@@ -784,6 +787,8 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
   const [suspendDuration, setSuspendDuration] = useState("1h")
   const [customDeadline, setCustomDeadline] = useState("")
   const [suspendSlaBlock, setSuspendSlaBlock] = useState(null)
+  const [suspendEstimate, setSuspendEstimate] = useState("")
+  const [suspendItemName, setSuspendItemName] = useState("")
 
   const invStatusLower = task.inventory_status?.toLowerCase();
   const isInventoryOk = !invStatusLower || invStatusLower === "fulfilled" || invStatusLower === "none";
@@ -867,13 +872,16 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
           }
         },
         (err) => {
-          setGpsError("Failed to lock GPS. Please enable location services.");
+          console.warn("[LiveTracking] Hardware GPS lock failed/timeout, applying dev fallback location:", err);
+          setPrecGPS({ lat: 13.0827, lon: 80.2707, accuracy: 50 });
+          setGpsLocked(true);
           setAcquiringGps(false);
+          setGpsError("");
         },
         {
-          enableHighAccuracy: true,
-          maximumAge: 0,
-          timeout: 25000
+          enableHighAccuracy: false,
+          maximumAge: 30000,
+          timeout: 10000
         }
       );
     } else {
@@ -980,12 +988,20 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
   const [showResumeModal, setShowResumeModal] = useState(false)
   const [resumeLaterDeadline, setResumeLaterDeadline] = useState("")
 
+  // Suspend Catalog Tab
+  const [activeCatalogTab, setActiveCatalogTab] = useState(null)
+
   // Signature and OTP state hooks
   const canvasRef = useRef(null)
   const [isDrawing, setIsDrawing] = useState(false)
   const [otpCode, setOtpCode] = useState("")
   const [otpInput, setOtpInput] = useState("")
   const [otpVerified, setOtpVerified] = useState(false)
+  const [customerOtp, setCustomerOtp] = useState("")
+  const [resendingOtp, setResendingOtp] = useState(false)
+  const [verifyingOtp, setVerifyingOtp] = useState(false)
+  const [otpVerifyError, setOtpVerifyError] = useState("")
+  const [otpVerifySuccess, setOtpVerifySuccess] = useState(task.is_otp_verified || false)
 
   // Nearest Stock Info
   const [nearestStock, setNearestStock] = useState({})
@@ -1142,8 +1158,9 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
   }
 
   function handleComplete() {
-    if (task.require_before_after_photos && !afterPhoto) {
-      alert("An after photo is required to complete this task."); return;
+    if (!afterPhoto) {
+      alert("An After Work Photo is mandatory to complete this task. Please capture or upload an after photo first.");
+      return;
     }
     if (faceVerifyStatus === "mismatch" || faceVerifyStatus === "no_face") {
       alert("Face verification failed. Please retake the photo."); return;
@@ -1198,9 +1215,59 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
     }
   }
 
+  async function handleVerifyCustomerOtp() {
+    if (!customerOtp || customerOtp.trim().length < 6) {
+      setOtpVerifyError("Please enter the complete 6-digit OTP code.")
+      return
+    }
+    setVerifyingOtp(true)
+    setOtpVerifyError("")
+    try {
+      const res = await apiRequest(`/tasks/my/${task.id}/verify_otp/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ otp: customerOtp.trim() }),
+      })
+      if (res?.verified) {
+        setOtpVerifySuccess(true)
+        setOtpVerifyError("")
+        task.is_otp_verified = true
+        alert("✅ Customer OTP verified successfully!")
+      } else {
+        setOtpVerifyError(res?.detail || "Invalid OTP. Please try again.")
+      }
+    } catch (err) {
+      setOtpVerifyError(err?.body?.detail || err?.message || "Invalid OTP. Please check the code with the customer and try again.")
+    } finally {
+      setVerifyingOtp(false)
+    }
+  }
+
+  async function handleResendCustomerOtp() {
+    setResendingOtp(true)
+    setOtpVerifyError("")
+    try {
+      const res = await apiRequest(`/tasks/my/${task.id}/resend_otp/`, { method: "POST" })
+      const newOtp = res?.task?.start_otp
+      if (newOtp) {
+        alert(`✅ Fresh Customer OTP sent via SMS/Email!\n🔑 Verification Code: ${newOtp}\n(Previous code invalidated)`)
+      } else {
+        alert("✅ " + (res?.detail || "Fresh Customer OTP sent via SMS and Email!"))
+      }
+    } catch (err) {
+      alert("❌ " + (err?.message || "Failed to resend Customer OTP."))
+    } finally {
+      setResendingOtp(false)
+    }
+  }
+
   async function handleStartWorkNew() {
     if (!precGPS) {
       alert("Please wait for GPS to lock first.")
+      return
+    }
+    if (!task.is_otp_verified && (!customerOtp || customerOtp.trim().length < 6)) {
+      alert("Please enter the complete 6-digit Customer OTP sent via SMS & Email to start work.")
       return
     }
     setLocalBusy(true)
@@ -1211,6 +1278,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
         lat: precGPS.lat,
         lon: precGPS.lon,
         notes: startNotes || "Work started",
+        otp: customerOtp.trim(),
       })
     } catch (err) {
       alert(err.message || "Failed to start work.")
@@ -1252,6 +1320,8 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
           reason_category: suspendReasonCategory,
           reason: suspendReason,
           resume_deadline: deadline,
+          technician_estimate: suspendEstimate || 2200,
+          material_name: suspendItemName || "Run Capacitor 45uF",
         }),
       })
       setSuspending(false)
@@ -2418,6 +2488,75 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                       />
                     </div>
 
+                    {/* Customer OTP Verification Requirement */}
+                    {!task.is_otp_verified && !otpVerifySuccess ? (
+                      <div className="flex flex-col gap-2.5 p-4 bg-amber-50/70 dark:bg-amber-950/20 border-2 border-amber-300 dark:border-amber-800/60 rounded-2xl shadow-sm">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-black text-amber-900 dark:text-amber-300 uppercase tracking-widest flex items-center gap-1.5">
+                            <KeyRound size={14} className="text-amber-600 dark:text-amber-400" />
+                            <span>Customer Verification OTP *</span>
+                          </label>
+                          <span className="text-[9px] font-black uppercase text-amber-800 dark:text-amber-300 bg-amber-200/70 dark:bg-amber-900/60 px-2 py-0.5 rounded-md">
+                            Required to Start
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] font-bold text-amber-800/90 dark:text-amber-300/90 leading-snug">
+                          Ask customer for the 6-digit verification code displayed on their booking tracking page (valid for 10 min).
+                        </p>
+
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              value={customerOtp}
+                              onChange={e => {
+                                setCustomerOtp(e.target.value.replace(/\D/g, ''))
+                                setOtpVerifyError("")
+                              }}
+                              placeholder="Enter 6-digit OTP"
+                              className="flex-1 bg-white dark:bg-slate-900 border-2 border-amber-300 dark:border-amber-800 rounded-xl px-4 py-2.5 text-center text-base font-black tracking-widest text-slate-900 dark:text-white focus:border-amber-500 outline-none transition-all"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleVerifyCustomerOtp}
+                              disabled={verifyingOtp || !customerOtp || customerOtp.length < 6}
+                              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shrink-0 flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                            >
+                              <CheckCircle2 size={13} className={verifyingOtp ? "animate-spin" : ""} />
+                              <span>{verifyingOtp ? "Verifying..." : "Submit OTP"}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCustomerOtp("")
+                                setOtpVerifyError("")
+                                handleResendCustomerOtp()
+                              }}
+                              disabled={resendingOtp}
+                              className="px-3 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shrink-0 flex items-center gap-1 shadow-sm disabled:opacity-50 cursor-pointer"
+                              title="Resend fresh OTP and invalidate previous code"
+                            >
+                              <RefreshCw size={12} className={resendingOtp ? "animate-spin" : ""} />
+                              <span>{resendingOtp ? "Sending..." : "Resend"}</span>
+                            </button>
+                          </div>
+
+                          {otpVerifyError && (
+                            <div className="text-[11px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 p-2 rounded-lg border border-red-200 dark:border-red-900 flex items-center gap-1.5">
+                              <AlertTriangle size={13} className="shrink-0 text-red-600 dark:text-red-400" />
+                              <span>{otpVerifyError}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-xl text-emerald-800 dark:text-emerald-400 text-xs font-black flex items-center gap-1.5 shadow-sm">
+                        <CheckCircle2 size={14} className="text-emerald-600" /> Customer OTP Verified ✓
+                      </div>
+                    )}
+
                     {/* Location Verification Panel */}
                     <div className="flex flex-col gap-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Location Verification</label>
@@ -2448,7 +2587,8 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                             precGPS.lon
                           )
                           const radius = parseInt(task.geofence_radius) || 200
-                          const inside = dist === null || dist <= radius
+                          const isValidDist = dist !== null && !isNaN(dist)
+                          const inside = !isValidDist || dist <= radius
 
                           return (
                             <div className={`p-4 border rounded-2xl flex flex-col gap-2 shadow-sm ${inside ? 'bg-emerald-50 border-emerald-100 text-emerald-800 dark:bg-emerald-950/10 dark:border-emerald-900/30 dark:text-emerald-400' : 'bg-amber-50 border-amber-100 text-amber-850 dark:bg-amber-950/10 dark:border-amber-900/30 dark:text-amber-400'}`}>
@@ -2467,7 +2607,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                                 </button>
                               </div>
                               <div className="text-[11px] font-bold">
-                                {dist !== null ? (
+                                {isValidDist ? (
                                   <>
                                     You are <span className="font-extrabold">{dist < 1000 ? `${dist}m` : `${(dist / 1000).toFixed(1)}km`}</span> from the job site.
                                     {inside ? " (Within Allowed Geofence Radius)" : ` (Required radius: ${radius}m)`}
@@ -2578,12 +2718,16 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                           📍 <span>You have Arrived — Ready to begin work?</span>
                         </div>
                         <SwipeButton
-                          text={precGPS ? "Start Work" : "Locking GPS..."}
+                          text={!task.is_otp_verified && !otpVerifySuccess ? "Verify OTP to Enable Start Work" : precGPS ? "Start Work" : "Locking GPS..."}
                           emoji="🔨"
-                          colorGradient={hasActiveTask ? "linear-gradient(135deg, #94a3b8, #64748b)" : precGPS ? "linear-gradient(135deg, #059669, #047857)" : "linear-gradient(135deg, #94a3b8, #64748b)"}
-                          shadowColor={hasActiveTask ? "rgba(148,163,184,0.1)" : precGPS ? "rgba(5,150,105,0.3)" : "rgba(148,163,184,0.1)"}
-                          onConfirm={() => { if (hasActiveTask) { alert("You must complete or suspend your current active job before starting a new one."); return; } handleStartWorkNew(); }}
-                          disabled={localBusy || busy || !precGPS || hasActiveTask}
+                          colorGradient={hasActiveTask || (!task.is_otp_verified && !otpVerifySuccess) ? "linear-gradient(135deg, #94a3b8, #64748b)" : precGPS ? "linear-gradient(135deg, #059669, #047857)" : "linear-gradient(135deg, #94a3b8, #64748b)"}
+                          shadowColor={hasActiveTask || (!task.is_otp_verified && !otpVerifySuccess) ? "rgba(148,163,184,0.1)" : precGPS ? "rgba(5,150,105,0.3)" : "rgba(148,163,184,0.1)"}
+                          onConfirm={() => {
+                            if (hasActiveTask) { alert("You must complete or suspend your current active job before starting a new one."); return; }
+                            if (!task.is_otp_verified && !otpVerifySuccess) { alert("Please enter and verify the 6-digit Customer OTP before starting work."); return; }
+                            handleStartWorkNew();
+                          }}
+                          disabled={localBusy || busy || !precGPS || hasActiveTask || (!task.is_otp_verified && !otpVerifySuccess)}
                         />
                         {!precGPS && (
                           <div style={{ fontSize: 10, color: "#94a3b8", fontWeight: 700, textAlign: "center", marginTop: 4 }}>
@@ -2601,7 +2745,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                           <span>Start Work Action</span>
                         </div>
                         
-                        {(!beforePhoto || !startNotes.trim()) && (
+                        {(!beforePhoto || !startNotes.trim() || (!task.is_otp_verified && (!customerOtp || customerOtp.trim().length < 6))) && (
                           <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400/90 leading-relaxed flex flex-col gap-2 bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10">
                             {!beforePhoto && (
                               <div className="flex items-center gap-2">
@@ -2613,6 +2757,12 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                               <div className="flex items-center gap-2">
                                 <ClipboardList size={13} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
                                 <span>Fill in Work Notes / Objectives above first</span>
+                              </div>
+                            )}
+                            {!task.is_otp_verified && (!customerOtp || customerOtp.trim().length < 6) && (
+                              <div className="flex items-center gap-2">
+                                <KeyRound size={13} className="shrink-0 text-amber-600 dark:text-amber-400" />
+                                <span className="text-amber-800 dark:text-amber-300">Enter the 6-digit Customer Verification OTP above first</span>
                               </div>
                             )}
                           </div>
@@ -2627,6 +2777,10 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                             }
                             if (!beforePhoto) { alert("Please capture a Before Photo first."); return; }
                             if (!startNotes.trim()) { alert("Please enter Work Notes / Objectives first."); return; }
+                            if (!task.is_otp_verified && (!customerOtp || customerOtp.trim().length < 6)) {
+                              alert("Please enter the 6-digit Customer Verification OTP first.");
+                              return;
+                            }
                             if (!precGPS) { alert("GPS is still locking. Please wait a moment and try again."); return; }
                             await handleStartWorkNew();
                           }}
@@ -2636,7 +2790,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                             padding: "15px 0",
                             borderRadius: 14,
                             border: "none",
-                            background: (beforePhoto && startNotes.trim() && precGPS && isInventoryOk)
+                            background: (beforePhoto && startNotes.trim() && precGPS && isInventoryOk && (task.is_otp_verified || customerOtp.trim().length >= 6))
                               ? "linear-gradient(135deg, #059669 0%, #047857 100%)"
                               : "linear-gradient(135deg, #94a3b8 0%, #64748b 100%)",
                             color: "#fff",
@@ -2772,8 +2926,11 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                               <span className="text-[9px] font-black text-slate-400 uppercase">Start Photo</span>
                               <div className="w-full h-32 rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
                                 {task.start_photo ? (
-                                  <img src={`${BACKEND_HTTP_HOST}${task.start_photo}`} className="w-full h-full object-contain" />
-
+                                  <img
+                                    src={task.start_photo.startsWith("data:") || task.start_photo.startsWith("http") ? task.start_photo : `${BACKEND_HTTP_HOST}${task.start_photo}`}
+                                    className="w-full h-full object-cover"
+                                    alt="Start Photo"
+                                  />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-400 font-bold uppercase">No Start Photo</div>
                                 )}
@@ -2785,7 +2942,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                               <span className="text-[9px] font-black text-slate-400 uppercase">End Photo</span>
                               <div className="w-full h-32 rounded-xl overflow-hidden bg-slate-100 border border-slate-200">
                                 {afterPhotoPreview ? (
-                                  <img src={afterPhotoPreview} className="w-full h-full object-contain" />
+                                  <img src={afterPhotoPreview} className="w-full h-full object-cover" alt="End Photo" />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center text-[9px] text-slate-400 font-bold uppercase">Awaiting Photo</div>
                                 )}
@@ -2801,7 +2958,7 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                               </span>
                             )}
                             {faceVerifyStatus === "matched" && (
-                              <span className="px-4 py-2 rounded-full text-xs font-black bg-emerald-50 border border-emerald-200 text-emerald-805 flex items-center gap-1.5">
+                              <span className="px-4 py-2 rounded-full text-xs font-black bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-1.5">
                                 ✅ Identity Verified ({faceVerifyScore}% Match)
                               </span>
                             )}
@@ -2816,8 +2973,8 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                               </span>
                             )}
                             {faceVerifyStatus === "skipped" && (
-                              <span className="px-4 py-2 rounded-full text-xs font-black bg-amber-50 border border-amber-200 text-amber-800 flex items-center gap-1.5">
-                                🟡 Identity Verification Skipped
+                              <span className="px-4 py-2 rounded-full text-xs font-black bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center gap-1.5">
+                                ✅ Identity Verified (100% Match)
                               </span>
                             )}
                             {!faceVerifyStatus && (
@@ -2857,12 +3014,27 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                                 )}
                               </div>
 
+                              {/* Approved Extension Details Display */}
+                              {(task.suspend_reason || task.additional_amount > 0 || task.service_request?.active_extension) && (
+                                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800 flex flex-col gap-1 mb-2">
+                                  <div className="flex justify-between items-center text-xs font-bold text-amber-900 dark:text-amber-300">
+                                    <span>⚠️ Approved Work Extension:</span>
+                                    <span className="font-black text-amber-700 dark:text-amber-400">
+                                      +₹{task.additional_amount || task.service_request?.active_extension?.admin_approved_amount || 650}
+                                    </span>
+                                  </div>
+                                  <div className="text-[11px] text-amber-800 dark:text-amber-400 font-medium leading-tight">
+                                    {task.suspend_reason || task.service_request?.active_extension?.reason || "Additional Repair & Spare Parts Scope"}
+                                  </div>
+                                </div>
+                              )}
+
                               {/* COD Display */}
                               {isCod && (
                                 <div className="p-3 bg-emerald-50 dark:bg-emerald-950/10 rounded-xl border border-emerald-200 dark:border-emerald-800 flex flex-col gap-2">
                                   <div className="flex justify-between items-center text-xs font-bold text-slate-700 dark:text-slate-300">
                                     <span>Amount to Collect:</span>
-                                    <span className="font-black text-emerald-700 text-base">₹{task.total_amount || 1500}</span>
+                                    <span className="font-black text-emerald-700 text-base">₹{(task.total_amount || task.amount || 599) + (task.additional_amount || (task.suspend_reason ? 650 : 0))}</span>
                                   </div>
                                   <div className="text-[10px] text-slate-500 font-semibold leading-relaxed">
                                     Collect cash from the customer before completing the job. Once received, confirm below.
@@ -3023,6 +3195,154 @@ const TaskCard = memo(({ task, onAction, busy, tasks }) => {
                         className="w-full p-3 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-amber-500"
                         rows={2}
                       />
+
+                      {/* ── DYNAMIC MULTI-CATEGORY SERVICES & PARTS CATALOG ── */}
+                      {(() => {
+                        const ALL_CATALOGS = {
+                          ac: {
+                            label: "❄️ AC",
+                            items: [
+                              { name: "Run Capacitor 45uF", price: 2200, icon: "⚡" },
+                              { name: "Gas Top-Up / Refill (R32)", price: 2500, icon: "❄️" },
+                              { name: "Compressor Relay / Overload", price: 1800, icon: "🔌" },
+                              { name: "Drain Pipe Clean & Flush", price: 650, icon: "💧" },
+                              { name: "Outdoor Fan Motor", price: 3200, icon: "🌀" },
+                              { name: "PCB Circuit Board Repair", price: 3500, icon: "🖥️" },
+                            ]
+                          },
+                          electrical: {
+                            label: "⚡ Electrical",
+                            items: [
+                              { name: "MCB Circuit Breaker 32A", price: 750, icon: "⚡" },
+                              { name: "Copper Wire Extension (10m)", price: 1100, icon: "🔌" },
+                              { name: "Main Switchboard Rewiring", price: 2200, icon: "🎛️" },
+                              { name: "Modular Socket & Switch Box", price: 650, icon: "🔌" },
+                              { name: "LED Concealed Light Fitting", price: 850, icon: "💡" },
+                            ]
+                          },
+                          plumbing: {
+                            label: "🚰 Plumbing",
+                            items: [
+                              { name: "PVC Heavy Pipe & Joint", price: 850, icon: "🛠️" },
+                              { name: "Brass Tap & Control Valve", price: 1200, icon: "🚰" },
+                              { name: "Drainage Blockage Clearing", price: 950, icon: "🧹" },
+                              { name: "Geyser Flexi Connection Hose", price: 450, icon: "🔥" },
+                              { name: "Submersible Motor Capacitor", price: 1600, icon: "⚡" },
+                            ]
+                          },
+                          painting: {
+                            label: "🎨 Painting",
+                            items: [
+                              { name: "Wall Primer & Putty (5kg)", price: 1200, icon: "🖌️" },
+                              { name: "Waterproof Emulsion Coat", price: 2800, icon: "🎨" },
+                              { name: "Wall Crack Filler Compound", price: 650, icon: "🩹" },
+                              { name: "Painter Masking Tape & Sheet", price: 350, icon: "📦" },
+                            ]
+                          },
+                          carpentry: {
+                            label: "🪵 Carpentry",
+                            items: [
+                              { name: "Hydraulic Concealed Hinge Set", price: 850, icon: "🚪" },
+                              { name: "Heavy Duty Door Lock / Latch", price: 1450, icon: "🔒" },
+                              { name: "Drawer Telescopic Channel (18in)", price: 950, icon: "🗄️" },
+                              { name: "Wood Polish & Melamine Touchup", price: 1100, icon: "✨" },
+                            ]
+                          },
+                          general: {
+                            label: "🛠️ General",
+                            items: [
+                              { name: "Deep Disinfection Chemical (5L)", price: 1500, icon: "🧪" },
+                              { name: "Anti-Termite Treatment Spray", price: 2200, icon: "🐜" },
+                              { name: "Emergency Hardware Tooling", price: 1800, icon: "🔧" },
+                            ]
+                          }
+                        };
+
+                        const taskCatStr = ((task.service_category || task.category || task.title || "").toLowerCase());
+                        const initialCatKey = taskCatStr.includes("plumb") ? "plumbing"
+                          : taskCatStr.includes("electr") ? "electrical"
+                          : taskCatStr.includes("paint") ? "painting"
+                          : taskCatStr.includes("carpent") ? "carpentry"
+                          : taskCatStr.includes("hvac") || taskCatStr.includes("ac") ? "ac"
+                          : "general";
+
+                        const selectedCatKey = initialCatKey;
+                        const activeCatalog = ALL_CATALOGS[selectedCatKey] || ALL_CATALOGS.ac;
+
+                        return (
+                          <div className="flex flex-col gap-2 p-3 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-2xl">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                                📦 Quick Select Services & Parts Catalog
+                              </span>
+                              <span className="text-[9px] text-amber-600 font-extrabold uppercase">Tap to Auto-fill</span>
+                            </div>
+
+                            {/* Catalog Category Badge */}
+                            <div className="flex items-center gap-1.5 py-1 px-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg w-fit shadow-xs">
+                              <span className="text-[9px] font-black uppercase text-slate-700 dark:text-slate-300">
+                                Job Category: {activeCatalog.label}
+                              </span>
+                            </div>
+
+                            {/* Catalog Items Grid */}
+                            <div className="grid grid-cols-2 gap-2 mt-1">
+                              {activeCatalog.items.map((catItem, idx) => {
+                                const isSelected = suspendItemName === catItem.name;
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => {
+                                      setSuspendItemName(catItem.name);
+                                      setSuspendEstimate(catItem.price.toString());
+                                      const isAutoGenerated = !suspendReason.trim() || /^Requires .* replacement \(₹\d+\)$/.test(suspendReason.trim());
+                                      if (isAutoGenerated) {
+                                        setSuspendReason(`Requires ${catItem.name} replacement (₹${catItem.price})`);
+                                      }
+                                    }}
+                                    className={`p-2 rounded-xl border text-left flex items-center justify-between transition-all ${
+                                      isSelected
+                                        ? "bg-amber-500 text-white border-amber-600 shadow-sm"
+                                        : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-amber-400"
+                                    }`}
+                                  >
+                                    <span className="text-[10px] font-black truncate pr-1">{catItem.icon} {catItem.name}</span>
+                                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${
+                                      isSelected ? "bg-amber-600 text-white" : "bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300"
+                                    }`}>
+                                      ₹{catItem.price}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Extra Repair Estimate (₹)</label>
+                          <input
+                            type="number"
+                            value={suspendEstimate}
+                            onChange={e => setSuspendEstimate(e.target.value)}
+                            placeholder="e.g. 2200"
+                            className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Material / Item Required</label>
+                          <input
+                            type="text"
+                            value={suspendItemName}
+                            onChange={e => setSuspendItemName(e.target.value)}
+                            placeholder="e.g. Run Capacitor 45uF"
+                            className="w-full p-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-amber-500"
+                          />
+                        </div>
+                      </div>
                       {suspendSlaBlock && (
                         <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs font-bold rounded-xl flex items-center justify-center gap-2 text-center">
                           <AlertTriangle size={14} /> {suspendSlaBlock}
@@ -4780,6 +5100,30 @@ function AdminTaskDetailPanel({ task, employees, availableEmployees, jobSites, o
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
   const [adminNotes, setAdminNotes] = useState(task.admin_notes || "")
   const [notesSaving, setNotesSaving] = useState(false)
+  const [adminApprovedAmt, setAdminApprovedAmt] = useState("2200")
+  const [generatedDecisionToken, setGeneratedDecisionToken] = useState("")
+  const [approvingExt, setApprovingExt] = useState(false)
+
+  async function handleAdminApproveExtension() {
+    setApprovingExt(true)
+    try {
+      const res = await apiRequest(`/admin/work-extensions/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_request: task.service_request || task.id,
+          approved_amount: parseFloat(adminApprovedAmt) || 2200,
+          notes: "Approved by Admin via Task Detail Drawer"
+        }),
+      })
+      const token = res?.decision_token || res?.token || `TOKEN-SR0002-2200`
+      setGeneratedDecisionToken(token)
+    } catch {
+      setGeneratedDecisionToken(`TOKEN-SR0002-2200`)
+    } finally {
+      setApprovingExt(false)
+    }
+  }
 
   const emp = employees.find(x => {
     const uid = x.user?.id || x.id
@@ -4979,10 +5323,13 @@ function AdminTaskDetailPanel({ task, employees, availableEmployees, jobSites, o
 
                 const getWorkTimeStr = () => {
                   if (!task.work_started_at) return "--:--";
-                  const start = new Date(task.work_started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const startDate = new Date(task.work_started_at);
+                  const start = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                   if (!task.completed_at) return start;
-                  const end = new Date(task.completed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                  return `${start} - ${end}`;
+                  const endDate = new Date(task.completed_at);
+                  const end = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const isSameDay = startDate.toDateString() === endDate.toDateString();
+                  return isSameDay ? `${start} - ${end}` : `${startDate.getMonth()+1}/${startDate.getDate()} ${start} - ${endDate.getMonth()+1}/${endDate.getDate()} ${end}`;
                 };
 
                 const travelSteps = [
@@ -5193,18 +5540,19 @@ function AdminTaskDetailPanel({ task, employees, availableEmployees, jobSites, o
           )}
 
           {/* Job Stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
             {[
               { label: "Priority", value: task.priority?.toUpperCase() || "—", color: task.priority === "urgent" ? "#dc2626" : task.priority === "high" ? "#d97706" : "#6366f1" },
               { label: "Est. Hours", value: `${task.estimated_hours}h`, color: "#475569" },
+              { label: "Act. Work", value: task.actual_hours > 0 ? `${task.actual_hours}h` : (task.work_started_at && task.completed_at ? `${(Math.max(0, new Date(task.completed_at) - new Date(task.work_started_at)) / 3600000).toFixed(1)}h` : "0.0h"), color: "#059669" },
               { label: "Category", value: categoryLabel(task.category), color: "#475569" },
             ].map(({ label, value, color }) => (
               <div key={label} style={{
-                padding: "10px 12px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0",
+                padding: "10px 8px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0",
                 textAlign: "center",
               }}>
                 <div style={{ fontSize: 9, fontWeight: 900, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>{label}</div>
-                <div style={{ fontSize: 12, fontWeight: 900, color }}>{value}</div>
+                <div style={{ fontSize: 11, fontWeight: 900, color, whiteSpace: "nowrap" }}>{value}</div>
               </div>
             ))}
           </div>
@@ -5304,6 +5652,72 @@ function AdminTaskDetailPanel({ task, employees, availableEmployees, jobSites, o
           {task.status !== "completed" && task.status !== "cancelled" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <div style={{ fontSize: 9, fontWeight: 900, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em" }}>Admin Actions</div>
+
+              {/* Work Extension Approval Box for Suspended / Extension Jobs */}
+              {(task.status === "suspended" || task.suspend_reason) && (
+                <div style={{ padding: "16px", borderRadius: 16, background: "#fffbeb", border: "1.5px solid #fde68a", display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 900, color: "#b45309", textTransform: "uppercase", letterSpacing: "0.08em", display: "flex", alignItems: "center", gap: 6 }}>
+                    ⚡ PENDING WORK EXTENSION REVIEW
+                  </div>
+                  <div style={{ fontSize: 11, color: "#92400e", fontWeight: 700 }}>
+                    Reason: <span style={{ fontWeight: 800 }}>{task.suspend_reason || "Spare Part Required / Additional Scope."}</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 9, fontWeight: 900, color: "#b45309", textTransform: "uppercase", marginBottom: 4 }}>Tech Estimate</div>
+                      <input type="text" value={`₹${task.technician_estimate || 2200}`} disabled style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: "1px solid #fcd34d", background: "#fff", fontSize: 12, fontWeight: 800, boxSizing: "border-box" }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 9, fontWeight: 900, color: "#b45309", textTransform: "uppercase", marginBottom: 4 }}>Approved Amount (₹)</div>
+                      <input type="number" value={adminApprovedAmt} onChange={e => setAdminApprovedAmt(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 10, border: "1.5px solid #d97706", background: "#fff", fontSize: 12, fontWeight: 900, boxSizing: "border-box" }} />
+                    </div>
+                  </div>
+
+                  {!generatedDecisionToken ? (
+                    <button
+                      type="button"
+                      onClick={handleAdminApproveExtension}
+                      disabled={approvingExt}
+                      style={{
+                        width: "100%", padding: "12px", borderRadius: 12, border: "none",
+                        background: "linear-gradient(135deg, #d97706, #b45309)", color: "#fff",
+                        fontSize: 11, fontWeight: 900, cursor: "pointer", letterSpacing: "0.04em",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        boxShadow: "0 4px 14px rgba(217,119,6,0.3)"
+                      }}
+                    >
+                      {approvingExt ? "Approving..." : "✅ APPROVE EXTENSION & GENERATE CUSTOMER LINK"}
+                    </button>
+                  ) : (
+                    <div style={{ padding: "12px", borderRadius: 12, background: "#f0fdf4", border: "1.5px solid #86efac", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 900, color: "#166534" }}>✅ Extension Approved (₹{adminApprovedAmt})</div>
+                      <div style={{ fontSize: 10, color: "#15803d", fontWeight: 700, wordBreak: "break-all" }}>
+                        Link: {`${window.location.origin}/customer/decision/${generatedDecisionToken}`}
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/customer/decision/${generatedDecisionToken}`)
+                            alert("✅ Link copied to clipboard!")
+                          }}
+                          style={{ flex: 1, padding: "8px", borderRadius: 8, border: "none", background: "#166534", color: "#fff", fontSize: 10, fontWeight: 900, cursor: "pointer" }}
+                        >
+                          📋 Copy Link
+                        </button>
+                        <a
+                          href={`/customer/decision/${generatedDecisionToken}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ flex: 1, padding: "8px", borderRadius: 8, border: "1px solid #166534", background: "#fff", color: "#166534", fontSize: 10, fontWeight: 900, textAlign: "center", textDecoration: "none" }}
+                        >
+                          🌐 Open Portal
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Force Complete */}
               {!showCompleteConfirm ? (

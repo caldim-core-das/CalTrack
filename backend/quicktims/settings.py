@@ -78,6 +78,8 @@ INSTALLED_APPS = _installed
 
 TENANT_MODEL = "companies.Company"
 TENANT_DOMAIN_MODEL = "companies.Domain"
+TEST_RUNNER = "django_tenants.test.runners.TenantTestSuiteRunner"
+FAST_TENANT_TESTS = True
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
@@ -123,9 +125,9 @@ if USE_POSTGRES:
             "ENGINE": "django_tenants.postgresql_backend",
             "NAME": os.getenv("DB_NAME", "caltrack"),
             "USER": os.getenv("DB_USER", "caltrack_user"),
-            "PASSWORD": os.getenv("DB_PASSWORD", ""),
-            "HOST": os.getenv("DB_HOST", "localhost"),
-            "PORT": os.getenv("DB_PORT", "5432"),
+            "PASSWORD": os.getenv("DB_PASSWORD", "caltrack_pass"),
+            "HOST": os.getenv("DB_HOST", "127.0.0.1"),
+            "PORT": os.getenv("DB_PORT", "5435"),
             "OPTIONS": _db_options,
             "CONN_MAX_AGE": int(os.getenv("DB_CONN_MAX_AGE", "0")),
             "CONN_HEALTH_CHECKS": True,
@@ -238,6 +240,7 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         # Cookie-first auth — also accepts Bearer header for API clients / mobile.
         "accounts.authentication.CookieJWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
@@ -268,7 +271,7 @@ AUTH_COOKIE_SECURE   = not DEBUG           # HTTPS-only in production; False in 
 # "Lax" is required for cross-origin dev (frontend:5173 → backend:8000).
 # In production with same domain, change back to "Strict" via env var.
 AUTH_COOKIE_SAMESITE = os.getenv("AUTH_COOKIE_SAMESITE", "Lax" if DEBUG else "Strict")
-AUTH_COOKIE_DOMAIN = os.getenv("AUTH_COOKIE_DOMAIN", ".localhost" if DEBUG else None)
+AUTH_COOKIE_DOMAIN = os.getenv("AUTH_COOKIE_DOMAIN", None)
 
 # ── CORS — must name origins explicitly when credentials=True ────────────────
 # CORS_ALLOW_ALL_ORIGINS + CORS_ALLOW_CREDENTIALS together are rejected by browsers.
@@ -338,17 +341,21 @@ else:
         },
     }
 
-# ── Email Settings for Password Reset ──────────────────────────────────────────
-if os.getenv("EMAIL_HOST_USER") and os.getenv("EMAIL_HOST_PASSWORD"):
+# ── Email Settings for Auth & OTP ─────────────────────────────────────────────
+_email_user = (os.getenv("EMAIL_HOST_USER") or "").strip()
+_email_pass = (os.getenv("EMAIL_HOST_PASSWORD") or "").replace(" ", "").strip()
+
+if _email_user and _email_pass:
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-    EMAIL_HOST = "smtp.gmail.com"
-    EMAIL_PORT = 587
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
     EMAIL_USE_TLS = True
-    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
-    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-    DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+    EMAIL_HOST_USER = _email_user
+    EMAIL_HOST_PASSWORD = _email_pass
+    DEFAULT_FROM_EMAIL = _email_user
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend" # Prints to console for dev
+    DEFAULT_FROM_EMAIL = "noreply@caltrack.com"
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 

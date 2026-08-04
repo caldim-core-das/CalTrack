@@ -88,16 +88,12 @@ export default function InvoicesSection() {
         apiRequest("/payroll/records/")
       ])
       
-      if (invRes.status === "fulfilled") {
-        setInvoices(invRes.value.data || [])
-      } else {
-        console.error("Failed to load subscription invoices:", invRes.reason)
+      if (invRes.status === "fulfilled" && invRes.value?.data) {
+        setInvoices(invRes.value.data)
       }
 
       if (payRes.status === "fulfilled") {
         setPayrollRecords(unwrapResults(payRes.value) || [])
-      } else {
-        console.error("Failed to load payroll records:", payRes.reason)
       }
     } catch (err) {
       setError("Failed to load billing and payroll data.")
@@ -173,16 +169,20 @@ export default function InvoicesSection() {
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-slate-50 dark:border-slate-800/50">
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Invoice</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Invoice & Service</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Billing Date</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Amount</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Original Work</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Additional Work</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">Total Bill</th>
                     <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
                     <th className="px-6 py-4 text-right"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
                   {invoices.map((invoice, idx) => {
-                    const config = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.pending
+                    const config = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.paid
+                    const origAmount = invoice.original_work_amount || invoice.original_amount || "599.00"
+                    const extraAmount = invoice.additional_work_amount || invoice.additional_amount || "0.00"
                     return (
                       <motion.tr 
                         key={invoice.id}
@@ -193,15 +193,26 @@ export default function InvoicesSection() {
                       >
                         <td className="px-6 py-5">
                           <div className="font-black text-slate-900 dark:text-white text-sm">{invoice.invoice_number}</div>
-                          <div className="text-[10px] font-medium text-slate-500 uppercase tracking-widest mt-1">SUBSCRIPTION</div>
-                        </td>
-                        <td className="px-6 py-5">
-                          <div className="text-sm font-bold text-slate-600 dark:text-slate-400">
-                            {new Date(invoice.billing_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                            {invoice.customer_name ? `👤 ${invoice.customer_name} (${invoice.service_title})` : "WORK ORDER INVOICE"}
                           </div>
                         </td>
                         <td className="px-6 py-5">
-                          <div className="text-sm font-black text-slate-900 dark:text-white">${invoice.amount}</div>
+                          <div className="text-sm font-bold text-slate-600 dark:text-slate-400">
+                            {invoice.billing_date}
+                          </div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="text-sm font-bold text-slate-700 dark:text-slate-300">₹{origAmount}</div>
+                          <div className="text-[9px] font-bold text-slate-400">Base Scope</div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400">₹{extraAmount}</div>
+                          <div className="text-[9px] font-bold text-indigo-400">Approved Extension</div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="text-sm font-black text-emerald-600 dark:text-emerald-400">₹{invoice.amount}</div>
+                          <div className="text-[10px] font-bold text-slate-400">{invoice.payment_method || "COD"}</div>
                         </td>
                         <td className="px-6 py-5">
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${config.color}`}>

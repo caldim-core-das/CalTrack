@@ -21,7 +21,7 @@ class TrialStatusView(APIView):
                 "data": {
                     "status":        trial.status,
                     "days_remaining": trial.days_remaining,
-                    "trial_end":     trial.trial_end.isoformat(),
+                    "trial_end":     trial.trial_end.isoformat() if trial.trial_end else None,
                     "is_active":     trial.is_active,
                 }
             })

@@ -25,6 +25,10 @@ export default defineConfig({
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
     },
+    watch: {
+      usePolling: true,
+      interval: 100,
+    },
     // Warm up the most-visited pages so the first dev request is instant
     warmup: {
       clientFiles: [

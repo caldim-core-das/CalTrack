@@ -189,6 +189,104 @@ function ProofModal({ job, onClose, onSubmit, loading }) {
   )
 }
 
+/* ─── Extra Work Modal ─────────────────────────────────────────────────── */
+function ExtraWorkModal({ job, onClose, onSubmit, loading }) {
+  const [estimate, setEstimate] = useState("")
+  const [requiresSpecialist, setRequiresSpecialist] = useState(false)
+  const [requiredSkill, setRequiredSkill] = useState("")
+  const [items, setItems] = useState([
+    { item_name: "", quantity: 1, fulfillment_source: "ORGANIZATION_STOCK", billed_to_customer: 0, actual_cost: 0 }
+  ])
+
+  const addItem = () => {
+    setItems([...items, { item_name: "", quantity: 1, fulfillment_source: "ORGANIZATION_STOCK", billed_to_customer: 0, actual_cost: 0 }])
+  }
+
+  const removeItem = (idx) => {
+    setItems(items.filter((_, i) => i !== idx))
+  }
+
+  const updateItem = (idx, field, val) => {
+    const copy = [...items]
+    copy[idx][field] = val
+    setItems(copy)
+  }
+
+  const handleSubmit = () => {
+    onSubmit({
+      technician_estimate: Number(estimate) || 0,
+      requires_specialist: requiresSpecialist,
+      required_skill: requiredSkill,
+      items: items.filter(i => i.item_name.trim() !== ""),
+    })
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9000, background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}>
+      <div style={{ background: "var(--surface, #ffffff)", borderRadius: "16px", padding: "24px", maxWidth: "560px", width: "100%", maxHeight: "90vh", overflowY: "auto", border: "1px solid var(--stroke, #e2e8f0)", color: "var(--fg, #0f172a)", fontFamily: "inherit" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+          <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700 }}>Report Additional Work</h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--muted, #64748b)" }}><X size={18} /></button>
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <label style={{ display: "block", fontSize: "13px", fontWeight: 600, marginBottom: "4px" }}>Technician Estimate (₹)</label>
+          <input
+            type="number"
+            value={estimate}
+            onChange={e => setEstimate(e.target.value)}
+            placeholder="e.g. 1500"
+            style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1" }}
+          />
+        </div>
+
+        <div style={{ marginBottom: "16px", background: "var(--bg, #f8fafc)", padding: "12px 14px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", fontWeight: 600, cursor: "pointer" }}>
+            <input type="checkbox" checked={requiresSpecialist} onChange={e => setRequiresSpecialist(e.target.checked)} />
+            Requires Certified Specialist (Handoff)
+          </label>
+          {requiresSpecialist && (
+            <input
+              type="text"
+              value={requiredSkill}
+              onChange={e => setRequiredSkill(e.target.value)}
+              placeholder="e.g. Compressor Specialist"
+              style={{ width: "100%", padding: "8px 10px", borderRadius: "6px", border: "1px solid #cbd5e1", marginTop: "8px", fontSize: "13px" }}
+            />
+          )}
+        </div>
+
+        <div style={{ marginBottom: "16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <label style={{ fontSize: "13px", fontWeight: 700 }}>Required Parts / Materials</label>
+            <button onClick={addItem} style={{ background: "#5d5fef", color: "#fff", border: "none", borderRadius: "6px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}>+ Add Item</button>
+          </div>
+          {items.map((item, idx) => (
+            <div key={idx} style={{ background: "var(--bg, #f8fafc)", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "10px", marginBottom: "8px", display: "grid", gridTemplateColumns: "2fr 1fr 2fr 1fr auto", gap: "6px", alignItems: "center" }}>
+              <input type="text" placeholder="Item Name" value={item.item_name} onChange={e => updateItem(idx, "item_name", e.target.value)} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }} />
+              <input type="number" placeholder="Qty" value={item.quantity} onChange={e => updateItem(idx, "quantity", Number(e.target.value))} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }} />
+              <select value={item.fulfillment_source} onChange={e => updateItem(idx, "fulfillment_source", e.target.value)} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "11px" }}>
+                <option value="ORGANIZATION_STOCK">Org Stock</option>
+                <option value="ORGANIZATION_TRANSFER">Stock Transfer</option>
+                <option value="ORGANIZATION_PROCUREMENT">Procurement</option>
+                <option value="TECHNICIAN_PURCHASE">Tech Purchase</option>
+                <option value="CUSTOMER_SUPPLIED">Customer Supplied</option>
+              </select>
+              <input type="number" placeholder="₹ Billed" value={item.billed_to_customer} onChange={e => updateItem(idx, "billed_to_customer", Number(e.target.value))} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "12px" }} />
+              <button onClick={() => removeItem(idx)} style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer" }}><X size={14} /></button>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "20px" }}>
+          <button onClick={onClose} style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "transparent", cursor: "pointer", fontWeight: 600 }}>Cancel</button>
+          <button onClick={handleSubmit} disabled={loading} style={{ padding: "10px 20px", borderRadius: "8px", border: "none", background: "#5d5fef", color: "#fff", cursor: "pointer", fontWeight: 700 }}>{loading ? "Submitting..." : "Submit Extension"}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Confirm Action Modal ───────────────────────────────────────────────── */
 function ConfirmModal({ title, message, onConfirm, onClose, confirmLabel = "Confirm", danger = false }) {
   return (
@@ -511,13 +609,21 @@ function JobCard({ job, onAction, onProof, actionLoading }) {
               <CheckCheck size={13} /> Mark Complete
             </button>
           )}
+          {(canComplete || canStart) && (
+            <button
+              onClick={() => onReportExtraWork && onReportExtraWork(job)}
+              style={btnStyle("#5d5fef", "#eff6ff", "#bfdbfe")}
+            >
+              <Wrench size={13} /> Report Extra Work
+            </button>
+          )}
           {canProof && (
             <button
               onClick={() => onProof(job)}
               style={{
                 display: "flex", alignItems: "center", gap: "0.3rem",
                 fontSize: "0.72rem", fontWeight: 700, padding: "0.4rem 0.75rem",
-                border: "1.5px solid #CBD5E1", borderRadius: 8, cursor: "pointer",
+                border: "1.5px solid #CBD5E1", borderRadius: 8, cursor: "cursor",
                 background: "#f8fafc", color: "#475569", fontFamily: "inherit",
                 transition: "all 0.15s ease",
               }}
@@ -628,11 +734,35 @@ export function EmployeeJobsPage() {
   const [actionLoading, setActionLoading] = useState(null) // jobId
   const [proofLoading, setProofLoading] = useState(false)
   const [proofJob, setProofJob] = useState(null)
+  const [extraWorkJob, setExtraWorkJob] = useState(null)
+  const [extraWorkLoading, setExtraWorkLoading] = useState(false)
   const [confirmModal, setConfirmModal] = useState(null) // { jobId, action, title, message }
   const [toast, setToast] = useState(null)
   const [activeTab, setActiveTab] = useState("active") // active | history
 
   const showToast = (msg, type = "success") => setToast({ msg, type, id: Date.now() })
+
+  const handleExtraWorkSubmit = async (data) => {
+    if (!extraWorkJob) return
+    setExtraWorkLoading(true)
+    try {
+      const res = await apiRequest(`/employee/jobs/${extraWorkJob.id}/report-extra-work/`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      })
+      if (res?.success) {
+        showToast("Work extension reported successfully!", "success")
+        setExtraWorkJob(null)
+        loadJobs()
+      } else {
+        showToast(res?.message || "Failed to report extra work.", "error")
+      }
+    } catch (err) {
+      showToast(err?.body?.message || "Error reporting extra work.", "error")
+    } finally {
+      setExtraWorkLoading(false)
+    }
+  }
 
   /* ── Load Jobs ── */
   const loadJobs = async () => {
@@ -795,6 +925,7 @@ export function EmployeeJobsPage() {
                         job={job}
                         onAction={handleAction}
                         onProof={setProofJob}
+                        onReportExtraWork={setExtraWorkJob}
                         actionLoading={actionLoading}
                       />
                     ))}
@@ -823,6 +954,7 @@ export function EmployeeJobsPage() {
                       job={job}
                       onAction={handleAction}
                       onProof={setProofJob}
+                      onReportExtraWork={setExtraWorkJob}
                       actionLoading={actionLoading}
                     />
                   ))}
@@ -841,6 +973,14 @@ export function EmployeeJobsPage() {
             onClose={() => setProofJob(null)}
             onSubmit={handleProofSubmit}
             loading={proofLoading}
+          />
+        )}
+        {extraWorkJob && (
+          <ExtraWorkModal
+            job={extraWorkJob}
+            onClose={() => setExtraWorkJob(null)}
+            onSubmit={handleExtraWorkSubmit}
+            loading={extraWorkLoading}
           />
         )}
         {confirmModal && (

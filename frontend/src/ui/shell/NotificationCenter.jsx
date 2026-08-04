@@ -275,7 +275,7 @@ export function NotificationCenter() {
   const role = user?.role
 
   const load = useCallback(async () => {
-    if (!role) return
+    if (!role || role === 'customer') return
     setLoading(true)
     setError("")
     try {
@@ -312,6 +312,25 @@ export function NotificationCenter() {
         ...backendItems,
         ...buildNotifications({ tasks, leaves, shifts, payroll, timesheet, sos, isAdmin })
       ]
+      
+      // Trigger emergency audio chime if new active SOS alerts arrive
+      if (Array.isArray(sos) && sos.length > 0) {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)()
+          const osc = ctx.createOscillator()
+          const gain = ctx.createGain()
+          osc.type = 'sawtooth'
+          osc.frequency.setValueAtTime(880, ctx.currentTime)
+          osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.4)
+          gain.gain.setValueAtTime(0.3, ctx.currentTime)
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4)
+          osc.connect(gain)
+          gain.connect(ctx.destination)
+          osc.start()
+          osc.stop(ctx.currentTime + 0.4)
+        } catch(e) {}
+      }
+
       setItems(next)
     } catch {
       setError("Failed to load notifications.")
