@@ -22,7 +22,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(source='user.last_name', required=False, allow_blank=True)
     email = serializers.EmailField(source='user.email', required=False, allow_blank=True)
     role = serializers.CharField(source='user.role', required=False)
-    exempt_status = serializers.CharField(required=False, allow_null=True, default="non_exempt")
+    exempt_status = serializers.CharField(required=False, allow_null=True, allow_blank=True, default="non_exempt")
     job_site_name = serializers.SlugRelatedField(
         source='assigned_job_site',
         read_only=True,
@@ -170,7 +170,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
     def validate_exempt_status(self, value):
         if not value:
-            return "non_exempt"
+            return Employee.ExemptStatus.NON_EXEMPT
         return value
 
     def update(self, instance, validated_data):

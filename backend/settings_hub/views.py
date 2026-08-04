@@ -335,6 +335,21 @@ class TeamInviteListCreateView(APIView):
     def get(self, request):
         if not _is_admin(request.user):
             return Response({"success": False, "message": "Admins only."}, status=403)
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        active_emails = set(
+            User.objects.filter(company=request.user.company, is_active=True)
+            .values_list("email", flat=True)
+        )
+        active_emails = {e.lower() for e in active_emails if e}
+
+        # Auto-update status of invites whose email is now an active User
+        pending_invites = TeamInvite.objects.filter(company=request.user.company, status="pending")
+        for inv in pending_invites:
+            if inv.email and inv.email.lower() in active_emails:
+                inv.status = "accepted"
+                inv.save(update_fields=["status"])
+
         invites = TeamInvite.objects.filter(company=request.user.company, status="pending")
         return Response({"success": True, "data": TeamInviteSerializer(invites, many=True).data})
 

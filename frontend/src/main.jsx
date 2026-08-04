@@ -33,7 +33,7 @@ if (!enableLogs) {
 initTheme()
 
 console.log("DEBUG: main.jsx loaded and initTheme() called");
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "mock-client-id.apps.googleusercontent.com"
+const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "628867483502-e7snj6l150js2vpvkv70opo5h4aacgus.apps.googleusercontent.com"
 const rootEl = document.getElementById("root");
 console.log("DEBUG: Root element found:", rootEl);
 

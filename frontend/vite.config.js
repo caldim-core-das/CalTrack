@@ -23,7 +23,22 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     headers: {
-      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+      "Cross-Origin-Opener-Policy": "unsafe-none",
+    },
+    // Proxy /api to Django with a tenant Host header so django-tenants
+    // routes requests to the correct schema instead of the public schema.
+    // Change the VITE_DEV_TENANT env var (or the fallback below) to switch tenants.
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on("proxyReq", (proxyReq) => {
+            const tenant = process.env.VITE_DEV_TENANT ?? "demo.localhost";
+            proxyReq.setHeader("Host", tenant);
+          });
+        },
+      },
     },
     watch: {
       usePolling: true,
@@ -38,6 +53,7 @@ export default defineConfig({
       ],
     },
   },
+
 
   build: {
     // Raise warning threshold — vendor chunks are intentionally large

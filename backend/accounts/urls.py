@@ -17,6 +17,12 @@ from .customer_auth import (
     CustomerPhoneOTPRequestView, CustomerPhoneOTPVerifyView,
     CustomerGoogleLoginView
 )
+from .views import (
+    CustomerProfileView, CustomerProfileUpdateView,
+    CustomerAddressListCreateView, CustomerAddressDetailView,
+    CustomerAddressSetDefaultView, CustomerAddressServiceabilityView,
+    CustomerAddressMarkUsedView,
+)
 
 urlpatterns = [
     path("login/",          LoginView.as_view(),                  name="jwt-login"),
@@ -51,5 +57,14 @@ urlpatterns = [
     path("customer/phone/request-otp/", CustomerPhoneOTPRequestView.as_view(), name="customer-phone-otp-request"),
     path("customer/phone/verify-otp/", CustomerPhoneOTPVerifyView.as_view(), name="customer-phone-otp-verify"),
     path("customer/google/", CustomerGoogleLoginView.as_view(), name="customer-google-login"),
+
+    # ── Customer Profile & Saved Addresses ────────────────────────────────────
+    path("customer/profile/",                         CustomerProfileView.as_view(),          name="customer-profile"),
+    path("customer/profile/update/",                  CustomerProfileUpdateView.as_view(),     name="customer-profile-update"),
+    path("customer/addresses/",                       CustomerAddressListCreateView.as_view(), name="customer-addresses"),
+    path("customer/addresses/<int:pk>/",               CustomerAddressDetailView.as_view(),    name="customer-address-detail"),
+    path("customer/addresses/<int:pk>/set-default/",   CustomerAddressSetDefaultView.as_view(),name="customer-address-set-default"),
+    path("customer/addresses/<int:pk>/serviceability/", CustomerAddressServiceabilityView.as_view(), name="customer-address-serviceability"),
+    path("customer/addresses/<int:pk>/mark-used/",     CustomerAddressMarkUsedView.as_view(),  name="customer-address-mark-used"),
 ]
 

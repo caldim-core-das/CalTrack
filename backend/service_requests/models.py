@@ -592,3 +592,514 @@ class CatalogService(models.Model):
 
     def __str__(self):
         return f"{self.category.name} / {self.name}"
+
+
+# ─── Slice 2: Reschedule ──────────────────────────────────────────────────────
+
+class RescheduleStatus(models.TextChoices):
+    # ── Complete Manual Workflow Statuses ──────────────────────────────────────
+    PENDING                     = "PENDING",                     "Pending Admin Review"
+    PENDING_ADMIN_REVIEW        = "PENDING_ADMIN_REVIEW",        "Pending Admin Review"
+    ADMIN_REVIEW                = "ADMIN_REVIEW",                "Under Admin Review"
+    ADMIN_APPROVED              = "ADMIN_APPROVED",              "Admin Approved"
+    EMPLOYEE_ASSIGNMENT_IN_PROGRESS = "EMPLOYEE_ASSIGNMENT_IN_PROGRESS", "Employee Assignment in Progress"
+    EMPLOYEE_ASSIGNED           = "EMPLOYEE_ASSIGNED",           "Employee Assigned"
+    AWAITING_EMPLOYEE_RESPONSE  = "AWAITING_EMPLOYEE_RESPONSE",  "Awaiting Employee Confirmation"
+    AWAITING_EMPLOYEE_CONFIRMATION = "AWAITING_EMPLOYEE_CONFIRMATION", "Awaiting Employee Confirmation"
+    TECHNICIAN_CONFIRMATION     = "TECHNICIAN_CONFIRMATION",     "Technician Confirmation"
+    EMPLOYEE_CONFIRMED          = "EMPLOYEE_CONFIRMED",          "Employee Confirmed"
+    EMPLOYEE_ACCEPTED           = "EMPLOYEE_ACCEPTED",           "Employee Accepted"
+    EMPLOYEE_REJECTED           = "EMPLOYEE_REJECTED",           "Employee Rejected"
+    REASSIGNMENT_NEEDED         = "REASSIGNMENT_NEEDED",         "Reassignment Needed"
+    BOOKING_UPDATED             = "BOOKING_UPDATED",             "Booking Being Updated"
+    APPROVED                    = "APPROVED",                    "Approved"
+    CUSTOMER_NOTIFIED           = "CUSTOMER_NOTIFIED",           "Customer Notified"
+    SLOT_SUGGESTED              = "SLOT_SUGGESTED",              "Slot Suggested by Admin"
+    CUSTOMER_ACCEPTED_SUGGESTION = "CUSTOMER_ACCEPTED_SUGGESTION", "Customer Accepted Suggestion"
+    CANCELLED_SUGGESTION        = "CANCELLED_SUGGESTION",        "Cancelled Suggestion"
+    RESCHEDULED                 = "RESCHEDULED",                 "Rescheduled Successfully"
+    REJECTED                    = "REJECTED",                    "Rejected"
+    CANCELLED                   = "CANCELLED",                   "Cancelled"
+
+
+class RescheduleRejectionReason(models.TextChoices):
+    EMPLOYEE_UNAVAILABLE  = "EMPLOYEE_UNAVAILABLE",  "Employee Unavailable"
+    OUTSIDE_WORKING_HOURS = "OUTSIDE_WORKING_HOURS", "Outside Working Hours"
+    SERVICE_AREA_CLOSED   = "SERVICE_AREA_CLOSED",   "Service Area Closed"
+    DUPLICATE_REQUEST     = "DUPLICATE_REQUEST",     "Duplicate Request"
+    INVALID_REQUEST       = "INVALID_REQUEST",       "Invalid Request"
+    POLICY_VIOLATION      = "POLICY_VIOLATION",      "Policy Violation"
+    OTHER                 = "OTHER",                 "Other"
+
+
+class EmployeeResponseChoices(models.TextChoices):
+    PENDING  = "PENDING",  "Pending"
+    ACCEPTED = "ACCEPTED", "Accepted"
+    REJECTED = "REJECTED", "Rejected"
+
+
+class EmployeeRejectionReason(models.TextChoices):
+    ALREADY_ASSIGNED      = "ALREADY_ASSIGNED",      "Already Assigned"
+    LEAVE                 = "LEAVE",                 "On Leave"
+    EMERGENCY             = "EMERGENCY",             "Personal Emergency"
+    OUTSIDE_WORKING_HOURS = "OUTSIDE_WORKING_HOURS", "Outside Working Hours"
+    DISTANCE_TOO_FAR      = "DISTANCE_TOO_FAR",      "Distance Too Far"
+    PERSONAL_CONFLICT     = "PERSONAL_CONFLICT",     "Personal Conflict"
+    OTHER                 = "OTHER",                 "Other"
+
+
+class RescheduleReason(models.TextChoices):
+    SCHEDULE_CONFLICT = "schedule_conflict", "Schedule Conflict"
+    EMERGENCY         = "emergency",         "Emergency"
+    WEATHER_DELAY     = "weather_delay",     "Weather Delay"
+    TECHNICAL_ISSUE   = "technical_issue",   "Technical Issue"
+    CUSTOMER_REQUEST  = "customer_request",  "Customer Request"
+    OTHER             = "other",             "Other"
+
+
+class TimeSlotChoices(models.TextChoices):
+    SLOT_09_10 = "09-10", "09:00 - 10:00"
+    SLOT_10_11 = "10-11", "10:00 - 11:00"
+    SLOT_11_12 = "11-12", "11:00 - 12:00"
+    SLOT_14_15 = "14-15", "14:00 - 15:00"
+    SLOT_15_16 = "15-16", "15:00 - 16:00"
+
+
+class RescheduleAttachment(models.Model):
+    """File attachment uploaded for a reschedule request."""
+    file          = models.FileField(upload_to="reschedules/attachments/")
+    original_name = models.CharField(max_length=255, blank=True)
+    uploaded_by   = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="reschedule_attachments",
+    )
+    uploaded_at   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return f"RescheduleAttachment {self.pk} - {self.original_name}"
+
+
+def _generate_reschedule_id():
+    """Generate RS-XXXX style human-readable ID."""
+    last = RescheduleRequest.objects.order_by("-id").first()
+    if last and last.reschedule_id:
+        try:
+            num = int(last.reschedule_id.split("-")[1]) + 1
+        except (IndexError, ValueError):
+            num = 1
+    else:
+        num = 1
+    return f"RS-{str(num).zfill(4)}"
+
+
+class RescheduleRequest(models.Model):
+    """Customer, Admin, or System driven reschedule request for a booking."""
+
+    class Persona(models.TextChoices):
+        CUSTOMER = "CUSTOMER", "Customer"
+        ADMIN    = "ADMIN",    "Admin"
+        EMPLOYEE = "EMPLOYEE", "Employee"
+
+    # Human-readable ID (RS-0001, RS-0002, ...)
+    reschedule_id         = models.CharField(max_length=20, unique=True, blank=True, null=True)
+
+    booking               = models.ForeignKey(
+        ServiceRequest,
+        on_delete=models.CASCADE,
+        related_name="reschedule_requests",
+    )
+    requested_by          = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reschedule_requests_made",
+    )
+    persona               = models.CharField(max_length=10, choices=Persona.choices, default=Persona.CUSTOMER)
+
+    # Immutable snapshot copied from booking at request time
+    current_date          = models.DateField(null=True, blank=True)
+    current_time          = models.CharField(max_length=50, blank=True, null=True)
+
+    # Proposed new date & slot
+    new_date              = models.DateField()
+    new_time_slot         = models.CharField(max_length=20, choices=TimeSlotChoices.choices, default=TimeSlotChoices.SLOT_09_10)
+
+    reason                = models.CharField(max_length=50, choices=RescheduleReason.choices, default=RescheduleReason.SCHEDULE_CONFLICT)
+    additional_notes      = models.TextField(blank=True, default="")
+    attachment            = models.ForeignKey(
+        RescheduleAttachment,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="reschedule_requests",
+    )
+
+    status                = models.CharField(max_length=60, choices=RescheduleStatus.choices, default=RescheduleStatus.PENDING)
+
+    # Admin review & technician proposal (legacy + extended)
+    proposed_technician   = models.ForeignKey(
+        "employees.Employee",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="proposed_reschedules",
+    )
+    technician_response_note  = models.TextField(blank=True, default="")
+    alternate_slots_suggested = models.JSONField(default=list, blank=True)
+
+    reviewed_by           = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="reschedule_reviews",
+    )
+    reviewed_at           = models.DateTimeField(null=True, blank=True)
+    review_notes          = models.TextField(blank=True, default="")
+
+    # ── Extended workflow fields ────────────────────────────────────────────
+    approved_date         = models.DateField(null=True, blank=True)
+    approved_time         = models.CharField(max_length=20, null=True, blank=True)
+
+    customer_response     = models.CharField(
+        max_length=20,
+        choices=[("PENDING", "Pending"), ("ACCEPTED", "Accepted"), ("REJECTED", "Rejected")],
+        null=True, blank=True,
+    )
+
+    # Admin suggests alternate slot
+    suggested_date        = models.DateField(null=True, blank=True)
+    suggested_time_slot   = models.CharField(max_length=20, null=True, blank=True)
+
+    # Admin rejection reason
+    rejection_reason      = models.CharField(
+        max_length=30,
+        choices=RescheduleRejectionReason.choices,
+        null=True, blank=True,
+    )
+    rejection_notes       = models.TextField(blank=True, default="")
+    admin_remarks         = models.TextField(blank=True, default="")
+
+    # Admin who took the final approval/rejection action
+    admin_reviewed_by     = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="admin_reviewed_reschedules",
+    )
+
+    # Employee response tracking
+    employee_response     = models.CharField(
+        max_length=20,
+        choices=EmployeeResponseChoices.choices,
+        null=True, blank=True,
+    )
+    employee_response_note = models.TextField(blank=True, default="")
+    employee_rejection_reason = models.CharField(
+        max_length=30,
+        choices=EmployeeRejectionReason.choices,
+        null=True, blank=True,
+    )
+    employee_responded_at = models.DateTimeField(null=True, blank=True)
+
+    created_at            = models.DateTimeField(auto_now_add=True)
+    updated_at            = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.reschedule_id:
+            self.reschedule_id = _generate_reschedule_id()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        rid = self.reschedule_id or f"#{self.pk}"
+        return f"RescheduleRequest({rid}) for {self.booking.request_id} [{self.status}]"
+
+
+class RescheduleSuggestedSlot(models.Model):
+    """Slot suggested by admin for customer review."""
+    request     = models.ForeignKey(RescheduleRequest, on_delete=models.CASCADE, related_name="suggested_slots")
+    date        = models.DateField()
+    time_slot   = models.CharField(max_length=20)
+    is_selected = models.BooleanField(default=False)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["date", "time_slot"]
+
+    def __str__(self):
+        return f"SuggestedSlot for {self.request.reschedule_id}: {self.date} ({self.time_slot})"
+
+
+class RescheduleStatusHistory(models.Model):
+    """Audit log tracking every status transition of a reschedule request."""
+    request     = models.ForeignKey(RescheduleRequest, on_delete=models.CASCADE, related_name="history")
+    from_status = models.CharField(max_length=50)
+    to_status   = models.CharField(max_length=50)
+    changed_by  = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="reschedule_history_actions",
+    )
+    note        = models.TextField(blank=True, default="")
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"RescheduleHistory {self.request.reschedule_id}: {self.from_status} -> {self.to_status}"
+
+
+
+# ─── Slice 3: Refund ──────────────────────────────────────────────────────────
+
+class RefundStatus(models.TextChoices):
+    PENDING         = "PENDING",         "Pending Admin Review"
+    INFO_REQUESTED  = "INFO_REQUESTED",  "Information Requested"
+    APPROVED_FULL   = "APPROVED_FULL",   "Approved Full"
+    APPROVED_PARTIAL= "APPROVED_PARTIAL", "Approved Partial"
+    REJECTED        = "REJECTED",        "Rejected"
+    SENT_TO_FINANCE = "SENT_TO_FINANCE", "Sent to Finance"
+    COMPLETED       = "COMPLETED",       "Completed"
+
+
+class RefundType(models.TextChoices):
+    FULL    = "FULL",    "Full Refund"
+    PARTIAL = "PARTIAL", "Partial Refund"
+
+
+class RefundReason(models.TextChoices):
+    POOR_QUALITY         = "POOR_QUALITY",         "Poor Quality"
+    SERVICE_NOT_COMPLETED = "SERVICE_NOT_COMPLETED", "Service Not Completed"
+    CANCELLED_BY_PROVIDER = "CANCELLED_BY_PROVIDER", "Cancelled By Provider"
+    OVERCHARGED          = "OVERCHARGED",          "Overcharged"
+    OTHER                = "OTHER",                "Other"
+
+
+class RefundInfoTarget(models.TextChoices):
+    CUSTOMER = "CUSTOMER", "Customer"
+    EMPLOYEE = "EMPLOYEE", "Employee"
+
+
+class RefundRequest(models.Model):
+    """
+    Customer refund request — spans Customer, Admin, and Employee personas.
+    Tracks financial snapshots, evidence, status lifecycle, internal notes, and employee investigations.
+    """
+    refund_id            = models.CharField(max_length=30, blank=True, null=True, unique=True)
+    booking              = models.ForeignKey(
+        ServiceRequest,
+        on_delete=models.CASCADE,
+        related_name="refund_requests",
+    )
+    customer             = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="refund_requests",
+        null=True,
+        blank=True
+    )
+    paid_amount          = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    refund_type          = models.CharField(max_length=20, choices=RefundType.choices, default=RefundType.FULL)
+    requested_amount     = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    approved_amount      = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    reason               = models.CharField(max_length=50, choices=RefundReason.choices, default=RefundReason.POOR_QUALITY)
+    additional_notes     = models.TextField(blank=True, default="")
+    internal_notes       = models.TextField(blank=True, default="")
+    status               = models.CharField(max_length=30, choices=RefundStatus.choices, default=RefundStatus.PENDING)
+    info_requested_from  = models.CharField(max_length=20, choices=RefundInfoTarget.choices, null=True, blank=True)
+    assigned_employee    = models.ForeignKey(
+        "employees.Employee",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_refund_investigations"
+    )
+    gateway_reference    = models.CharField(max_length=200, blank=True, null=True)
+    created_at           = models.DateTimeField(auto_now_add=True)
+    updated_at           = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.refund_id:
+            import uuid, datetime
+            stamp = datetime.date.today().strftime("%Y%m%d")
+            rand_code = uuid.uuid4().hex[:4].upper()
+            self.refund_id = f"RF-{stamp}-{rand_code}"
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"RefundRequest({self.refund_id}) for {self.booking.request_id} — ₹{self.requested_amount} [{self.status}]"
+
+
+class RefundEvidence(models.Model):
+    """Evidence file (photos/documents) uploaded for a refund request."""
+    refund_request = models.ForeignKey(
+        RefundRequest,
+        on_delete=models.CASCADE,
+        related_name="evidence"
+    )
+    file           = models.FileField(upload_to="refund_evidence/")
+    uploaded_by    = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE
+    )
+    uploaded_at    = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"RefundEvidence({self.pk}) for {self.refund_request.refund_id}"
+
+
+class RefundInvestigationNote(models.Model):
+    """Technician / Employee investigation response note."""
+    refund_request             = models.ForeignKey(
+        RefundRequest,
+        on_delete=models.CASCADE,
+        related_name="investigation_notes"
+    )
+    employee                   = models.ForeignKey(
+        "employees.Employee",
+        on_delete=models.CASCADE
+    )
+    explanation                = models.TextField()
+    work_completed_confirmed   = models.BooleanField(default=False)
+    created_at                 = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"InvestigationNote({self.pk}) by {self.employee.employee_id}"
+
+
+# ─── Slice 4: Complaint ───────────────────────────────────────────────────────
+
+class Complaint(models.Model):
+    """Customer complaint — can be booking-specific or general."""
+
+    class Category(models.TextChoices):
+        POOR_SERVICE         = "POOR_SERVICE",         "Poor Service"
+        TECHNICIAN_LATE      = "TECHNICIAN_LATE",      "Technician Late"
+        TECHNICIAN_BEHAVIOUR = "TECHNICIAN_BEHAVIOUR", "Technician Behaviour"
+        INCOMPLETE_WORK      = "INCOMPLETE_WORK",      "Incomplete Work"
+        WRONG_BILLING        = "WRONG_BILLING",        "Wrong Billing"
+        DAMAGED_PROPERTY     = "DAMAGED_PROPERTY",     "Damaged Property"
+        QUALITY_ISSUE        = "QUALITY_ISSUE",        "Quality Issue"
+        OTHER                = "OTHER",                "Other"
+
+    class Priority(models.TextChoices):
+        LOW      = "LOW",      "Low"
+        MEDIUM   = "MEDIUM",   "Medium"
+        HIGH     = "HIGH",     "High"
+        CRITICAL = "CRITICAL", "Critical"
+
+    class Status(models.TextChoices):
+        OPEN                = "OPEN",                "Open"
+        ASSIGNED            = "ASSIGNED",            "Assigned"
+        UNDER_INVESTIGATION = "UNDER_INVESTIGATION", "Under Investigation"
+        WAITING_CUSTOMER    = "WAITING_CUSTOMER",    "Waiting on Customer"
+        WAITING_TECHNICIAN  = "WAITING_TECHNICIAN",  "Waiting on Technician"
+        ADMIN_REVIEW        = "ADMIN_REVIEW",        "Admin Review"
+        ESCALATED           = "ESCALATED",           "Escalated"
+        RESOLVED            = "RESOLVED",            "Resolved"
+        CLOSED              = "CLOSED",              "Closed"
+        
+    class ResolutionType(models.TextChoices):
+        COMPLAINT_VALID   = "COMPLAINT_VALID",   "Complaint Valid"
+        COMPLAINT_INVALID = "COMPLAINT_INVALID", "Complaint Invalid"
+        CUSTOMER_ERROR    = "CUSTOMER_ERROR",    "Customer Error"
+        TECHNICIAN_ERROR  = "TECHNICIAN_ERROR",  "Technician Error"
+        COMPANY_ERROR     = "COMPANY_ERROR",     "Company Error"
+
+    complaint_number  = models.CharField(max_length=50, unique=True, blank=True, null=True)
+    booking           = models.ForeignKey(
+        ServiceRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name="complaints"
+    )
+    raised_by         = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="complaints_raised"
+    )
+    category          = models.CharField(max_length=30, choices=Category.choices, default=Category.OTHER)
+    description       = models.TextField()
+    priority          = models.CharField(max_length=15, choices=Priority.choices, default=Priority.MEDIUM)
+    status            = models.CharField(max_length=30, choices=Status.choices, default=Status.OPEN)
+    
+    assigned_admin    = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_admin_complaints"
+    )
+    assigned_employee = models.ForeignKey(
+        "employees.Employee", on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_complaints"
+    )
+    risk_score        = models.IntegerField(null=True, blank=True)
+    
+    resolution_type   = models.CharField(max_length=30, choices=ResolutionType.choices, null=True, blank=True)
+    resolution_notes  = models.TextField(blank=True, default="")
+    
+    refund_request    = models.ForeignKey(
+        "RefundRequest", on_delete=models.SET_NULL, null=True, blank=True, related_name="linked_complaints"
+    )
+    rework_booking    = models.ForeignKey(
+        ServiceRequest, on_delete=models.SET_NULL, null=True, blank=True, related_name="rework_source_complaints"
+    )
+
+    created_at        = models.DateTimeField(auto_now_add=True)
+    updated_at        = models.DateTimeField(auto_now=True)
+    resolved_at       = models.DateTimeField(null=True, blank=True)
+    closed_at         = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Complaint({self.complaint_number}) [{self.get_status_display()}]"
+
+
+class ComplaintAttachment(models.Model):
+    """Files/photos attached to a complaint."""
+    class AttachmentType(models.TextChoices):
+        IMAGE   = "IMAGE",   "Image"
+        VIDEO   = "VIDEO",   "Video"
+        INVOICE = "INVOICE", "Invoice"
+
+    complaint       = models.ForeignKey(Complaint, on_delete=models.CASCADE, related_name="attachments")
+    file            = models.FileField(upload_to="service_requests/complaints/")
+    attachment_type = models.CharField(max_length=15, choices=AttachmentType.choices, default=AttachmentType.IMAGE)
+    uploaded_by     = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at      = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"Attachment for {self.complaint.complaint_number}"
+
+
+class ComplaintMessage(models.Model):
+    """The shared conversation thread for complaints."""
+
+    class Persona(models.TextChoices):
+        CUSTOMER = "CUSTOMER", "Customer"
+        ADMIN    = "ADMIN",    "Admin"
+        EMPLOYEE = "EMPLOYEE", "Employee"
+
+    complaint = models.ForeignKey(Complaint, on_delete=models.CASCADE, related_name="messages")
+    sender    = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_complaint_messages")
+    sender_persona = models.CharField(max_length=10, choices=Persona.choices)
+    message   = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+
+class ComplaintStatusHistory(models.Model):
+    """Audit trail for complaint statuses."""
+    complaint   = models.ForeignKey(Complaint, on_delete=models.CASCADE, related_name="status_history")
+    from_status = models.CharField(max_length=30)
+    to_status   = models.CharField(max_length=30)
+    changed_by  = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    notes       = models.TextField(null=True, blank=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]

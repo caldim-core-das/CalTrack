@@ -77,6 +77,10 @@ const SettingsPage = lazy(() =>
   import("./pages/SettingsPage.jsx").then(m => ({ default: m.SettingsPage }))
 )
 
+const AdminComplaintsPage = lazy(() =>
+  import("./pages/AdminComplaintsPage.jsx").then(m => ({ default: m.AdminComplaintsPage }))
+)
+
 const OnboardingPage = lazy(() =>
   import("./pages/OnboardingPage.jsx").then(m => ({ default: m.OnboardingPage }))
 )
@@ -401,9 +405,11 @@ export function App() {
               <Route path={routes.admin_feedback} element={<FeedbackManagementPage />} />
               <Route path="/customers/list" element={<ServiceRequestsPage />} />
               <Route path="/customers/bookings" element={<ServiceRequestsPage />} />
+              <Route path="/customers/reschedules" element={<ServiceRequestsPage />} />
+              <Route path="/customers/refunds" element={<ServiceRequestsPage />} />
               <Route path="/customers/payments" element={<ServiceRequestsPage />} />
               <Route path="/customers/documents" element={<ServiceRequestsPage />} />
-              <Route path="/customers/complaints" element={<FeedbackManagementPage />} />
+              <Route path="/customers/complaints" element={<AdminComplaintsPage />} />
               <Route path="/customers/reviews" element={<FeedbackManagementPage />} />
             </Route>
 

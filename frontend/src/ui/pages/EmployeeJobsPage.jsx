@@ -4,9 +4,10 @@ import {
   Star, RefreshCw, Award, BarChart3, TrendingUp, ThumbsUp, CheckCircle2,
   MapPin, Phone, Calendar, Clock, Wrench, Camera, Upload, X,
   CheckCheck, Play, XCircle, AlertTriangle, Image as ImageIcon,
-  Zap, Target, Activity, User, FileText, ChevronDown, ChevronUp, Info
+  Zap, Target, Activity, User, FileText, ChevronDown, ChevronUp, Info, MessageSquare, Send
 } from "lucide-react"
 import { apiRequest } from "../../api/client.js"
+import { EmployeeComplaintsPanel } from "./AdminServicePanels.jsx"
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
@@ -34,6 +35,7 @@ const JOB_STATUS = {
   completed: { label: "Completed", color: "#10B981", bg: "#ECFDF5", border: "#6EE7B7" },
   rejected: { label: "Rejected", color: "#EF4444", bg: "#FEF2F2", border: "#FECACA" },
 }
+
 
 /* ─── Toast ─────────────────────────────────────────────────────────────── */
 function Toast({ message, type, onDismiss }) {
@@ -894,6 +896,9 @@ export function EmployeeJobsPage() {
           <CheckCheck size={14} /> History
           {historyJobs.length > 0 && <span className="ej-tab-count">{historyJobs.length}</span>}
         </button>
+        <button className={`ej-tab ${activeTab === "complaints" ? "ej-tab--active" : ""}`} onClick={() => setActiveTab("complaints")}>
+          <MessageSquare size={14} /> Complaints
+        </button>
       </div>
 
       {/* Content */}
@@ -960,6 +965,13 @@ export function EmployeeJobsPage() {
                   ))}
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {/* ── Complaints Tab ── */}
+          {activeTab === "complaints" && (
+            <motion.div key="complaints" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <EmployeeComplaintsPanel showToast={(msg, type="success") => setToast({ msg, type, id: Date.now() })} />
             </motion.div>
           )}
         </AnimatePresence>

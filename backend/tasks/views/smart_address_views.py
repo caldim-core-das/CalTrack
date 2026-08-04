@@ -82,10 +82,7 @@ class SmartAddressWorkflowView(APIView):
     def post(self, request):
         address_str = (request.data.get("address") or "").strip()
         if not address_str:
-            return Response(
-                {"detail": "'address' is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            address_str = "Main Service Location"
 
         company = getattr(request, "company", None)
 

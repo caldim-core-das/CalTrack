@@ -25,7 +25,7 @@ import {
   Users, BarChart3, MapPin, Settings, Search, LogOut,
   ChevronLeft, ChevronRight, Rocket, ShieldAlert, Globe, Package, Award,
   FolderOpen, GraduationCap, Bell, FileText, CheckCircle, XCircle, Car, X,
-  Wrench, MessageSquare, UserCheck, Activity, ArrowUpRight
+  Wrench, MessageSquare, UserCheck, Activity, ArrowUpRight, Repeat2
 } from "lucide-react"
 
 const ADMIN_NAV_ITEMS = [
@@ -49,6 +49,8 @@ const ADMIN_NAV_ITEMS = [
     children: [
       { label: "Customer List", to: "/customers/list", icon: <Users size={16} />, color: "#6366F1" },
       { label: "Bookings", to: "/customers/bookings", icon: <CalendarDays size={16} />, color: "#38BDF8" },
+      { label: "Reschedule Requests", to: "/customers/reschedules", icon: <Repeat2 size={16} />, color: "#F59E0B" },
+      { label: "Refund Requests", to: "/customers/refunds", icon: <Banknote size={16} />, color: "#10B981" },
       { label: "Payments", to: "/customers/payments", icon: <Banknote size={16} />, color: "#10B981" },
       { label: "Complaints", to: "/customers/complaints", icon: <ShieldAlert size={16} />, color: "#EF4444" },
       { label: "Reviews", to: "/customers/reviews", icon: <Award size={16} />, color: "#F59E0B" },
@@ -99,6 +101,7 @@ const ADMIN_NAV_ITEMS = [
       { label: "Location Settings", to: "/settings/location", icon: <Settings size={16} />, color: "#64748B" },
     ]
   },
+  { label: "Inventory", to: routes.inventory, icon: <Package size={20} />, color: "#8B5CF6" },
   { label: "Organization", to: "/settings/organization", icon: <Globe size={20} />, color: "#38BDF8", adminOnly: true },
   { label: "Reports", to: "/reports", icon: <BarChart3 size={20} />, color: "#FACC15", adminOnly: true },
   { label: "Settings", to: "/settings", icon: <Settings size={20} />, color: "#64748B" },
@@ -109,6 +112,7 @@ const EMPLOYEE_NAV_ITEMS = [
   { label: "Feedback", to: routes.employee_feedback, icon: <MessageSquare size={20} />, color: "#F59E0B" },
   { label: "Analysis", to: routes.analysis, icon: <BarChart3 size={20} />, color: "#6366F1" },
   { label: "Jobs", to: routes.tasks, icon: <CheckSquare size={20} />, color: "#14B8A6" },
+  { label: "Inventory", to: routes.inventory, icon: <Package size={20} />, color: "#8B5CF6" },
   { label: "Leaves", to: routes.leaves, icon: <CalendarDays size={20} />, color: "#EC4899" },
   { label: "Time", to: routes.time, icon: <Clock size={20} />, color: "#F59E0B", module: "attendance" },
   { label: "Mileage", to: routes.mileage, icon: <Car size={20} />, color: "#EF4444" },

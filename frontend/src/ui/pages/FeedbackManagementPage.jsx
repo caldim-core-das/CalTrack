@@ -5,8 +5,6 @@ import { apiRequest } from "../../api/client.js"
 import { useLocation } from "react-router-dom"
 
 export function FeedbackManagementPage() {
-  const location = useLocation()
-  const isComplaintsView = location.pathname === "/customers/complaints"
   const [feedbackList, setFeedbackList] = useState([])
   const [metrics, setMetrics] = useState(null)
   const [employees, setEmployees] = useState([])
@@ -19,9 +17,7 @@ export function FeedbackManagementPage() {
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
 
-  const displayedList = isComplaintsView
-    ? feedbackList.filter(fb => fb.rating <= 2 || fb.issue_resolved === false)
-    : feedbackList
+  const displayedList = feedbackList
 
   const loadFeedbackData = async () => {
     setLoading(true)
@@ -87,12 +83,10 @@ export function FeedbackManagementPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-slate-900 leading-tight">
-            {isComplaintsView ? "Customer Complaints Center" : "Feedback & Performance Reviews"}
+            Feedback & Performance Reviews
           </h1>
           <p className="text-xs font-semibold text-slate-500 mt-1">
-            {isComplaintsView
-              ? "Review poor ratings, client complaints, and unresolved service tickets."
-              : "Monitor overall client satisfaction, technician performance reviews, and ticket resolution feedback."}
+            Monitor overall client satisfaction, technician performance reviews, and ticket resolution feedback.
           </p>
         </div>
         <button
